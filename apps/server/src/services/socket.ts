@@ -1,10 +1,10 @@
 import { Server } from "socket.io";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../utils/prisma";
 import { GameStates } from "@prisma/client";
 
 class SocketService {
   private _io: Server;
-  private prisma: PrismaClient;
+  private prisma: typeof prisma;
   constructor() {
     console.log("Init Socket Service...");
 
@@ -15,7 +15,7 @@ class SocketService {
       },
     });
 
-    this.prisma = new PrismaClient();
+    this.prisma = prisma;
   }
 
   public initListeners() {
