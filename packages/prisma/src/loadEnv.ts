@@ -32,5 +32,5 @@ export function loadEnv(): void {
     const rootEnv = path.join(root, ".env");
     if (existsSync(rootEnv)) config({ path: rootEnv });
   }
-  config(); // cwd .env overrides
+  config({ override: true }); // cwd .env overrides root
 }
