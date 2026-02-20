@@ -185,11 +185,10 @@ __metadata:
   resolution: "@buzrr/prisma@workspace:packages/prisma"
   dependencies:
     "@prisma/adapter-pg": "npm:^7.4.0"
+    "@prisma/client": "npm:^7.4.0"
     dotenv: "npm:^17.3.1"
     prisma: "npm:^7.4.0"
     typescript: "npm:5.8.2"
-  peerDependencies:
-    "@prisma/client": ^7.4.0
   languageName: unknown
   linkType: soft
 
@@ -1321,7 +1320,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@prisma/client@npm:^7.4.1":
+"@prisma/client@npm:^7.4.0, @prisma/client@npm:^7.4.1":
   version: 7.4.1
   resolution: "@prisma/client@npm:7.4.1"
   dependencies:
