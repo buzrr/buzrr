@@ -18,10 +18,6 @@ async function init() {
 
   socketService.io.attach(httpServer);
 
-  httpServer.listen(PORT, () => {
-    console.log(`Server running on PORT: ${PORT}`);
-  });
-
   app.use(express.json());
   app.use(cors({ origin: true }));
   app.use(express.urlencoded({ extended: false }));
@@ -31,6 +27,10 @@ async function init() {
   });
 
   socketService.initListeners();
+
+  httpServer.listen(PORT, () => {
+    console.log(`Server running on PORT: ${PORT}`);
+  });
 }
 
 init().catch((err) => {
