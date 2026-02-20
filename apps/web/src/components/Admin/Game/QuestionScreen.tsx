@@ -39,13 +39,13 @@ export default function QuestionScreen(props: any) {
 
   return (
     <>
-      <div className="flex items-center m-auto h-fit w-full md:mx-4 dark:text-white [&>*]:bg-white dark:[&>*]:bg-dark">
+      <div className="flex items-center m-auto h-fit w-full md:mx-4 dark:text-white *:bg-white dark:*:bg-dark">
         <div className="h-full w-[30vw] mx-2 hidden pt-8 md:block rounded-xl">
           <div className="flex justify-center">
             <Countdown timer={question?.timeOut} setTime={setTime} />
           </div>
           <div className="pl-4 mt-2">
-            <div className="text-[#c92929] bg-[#f4d4d4] dark:bg-[#513232] rounded-full px-2 w-fit font-bold">
+            <div className="text-red-light bg-[#f4d4d4] dark:bg-[#513232] rounded-full px-2 w-fit font-bold">
               &#9679; Live
             </div>
             <div className="text-2xl font-black">{quizTitle}</div>

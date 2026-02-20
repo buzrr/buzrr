@@ -107,31 +107,51 @@ const Lobby = (params: {
   return (
     <>
       <button
-        className="text-white dark:text-dark bg-red-light dark:bg-red-dark p-2 w-fit rounded-lg absolute text-sm font-black hover:bg-red-dark right-4 md:right-8 top-4 transition-all"
+        className="text-white dark:text-dark bg-red-light dark:bg-red-dark p-2 w-fit rounded-lg absolute text-sm font-black hover:bg-red-dark right-4 md:right-8 top-4 transition-all z-10"
         onClick={handleModalOpen}
       >
         Stop Hosting
       </button>
-      <div className="bg-white dark:bg-dark md:rounded-xl md:mx-8 py-8 my-4 h-[81vh] px-6 relative">
-        <div className="grid medium:flex md:gap-x-3 gap-y-4 medium:gap-y-0 mb-8 items-center">
-          <span className="font-extrabold text-5xl italic mr-4 dark:text-white">
-            {params?.quizTitle}
-          </span>
-          <div className="flex-wrap flex gap-4 w-fit">
-            <span className="p-2 dark:text-white border-[#7D49F8] border h-fit bg-light-bg dark:bg-cardhover-dark rounded-xl font-bold">
-              Number of Participants: {players.length}
-            </span>
-            <span className="p-2 dark:text-white border-[#7D49F8] border bg-light-bg dark:bg-cardhover-dark rounded-xl font-bold h-fit">
-              Room Code: {params?.gameCode}
-            </span>
-            <span className="p-2 dark:text-white border-[#7D49F8] border bg-light-bg dark:bg-cardhover-dark rounded-xl font-bold h-fit">
-              Joining Link: buzzr.silive.in
-            </span>
-          </div>
+  
+      <div className="bg-white dark:bg-dark md:rounded-xl md:mx-8 py-10 my-4 h-[81vh] px-6 relative flex flex-col items-center">
+  
+        <h1 className="font-extrabold text-3xl md:text-4xl italic dark:text-white mb-6 text-center">
+          {params?.quizTitle}
+        </h1>
+  
+        <div
+          onClick={() => {
+            navigator.clipboard.writeText(params?.gameCode);
+            toast.success("Room code copied!");
+          }}
+          className="cursor-pointer select-none bg-light-bg dark:bg-cardhover-dark border-2 border-[#7D49F8] rounded-2xl px-12 py-10 text-center shadow-lg hover:scale-[1.02] transition-all duration-300"
+        >
+          <p className="text-sm tracking-[4px] text-gray-500 dark:text-gray-300 mb-3">
+            ROOM CODE
+          </p>
+  
+          <h2 className="text-5xl md:text-5xl font-extrabold tracking-[12px] text-lprimary dark:text-dprimary font-mono drop-shadow-lg">
+            {params?.gameCode}
+          </h2>
+  
+          <p className="mt-3 text-sm text-stone-500 dark:text-stone-400">
+            Click to copy & share with players
+          </p>
         </div>
-        <div className="h-fit mt-2 mx-auto max-h-[60vh] flex flex-wrap overflow-y-auto gap-y-4 gap-x-3">
+  
+        <div className="flex flex-wrap justify-center gap-6 mt-6">
+          <span className="p-2 dark:text-white border border-[#7D49F8] bg-light-bg dark:bg-cardhover-dark rounded-xl font-bold">
+            Participants: {players.length}
+          </span>
+  
+          <span className="p-2 dark:text-white border border-[#7D49F8] bg-light-bg dark:bg-cardhover-dark rounded-xl font-bold">
+            Join at: buzzr.silive.in
+          </span>
+        </div>
+  
+        <div className="h-fit mt-8 mx-auto max-h-[40vh] flex flex-wrap justify-center overflow-y-auto gap-y-4 gap-x-3 w-full">
           {players.length === 0 ? (
-            <div className="p-2 mx-auto w-fit dark:text-white">
+            <div className="p-2 mx-auto w-fit dark:text-white text-lg">
               Waiting for players to join...
             </div>
           ) : (
@@ -139,7 +159,7 @@ const Lobby = (params: {
               return (
                 <div
                   key={player.id}
-                  className="border flex justify-between items-center w-fit gap-2 rounded-full py-1 px-2 text-dark dark:text-white text-base"
+                  className="border flex justify-between items-center w-fit gap-3 rounded-full py-2 px-3 text-dark dark:text-white text-base shadow-sm"
                 >
                   <Image
                     src={
@@ -153,7 +173,7 @@ const Lobby = (params: {
                   />
                   {player.name}
                   <span
-                    className="cursor-pointer font-bold text-lg"
+                    className="cursor-pointer font-bold text-lg hover:text-red-500 transition"
                     onClick={() => handlePlayerRemove(player)}
                   >
                     <RxCross2 size={20} />
@@ -163,15 +183,16 @@ const Lobby = (params: {
             })
           )}
         </div>
+
         <button
-          className="mt-8 rounded-xl text-white dark:text-dark bg-lprimary dark:bg-dprimary px-5 py-3 hover:cursor-pointer transition-all duration-300 ease-in-out disabled:cursor-default font-bold disabled:bg-gray dark:disabled:bg-gray w-64 sm:w-96 absolute bottom-10"
+          className="mt-10 rounded-xl text-white dark:text-dark bg-lprimary dark:bg-dprimary px-6 py-4 hover:cursor-pointer transition-all duration-300 ease-in-out disabled:cursor-default font-bold disabled:bg-gray dark:disabled:bg-gray w-64 sm:w-96 absolute bottom-10"
           disabled={players.length === 0 || load}
           onClick={handleGameStart}
         >
-          {load === true ? "Loading..." : "Start"}
+          {load === true ? "Loading..." : "Start Game"}
         </button>
       </div>
-
+  
       <ConfirmationModal
         open={endGame}
         setOpen={setEndGame}

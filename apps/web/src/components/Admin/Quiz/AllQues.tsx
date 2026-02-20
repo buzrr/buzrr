@@ -139,7 +139,7 @@ export default function AllQues(props: { quizId: string }) {
                             <div className="p-3">
                               <div className="flex flex-col">
                                 <div className="flex justify-between items-center">
-                                  <p className="text-md font-semibold flex items-center w-[70%] break-words">
+                                  <p className="text-md font-semibold flex items-center w-[70%] wrap-break-word">
                                     {index + 1}. {ques?.title}
                                   </p>
                                   <p className="text-sm text-dark font-black p-1 rounded-md bg-[#dadadd] dark:text-white dark:bg-transparent w-fit">
@@ -185,8 +185,8 @@ export default function AllQues(props: { quizId: string }) {
                                 )}
                               </div>
                             </div>
-                            <div className="bg-[#ede9fe] dark:bg-[#332d40] p-2 px-3 rounded-b-xl">
-                              <div className="flex [&>*]:text-xs [&>*]:font-semibold">
+                            <div className="bg-card-light dark:bg-[#332d40] p-2 px-3 rounded-b-xl">
+                              <div className="flex *:text-xs *:font-semibold">
                                 <button
                                   className="p-1 mr-1 text-red-light hover:bg-[#fccccc] rounded-md"
                                   onClick={() => {

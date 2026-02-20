@@ -3,10 +3,12 @@ import SocketService from './services/socket';
 import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
+import { connectDatabase } from './utils/prisma';
 
 dotenv.config();
 
-async function init(){
+async function init() {
+    await connectDatabase();
 
     const socketService = new SocketService();
 
@@ -21,8 +23,8 @@ async function init(){
     });
 
     app.use(express.json());
-	app.use(cors({origin:true}));
-	app.use(express.urlencoded({ extended: false }));
+    app.use(cors({origin:true}));
+    app.use(express.urlencoded({ extended: false }));
 
     app.get('/', (req, res) => {
         res.send('Server is running at PORT: ' + PORT);
@@ -31,4 +33,7 @@ async function init(){
     socketService.initListeners();
 }
 
-init();
+init().catch((err) => {
+    console.error("Server failed to start:", err.message);
+    process.exit(1);
+});

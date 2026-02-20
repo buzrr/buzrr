@@ -24,11 +24,11 @@ export default function Navbar() {
   return (
     <>
       <div
-        className={`absolute top-0 left-0 w-[100vw] h-[100vh] z-10 bg-[#0000006a] md:hidden ${toggle === navToggle.collapse ? "hidden" : ""}`}
+        className={`absolute top-0 left-0 w-screen h-screen z-10 bg-[#0000006a] md:hidden ${toggle === navToggle.collapse ? "hidden" : ""}`}
         onClick={() => dispatch(setNavToggle(navToggle.collapse))}
       ></div>
       <div
-        className={`z-20 p-6 px-8 flex bg-light-bg dark:bg-dark-bg flex-col h-[100vh] md:h-[85vh] absolute md:relative w-[80vw] md:w-[25%] left-0 ${toggle === navToggle.collapse ? "hidden md:flex" : ""}`}
+        className={`z-20 p-6 px-8 flex bg-light-bg dark:bg-dark-bg flex-col h-screen md:h-[85vh] absolute md:relative w-[80vw] md:w-[25%] left-0 ${toggle === navToggle.collapse ? "hidden md:flex" : ""}`}
       >
         <div className="flex justify-center items-center md:hidden p-5 mb-2 border-b border-gray">
           <ClientImage

@@ -30,73 +30,89 @@ class SocketService {
       const adminId = socket.handshake.query.adminId as string;
 
       let player;
+      let gameCode: string;
 
-      // check if player or admin exists
+      try {
+        // check if player or admin exists
 
-      if (userType === "player") {
-        player = await this.prisma.player.findUnique({
+        if (userType === "player") {
+          player = await this.prisma.player.findUnique({
+            where: {
+              id: playerId,
+            },
+          });
+
+          if (!player) {
+            console.log(
+              "Player",
+              playerId,
+              "not found... \nDisconnecting Socket:",
+              socket.id
+            );
+            socket.disconnect();
+            return;
+          }
+        } else if (userType === "admin") {
+          const admin = await this.prisma.user.findUnique({
+            where: {
+              id: adminId,
+            },
+          });
+
+          if (!admin) {
+            console.log(
+              "Admin: ",
+              adminId,
+              "not found... \nDisconnecting Socket:",
+              socket.id
+            );
+            socket.disconnect();
+            return;
+          }
+        } else {
+          console.log(
+            "Invalid userType:",
+            userType,
+            "\nDisconnecting Socket:",
+            socket.id
+          );
+          socket.disconnect();
+          return;
+        }
+        gameCode = socket.handshake.query.gameCode as string;
+
+        const game = await this.prisma.gameSession.findUnique({
           where: {
-            id: playerId,
+            gameCode,
           },
         });
 
-        if (!player) {
+        if (!game) {
           console.log(
-            "Player",
-            playerId,
+            "Game: ",
+            gameCode,
             "not found... \nDisconnecting Socket:",
             socket.id
           );
           socket.disconnect();
           return;
         }
-      } else if (userType === "admin") {
-        const admin = await this.prisma.user.findUnique({
-          where: {
-            id: adminId,
-          },
-        });
 
-        if (!admin) {
-          console.log(
-            "Admin: ",
-            adminId,
-            "not found... \nDisconnecting Socket:",
-            socket.id
+        socket.join(gameCode);
+      } catch (err) {
+        const code = err && typeof err === "object" && "code" in err ? (err as { code: string }).code : "";
+        if (code === "ECONNREFUSED" || code === "P1001") {
+          console.error(
+            "Database unavailable. Disconnecting socket:",
+            socket.id,
+            err instanceof Error ? err.message : err
           );
-          socket.disconnect();
-          return;
+        } else {
+          console.error("Error during socket connection:", err);
         }
-      } else {
-        console.log(
-          "Invalid userType:",
-          userType,
-          "\nDisconnecting Socket:",
-          socket.id
-        );
         socket.disconnect();
         return;
       }
-      const gameCode = socket.handshake.query.gameCode as string;
-
-      const game = await this.prisma.gameSession.findUnique({
-        where: {
-          gameCode,
-        },
-      });
-
-      if (!game) {
-        console.log(
-          "Game: ",
-          gameCode,
-          "not found... \nDisconnecting Socket:",
-          socket.id
-        );
-        socket.disconnect();
-        return;
-      }
-
-      socket.join(gameCode);
 
       console.log(
         userType === "player" ? `Player: ${playerId}` : `Admin: ${adminId}`,

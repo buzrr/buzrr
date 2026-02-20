@@ -9,7 +9,7 @@ const WaitGameStart = (params: { player: any; game: GameSession }) => {
   return (
     <>
       <div className="px-4 py-2">
-        <div className="w-full h-[81vh] flex gap-4 [&>*]:bg-white dark:[&>*]:bg-dark [&>*]:rounded-xl">
+        <div className="w-full h-[81vh] flex gap-4 *:bg-white dark:*:bg-dark *:rounded-xl">
           <div className="w-full md:w-full p-4 hidden md:flex md:flex-col">
             <BackNavButton />
             <h1 className="text-5xl py-2 font-extrabold dark:text-white">

@@ -32,9 +32,13 @@ const JoinRoomForm = (params: { playerId: string }) => {
         type="text"
         name="gameCode"
         placeholder="Enter Code"
-        className="w-full border-gray dark:bg-dark-bg dark:text-white border focus:border-blue-600 rounded-lg outline-none md:w-4/5 text-slate-900 my-12 px-4 py-3"
+        className="w-full border-gray dark:bg-dark-bg dark:text-white border focus:border-blue-600 rounded-lg outline-none md:w-4/5 text-slate-900 my-12 px-4 py-3 uppercase tracking-widest font-mono"
         autoComplete="off"
         required
+        onInput={(e: React.FormEvent<HTMLInputElement>) => {
+          const input = e.currentTarget;
+          input.value = input.value.replace(/\s/g, "").toUpperCase();
+        }}
       />
       <div className="w-full md:w-[40%] mt-10">
         <SubmitButton text="Join" />

@@ -37,26 +37,26 @@ export default function LeaderBoard(props: any) {
                 return (
                   <div
                     key={index}
-                    className={`flex md:flex-col md:justify-center items-center w-full md:w-[25vw] p-2 md:p-4 my-2 rounded-lg border-2 [&>*]:my-1 ${index == 0 ? "md:order-2 order-0 border-yellow-500 " : index == 1 ? "md:order-1 order-0 border-gray" : index == 2 ? "md:order-3 order-0 border-[#ec7070e8]" : ""}`}
+                    className={`flex md:flex-col md:justify-center items-center w-full md:w-[25vw] p-2 md:p-4 my-2 rounded-lg border-2 *:my-1 ${index == 0 ? "md:order-2 order-0 border-yellow-500 " : index == 1 ? "md:order-1 order-0 border-gray" : index == 2 ? "md:order-3 order-0 border-[#ec7070e8]" : ""}`}
                   >
                     {index == 0 ? (
                       <span className="text-xl md:text-3xl overflow-hidden text-[#F2AB53]">
                         1
-                        <sup className="bg-gradient-to-b from-[#FFFF00] to-[#FFA800] text-transparent bg-clip-text">
+                        <sup className="bg-linear-to-b from-[#FFFF00] to-[#FFA800] text-transparent bg-clip-text">
                           st
                         </sup>
                       </span>
                     ) : index == 1 ? (
-                      <span className="text-xl md:text-3xl overflow-hidden bg-gradient-to-b from-[#27272A] to-[#A6A6A6] text-transparent bg-clip-text">
+                      <span className="text-xl md:text-3xl overflow-hidden bg-linear-to-b from-[#27272A] to-[#A6A6A6] text-transparent bg-clip-text">
                         2
-                        <sup className="bg-gradient-to-b from-[#27272A] to-[#A6A6A6] text-transparent bg-clip-text">
+                        <sup className="bg-linear-to-b from-[#27272A] to-[#A6A6A6] text-transparent bg-clip-text">
                           nd
                         </sup>
                       </span>
                     ) : index == 2 ? (
-                      <span className="text-xl md:text-3xl overflow-hidden bg-gradient-to-b from-[#EC7070F0] to-[#6D1E1EE5] text-transparent bg-clip-text">
+                      <span className="text-xl md:text-3xl overflow-hidden bg-linear-to-b from-[#EC7070F0] to-[#6D1E1EE5] text-transparent bg-clip-text">
                         3
-                        <sup className="bg-gradient-to-b from-[#EC7070F0] to-[#6D1E1EE5] text-transparent bg-clip-text">
+                        <sup className="bg-linear-to-b from-[#EC7070F0] to-[#6D1E1EE5] text-transparent bg-clip-text">
                           rd
                         </sup>
                       </span>
@@ -74,7 +74,7 @@ export default function LeaderBoard(props: any) {
                         height={50}
                         alt="profile pic"
                       />
-                      <p className="text-base md:text-xl font-black break-words md:w-fit w-[40%]">
+                      <p className="text-base md:text-xl font-black wrap-break-word md:w-fit w-[40%]">
                         {lead.Player.name}
                       </p>
                     </div>

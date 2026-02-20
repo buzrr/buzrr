@@ -7,7 +7,6 @@ import { useFormStatus } from "react-dom";
 export default function SelectProfile(props: {
   data: {
     name: string;
-    err: boolean;
     image: string;
   };
   setData: (data: any) => void;

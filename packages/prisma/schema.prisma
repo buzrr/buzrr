@@ -129,7 +129,7 @@ model GameLeaderboard {
   gameSessionId String?
   score         Int         @default(0)
   GameSession   GameSession? @relation(fields: [gameSessionId], references: [id], onDelete: SetNull)
-  Player        Player      @relation(fields: [playerId], references: [id])
+  Player        Player      @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   @@unique([playerId, gameSessionId])
 }

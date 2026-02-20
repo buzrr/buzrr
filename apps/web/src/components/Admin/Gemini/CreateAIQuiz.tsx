@@ -31,7 +31,7 @@ export default function CreateAIQuiz() {
   return (
     <>
       <div
-        className={`p-2 border-2 border-[#c2b4fe] dark:border-transparent w-full text-dark dark:text-white rounded flex justify-center items-center bg-gradient-to-b from-[#8D6DDD] to-[#AD56D6] cursor-pointer hover:border-transparent hover:from-[#8D6DDD] hover:to-[#AD56D6] transition-all duration-300 ease-in-out ${view === "list" ? "md:w-full flex-row gap-x-3 md:gap-x-1 py-4 px-2" : "p-2 flex-col md:w-40 h-[50vh] md:h-44"}`}
+        className={`p-2 border-2 border-[#c2b4fe] dark:border-transparent w-full text-dark dark:text-white rounded flex justify-center items-center bg-linear-to-b from-[#8D6DDD] to-[#AD56D6] cursor-pointer hover:border-transparent hover:from-[#8D6DDD] hover:to-[#AD56D6] transition-all duration-300 ease-in-out ${view === "list" ? "md:w-full flex-row gap-x-3 md:gap-x-1 py-4 px-2" : "p-2 flex-col md:w-40 h-[50vh] md:h-44"}`}
         onClick={() => setOpen(true)}
       >
         <div className="h-full w-full flex gap-x-4 justify-center items-center">
