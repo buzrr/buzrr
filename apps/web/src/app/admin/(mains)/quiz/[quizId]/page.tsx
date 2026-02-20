@@ -13,7 +13,7 @@ async function Quiz({ params }: { params: Promise<{ quizId: string }> }) {
   const { quizId } = await params;
   const session = await auth();
 
-  if (!session || !session.user) redirect("/api/auth/signin");
+  if (!session || !session.user || !session.user.id) redirect("/api/auth/signin");
   const quiz = await prisma.quiz.findFirst({
     where: {
       id: quizId,

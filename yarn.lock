@@ -180,7 +180,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@buzrr/prisma@workspace:packages/prisma":
+"@buzrr/prisma@workspace:*, @buzrr/prisma@workspace:packages/prisma":
   version: 0.0.0-use.local
   resolution: "@buzrr/prisma@workspace:packages/prisma"
   dependencies:
@@ -1219,18 +1219,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@prisma/client-runtime-utils@npm:7.4.0":
-  version: 7.4.0
-  resolution: "@prisma/client-runtime-utils@npm:7.4.0"
-  checksum: 10c0/ab3ae7a494366acbc0dafea6e96e11717029048161fa206930d554e87d0a908962d0f19104cd6bc77600dda93d1fecc35f90d27cb9ac99c578460d7c9bced861
+"@prisma/client-runtime-utils@npm:7.4.1":
+  version: 7.4.1
+  resolution: "@prisma/client-runtime-utils@npm:7.4.1"
+  checksum: 10c0/59ca9754427a749a2fc83568d2c03e015cd81150e36b0a5dc985791753ea6dcb0763632f204e00abd6ec79921690c8358b010dada98e936713a24d4b2d5a5a29
   languageName: node
   linkType: hard
 
-"@prisma/client@npm:^7.4.0":
-  version: 7.4.0
-  resolution: "@prisma/client@npm:7.4.0"
+"@prisma/client@npm:^7.4.1":
+  version: 7.4.1
+  resolution: "@prisma/client@npm:7.4.1"
   dependencies:
-    "@prisma/client-runtime-utils": "npm:7.4.0"
+    "@prisma/client-runtime-utils": "npm:7.4.1"
   peerDependencies:
     prisma: "*"
     typescript: ">=5.4.0"
@@ -1239,7 +1239,7 @@ __metadata:
       optional: true
     typescript:
       optional: true
-  checksum: 10c0/f865fb9ac0415fcc481eacc737fd0f111e24a7ee5835d606eeaf22443d0060392ac74e54806f7c8ff4bbabc6d954a9e176bc126f2bc48e8538707a629d554502
+  checksum: 10c0/91c90050d16ce6dd74cc42f7331ddc2791ade78a6c8dbb091a4a90f6fe079deb3ef9252777a64a2ff288842c5526ff1d67f6e8fe580e55e7f8a801a9163e8ed4
   languageName: node
   linkType: hard
 
@@ -2290,6 +2290,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "buzrr@workspace:."
   dependencies:
+    "@prisma/client": "npm:^7.4.1"
     "@types/react": "npm:^19.2.14"
     "@types/react-dom": "npm:^19.2.3"
     dotenv: "npm:^17.3.1"
@@ -5920,8 +5921,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "server@workspace:apps/server"
   dependencies:
-    "@prisma/adapter-pg": "npm:^7.4.0"
-    "@prisma/client": "npm:^7.4.0"
+    "@buzrr/prisma": "workspace:*"
     "@types/express": "npm:^5.0.6"
     cors: "npm:^2.8.6"
     dotenv: "npm:^17.3.1"
@@ -6758,14 +6758,13 @@ __metadata:
   resolution: "web@workspace:apps/web"
   dependencies:
     "@auth/prisma-adapter": "npm:^2.11.1"
+    "@buzrr/prisma": "workspace:*"
     "@emotion/react": "npm:^11.14.0"
     "@emotion/styled": "npm:^11.14.1"
     "@eslint/eslintrc": "npm:^3"
     "@google/generative-ai": "npm:^0.24.1"
     "@hello-pangea/dnd": "npm:^18.0.1"
     "@mui/material": "npm:^7.3.8"
-    "@prisma/adapter-pg": "npm:^7.4.0"
-    "@prisma/client": "npm:^7.4.0"
     "@reduxjs/toolkit": "npm:^2.11.2"
     "@tailwindcss/postcss": "npm:^4.2.0"
     "@types/node": "npm:^20"

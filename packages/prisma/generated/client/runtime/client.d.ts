@@ -471,7 +471,7 @@ declare type Deprecation = ReadonlyDeep_2<{
 
 declare type DeserializedResponse = Array<Record<string, unknown>>;
 
-export declare function deserializeJsonResponse(result: unknown): unknown;
+export declare function deserializeJsonObject(result: unknown): unknown;
 
 export declare function deserializeRawResult(response: RawResponse): DeserializedResponse;
 
@@ -1936,7 +1936,7 @@ declare type OutputType = ReadonlyDeep_2<{
 declare type OutputTypeRef = TypeRef<'scalar' | 'outputObjectTypes' | 'enumTypes'>;
 
 declare type Pagination = {
-    cursor: Record<string, PrismaValue> | null;
+    cursor: Record<string, unknown> | null;
     take: number | null;
     skip: number | null;
 };

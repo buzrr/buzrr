@@ -20,17 +20,6 @@ export default function WaitScreen(params: {
   const [start, setStart] = useState(false);
   const socket = params.socket;
 
-  // Set up socket listeners once
-  useEffect(() => {
-    socket.on("get-question-index", (index: number) => {
-      dispatch(setScreenStatus(ScreenStatus.question));
-    });
-
-    socket.on("timer-starts", () => {
-      console.log("Timer started");
-      setStart(true);
-    });
-
   useEffect(() => {
     const handleQuestionIndex = (_index: number) => {
       dispatch(setScreenStatus(ScreenStatus.question));
@@ -47,7 +36,6 @@ export default function WaitScreen(params: {
       socket.off("get-question-index", handleQuestionIndex);
       socket.off("timer-starts", handleTimerStarts);
     };
-  }, [socket, dispatch]);
   }, [socket, dispatch]);
 
   useEffect(() => {

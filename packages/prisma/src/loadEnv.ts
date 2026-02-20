@@ -3,9 +3,9 @@ import { config } from "dotenv";
 import { existsSync, readFileSync } from "fs";
 
 /**
- * Load .env from monorepo root and then from cwd so that DATABASE_URL
- * can live in root .env or in apps/server / apps/web .env.
- * App-level .env overrides root (cwd is loaded after root).
+ * Load .env from cwd first, then from monorepo root (no override).
+ * Dotenv skips already-set keys by default, so: cwd values win over root,
+ * and system env (Docker, K8s, CI) always keeps highest precedence.
  */
 function findMonorepoRoot(): string | null {
   let dir = process.cwd();
@@ -27,10 +27,10 @@ function findMonorepoRoot(): string | null {
 }
 
 export function loadEnv(): void {
+  config({ quiet: true }); // cwd .env first (no override — system env preserved)
   const root = findMonorepoRoot();
   if (root) {
     const rootEnv = path.join(root, ".env");
-    if (existsSync(rootEnv)) config({ path: rootEnv });
+    if (existsSync(rootEnv)) config({ path: rootEnv, quiet: true }); // root fills in only unset keys
   }
-  config({ override: true }); // cwd .env overrides root
 }

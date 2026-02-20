@@ -2,7 +2,7 @@
   "name": "@buzrr/prisma",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
+  "type": "commonjs",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -17,7 +17,10 @@
     "generate": "prisma generate",
     "build": "tsc"
   },
-  "files": ["dist", "generated"],
+  "files": [
+    "dist",
+    "generated"
+  ],
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.0",
     "dotenv": "^17.3.1"
