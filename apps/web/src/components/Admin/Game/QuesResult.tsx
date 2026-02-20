@@ -1,5 +1,6 @@
 "use client";
 
+import { DEFAULT_AVATAR } from "@/constants";
 import { ScreenStatus, setScreenStatus } from "@/state/admin/screenSlice";
 import { BarPlot, ChartContainer } from "@mui/x-charts";
 import { useEffect } from "react";
@@ -86,7 +87,7 @@ export default function QuesResult(props: any) {
                               <Image
                                 src={
                                   lead.Player.profilePic ||
-                                  "/images/avatar-1577909_1280.webp"
+                                  DEFAULT_AVATAR
                                 }
                                 className="w-12 h-12 rounded-full"
                                 width={40}

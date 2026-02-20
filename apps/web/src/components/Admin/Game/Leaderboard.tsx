@@ -1,3 +1,4 @@
+import { DEFAULT_AVATAR } from "@/constants";
 import { RootState } from "@/state/store";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -67,7 +68,7 @@ export default function LeaderBoard(props: any) {
                       <Image
                         src={
                           lead.Player.profilePic ||
-                          "/images/avatar-1577909_1280.webp"
+                          DEFAULT_AVATAR
                         }
                         className="w-12 h-12 rounded-full"
                         width={50}
@@ -99,7 +100,7 @@ export default function LeaderBoard(props: any) {
                       <Image
                         src={
                           lead.Player.profilePic ||
-                          "/images/avatar-1577909_1280.webp"
+                          DEFAULT_AVATAR
                         }
                         className="w-12 h-12 rounded-full"
                         width={50}

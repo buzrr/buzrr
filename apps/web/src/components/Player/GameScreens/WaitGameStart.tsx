@@ -1,5 +1,6 @@
 import Game from "@/components/Game";
 import BackNavButton from "@/components/BackNavButton";
+import { DEFAULT_AVATAR } from "@/constants";
 import { GameSession } from "@buzrr/prisma";
 import Image from "next/image";
 
@@ -20,7 +21,7 @@ const WaitGameStart = (params: { player: any; game: GameSession }) => {
             </h2>
             <div className="flex justify-between items-center w-fit gap-2 rounded-full p-3 bg-off-white dark:bg-off-dark font-bold text-dark dark:text-white">
               <Image
-                src={`${params.player.profilePic ? params.player.profilePic : "imagesavatar-1577909_1280.webp"}`}
+                src={params.player.profilePic || DEFAULT_AVATAR}
                 width={50}
                 height={50}
                 alt="Profile"
@@ -37,7 +38,7 @@ const WaitGameStart = (params: { player: any; game: GameSession }) => {
             <div className="mt-auto">
               <p className="text-sm dark:text-off-white py-2">Quiz By</p>
               <Image
-                src={`${game.creator.image ? game.creator.image : "imagesavatar-1577909_1280.webp"}`}
+                src={game.creator.image || DEFAULT_AVATAR}
                 width={50}
                 height={50}
                 alt="Profile"
@@ -57,7 +58,7 @@ const WaitGameStart = (params: { player: any; game: GameSession }) => {
             </h2>
             <div className="text-xs flex justify-between items-center w-fit gap-2 rounded-full p-2 mb-2 bg-off-white dark:bg-off-dark font-bold text-dark dark:text-white md:hidden">
               <Image
-                src={`${params.player.profilePic ? params.player.profilePic : "imagesavatar-1577909_1280.webp"}`}
+                src={params.player.profilePic || DEFAULT_AVATAR}
                 width={50}
                 height={50}
                 alt="Profile"

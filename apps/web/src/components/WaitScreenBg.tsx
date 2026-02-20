@@ -1,3 +1,4 @@
+import { DEFAULT_AVATAR } from "@/constants";
 import Image from "next/image";
 
 export default function WaitScreen() {
@@ -30,7 +31,7 @@ export default function WaitScreen() {
                 <span className="text-xl mr-3">1</span>
                 <div className="flex flex-row items-center gap-x-2 z-20">
                   <Image
-                    src={"/avatar-1577909_1280.webp"}
+                    src={DEFAULT_AVATAR}
                     className="w-8 h-8 rounded-full"
                     width={50}
                     height={50}
@@ -44,7 +45,7 @@ export default function WaitScreen() {
                 <span className="text-3xl mr-3">2</span>
                 <div className="flex flex-row items-center gap-x-2 z-20">
                   <Image
-                    src={"/avatar-1577909_1280.webp"}
+                    src={DEFAULT_AVATAR}
                     className="w-12 h-12 rounded-full"
                     width={50}
                     height={50}
@@ -58,7 +59,7 @@ export default function WaitScreen() {
                 <span className="text-3xl mr-3">3</span>
                 <div className="flex flex-row items-center gap-x-2 z-20">
                   <Image
-                    src={"/avatar-1577909_1280.webp"}
+                    src={DEFAULT_AVATAR}
                     className="w-12 h-12 rounded-full"
                     width={50}
                     height={50}

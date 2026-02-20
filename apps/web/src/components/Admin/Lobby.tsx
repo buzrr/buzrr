@@ -1,4 +1,5 @@
 "use client";
+import { DEFAULT_AVATAR } from "@/constants";
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { useDispatch, useSelector } from "react-redux";
@@ -170,7 +171,7 @@ const Lobby = (params: {
                   <Image
                     src={
                       (player.profilePic as string) ||
-                      "/avatar-1577909_1280.webp"
+                      DEFAULT_AVATAR
                     }
                     width={40}
                     height={40}

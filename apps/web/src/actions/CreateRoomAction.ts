@@ -14,14 +14,23 @@ const createRoom = async (formData: FormData) => {
       email: session.user.email as string,
     },
   });
+  if (!user) redirect("/api/auth/signin");
+
+  const quizId = formData.get("quizId") as string;
+  const quiz = await prisma.quiz.findFirst({
+    where: { id: quizId, userId: user.id },
+  });
+  if (!quiz) {
+    redirect("/admin?error=unauthorized");
+  }
 
   const gameCode = customAlphabet("ABCDEFGHJKMNPQRSTUVWXYZ23456789", 6)();
 
   const room = await prisma.gameSession.create({
     data: {
       gameCode,
-      quizId: formData.get("quizId") as string,
-      creatorId: user?.id as string,
+      quizId,
+      creatorId: user.id,
     },
   });
 

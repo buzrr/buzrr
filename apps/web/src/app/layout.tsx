@@ -1,5 +1,5 @@
 import "./globals.css";
-import { Inter, IBM_Plex_Sans } from "next/font/google";
+import { IBM_Plex_Sans } from "next/font/google";
 import ReduxProvider from "@/state/ReduxProvider";
 import Footer from "@/components/Footer";
 import type { Metadata } from "next";
@@ -8,8 +8,6 @@ export const metadata: Metadata = {
   title: "Buzzr",
   description: "Buzzr is a platform for hosting quizzes and games",
 };
-
-const inter = Inter({ subsets: ["latin"] });
 
 const sans = IBM_Plex_Sans({
   weight: ["400"],

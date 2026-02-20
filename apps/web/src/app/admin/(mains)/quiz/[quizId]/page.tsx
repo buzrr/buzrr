@@ -14,9 +14,10 @@ async function Quiz({ params }: { params: Promise<{ quizId: string }> }) {
   const session = await auth();
 
   if (!session || !session.user) redirect("/api/auth/signin");
-  const quiz = await prisma.quiz.findUnique({
+  const quiz = await prisma.quiz.findFirst({
     where: {
       id: quizId,
+      userId: session.user.id,
     },
     include: {
       questions: true,
@@ -28,9 +29,7 @@ async function Quiz({ params }: { params: Promise<{ quizId: string }> }) {
     },
   });
 
-  if (!quiz) {
-    notFound();
-  }
+  if (!quiz) notFound();
 
   return (
     <div className="w-full bg-light-bg dark:bg-dark-bg h-full">

@@ -1,4 +1,5 @@
 "use client";
+import { DEFAULT_AVATAR } from "@/constants";
 import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import ClientImage from "../ClientImage";
@@ -66,7 +67,7 @@ export default function Navbar() {
         <div className="mt-auto mb-2 pt-6 border-t border-t-gray">
           <div className="flex items-center p-2 px-4 hover:cursor-pointer hover:bg-card-light dark:hover:bg-card-dark rounded-md">
             <Image
-              src={session?.user?.image || "/images/avatar-1577909_1280.webp"}
+              src={session?.user?.image || DEFAULT_AVATAR}
               className="rounded-full mr-2"
               alt="Profile Picture"
               width={40}

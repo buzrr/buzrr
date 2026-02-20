@@ -10,10 +10,15 @@ async function dltQuiz(quizId: string) {
     const session = await auth();
     if (!session || !session.user) redirect("/api/auth/signin");
 
+    const quiz = await prisma.quiz.findFirst({
+      where: { id: quizId, userId: session.user.id },
+    });
+    if (!quiz) {
+      return { error: "Unauthorized or quiz not found" };
+    }
+
     await prisma.quiz.delete({
-      where: {
-        id: quizId,
-      },
+      where: { id: quizId },
     });
 
     revalidatePath("/admin", "page");

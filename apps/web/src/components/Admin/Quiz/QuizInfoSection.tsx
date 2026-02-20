@@ -28,14 +28,14 @@ async function QuizInfoSection(props: { quiz: any }) {
           <h2 className="text-3xl my-3 font-bold">{props.quiz.title}</h2>
           <p className="capitalize mb-4">{props.quiz.description}</p>
           <p className="text-xs p-1 border border-[#8FB72E] bg-[#C4F849] rounded w-fit my-1 dark:text-dark">
-            Total number of questions : {props.quiz.questions?.length}
+            Total number of questions : {props.quiz.questions?.length ?? 0}
           </p>
           <input type="hidden" name="quizId" value={props.quiz.id} />
           <div className="w-full mt-4">
             <SubmitButton
               text="Host quiz"
               isQuiz={true}
-              error={props.quiz.questions.length === 0}
+              error={!props.quiz.questions?.length}
             />
           </div>
         </div>

@@ -1,4 +1,5 @@
 import { auth } from "@/utils/auth";
+import { DEFAULT_AVATAR } from "@/constants";
 import { prisma } from "@buzrr/prisma";
 import Image from "next/image";
 import { redirect } from "next/navigation";
@@ -52,7 +53,7 @@ export default async function QuizLeaderboard({
                     <div className="flex flex-row items-center gap-x-2 z-20">
                       <Image
                         src={
-                          lead.Player.profilePic || "/avatar-1577909_1280.webp"
+                          lead.Player.profilePic || DEFAULT_AVATAR
                         }
                         className="w-12 h-12 rounded-full"
                         width={50}
