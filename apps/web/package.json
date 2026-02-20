@@ -22,7 +22,7 @@
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.36.2",
     "cloudinary": "^2.9.0",
-    "next": "15.2.2",
+    "next": "15.2.8",
     "next-auth": "^5.0.0-beta.30",
     "react": "^19.0.0",
     "react-countdown-circle-timer": "^3.2.1",
