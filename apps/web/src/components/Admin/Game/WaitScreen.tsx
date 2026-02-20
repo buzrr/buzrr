@@ -31,10 +31,23 @@ export default function WaitScreen(params: {
       setStart(true);
     });
 
-    return () => {
-      socket.off("get-question-index");
-      socket.off("timer-starts");
+  useEffect(() => {
+    const handleQuestionIndex = (_index: number) => {
+      dispatch(setScreenStatus(ScreenStatus.question));
     };
+    const handleTimerStarts = () => {
+      console.log("Timer started");
+      setStart(true);
+    };
+
+    socket.on("get-question-index", handleQuestionIndex);
+    socket.on("timer-starts", handleTimerStarts);
+
+    return () => {
+      socket.off("get-question-index", handleQuestionIndex);
+      socket.off("timer-starts", handleTimerStarts);
+    };
+  }, [socket, dispatch]);
   }, [socket, dispatch]);
 
   useEffect(() => {
