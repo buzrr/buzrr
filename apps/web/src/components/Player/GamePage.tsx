@@ -4,7 +4,7 @@ import { io, Socket } from "socket.io-client";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/state/store";
 import { useRouter } from "next/navigation";
-import { GameSession } from "@prisma/client";
+import { GameSession } from "@buzrr/prisma";
 import {
   WaitGameStart,
   Question,

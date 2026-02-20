@@ -4,7 +4,7 @@ import React from "react";
 const Loader = () => {
   return (
     <>
-      <div className="w-[100vw] h-[100vh] bg-lprimary dark:bg-dprimary absolute top-0 flex flex-col justify-center items-center">
+      <div className="w-screen h-screen bg-lprimary dark:bg-dprimary absolute top-0 flex flex-col justify-center items-center">
         <div className="text-3xl font-bold my-4 dark:text-dark text-white">
           Ready up!
         </div>

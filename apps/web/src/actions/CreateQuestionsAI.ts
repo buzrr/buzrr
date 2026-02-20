@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@/utils/auth";
-import { prisma } from "@/utils/prisma";
+import { prisma } from "@buzrr/prisma";
 import { redirect } from "next/navigation";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Ratelimit } from "@upstash/ratelimit";
@@ -54,8 +54,14 @@ function parseQuestions(content: string) {
 const addQuestionsByAI = async (formData: FormData) => {
   try {
     if (process.env.RATELIMIT === "ON") {
-      const ip = headers().get("x-forwarded-for");
-      const { remaining, limit, success } = await rateLimit.limit(ip as string);
+      let ip = (await headers())?.get("x-forwarded-for");
+      ip = ip?.split(",")[0]?.trim() ?? null;
+
+      if (!ip) {
+        throw new Error("IP not found");
+      }
+
+      const { remaining, limit, success } = await rateLimit.limit(ip);
 
       if (!success) {
         throw new Error("Rate limit reached wait for some time and try again.");

@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@/utils/auth";
-import { prisma } from "@/utils/prisma";
+import { prisma } from "@buzrr/prisma";
 import { redirect } from "next/navigation";
 
 async function getAllQuestion(quizId: string) {

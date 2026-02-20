@@ -1,4 +1,4 @@
-import { prisma } from "@/utils/prisma";
+import { prisma } from "@buzrr/prisma";
 import { auth } from "@/utils/auth";
 import { redirect } from "next/navigation";
 import ClientBuzzr from "./ClientBuzzrs";

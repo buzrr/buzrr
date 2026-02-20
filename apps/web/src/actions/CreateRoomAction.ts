@@ -1,5 +1,5 @@
 import { auth } from "@/utils/auth";
-import { prisma } from "@/utils/prisma";
+import { prisma } from "@buzrr/prisma";
 import { redirect } from "next/navigation";
 import { customAlphabet } from "nanoid";
 
@@ -14,14 +14,23 @@ const createRoom = async (formData: FormData) => {
       email: session.user.email as string,
     },
   });
+  if (!user) redirect("/api/auth/signin");
 
-  const gameCode = customAlphabet("abcdefghijkmnpqrstuvwxyz23456789", 6)();
+  const quizId = formData.get("quizId") as string;
+  const quiz = await prisma.quiz.findFirst({
+    where: { id: quizId, userId: user.id },
+  });
+  if (!quiz) {
+    redirect("/admin?error=unauthorized");
+  }
+
+  const gameCode = customAlphabet("ABCDEFGHJKMNPQRSTUVWXYZ23456789", 6)();
 
   const room = await prisma.gameSession.create({
     data: {
       gameCode,
-      quizId: formData.get("quizId") as string,
-      creatorId: user?.id as string,
+      quizId,
+      creatorId: user.id,
     },
   });
 

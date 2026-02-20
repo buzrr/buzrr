@@ -1,5 +1,5 @@
 "use server";
-import { prisma } from "@/utils/prisma";
+import { prisma } from "@buzrr/prisma";
 
 export default async function submitAnswer({
   gameSessionId,

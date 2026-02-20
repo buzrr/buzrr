@@ -21,7 +21,25 @@ export default function WaitScreen(params: {
   const socket = params.socket;
 
   useEffect(() => {
-    if (currIndex != 0) {
+    const handleQuestionIndex = (_index: number) => {
+      dispatch(setScreenStatus(ScreenStatus.question));
+    };
+    const handleTimerStarts = () => {
+      console.log("Timer started");
+      setStart(true);
+    };
+
+    socket.on("get-question-index", handleQuestionIndex);
+    socket.on("timer-starts", handleTimerStarts);
+
+    return () => {
+      socket.off("get-question-index", handleQuestionIndex);
+      socket.off("timer-starts", handleTimerStarts);
+    };
+  }, [socket, dispatch]);
+
+  useEffect(() => {
+    if (start || currIndex != 0) {
       const timer = setInterval(() => {
         if (time >= 0) {
           dispatch(setTimer());
@@ -30,33 +48,16 @@ export default function WaitScreen(params: {
 
       if (time < 0) {
         socket.emit("set-question-index", params.gameCode, currIndex);
-        socket.on("get-question-index", (index: number) => {
-          dispatch(setScreenStatus(ScreenStatus.question));
-        });
       }
 
       return () => {
         clearInterval(timer);
       };
     }
-  }, [time, currIndex, dispatch, params.gameCode, socket]);
+  }, [time, currIndex, dispatch, params.gameCode, socket, start]);
 
   function handleSocket() {
     socket.emit("start-timer", params.gameCode);
-    socket.on("timer-starts", () => {
-      console.log("Timer started");
-      setStart(true);
-      const timer = setInterval(() => {
-        if (time >= 0) {
-          dispatch(setTimer());
-        }
-      }, 1000);
-
-      setTimeout(() => {
-        socket.emit("set-question-index", params.gameCode, currIndex);
-        dispatch(setScreenStatus(ScreenStatus.question));
-      }, 4000);
-    });
   }
 
   return (

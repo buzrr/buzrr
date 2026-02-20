@@ -19,7 +19,7 @@ export default function BasicModal(props: {
     <>
       <button
         onClick={handleOpen}
-        className={`${props.btnStyle ? props.btnStyle : props.isEdit ? "p-1 text-lprimary mr-1 hover:bg-[#ddd5ff] rounded-md" : "text-white font-sm bg-dark-bg rounded-lg w-full mx-auto md:ml-5 p-2"}`}
+        className={`${props.btnStyle ? props.btnStyle : props.isEdit ? "p-1 text-lprimary mr-1 hover:bg-cardhover-light rounded-md" : "text-white font-sm bg-dark-bg rounded-lg w-full mx-auto md:ml-5 p-2"}`}
       >
         {props.btnTitle}
       </button>

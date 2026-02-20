@@ -1,12 +1,13 @@
 "use client";
 
+import { DEFAULT_AVATAR } from "@/constants";
 import { ScreenStatus, setScreenStatus } from "@/state/admin/screenSlice";
 import { BarPlot, ChartContainer } from "@mui/x-charts";
 import { useEffect } from "react";
 import { RxCross2 } from "react-icons/rx";
 import { TiTick } from "react-icons/ti";
 import { useDispatch, useSelector } from "react-redux";
-import { Option } from "@prisma/client";
+import { Option } from "@buzrr/prisma";
 import { RootState } from "@/state/store";
 import { setCurrIndex, setLeaderboard } from "@/state/admin/playersSlice";
 import Image from "next/image";
@@ -86,7 +87,7 @@ export default function QuesResult(props: any) {
                               <Image
                                 src={
                                   lead.Player.profilePic ||
-                                  "/images/avatar-1577909_1280.webp"
+                                  DEFAULT_AVATAR
                                 }
                                 className="w-12 h-12 rounded-full"
                                 width={40}

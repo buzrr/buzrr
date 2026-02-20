@@ -1,10 +1,9 @@
 import { Server } from "socket.io";
-import { PrismaClient } from "@prisma/client";
-import { GameStates } from "@prisma/client";
+import { prisma, GameStates } from "@buzrr/prisma";
 
 class SocketService {
   private _io: Server;
-  private prisma: PrismaClient;
+  private prisma: typeof prisma;
   constructor() {
     console.log("Init Socket Service...");
 
@@ -15,7 +14,7 @@ class SocketService {
       },
     });
 
-    this.prisma = new PrismaClient();
+    this.prisma = prisma;
   }
 
   public initListeners() {
@@ -30,80 +29,99 @@ class SocketService {
       const adminId = socket.handshake.query.adminId as string;
 
       let player;
+      let gameCode: string;
 
-      // check if player or admin exists
+      try {
+        // check if player or admin exists
 
-      if (userType === "player") {
-        player = await this.prisma.player.findUnique({
-          where: {
-            id: playerId,
-          },
-        });
+        if (userType === "player") {
+          player = await this.prisma.player.findUnique({
+            where: {
+              id: playerId,
+            },
+          });
 
-        if (!player) {
+          if (!player) {
+            console.log(
+              "Player",
+              playerId,
+              "not found... \nDisconnecting Socket:",
+              socket.id,
+            );
+            socket.disconnect();
+            return;
+          }
+        } else if (userType === "admin") {
+          const admin = await this.prisma.user.findUnique({
+            where: {
+              id: adminId,
+            },
+          });
+
+          if (!admin) {
+            console.log(
+              "Admin: ",
+              adminId,
+              "not found... \nDisconnecting Socket:",
+              socket.id,
+            );
+            socket.disconnect();
+            return;
+          }
+        } else {
           console.log(
-            "Player",
-            playerId,
-            "not found... \nDisconnecting Socket:",
-            socket.id
+            "Invalid userType:",
+            userType,
+            "\nDisconnecting Socket:",
+            socket.id,
           );
           socket.disconnect();
           return;
         }
-      } else if (userType === "admin") {
-        const admin = await this.prisma.user.findUnique({
+        gameCode = socket.handshake.query.gameCode as string;
+
+        const game = await this.prisma.gameSession.findUnique({
           where: {
-            id: adminId,
+            gameCode,
           },
         });
 
-        if (!admin) {
+        if (!game) {
           console.log(
-            "Admin: ",
-            adminId,
+            "Game: ",
+            gameCode,
             "not found... \nDisconnecting Socket:",
-            socket.id
+            socket.id,
           );
           socket.disconnect();
           return;
         }
-      } else {
-        console.log(
-          "Invalid userType:",
-          userType,
-          "\nDisconnecting Socket:",
-          socket.id
-        );
+
+        socket.join(gameCode);
+      } catch (err) {
+        const code =
+          err && typeof err === "object" && "code" in err
+            ? (err as { code: string }).code
+            : "";
+        if (code === "ECONNREFUSED" || code === "P1001") {
+          console.error(
+            "Database unavailable. Disconnecting socket:",
+            socket.id,
+            err instanceof Error ? err.message : err,
+          );
+        } else {
+          console.error("Error during socket connection:", err);
+        }
         socket.disconnect();
         return;
       }
-      const gameCode = socket.handshake.query.gameCode as string;
-
-      const game = await this.prisma.gameSession.findUnique({
-        where: {
-          gameCode,
-        },
-      });
-
-      if (!game) {
-        console.log(
-          "Game: ",
-          gameCode,
-          "not found... \nDisconnecting Socket:",
-          socket.id
-        );
-        socket.disconnect();
-        return;
-      }
-
-      socket.join(gameCode);
 
       console.log(
         userType === "player" ? `Player: ${playerId}` : `Admin: ${adminId}`,
         "with SocketId:",
         socket.id,
         "joined Game:",
-        gameCode
+        gameCode,
       );
 
       if (userType === "player") {

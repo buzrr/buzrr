@@ -1,4 +1,5 @@
 "use client";
+import { DEFAULT_AVATAR } from "@/constants";
 import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import ClientImage from "../ClientImage";
@@ -24,11 +25,11 @@ export default function Navbar() {
   return (
     <>
       <div
-        className={`absolute top-0 left-0 w-[100vw] h-[100vh] z-10 bg-[#0000006a] md:hidden ${toggle === navToggle.collapse ? "hidden" : ""}`}
+        className={`absolute top-0 left-0 w-screen h-screen z-10 bg-[#0000006a] md:hidden ${toggle === navToggle.collapse ? "hidden" : ""}`}
         onClick={() => dispatch(setNavToggle(navToggle.collapse))}
       ></div>
       <div
-        className={`z-20 p-6 px-8 flex bg-light-bg dark:bg-dark-bg flex-col h-[100vh] md:h-[85vh] absolute md:relative w-[80vw] md:w-[25%] left-0 ${toggle === navToggle.collapse ? "hidden md:flex" : ""}`}
+        className={`z-20 p-6 px-8 flex bg-light-bg dark:bg-dark-bg flex-col h-screen md:h-[85vh] absolute md:relative w-[80vw] md:w-[25%] left-0 ${toggle === navToggle.collapse ? "hidden md:flex" : ""}`}
       >
         <div className="flex justify-center items-center md:hidden p-5 mb-2 border-b border-gray">
           <ClientImage
@@ -66,7 +67,7 @@ export default function Navbar() {
         <div className="mt-auto mb-2 pt-6 border-t border-t-gray">
           <div className="flex items-center p-2 px-4 hover:cursor-pointer hover:bg-card-light dark:hover:bg-card-dark rounded-md">
             <Image
-              src={session?.user?.image || "/images/avatar-1577909_1280.webp"}
+              src={session?.user?.image || DEFAULT_AVATAR}
               className="rounded-full mr-2"
               alt="Profile Picture"
               width={40}

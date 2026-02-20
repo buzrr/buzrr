@@ -1,29 +1,15 @@
-import { prisma } from "@/utils/prisma";
 import { auth } from "@/utils/auth";
 import { redirect } from "next/navigation";
 import createRoom from "@/actions/CreateRoomAction";
 import SubmitButton from "@/components/SubmitButton";
 import Link from "next/link";
 
-async function QuizInfoSection(props: { quizId: string }) {
+async function QuizInfoSection(props: { quiz: any }) {
   const session = await auth();
 
   if (!session || !session.user) redirect("/api/auth/signin");
-  const quiz = await prisma.quiz.findUnique({
-    where: {
-      id: props.quizId as string,
-    },
-    include: {
-      questions: true,
-      gameSessions: {
-        orderBy: {
-          createdAt: "desc",
-        },
-      },
-    },
-  });
 
-  const allQuiz = quiz?.gameSessions ? quiz?.gameSessions : [];
+  const allQuiz = props.quiz.gameSessions ? props.quiz.gameSessions : [];
 
   return (
     <>
@@ -39,20 +25,17 @@ async function QuizInfoSection(props: { quizId: string }) {
             <span className="p-1 py-2">&gt;</span>
             <span className="p-1 py-2">Quizzes</span>
           </div>
-          <h2 className="text-3xl my-3 font-bold">{quiz?.title}</h2>
-          <p className="capitalize mb-4">{quiz?.description}</p>
+          <h2 className="text-3xl my-3 font-bold">{props.quiz.title}</h2>
+          <p className="capitalize mb-4">{props.quiz.description}</p>
           <p className="text-xs p-1 border border-[#8FB72E] bg-[#C4F849] rounded w-fit my-1 dark:text-dark">
-            Total number of questions :{" "}
-            <span className="font-semibold text-gray-50">
-              {quiz?.questions?.length}
-            </span>
+            Total number of questions : {props.quiz.questions?.length ?? 0}
           </p>
-          <input type="hidden" name="quizId" value={props.quizId} />
+          <input type="hidden" name="quizId" value={props.quiz.id} />
           <div className="w-full mt-4">
             <SubmitButton
               text="Host quiz"
               isQuiz={true}
-              error={quiz?.questions.length === 0}
+              error={!props.quiz.questions?.length}
             />
           </div>
         </div>
@@ -60,7 +43,7 @@ async function QuizInfoSection(props: { quizId: string }) {
           <div className="font-black p-4">Previously used</div>
           <div className="my-2 h-[33.6vh] overflow-auto">
             {allQuiz?.length > 0 ? (
-              allQuiz.map((quiz) => {
+              allQuiz.map((quiz: any) => {
                 return (
                   <div key={quiz.id}>
                     <div className="bg-card-light dark:bg-card-dark p-4 mt-2">
@@ -74,7 +57,7 @@ async function QuizInfoSection(props: { quizId: string }) {
                           {quiz.gameCode}
                         </div>
                       </div>
-                      <div className="text-xs mt-3 [&>*]:bg-[#f87d49] [&>*]:text-white [&>*]:dark:text-dark [&>*]:font-black [&>*]:rounded-md [&>*]:p-[6px] [&>*]:ml-1">
+                      <div className="text-xs mt-3 *:bg-[#f87d49] *:text-white *:dark:text-dark *:font-black *:rounded-md *:p-[6px] *:ml-1">
                         <Link href="#">Import Questions</Link>
                         <Link href={`/admin/quiz/leaderboard/${quiz.id}`}>
                           See leaderboard

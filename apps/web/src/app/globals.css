@@ -1,26 +1,58 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Tailwind v4: dark mode by class on ancestor (e.g. <html class="dark">) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Ensure all source files are scanned (helps in monorepos) */
+@source "../";
+
+/* Extend the default theme so spacing, radius, etc. are preserved */
+@theme default {
+  --color-light-bg: #f5f3ff;
+  --color-dark-bg: #1e1e1e;
+  --color-white: #ffffff;
+  --color-off-white: #f5f3ff;
+  --color-off-dark: #434349;
+  --color-dark: #2c2c2c;
+  --color-gray: #c4c6c9;
+  --color-lprimary: #7d49f8;
+  --color-dprimary: #a589fc;
+  --color-red-dark: #e84b4b;
+  --color-red-light: #c92929;
+  --color-card-light: #ede9fe;
+  --color-cardhover-light: #ddd5ff;
+  --color-card-dark: #3d3c3e;
+  --color-cardhover-dark: #4c4c4c;
+  --breakpoint-medium: 860px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  ::-webkit-scrollbar {
+    width: 10px;
   }
-}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  ::-webkit-scrollbar-track {
+    border-radius: 5px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #353535;
+    border-radius: 5px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #646464;
+  }
+
+  * {
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+  }
+
+  body,
+  html {
+    height: 100dvh;
+    width: 100%;
+  }
 }
