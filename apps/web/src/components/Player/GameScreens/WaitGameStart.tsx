@@ -1,6 +1,6 @@
 import Game from "@/components/Game";
 import BackNavButton from "@/components/BackNavButton";
-import { GameSession } from "@prisma/client";
+import { GameSession } from "@buzrr/prisma";
 import Image from "next/image";
 
 const WaitGameStart = (params: { player: any; game: GameSession }) => {

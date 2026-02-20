@@ -180,6 +180,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@buzrr/prisma@workspace:packages/prisma":
+  version: 0.0.0-use.local
+  resolution: "@buzrr/prisma@workspace:packages/prisma"
+  dependencies:
+    "@prisma/adapter-pg": "npm:^7.4.0"
+    dotenv: "npm:^17.3.1"
+    prisma: "npm:^7.4.0"
+    typescript: "npm:5.8.2"
+  peerDependencies:
+    "@prisma/client": ^7.4.0
+  languageName: unknown
+  linkType: soft
+
 "@chevrotain/cst-dts-gen@npm:10.5.0":
   version: 10.5.0
   resolution: "@chevrotain/cst-dts-gen@npm:10.5.0"
@@ -2282,8 +2295,6 @@ __metadata:
     dotenv: "npm:^17.3.1"
     prettier: "npm:^3.5.3"
     prisma: "npm:^7.4.0"
-    react: "npm:^19.2.4"
-    react-dom: "npm:^19.2.4"
     turbo: "npm:^2.8.10"
     typescript: "npm:5.8.2"
   languageName: unknown
@@ -5514,17 +5525,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-dom@npm:^19.2.4":
-  version: 19.2.4
-  resolution: "react-dom@npm:19.2.4"
-  dependencies:
-    scheduler: "npm:^0.27.0"
-  peerDependencies:
-    react: ^19.2.4
-  checksum: 10c0/f0c63f1794dedb154136d4d0f59af00b41907f4859571c155940296808f4b94bf9c0c20633db75b5b2112ec13d8d7dd4f9bf57362ed48782f317b11d05a44f35
-  languageName: node
-  linkType: hard
-
 "react-icons@npm:^5.5.0":
   version: 5.5.0
   resolution: "react-icons@npm:5.5.0"
@@ -5598,13 +5598,6 @@ __metadata:
   version: 19.0.0
   resolution: "react@npm:19.0.0"
   checksum: 10c0/9cad8f103e8e3a16d15cb18a0d8115d8bd9f9e1ce3420310aea381eb42aa0a4f812cf047bb5441349257a05fba8a291515691e3cb51267279b2d2c3253f38471
-  languageName: node
-  linkType: hard
-
-"react@npm:^19.2.4":
-  version: 19.2.4
-  resolution: "react@npm:19.2.4"
-  checksum: 10c0/cd2c9ff67a720799cc3b38a516009986f7fc4cb8d3e15716c6211cf098d1357ee3e348ab05ad0600042bbb0fd888530ba92e329198c92eafa0994f5213396596
   languageName: node
   linkType: hard
 
@@ -5864,13 +5857,6 @@ __metadata:
   version: 0.25.0
   resolution: "scheduler@npm:0.25.0"
   checksum: 10c0/a4bb1da406b613ce72c1299db43759526058fdcc413999c3c3e0db8956df7633acf395cb20eb2303b6a65d658d66b6585d344460abaee8080b4aa931f10eaafe
-  languageName: node
-  linkType: hard
-
-"scheduler@npm:^0.27.0":
-  version: 0.27.0
-  resolution: "scheduler@npm:0.27.0"
-  checksum: 10c0/4f03048cb05a3c8fddc45813052251eca00688f413a3cee236d984a161da28db28ba71bd11e7a3dd02f7af84ab28d39fb311431d3b3772fed557945beb00c452
   languageName: node
   linkType: hard
 
@@ -6801,6 +6787,7 @@ __metadata:
     socket.io-client: "npm:^4.8.3"
     tailwindcss: "npm:^4.2.0"
     typescript: "npm:^5"
+    zod: "npm:^4.3.6"
   languageName: unknown
   linkType: soft
 
@@ -6955,5 +6942,12 @@ __metadata:
     grammex: "npm:^3.1.11"
     graphmatch: "npm:^1.1.0"
   checksum: 10c0/6baa15863f1bbf0131a50f80df82bdc1d174f45e81587ff6a2ac2ad13a0c4a1f80e883794d5711ad31acdd85195ebe052375e43db5c4bcbaff98f040c082234e
+  languageName: node
+  linkType: hard
+
+"zod@npm:^4.3.6":
+  version: 4.3.6
+  resolution: "zod@npm:4.3.6"
+  checksum: 10c0/860d25a81ab41d33aa25f8d0d07b091a04acb426e605f396227a796e9e800c44723ed96d0f53a512b57be3d1520f45bf69c0cb3b378a232a00787a2609625307
   languageName: node
   linkType: hard

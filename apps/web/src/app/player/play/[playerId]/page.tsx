@@ -1,16 +1,17 @@
-import { prisma } from "@/utils/prisma";
+import { prisma, GameSession } from "@buzrr/prisma";
 import GamePage from "@/components/Player/GamePage";
-import { GameSession } from "@prisma/client";
 import ValidatePlayer from "@/components/Player/ValidatePlayer";
 import ClientImage from "@/components/ClientImage";
+import { redirect, notFound } from "next/navigation";
 
-const page = async ({ params }: { params: { playerId: string } }) => {
+const page = async ({ params }: { params: Promise<{ playerId: string }> }) => {
+  const { playerId } = await params;
   const player = await prisma.player.findUnique({
-    where: { id: params.playerId },
+    where: { id: playerId },
   });
 
   if (!player) {
-    throw new Error("Player not found");
+    notFound();
   }
 
   if (!player.gameId) {
@@ -42,6 +43,10 @@ const page = async ({ params }: { params: { playerId: string } }) => {
       },
     },
   });
+
+  if (!game) {
+    redirect("/player/joinRoom/" + playerId);
+  }
 
   return (
     <>

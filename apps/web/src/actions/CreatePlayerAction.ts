@@ -1,5 +1,5 @@
 "use server";
-import { prisma } from "@/utils/prisma";
+import { prisma } from "@buzrr/prisma";
 import { Ratelimit } from "@upstash/ratelimit";
 import { redis } from "@/server/upstash";
 import { headers } from "next/headers";
@@ -12,7 +12,7 @@ const rateLimit = new Ratelimit({
 const createPlayer = async (formData: FormData) => {
   try {
     if (process.env.RATELIMIT === "ON") {
-      const ip = headers().get("x-forwarded-for");
+      const ip = (await headers())?.get("x-forwarded-for");
       const { remaining, limit, success } = await rateLimit.limit(ip as string);
 
       if (!success) {

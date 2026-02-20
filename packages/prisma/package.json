@@ -1,0 +1,31 @@
+{
+  "name": "@buzrr/prisma",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "generate": "prisma generate",
+    "build": "tsc"
+  },
+  "files": ["dist", "generated"],
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.4.0",
+    "dotenv": "^17.3.1"
+  },
+  "devDependencies": {
+    "prisma": "^7.4.0",
+    "typescript": "5.8.2"
+  },
+  "peerDependencies": {
+    "@prisma/client": "^7.4.0"
+  }
+}

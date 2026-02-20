@@ -1,9 +1,10 @@
 import { auth } from "@/utils/auth";
 import GameLobby from "@/components/Admin/Game/GameLobby";
-import { prisma } from "@/utils/prisma";
-import { redirect } from "next/navigation";
+import { prisma } from "@buzrr/prisma";
+import { redirect, notFound } from "next/navigation";
 
-const page = async ({ params }: { params: { roomId: string } }) => {
+const page = async ({ params }: { params: Promise<{ roomId: string }> }) => {
+  const { roomId } = await params;
   const session = await auth();
 
   if (!session || !session.user) redirect("/api/auth/signin");
@@ -16,17 +17,19 @@ const page = async ({ params }: { params: { roomId: string } }) => {
 
   const room = await prisma.gameSession.findUnique({
     where: {
-      id: params.roomId,
+      id: roomId,
     },
   });
 
   const players = await prisma.player.findMany({
     where: {
-      gameId: params.roomId,
+      gameId: roomId,
     },
   });
 
-  if (!room) throw new Error("Room not found");
+  if (!room) {
+    return notFound();
+  }
 
   if (room.creatorId !== user?.id) throw new Error("Unauthorized");
 
@@ -44,7 +47,7 @@ const page = async ({ params }: { params: { roomId: string } }) => {
   return (
     <div className="flex justify-center items-center h-fit md:h-[85vh] w-full bg-light-bg dark:bg-dark-bg">
       <GameLobby
-        roomId={params.roomId}
+        roomId={roomId}
         userId={user.id}
         gameCode={room?.gameCode}
         players={players}

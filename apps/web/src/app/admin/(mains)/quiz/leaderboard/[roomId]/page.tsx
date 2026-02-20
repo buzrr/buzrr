@@ -1,20 +1,21 @@
 import { auth } from "@/utils/auth";
-import { prisma } from "@/utils/prisma";
+import { prisma } from "@buzrr/prisma";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 
 export default async function QuizLeaderboard({
   params,
 }: {
-  params: { roomId: string };
+  params: Promise<{ roomId: string }>;
 }) {
+  const { roomId } = await params;
   const session = await auth();
 
   if (!session || !session.user) redirect("/api/auth/signin");
 
   const leaderboard = await prisma.gameLeaderboard.findMany({
     where: {
-      gameSessionId: params.roomId,
+      gameSessionId: roomId,
     },
     include: {
       Player: true,

@@ -1,7 +1,7 @@
 "use server";
 import { auth } from "@/utils/auth";
 import { redirect } from "next/navigation";
-import { prisma } from "@/utils/prisma";
+import { prisma } from "@buzrr/prisma";
 import { revalidatePath } from "next/cache";
 import { v2 as cloudinary } from "cloudinary";
 cloudinary.config({

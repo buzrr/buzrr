@@ -1,5 +1,5 @@
 "use server";
-import { prisma } from "@/utils/prisma";
+import { prisma } from "@buzrr/prisma";
 import { Ratelimit } from "@upstash/ratelimit";
 import { redis } from "@/server/upstash";
 import { headers } from "next/headers";

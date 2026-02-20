@@ -1,5 +1,5 @@
 import { auth } from "@/utils/auth";
-import { prisma } from "@/utils/prisma";
+import { prisma } from "@buzrr/prisma";
 import { redirect } from "next/navigation";
 import { customAlphabet } from "nanoid";
 
@@ -15,7 +15,7 @@ const createRoom = async (formData: FormData) => {
     },
   });
 
-  const gameCode = customAlphabet("ABCDEFGHIJKLMNPQRSTUVWXYZ123456789", 6)();
+  const gameCode = customAlphabet("ABCDEFGHJKMNPQRSTUVWXYZ23456789", 6)();
 
   const room = await prisma.gameSession.create({
     data: {

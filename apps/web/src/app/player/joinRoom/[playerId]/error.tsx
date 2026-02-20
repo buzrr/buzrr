@@ -5,10 +5,8 @@ import { useRouter } from "next/navigation";
 export default function ErrorBoundary({ error }: { error: Error }) {
   const router = useRouter();
   useEffect(() => {
-    if (window !== undefined) {
-      window.localStorage.removeItem("playerId");
-      router.push("/player");
-    }
+    localStorage?.removeItem("playerId");
+    router.push("/player");
   }, [router]);
   return (
     <div className="h-screen w-screen flex justify-center items-center">

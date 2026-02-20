@@ -112,43 +112,49 @@ const Lobby = (params: {
       >
         Stop Hosting
       </button>
-  
+
       <div className="bg-white dark:bg-dark md:rounded-xl md:mx-8 py-10 my-4 h-[81vh] px-6 relative flex flex-col items-center">
-  
         <h1 className="font-extrabold text-3xl md:text-4xl italic dark:text-white mb-6 text-center">
           {params?.quizTitle}
         </h1>
-  
+
         <div
           onClick={() => {
-            navigator.clipboard.writeText(params?.gameCode);
-            toast.success("Room code copied!");
+            navigator.clipboard
+              .writeText(params?.gameCode)
+              .then(() => {
+                toast.success("Room code copied!");
+              })
+              .catch((err) => {
+                console.error(err);
+                toast.error("Failed to copy room code");
+              });
           }}
           className="cursor-pointer select-none bg-light-bg dark:bg-cardhover-dark border-2 border-[#7D49F8] rounded-2xl px-12 py-10 text-center shadow-lg hover:scale-[1.02] transition-all duration-300"
         >
           <p className="text-sm tracking-[4px] text-gray-500 dark:text-gray-300 mb-3">
             ROOM CODE
           </p>
-  
+
           <h2 className="text-5xl md:text-5xl font-extrabold tracking-[12px] text-lprimary dark:text-dprimary font-mono drop-shadow-lg">
             {params?.gameCode}
           </h2>
-  
+
           <p className="mt-3 text-sm text-stone-500 dark:text-stone-400">
             Click to copy & share with players
           </p>
         </div>
-  
+
         <div className="flex flex-wrap justify-center gap-6 mt-6">
           <span className="p-2 dark:text-white border border-[#7D49F8] bg-light-bg dark:bg-cardhover-dark rounded-xl font-bold">
             Participants: {players.length}
           </span>
-  
+
           <span className="p-2 dark:text-white border border-[#7D49F8] bg-light-bg dark:bg-cardhover-dark rounded-xl font-bold">
             Join at: buzzr.silive.in
           </span>
         </div>
-  
+
         <div className="h-fit mt-8 mx-auto max-h-[40vh] flex flex-wrap justify-center overflow-y-auto gap-y-4 gap-x-3 w-full">
           {players.length === 0 ? (
             <div className="p-2 mx-auto w-fit dark:text-white text-lg">
@@ -192,7 +198,7 @@ const Lobby = (params: {
           {load === true ? "Loading..." : "Start Game"}
         </button>
       </div>
-  
+
       <ConfirmationModal
         open={endGame}
         setOpen={setEndGame}

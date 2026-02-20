@@ -1,6 +1,5 @@
 import { Server } from "socket.io";
-import { prisma } from "../utils/prisma";
-import { GameStates } from "@prisma/client";
+import { prisma, GameStates } from "@buzrr/prisma";
 
 class SocketService {
   private _io: Server;
@@ -47,7 +46,7 @@ class SocketService {
               "Player",
               playerId,
               "not found... \nDisconnecting Socket:",
-              socket.id
+              socket.id,
             );
             socket.disconnect();
             return;
@@ -64,7 +63,7 @@ class SocketService {
               "Admin: ",
               adminId,
               "not found... \nDisconnecting Socket:",
-              socket.id
+              socket.id,
             );
             socket.disconnect();
             return;
@@ -74,7 +73,7 @@ class SocketService {
             "Invalid userType:",
             userType,
             "\nDisconnecting Socket:",
-            socket.id
+            socket.id,
           );
           socket.disconnect();
           return;
@@ -92,7 +91,7 @@ class SocketService {
             "Game: ",
             gameCode,
             "not found... \nDisconnecting Socket:",
-            socket.id
+            socket.id,
           );
           socket.disconnect();
           return;
@@ -100,12 +99,15 @@ class SocketService {
 
         socket.join(gameCode);
       } catch (err) {
-        const code = err && typeof err === "object" && "code" in err ? (err as { code: string }).code : "";
+        const code =
+          err && typeof err === "object" && "code" in err
+            ? (err as { code: string }).code
+            : "";
         if (code === "ECONNREFUSED" || code === "P1001") {
           console.error(
             "Database unavailable. Disconnecting socket:",
             socket.id,
-            err instanceof Error ? err.message : err
+            err instanceof Error ? err.message : err,
           );
         } else {
           console.error("Error during socket connection:", err);
@@ -119,7 +121,7 @@ class SocketService {
         "with SocketId:",
         socket.id,
         "joined Game:",
-        gameCode
+        gameCode,
       );
 
       if (userType === "player") {

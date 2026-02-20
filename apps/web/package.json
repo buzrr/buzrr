@@ -15,8 +15,7 @@
     "@google/generative-ai": "^0.24.1",
     "@hello-pangea/dnd": "^18.0.1",
     "@mui/material": "^7.3.8",
-    "@prisma/adapter-pg": "^7.4.0",
-    "@prisma/client": "^7.4.0",
+    "@buzrr/prisma": "workspace:*",
     "@reduxjs/toolkit": "^2.11.2",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.36.2",
@@ -29,7 +28,8 @@
     "react-redux": "^9.2.0",
     "react-toastify": "^11.0.5",
     "redux-persist": "^6.0.0",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.3",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

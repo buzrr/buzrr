@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import { RxCross2 } from "react-icons/rx";
 import { TiTick } from "react-icons/ti";
 import { useDispatch, useSelector } from "react-redux";
-import { Option } from "@prisma/client";
+import { Option } from "@buzrr/prisma";
 import { RootState } from "@/state/store";
 import { setCurrIndex, setLeaderboard } from "@/state/admin/playersSlice";
 import Image from "next/image";
