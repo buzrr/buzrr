@@ -2,8 +2,8 @@ import { Suspense } from "react";
 import NavbarToggle from "@/components/Admin/NavbarToggle";
 import Navbar from "@/components/Admin/Navbar";
 import GridListToggle from "@/components/Admin/GridListToggle";
-import Buzzrs from "@/components/Admin/Home/Buzzrs";
-import LoaderBuzzrs from "@/components/Admin/Home/LoaderBuzzrs";
+import Buzrrs from "@/components/Admin/Home/Buzrrs";
+import LoaderBuzrrs from "@/components/Admin/Home/LoaderBuzrrs";
 
 export default function Home() {
   return (
@@ -18,14 +18,14 @@ export default function Home() {
             <p className="dark:text-white text-xs md:text-base">
               Hey There 👋!
             </p>
-            <h1 className="text-md md:text-3xl font-black md:py-2 dark:text-white">
+            <h1 className="text-md md:text-3xl font-black md:py-2 text-dark dark:text-white">
               Welcome Back To Your Quiz Hub!
             </h1>
           </span>
           <GridListToggle />
         </div>
-        <Suspense fallback={<LoaderBuzzrs cardCount={3} />}>
-          <Buzzrs />
+        <Suspense fallback={<LoaderBuzrrs cardCount={3} />}>
+          <Buzrrs />
         </Suspense>
       </div>
     </div>

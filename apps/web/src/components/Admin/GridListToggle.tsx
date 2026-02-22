@@ -1,5 +1,6 @@
 "use client";
 
+import clsx from "clsx";
 import { setGridListToggle } from "@/state/admin/gridListSlice";
 import { RootState } from "@/state/store";
 import { IoGridOutline } from "react-icons/io5";
@@ -16,7 +17,7 @@ export default function GridListToggle() {
     <>
       <div className="grid grid-cols-2 bg-card-light dark:bg-[#332D40] rounded-lg shadow-[0px_4px_4px_-1px_rgba(36,104,147,0.04)] h-fit p-2 gap-x-2">
         <div
-          className={` cursor-pointer flex gap-x-1 items-center rounded-md p-2 ${view === "grid" && "bg-white dark:bg-[#27272A]"}`}
+          className={clsx("cursor-pointer flex gap-x-1 items-center rounded-md p-2", view === "grid" && "bg-white dark:bg-[#27272A]")}
           onClick={() => {
             handleToggle({ view: "grid" });
           }}
@@ -25,7 +26,7 @@ export default function GridListToggle() {
           <span className="dark:text-white hidden md:inline">Grid</span>
         </div>
         <div
-          className={` cursor-pointer flex gap-x-1 items-center p-2 rounded-md ${view === "list" && "bg-white dark:bg-[#27272A]"}`}
+          className={clsx("cursor-pointer flex gap-x-1 items-center p-2 rounded-md", view === "list" && "bg-white dark:bg-[#27272A]")}
           onClick={() => {
             handleToggle({ view: "list" });
           }}

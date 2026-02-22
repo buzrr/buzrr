@@ -1,4 +1,5 @@
 "use client";
+import clsx from "clsx";
 import { DEFAULT_AVATAR } from "@/constants";
 import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
@@ -25,18 +26,24 @@ export default function Navbar() {
   return (
     <>
       <div
-        className={`absolute top-0 left-0 w-screen h-screen z-10 bg-[#0000006a] md:hidden ${toggle === navToggle.collapse ? "hidden" : ""}`}
+        className={clsx(
+          "absolute top-0 left-0 w-screen h-screen z-10 bg-[#0000006a] md:hidden",
+          toggle === navToggle.collapse && "hidden"
+        )}
         onClick={() => dispatch(setNavToggle(navToggle.collapse))}
       ></div>
       <div
-        className={`z-20 p-6 px-8 flex bg-light-bg dark:bg-dark-bg flex-col h-screen md:h-[85vh] absolute md:relative w-[80vw] md:w-[25%] left-0 ${toggle === navToggle.collapse ? "hidden md:flex" : ""}`}
+        className={clsx(
+          "z-20 p-6 px-8 flex bg-light-bg dark:bg-dark-bg flex-col h-screen md:h-[85vh] absolute md:relative w-[80vw] md:w-[25%] left-0",
+          toggle === navToggle.collapse && "hidden md:flex"
+        )}
       >
         <div className="flex justify-center items-center md:hidden p-5 mb-2 border-b border-gray">
           <ClientImage
             props={{
               src: "/images/logo.svg",
               darksrc: "/images/logo-dark.svg",
-              alt: "Buzzr Logo",
+              alt: "Buzrr Logo",
               width: 90,
               height: 90,
             }}
@@ -48,11 +55,12 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`my-1 py-2 px-4 rounded-lg flex items-center ${
-                  pathname != link.href
+                className={clsx(
+                  "my-1 py-2 px-4 rounded-lg flex items-center",
+                  pathname !== link.href
                     ? "hover:bg-card-light hover:dark:bg-card-dark dark:text-white transition-colors duration-200 ease-in-out"
                     : "bg-lprimary text-white dark:bg-dprimary dark:text-dark dark:font-extrabold"
-                }`}
+                )}
                 onClick={() => {
                   toggle === navToggle.collapse
                     ? dispatch(setNavToggle(navToggle.expand))
@@ -102,7 +110,7 @@ export default function Navbar() {
               </Link>
               <br />
               <br />
-              Buzzr v2
+              Buzrr v{process.env.NEXT_PUBLIC_VERSION || "0.0.1"}
             </div>
           </div>
         </div>

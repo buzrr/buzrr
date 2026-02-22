@@ -1,5 +1,6 @@
 "use client";
 
+import clsx from "clsx";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
@@ -48,11 +49,9 @@ export default function SelectProfile(props: {
   }, [pending]);
 
   return (
-    <>
       <div className="whitespace-nowrap items-center mt-2 bg-transparent mb-6 max-h-[25vh] overflow-x-scroll overflow-y-hidden">
         {profiles.map((pr, index) => {
           return (
-            <>
               <div className="inline-block p-3" key={index}>
                 <input
                   name="profile"
@@ -67,17 +66,18 @@ export default function SelectProfile(props: {
                     width={128}
                     height={128}
                     src={pr}
-                    className={` ${avatar.index === index && "border-[3px] border-lprimary ease-linear duration-150 scale-[1.2] shadow-lg"} rounded-full w-20 h-20 border-black cursor-pointer`}
+                    className={clsx(
+                      "rounded-full w-20 h-20 border-black cursor-pointer",
+                      avatar.index === index && "border-[3px] border-lprimary ease-linear duration-150 scale-[1.2] shadow-lg"
+                    )}
                     onClick={() => {
                       handleProfile(pr, index);
                     }}
                   />
                 </label>
               </div>
-            </>
           );
         })}
       </div>
-    </>
   );
 }

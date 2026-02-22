@@ -11,6 +11,7 @@
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
     "@buzrr/prisma": "workspace:*",
+    "@buzrr/ui": "workspace:*",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@google/generative-ai": "^0.24.1",
@@ -21,6 +22,7 @@
     "@reduxjs/toolkit": "^2.11.2",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.36.2",
+    "clsx": "^2.1.1",
     "cloudinary": "^2.9.0",
     "next": "15.2.8",
     "next-auth": "^5.0.0-beta.30",

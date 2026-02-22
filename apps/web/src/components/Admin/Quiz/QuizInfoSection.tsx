@@ -14,7 +14,7 @@ async function QuizInfoSection(props: { quiz: any }) {
   return (
     <>
       <form
-        className="w-[40vw] h-[83vh] bg-white dark:bg-dark mr-2 hidden md:block"
+        className="w-[40vw] h-[83vh] bg-white dark:bg-dark p-4 hidden md:flex flex-col"
         action={createRoom}
       >
         <div className="flex flex-col w-[90%] mx-auto text-dark dark:text-white">
@@ -39,9 +39,9 @@ async function QuizInfoSection(props: { quiz: any }) {
             />
           </div>
         </div>
-        <div className="my-2">
+        <div className="flex-1 flex flex-col min-h-0">
           <div className="font-black p-4">Previously used</div>
-          <div className="my-2 h-[33.6vh] overflow-auto">
+          <div className="overflow-auto flex-1 min-h-0 mx-[-8px]">
             {allQuiz?.length > 0 ? (
               allQuiz.map((quiz: any) => {
                 return (

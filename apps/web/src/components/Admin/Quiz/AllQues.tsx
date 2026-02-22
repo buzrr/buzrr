@@ -1,5 +1,6 @@
 "use client";
 
+import clsx from "clsx";
 import ShowMedia from "./ShowMediaComp";
 import Image from "next/image";
 import AddQuesForm from "./AddQuesForm";
@@ -108,7 +109,7 @@ export default function AllQues(props: { quizId: string }) {
             <div
               {...provided.droppableProps}
               ref={provided.innerRef}
-              className={`overflow-x-auto h-[90%] ${visibility === hideQuestions.hide ? "blur-lg pointer-events-none" : ""}`}
+              className={clsx("overflow-x-auto md:h-[90%]", visibility === hideQuestions.hide && "blur-lg pointer-events-none")}
             >
               {questions.length > 0 ? (
                 questions

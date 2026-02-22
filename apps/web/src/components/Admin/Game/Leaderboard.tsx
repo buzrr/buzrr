@@ -1,3 +1,4 @@
+import clsx from "clsx";
 import { DEFAULT_AVATAR } from "@/constants";
 import { RootState } from "@/state/store";
 import Image from "next/image";
@@ -38,7 +39,12 @@ export default function LeaderBoard(props: any) {
                 return (
                   <div
                     key={index}
-                    className={`flex md:flex-col md:justify-center items-center w-full md:w-[25vw] p-2 md:p-4 my-2 rounded-lg border-2 *:my-1 ${index == 0 ? "md:order-2 order-0 border-yellow-500 " : index == 1 ? "md:order-1 order-0 border-gray" : index == 2 ? "md:order-3 order-0 border-[#ec7070e8]" : ""}`}
+                    className={clsx(
+                    "flex md:flex-col md:justify-center items-center w-full md:w-[25vw] p-2 md:p-4 my-2 rounded-lg border-2 *:my-1",
+                    index === 0 && "md:order-2 order-0 border-yellow-500",
+                    index === 1 && "md:order-1 order-0 border-gray",
+                    index === 2 && "md:order-3 order-0 border-[#ec7070e8]"
+                  )}
                   >
                     {index == 0 ? (
                       <span className="text-xl md:text-3xl overflow-hidden text-[#F2AB53]">

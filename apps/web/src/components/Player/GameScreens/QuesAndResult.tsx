@@ -1,4 +1,5 @@
 "use client";
+import clsx from "clsx";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
@@ -89,13 +90,16 @@ const QuestionAndResult = (params: {
             </p>
 
             <div
-              className={`grid grid-cols-1 ${params.question.mediaType === "image" && "lg:grid-cols-2 my-2"} gap-x-4 my-4`}
+              className={clsx("grid grid-cols-1 gap-x-4 my-4", params.question.mediaType === "image" && "lg:grid-cols-2 my-2")}
             >
               {options.map((option: any, index: number) => {
                 return (
                   <div
                     key={option.id}
-                    className={`cursor-pointer p-4 rounded-xl text-lg dark:text-white mt-4 ${option.id === params.optionId ? "dark:bg-dprimary bg-lprimary" : "bg-light-bg dark:bg-off-dark"}`}
+                    className={clsx(
+                    "cursor-pointer p-4 rounded-xl text-lg dark:text-white mt-4",
+                    option.id === params.optionId ? "dark:bg-dprimary bg-lprimary" : "bg-light-bg dark:bg-off-dark"
+                  )}
                     onClick={() => {
                       handleSubmit(option.id);
                     }}
@@ -127,13 +131,10 @@ const QuestionAndResult = (params: {
                 className="w-1/2 h-1/2 md:w-2/5 md:h-2/5"
               />
               <p
-                className={`text-xl xl:text-3xl font-medium mt-2 ${
-                  params.status === "correct"
-                    ? "text-[#20A97C]"
-                    : params.status === "incorrect"
-                      ? "text-red-dark"
-                      : "text-[#F2AB53]"
-                }`}
+                className={clsx(
+                  "text-xl xl:text-3xl font-medium mt-2",
+                  params.status === "correct" ? "text-[#20A97C]" : params.status === "incorrect" ? "text-red-dark" : "text-[#F2AB53]"
+                )}
               >
                 {params.message}
               </p>

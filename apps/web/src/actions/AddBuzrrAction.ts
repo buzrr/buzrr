@@ -5,7 +5,7 @@ import { prisma } from "@buzrr/prisma";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
-const addBuzzr = async (formData: FormData) => {
+const addBuzrr = async (formData: FormData) => {
   try {
     const title = formData.get("title") as string;
     const description = formData.get("description") as string;
@@ -33,4 +33,4 @@ const addBuzzr = async (formData: FormData) => {
   }
 };
 
-export default addBuzzr;
+export default addBuzrr;
