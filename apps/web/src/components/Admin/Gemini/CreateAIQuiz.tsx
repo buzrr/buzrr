@@ -1,6 +1,7 @@
 "use client";
 
-import InputField from "@/components/InputField";
+import clsx from "clsx";
+import { InputField } from "@buzrr/ui";
 import SubmitButton from "@/components/SubmitButton";
 import { Box, Modal } from "@mui/material";
 import Image from "next/image";
@@ -31,7 +32,10 @@ export default function CreateAIQuiz() {
   return (
     <>
       <div
-        className={`p-2 border-2 border-[#c2b4fe] dark:border-transparent w-full text-dark dark:text-white rounded flex justify-center items-center bg-linear-to-b from-[#8D6DDD] to-[#AD56D6] cursor-pointer hover:border-transparent hover:from-[#8D6DDD] hover:to-[#AD56D6] transition-all duration-300 ease-in-out ${view === "list" ? "md:w-full flex-row gap-x-3 md:gap-x-1 py-4 px-2" : "p-2 flex-col md:w-40 h-[50vh] md:h-44"}`}
+        className={clsx(
+          "p-2 border-2 border-[#c2b4fe] dark:border-transparent w-full text-dark dark:text-white rounded flex justify-center items-center bg-linear-to-b from-[#8D6DDD] to-[#AD56D6] cursor-pointer hover:border-transparent hover:from-[#8D6DDD] hover:to-[#AD56D6] transition-all duration-300 ease-in-out",
+          view === "list" ? "md:w-full flex-row gap-x-3 md:gap-x-1 py-4 px-2" : "p-2 flex-col md:w-40 h-[50vh] md:h-44"
+        )}
         onClick={() => setOpen(true)}
       >
         <div className="h-full w-full flex gap-x-4 justify-center items-center">
@@ -40,7 +44,7 @@ export default function CreateAIQuiz() {
             alt="AI Quiz"
             width={45}
             height={45}
-            className={`${view === "grid" ? "w-11 h-11" : "w-6 h-6"}`}
+            className={clsx(view === "grid" ? "w-11 h-11" : "w-6 h-6")}
           />
           {view === "list" && (
             <div className="text-base font-bold w-full text-white">
@@ -54,7 +58,7 @@ export default function CreateAIQuiz() {
           </div>
         )}
         <div
-          className={`${view === "grid" ? "text-xs" : "text-base"} w-full text-white`}
+          className={clsx(view === "grid" ? "text-xs" : "text-base", "w-full text-white")}
         >
           Let&apos;s get your quiz ready
         </div>

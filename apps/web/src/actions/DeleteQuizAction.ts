@@ -22,9 +22,9 @@ async function dltQuiz(quizId: string) {
     });
 
     revalidatePath("/admin", "page");
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
-      error: err.message,
+      error: err instanceof Error ? err.message : "Something went wrong",
     };
   }
 }

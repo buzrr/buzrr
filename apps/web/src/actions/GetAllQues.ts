@@ -19,10 +19,10 @@ async function getAllQuestion(quizId: string) {
     });
 
     return { status: 200, questions };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
       status: 500,
-      error: err.message,
+      error: err instanceof Error ? err.message : "Something went wrong",
     };
   }
 }

@@ -5,9 +5,11 @@
 
 /* Ensure all source files are scanned (helps in monorepos) */
 @source "../";
+@source "../../../../packages/ui/src";
 
 /* Extend the default theme so spacing, radius, etc. are preserved */
 @theme default {
+  --text-2xs: 0.625rem;
   --color-light-bg: #f5f3ff;
   --color-dark-bg: #1e1e1e;
   --color-white: #ffffff;
@@ -28,7 +30,8 @@
 
 @layer base {
   ::-webkit-scrollbar {
-    width: 10px;
+    width: 6px;
+    height: 3px;
   }
 
   ::-webkit-scrollbar-track {
@@ -36,7 +39,7 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #353535;
+    background: #535252;
     border-radius: 5px;
   }
 

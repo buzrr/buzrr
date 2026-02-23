@@ -44,13 +44,22 @@ const page = async ({ params }: { params: Promise<{ roomId: string }> }) => {
     },
   });
 
+  const playersForLobby = players.map((p) => ({
+    ...p,
+    profilePic: p.profilePic ?? undefined,
+  }));
+
+  if(!quizQuestions) {
+    return notFound();
+  }
+
   return (
     <div className="flex justify-center items-center h-fit md:h-[85vh] w-full bg-light-bg dark:bg-dark-bg">
       <GameLobby
         roomId={roomId}
         userId={user.id}
         gameCode={room?.gameCode}
-        players={players}
+        players={playersForLobby}
         quizQuestions={quizQuestions}
         currentQues={room?.currentQuestion}
       />

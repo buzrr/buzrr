@@ -1,10 +1,17 @@
+import clsx from "clsx";
 import { DEFAULT_AVATAR } from "@/constants";
 import { RootState } from "@/state/store";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 
-export default function LeaderBoard(props: any) {
+interface LeaderBoardProps {
+  gameCode: string;
+  quizQuestions?: { id?: string };
+  socket: { emit: (event: string, gameCode: string) => void };
+}
+
+export default function LeaderBoard(props: LeaderBoardProps) {
   const leaderboard = useSelector(
     (state: RootState) => state.player.leaderboard,
   );
@@ -38,7 +45,12 @@ export default function LeaderBoard(props: any) {
                 return (
                   <div
                     key={index}
-                    className={`flex md:flex-col md:justify-center items-center w-full md:w-[25vw] p-2 md:p-4 my-2 rounded-lg border-2 *:my-1 ${index == 0 ? "md:order-2 order-0 border-yellow-500 " : index == 1 ? "md:order-1 order-0 border-gray" : index == 2 ? "md:order-3 order-0 border-[#ec7070e8]" : ""}`}
+                    className={clsx(
+                    "flex md:flex-col md:justify-center items-center w-full md:w-[25vw] p-2 md:p-4 my-2 rounded-lg border-2 *:my-1",
+                    index === 0 && "md:order-2 order-0 border-yellow-500",
+                    index === 1 && "md:order-1 order-0 border-gray",
+                    index === 2 && "md:order-3 order-0 border-[#ec7070e8]"
+                  )}
                   >
                     {index == 0 ? (
                       <span className="text-xl md:text-3xl overflow-hidden text-[#F2AB53]">
@@ -67,7 +79,7 @@ export default function LeaderBoard(props: any) {
                     <div className="flex flex-row items-center gap-x-2 ml-3">
                       <Image
                         src={
-                          lead.Player.profilePic ||
+                          lead.Player?.profilePic ||
                           DEFAULT_AVATAR
                         }
                         className="w-12 h-12 rounded-full"
@@ -76,7 +88,7 @@ export default function LeaderBoard(props: any) {
                         alt="profile pic"
                       />
                       <p className="text-base md:text-xl font-black wrap-break-word md:w-fit w-[40%]">
-                        {lead.Player.name}
+                        {lead.Player?.name}
                       </p>
                     </div>
                     <p className="text-xs md:text-sm text-off-dark dark:text-off-white ml-auto md:ml-0">
@@ -99,7 +111,7 @@ export default function LeaderBoard(props: any) {
                     <div className="flex flex-row items-center gap-x-2 z-20">
                       <Image
                         src={
-                          lead.Player.profilePic ||
+                          lead.Player?.profilePic ||
                           DEFAULT_AVATAR
                         }
                         className="w-12 h-12 rounded-full"
@@ -107,7 +119,7 @@ export default function LeaderBoard(props: any) {
                         height={50}
                         alt="profile pic"
                       />
-                      <p>{lead.Player.name}</p>
+                      <p>{lead.Player?.name}</p>
                     </div>
                     <p className="ml-auto">{lead.score}</p>
                   </div>

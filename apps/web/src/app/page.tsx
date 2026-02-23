@@ -10,7 +10,7 @@ export default function Home() {
             props={{
               src: "/images/logo.svg",
               darksrc: "/images/logo-dark.svg",
-              alt: "Buzzr Logo",
+              alt: "Buzrr Logo",
               width: 80,
               height: 80,
             }}
@@ -43,7 +43,7 @@ export default function Home() {
             props={{
               src: "/images/landing-page.svg",
               darksrc: "/images/landing-page-dark.svg",
-              alt: "Buzzr Logo",
+              alt: "Buzrr Logo",
               width: 350,
               height: 350,
             }}

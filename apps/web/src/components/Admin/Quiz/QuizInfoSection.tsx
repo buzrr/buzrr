@@ -4,7 +4,15 @@ import createRoom from "@/actions/CreateRoomAction";
 import SubmitButton from "@/components/SubmitButton";
 import Link from "next/link";
 
-async function QuizInfoSection(props: { quiz: any }) {
+interface QuizWithSessions {
+  id: string;
+  title: string;
+  description: string | null;
+  questions?: unknown[];
+  gameSessions?: { id: string; createdAt: Date; gameCode?: string }[];
+}
+
+async function QuizInfoSection(props: { quiz: QuizWithSessions }) {
   const session = await auth();
 
   if (!session || !session.user) redirect("/api/auth/signin");
@@ -14,7 +22,7 @@ async function QuizInfoSection(props: { quiz: any }) {
   return (
     <>
       <form
-        className="w-[40vw] h-[83vh] bg-white dark:bg-dark mr-2 hidden md:block"
+        className="w-[40vw] h-[83vh] bg-white dark:bg-dark p-4 hidden md:flex flex-col"
         action={createRoom}
       >
         <div className="flex flex-col w-[90%] mx-auto text-dark dark:text-white">
@@ -30,7 +38,7 @@ async function QuizInfoSection(props: { quiz: any }) {
           <p className="text-xs p-1 border border-[#8FB72E] bg-[#C4F849] rounded w-fit my-1 dark:text-dark">
             Total number of questions : {props.quiz.questions?.length ?? 0}
           </p>
-          <input type="hidden" name="quizId" value={props.quiz.id} />
+          <input type="hidden" name="quizId" value={props.quiz.id} readOnly/>
           <div className="w-full mt-4">
             <SubmitButton
               text="Host quiz"
@@ -39,11 +47,11 @@ async function QuizInfoSection(props: { quiz: any }) {
             />
           </div>
         </div>
-        <div className="my-2">
+        <div className="flex-1 flex flex-col min-h-0">
           <div className="font-black p-4">Previously used</div>
-          <div className="my-2 h-[33.6vh] overflow-auto">
+          <div className="overflow-auto flex-1 min-h-0 mx-[-8px]">
             {allQuiz?.length > 0 ? (
-              allQuiz.map((quiz: any) => {
+              allQuiz.map((quiz: { id: string; createdAt: Date; gameCode?: string }) => {
                 return (
                   <div key={quiz.id}>
                     <div className="bg-card-light dark:bg-card-dark p-4 mt-2">

@@ -9,7 +9,6 @@ import BackNavButton from "@/components/BackNavButton";
 function Player() {
   const [data, setData] = useState({
     name: "",
-    err: false,
     image: "",
   });
 
@@ -21,14 +20,14 @@ function Player() {
           props={{
             src: "/images/logo.svg",
             darksrc: "/images/logo-dark.svg",
-            alt: "Buzzr Logo",
+            alt: "Buzrr Logo",
             width: 80,
             height: 80,
           }}
         />
       </div>
       <div className="w-full h-[81vh] flex gap-4 px-4 *:bg-white dark:*:bg-dark *:rounded-xl">
-        <div className="w-[95vw] mx-auto md:mx-0 md:w-[60vw]">
+        <div className="mx-auto md:w-[60vw] p-6">
           <BackNavButton />
           <CreatePlayerForm data={data} setData={setData} />
         </div>
@@ -50,9 +49,9 @@ function Player() {
               <Image
                 src={`${data?.image ? data.image : "/images/player_profile/profile1.png"}`}
                 alt="Card 2"
-                width={50}
-                height={50}
-                className="rounded-full"
+                width={128}
+                height={128}
+                className="rounded-full inline w-16 h-16"
               />
               <span className="mx-3 font-bold text-dark dark:text-white">
                 {data.name ? data.name : "Your Name"}

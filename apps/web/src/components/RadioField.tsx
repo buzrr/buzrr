@@ -21,7 +21,7 @@ export const RadioField = (props: { defaultvalue?: string; val: string }) => {
       const element = document.getElementById(val) as HTMLInputElement;
       element.checked = false;
     }
-  }, [pending]);
+  }, [pending, val]);
 
   return (
     <input

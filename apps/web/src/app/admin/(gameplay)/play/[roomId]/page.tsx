@@ -1,6 +1,6 @@
 import { prisma } from "@buzrr/prisma";
 import { auth } from "@/utils/auth";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Lobby from "@/components/Admin/Lobby";
 
 async function Play({ params }: { params: Promise<{ roomId: string }> }) {
@@ -37,6 +37,15 @@ async function Play({ params }: { params: Promise<{ roomId: string }> }) {
     },
   });
 
+  const playersForLobby = players.map((p) => ({
+    ...p,
+    profilePic: p.profilePic ?? undefined,
+  }));
+
+  if(!quizQuestions) {
+    return notFound();
+  }
+
   return (
     <>
       <Lobby
@@ -45,7 +54,7 @@ async function Play({ params }: { params: Promise<{ roomId: string }> }) {
         roomId={roomId}
         userId={session.user.id}
         gameCode={room.gameCode}
-        players={players}
+        players={playersForLobby}
         quizQuestions={quizQuestions}
         gameStarted={room.isPlaying}
         currentQues={room.currentQuestion}

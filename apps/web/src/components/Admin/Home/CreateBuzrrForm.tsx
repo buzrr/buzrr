@@ -1,14 +1,15 @@
-import addBuzzr from "../../../actions/AddBuzzrAction";
+"use client";
+import addBuzrr from "../../../actions/AddBuzrrAction";
 import SubmitButton from "../../SubmitButton";
-import InputField from "../../InputField";
+import { InputField } from "@buzrr/ui";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useRouter } from "next/navigation";
 
-const CreateBuzzrForm = (params: { setTitle: any }) => {
+const CreateBuzrrForm = (params: { setTitle: (title: string) => void }) => {
   const router = useRouter();
   async function clientAction(formData: FormData) {
-    const result = await addBuzzr(formData);
+    const result = await addBuzrr(formData);
     if (result?.error) {
       const errorMsg = result.error || "Something went wrong";
       toast.error(errorMsg);
@@ -44,4 +45,4 @@ const CreateBuzzrForm = (params: { setTitle: any }) => {
   );
 };
 
-export default CreateBuzzrForm;
+export default CreateBuzrrForm;

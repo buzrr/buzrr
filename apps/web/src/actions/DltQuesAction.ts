@@ -14,9 +14,9 @@ async function dltQuestion(quesId: string) {
         id: quesId,
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
-      error: err.message,
+      error: err instanceof Error ? err.message : "Something went wrong",
     };
   }
 }

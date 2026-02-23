@@ -1,0 +1,4 @@
+# Reduce deploy payload when Vercel uses repo root (monorepo).
+.next/cache
+.turbo
+**/*.tsbuildinfo

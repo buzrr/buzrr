@@ -1,4 +1,5 @@
 "use client";
+import clsx from "clsx";
 import Image from "next/image";
 import { useSelector } from "react-redux";
 import { pageTheme } from "@/state/pageThemeSlice";
@@ -25,7 +26,7 @@ const ClientImage = ({
         alt={props.alt}
         width={props.width}
         height={props.height}
-        className={` ${props.classname} inline`}
+        className={clsx(props.classname, "inline")}
       />
     </>
   );

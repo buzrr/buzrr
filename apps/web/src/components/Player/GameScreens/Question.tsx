@@ -1,15 +1,19 @@
 "use client";
-import { cssOptionColors } from "@/utils/optionColors";
 import { useEffect, useState } from "react";
 import { Socket } from "socket.io-client";
 import { useDispatch } from "react-redux";
 import { setScreenStatus, ScreenStatus } from "@/state/player/screenSlice";
 import submitAnswerAction from "@/actions/SubmitAnswerAction";
-import Image from "next/image";
 import QuestionAndResult from "./QuesAndResult";
 
+interface QuestionWithOptions {
+  title?: string;
+  timeOut?: number;
+  options: { id: string; title: string }[];
+}
+
 const Question = (params: {
-  question: any;
+  question: QuestionWithOptions;
   gameSessionId: string;
   playerId: string;
   socket: Socket;
@@ -17,7 +21,6 @@ const Question = (params: {
   quizTitle: string;
   gameCode: string;
 }) => {
-  const options = params.question.options;
   const dispatch = useDispatch();
   const [timer, setTimer] = useState(0);
   const [optionId, setOptionId] = useState("");
@@ -28,7 +31,7 @@ const Question = (params: {
     const timeout = setTimeout(() => {
       console.log("time up");
       dispatch(setScreenStatus(ScreenStatus.result));
-    }, params.question.timeOut * 1000);
+    }, (params.question.timeOut ?? 0) * 1000);
 
     const interval = setInterval(() => {
       setTimer(timer + 0.5);
@@ -59,7 +62,7 @@ const Question = (params: {
       <QuestionAndResult
         question={params.question}
         quizTitle={params.quizTitle}
-        quesTime={params.question.timeOut}
+        quesTime={params.question.timeOut ?? 0}
         gameCode={params.gameCode}
         screen="question"
         submitAnswer={submitAnswer}

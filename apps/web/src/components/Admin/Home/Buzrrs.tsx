@@ -1,9 +1,9 @@
 import { prisma } from "@buzrr/prisma";
 import { auth } from "@/utils/auth";
 import { redirect } from "next/navigation";
-import ClientBuzzr from "./ClientBuzzrs";
+import ClientBuzrrs from "./ClientBuzrrs";
 
-const Buzzrs = async () => {
+const Buzrrs = async () => {
   const session = await auth();
 
   if (!session || !session.user) redirect("/api/auth/signin");
@@ -14,7 +14,7 @@ const Buzzrs = async () => {
     },
   });
 
-  let quizzes = await prisma.quiz.findMany({
+  const quizzes = await prisma.quiz.findMany({
     where: {
       userId: user?.id as string,
     },
@@ -23,7 +23,7 @@ const Buzzrs = async () => {
     },
   });
 
-  return <ClientBuzzr quizzes={quizzes} />;
+  return <ClientBuzrrs quizzes={quizzes} />;
 };
 
-export default Buzzrs;
+export default Buzrrs;

@@ -7,7 +7,7 @@ import ThemeToggle from "./ThemeToggle";
 const Links = [
   {
     name: "Instagram",
-    link: "https://www.instagram.com/_buzzr/",
+    link: "https://www.instagram.com/buzrr.in/",
     icon: "/images/instagram.svg",
   },
   {
@@ -22,13 +22,8 @@ const Links = [
   },
   {
     name: "Github",
-    link: "https://github.com/alanansari/buzzr",
+    link: "https://github.com/buzrr/buzrr",
     icon: "/images/github.svg",
-  },
-  {
-    name: "Software Incubator",
-    link: "https://silive.in/",
-    icon: "/images/incubator.svg",
   },
 ];
 

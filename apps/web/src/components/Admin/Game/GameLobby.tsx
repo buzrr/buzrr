@@ -10,21 +10,43 @@ import {
   setPlayers,
 } from "@/state/admin/playersSlice";
 import { ScreenStatus } from "@/state/admin/screenSlice";
+import type { Option } from "@/types/db";
 import WaitScreen from "./WaitScreen";
 import QuestionScreen from "./QuestionScreen";
 import QuesResult from "./QuesResult";
 import LeaderBoard from "./Leaderboard";
 
+interface Player {
+  id: string;
+  name?: string;
+  profilePic?: string;
+  [key: string]: unknown;
+}
+
+interface QuizQuestionItem {
+  title?: string;
+  options?: Option[];
+  id?: string;
+  media?: string | null;
+  mediaType?: string | null;
+}
+
+interface QuizQuestion {
+  id?: string;
+  title?: string;
+  questions?: QuizQuestionItem[];
+}
+
 const GameLobby = (params: {
   roomId: string;
   userId: string;
   gameCode: string;
-  players: any[];
-  quizQuestions: any;
+  players: Player[];
+  quizQuestions: QuizQuestion;
   currentQues: number;
 }) => {
   const dispatch = useDispatch();
-  const players: any[] = useSelector(
+  const players: Player[] = useSelector(
     (state: RootState) => state.player.players,
   );
   const socket = useSelector((state: RootState) => state.socket.socket);
@@ -49,12 +71,12 @@ const GameLobby = (params: {
         dispatch(createConnection(socket));
       });
 
-      socket.on("player-joined", (player: any) => {
+      socket.on("player-joined", (player: Player) => {
         console.log(`Player ${player.id} Joined`);
         dispatch(addPlayer(player));
       });
 
-      socket.on("player-removed", (player: any) => {
+      socket.on("player-removed", (player: Player) => {
         console.log(`Player ${player.id} removed`);
         dispatch(removePlayer(player));
       });

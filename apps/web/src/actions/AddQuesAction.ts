@@ -30,7 +30,7 @@ export default async function addQues(formData: FormData) {
     const quizId = formData.get("quiz_id") as string;
     const quesId = formData.get("ques_id") as string;
     const correct_option = formData.get("choose_option") as string;
-    var options = [
+    const options = [
       { title: option1, isCorrect: correct_option === "a" ? true : false },
       { title: option2, isCorrect: correct_option === "b" ? true : false },
       { title: option3, isCorrect: correct_option === "c" ? true : false },
@@ -40,8 +40,8 @@ export default async function addQues(formData: FormData) {
     const file = formData.get("file") as File;
     const file_link = formData.get("file_link") as string;
     const file_type = formData.get("media_type") as string;
-    var fileLink = "",
-      fileType = "";
+    let fileLink = "";
+    let fileType = "";
 
     if (file.size != 0) {
       if (file_link) {
@@ -127,9 +127,9 @@ export default async function addQues(formData: FormData) {
       });
     }
     revalidatePath(`/quiz/${quizId}`);
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
-      error: err.message,
+      error: err instanceof Error ? err.message : "Something went wrong",
     };
   }
 }

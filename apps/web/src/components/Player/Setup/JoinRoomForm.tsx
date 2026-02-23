@@ -27,7 +27,7 @@ const JoinRoomForm = (params: { playerId: string }) => {
       <h2 className="text-md md:text-lg py-2 dark:text-white">
         Enter room code provided by the admin
       </h2>
-      <input type="hidden" name="playerId" value={params.playerId} />
+      <input type="hidden" name="playerId" value={params.playerId} readOnly/>
       <input
         type="text"
         name="gameCode"

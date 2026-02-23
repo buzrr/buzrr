@@ -1,4 +1,5 @@
 "use client";
+import clsx from "clsx";
 import { useState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 
@@ -14,7 +15,7 @@ const InputField = (props: {
   style?: string;
   accept?: string;
   textarea?: boolean;
-  onTitleChange?: any;
+  onTitleChange?: (value: string) => void;
   label?: string;
   labelClass?: string;
   fieldValue?: string;
@@ -31,7 +32,7 @@ const InputField = (props: {
     if (pending) setValue("");
   }, [pending]);
 
-  function handleInput(e: any) {
+  function handleInput(e: React.ChangeEvent<HTMLInputElement>) {
     if (props.onTitleChange) {
       props.onTitleChange(e.target.value);
     }
@@ -41,7 +42,7 @@ const InputField = (props: {
   return (
     <div className="flex flex-col mb-3">
       <label
-        className={`text-sm text-dark dark:text-white mb-0 ${props.labelClass}`}
+        className={clsx("text-sm text-dark dark:text-white mb-0", props.labelClass)}
       >
         {props.label}
       </label>
@@ -53,7 +54,7 @@ const InputField = (props: {
           placeholder={props.placeholder}
           autoComplete={props.autoComplete}
           required={props.required || false}
-          className={`${props.className} text-slate-900 my-2 rounded-lg px-4 py-3 focus:bg-[#EEEEF0] focus:outline-none focus:dark:bg-[#27272A] max-h-40 min-h-20`}
+          className={clsx(props.className, "text-slate-900 my-2 rounded-lg px-4 py-3 focus:bg-[#EEEEF0] focus:outline-none focus:dark:bg-[#27272A] max-h-40 min-h-20")}
           maxLength={props.maxLength || 100}
         />
       ) : (
@@ -65,7 +66,14 @@ const InputField = (props: {
           placeholder={props.placeholder}
           autoComplete={props.autoComplete}
           required={props.required || false}
-          className={`${props.style === "playerName" && "w-full border-black border-2 focus:border-blue-600 rounded-lg outline-none md:w-4/5"} text-slate-900 my-2 rounded-full px-4 py-3 ${props.style === "question" ? "w-4/5" : "w-full"}  ${props.accept && "text-white"} ${props.className} focus:bg-[#EEEEF0] focus:outline-none focus:dark:bg-[#27272A]`}
+          className={clsx(
+            props.style === "playerName" && "w-full border-black border-2 focus:border-blue-600 rounded-lg outline-none md:w-4/5",
+            "text-slate-900 my-2 rounded-full px-4 py-3",
+            props.style === "question" ? "w-4/5" : "w-full",
+            props.accept && "text-white",
+            props.className,
+            "focus:bg-[#EEEEF0] focus:outline-none focus:dark:bg-[#27272A]"
+          )}
           accept={props.accept}
           min={props.type === "number" ? 1 : undefined}
           max={props.maxNum}

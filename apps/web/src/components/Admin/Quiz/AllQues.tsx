@@ -1,5 +1,6 @@
 "use client";
 
+import clsx from "clsx";
 import ShowMedia from "./ShowMediaComp";
 import Image from "next/image";
 import AddQuesForm from "./AddQuesForm";
@@ -16,19 +17,33 @@ import { RootState } from "@/state/store";
 import { useSelector } from "react-redux";
 import { hideQuestions } from "@/state/hideQuestionsSlice";
 
+interface QuestionWithOrder {
+  id: string;
+  order: number;
+  title?: string;
+  timeOut?: number;
+  options?: { title?: string; isCorrect?: boolean }[];
+  media?: string | null;
+  mediaType?: string | null;
+  [key: string]: unknown;
+}
+
 export default function AllQues(props: { quizId: string }) {
-  const [questions, setQuestions] = useState<any[]>([]);
+  const [questions, setQuestions] = useState<QuestionWithOrder[]>([]);
   const [delQuesModalOpen, setDelQuesModalOpen] = useState(false);
   const [delQuesId, setDelQuesId] = useState("");
 
   useEffect(() => {
     async function fetchQues() {
       try {
-        const result: any = await getAllQuestion(props.quizId);
+        const result = await getAllQuestion(props.quizId);
         if (result.status == 200) {
-          setQuestions(result.questions);
+          setQuestions(result.questions ?? []);
         }
-      } catch (err) {}
+      } catch (error) {
+        console.error(error);
+        toast.error("Failed to fetch questions");
+      }
     }
     fetchQues();
   }, [props.quizId]);
@@ -47,9 +62,9 @@ export default function AllQues(props: { quizId: string }) {
   }
 
   const reorder = (
-    list: any,
-    startIndex: number,
-    endIndex: number,
+    _list: QuestionWithOrder[],
+    _startIndex: number,
+    _endIndex: number,
     dragId: string,
     dropId: string,
   ) => {
@@ -58,18 +73,18 @@ export default function AllQues(props: { quizId: string }) {
       dropQuesId: dropId,
     });
 
-    const dragBox = questions.find((box: any) => box?.id === dragId);
-    const dropBox = questions.find((box: any) => box.id === dropId);
+    const dragBox = questions.find((box) => box?.id === dragId);
+    const dropBox = questions.find((box) => box.id === dropId);
 
     const dragBoxOrder = dragBox?.order;
     const dropBoxOrder = dropBox?.order;
 
-    const result = questions.map((box: any) => {
+    const result = questions.map((box) => {
       if (box.id === dragId) {
-        box.order = dropBoxOrder;
+        box.order = dropBoxOrder ?? 0;
       }
       if (box.id === dropId) {
-        box.order = dragBoxOrder;
+        box.order = dragBoxOrder ?? 0;
       }
       return box;
     });
@@ -77,7 +92,7 @@ export default function AllQues(props: { quizId: string }) {
     return result;
   };
 
-  function onDragEnd(result: any) {
+  function onDragEnd(result: { destination: { index: number } | null; source: { index: number } }) {
     if (!result.destination) {
       return;
     }
@@ -108,7 +123,7 @@ export default function AllQues(props: { quizId: string }) {
             <div
               {...provided.droppableProps}
               ref={provided.innerRef}
-              className={`overflow-x-auto h-[90%] ${visibility === hideQuestions.hide ? "blur-lg pointer-events-none" : ""}`}
+              className={clsx("overflow-x-auto md:h-[90%]", visibility === hideQuestions.hide && "blur-lg pointer-events-none")}
             >
               {questions.length > 0 ? (
                 questions
@@ -149,7 +164,7 @@ export default function AllQues(props: { quizId: string }) {
                               </div>
                               <div className="flex flex-col md:grid md:grid-cols-4">
                                 {ques?.options?.map(
-                                  (op: any, index: number) => {
+                                  (op: { title?: string; isCorrect?: boolean }, index: number) => {
                                     return (
                                       <p
                                         key={index}
@@ -208,7 +223,7 @@ export default function AllQues(props: { quizId: string }) {
                                 {ques.media && (
                                   <ShowMedia
                                     media={ques.media}
-                                    mediaType={ques.mediaType || ""}
+                                    mediaType={ques.mediaType ?? ""}
                                   />
                                 )}
                               </div>

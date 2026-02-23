@@ -1,4 +1,5 @@
 "use client";
+import clsx from "clsx";
 import React from "react";
 import { Skeleton } from "@mui/material";
 import { useSelector } from "react-redux";
@@ -8,7 +9,10 @@ const CardSkeleton = (): React.ReactNode => {
   const view = useSelector((state: RootState) => state.gridListToggle.view);
   return (
     <div
-      className={`border border-[#c2b4fe] dark:border-transparent w-full bg-card-light dark:bg-card-dark text-dark dark:text-white rounded ${view === "list" ? "md:w-full py-4 px-2" : "p-2 md:w-40 h-[50vh] md:h-44"}`}
+      className={clsx(
+        "border border-[#c2b4fe] dark:border-transparent w-full bg-card-light dark:bg-card-dark text-dark dark:text-white rounded",
+        view === "list" ? "md:w-full py-4 px-2" : "p-2 md:w-40 h-[50vh] md:h-44"
+      )}
     >
       {view === "grid" ? (
         <>
@@ -22,7 +26,7 @@ const CardSkeleton = (): React.ReactNode => {
   );
 };
 
-const LoaderBuzzrs = ({ cardCount }: { cardCount: number }) => {
+const LoaderBuzrrs = ({ cardCount }: { cardCount: number }) => {
   const cards: Array<React.ReactNode> = [];
   const view = useSelector((state: RootState) => state.gridListToggle.view);
 
@@ -31,11 +35,11 @@ const LoaderBuzzrs = ({ cardCount }: { cardCount: number }) => {
   }
   return (
     <div
-      className={`flex gap-x-3 ${view === "list" ? "flex-col gap-y-3" : ""} `}
+      className={clsx("flex gap-x-3", view === "list" && "flex-col gap-y-3")}
     >
       {cards}
     </div>
   );
 };
 
-export default LoaderBuzzrs;
+export default LoaderBuzrrs;

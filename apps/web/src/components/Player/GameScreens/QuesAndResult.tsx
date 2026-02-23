@@ -1,19 +1,33 @@
 "use client";
+import clsx from "clsx";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
+interface QuestionOption {
+  id: string;
+  title: string;
+}
+
+interface QuestionWithOptions {
+  title?: string;
+  timeOut?: number;
+  media?: string;
+  mediaType?: string;
+  options?: QuestionOption[];
+}
+
 const QuestionAndResult = (params: {
-  question?: any;
+  question?: QuestionWithOptions;
   quizTitle: string;
   gameCode: string;
   screen: string;
-  submitAnswer?: any;
+  submitAnswer?: (optionId: string) => void;
   quesTime: number;
   optionId?: string;
   status?: string;
   message?: string;
 }) => {
-  const options = params?.question?.options;
+  const options = params?.question?.options ?? [];
   const [quesTime, setQuesTime] = useState(params?.quesTime);
   const [percent, setPercent] = useState(100);
 
@@ -23,7 +37,7 @@ const QuestionAndResult = (params: {
         setQuesTime((prev: number) => prev - 1);
       }
       if (quesTime >= 0) {
-        var x = Math.floor((quesTime * 100) / params?.question?.timeOut);
+        const x = Math.floor((quesTime * 100) / (params?.question?.timeOut ?? 1));
         setPercent(x);
       }
     }, 1000);
@@ -31,10 +45,10 @@ const QuestionAndResult = (params: {
     return () => {
       clearInterval(timer);
     };
-  }, [quesTime, params.question]);
+  }, [quesTime, params?.question]);
 
   function handleSubmit(id: string) {
-    params?.submitAnswer(id);
+    params?.submitAnswer?.(id);
   }
 
   return (
@@ -74,9 +88,9 @@ const QuestionAndResult = (params: {
         </div>
         {params.screen === "question" ? (
           <div className="w-full p-6 flex flex-col min-h-full h-fit ">
-            {params.question.mediaType === "image" && (
+            {params.question?.mediaType === "image" && (
               <Image
-                src={params.question.media}
+                src={params.question?.media ?? ""}
                 className="mb-10 mx-auto md:h-[30vh]"
                 alt="media Image"
                 height={320}
@@ -85,17 +99,20 @@ const QuestionAndResult = (params: {
             )}
             <p className="dark:text-white">Question</p>
             <p className="font-bold text-2xl dark:text-white">
-              {params.question.title}
+              {params.question?.title ?? ""}
             </p>
 
             <div
-              className={`grid grid-cols-1 ${params.question.mediaType === "image" && "lg:grid-cols-2 my-2"} gap-x-4 my-4`}
+              className={clsx("grid grid-cols-1 gap-x-4", params.question?.mediaType === "image" ? "lg:grid-cols-2 my-2" : "my-4")}
             >
-              {options.map((option: any, index: number) => {
+              {options.map((option: QuestionOption, index: number) => {
                 return (
                   <div
                     key={option.id}
-                    className={`cursor-pointer p-4 rounded-xl text-lg dark:text-white mt-4 ${option.id === params.optionId ? "dark:bg-dprimary bg-lprimary" : "bg-light-bg dark:bg-off-dark"}`}
+                    className={clsx(
+                    "cursor-pointer p-4 rounded-xl text-lg dark:text-white mt-4",
+                    option.id === params.optionId ? "dark:bg-dprimary bg-lprimary" : "bg-light-bg dark:bg-off-dark"
+                  )}
                     onClick={() => {
                       handleSubmit(option.id);
                     }}
@@ -127,13 +144,10 @@ const QuestionAndResult = (params: {
                 className="w-1/2 h-1/2 md:w-2/5 md:h-2/5"
               />
               <p
-                className={`text-xl xl:text-3xl font-medium mt-2 ${
-                  params.status === "correct"
-                    ? "text-[#20A97C]"
-                    : params.status === "incorrect"
-                      ? "text-red-dark"
-                      : "text-[#F2AB53]"
-                }`}
+                className={clsx(
+                  "text-xl xl:text-3xl font-medium mt-2",
+                  params.status === "correct" ? "text-[#20A97C]" : params.status === "incorrect" ? "text-red-dark" : "text-[#F2AB53]"
+                )}
               >
                 {params.message}
               </p>

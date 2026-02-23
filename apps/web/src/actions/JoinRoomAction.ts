@@ -19,7 +19,7 @@ export default async function joinRoom(formData: FormData) {
         throw new Error("IP not found");
       }
 
-      const { remaining, limit, success } = await rateLimit.limit(ip);
+      const { success } = await rateLimit.limit(ip);
 
       if (!success) {
         throw new Error("Rate limit reached wait for some time and try again.");
@@ -48,7 +48,7 @@ export default async function joinRoom(formData: FormData) {
       throw new Error("Player not found");
     }
     return { roomId: game.id, playerId: playerId };
-  } catch (err: any) {
-    return { error: err.message };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : "Something went wrong" };
   }
 }

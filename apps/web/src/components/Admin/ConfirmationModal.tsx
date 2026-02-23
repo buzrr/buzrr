@@ -9,8 +9,8 @@ export default function ConfirmationModal({
   desc,
 }: {
   open: boolean;
-  setOpen: any;
-  onClick: any;
+  setOpen: (open: boolean) => void;
+  onClick: () => void;
   desc?: string;
 }) {
   return (

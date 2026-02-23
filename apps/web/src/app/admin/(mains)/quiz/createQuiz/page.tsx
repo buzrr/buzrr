@@ -1,6 +1,6 @@
 "use client";
 
-import CreateBuzzrForm from "@/components/Admin/Home/CreateBuzzrForm";
+import CreateBuzrrForm from "@/components/Admin/Home/CreateBuzrrForm";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -44,7 +44,7 @@ export default function CreateQuiz() {
               Give your quiz title
               <br /> and description
             </p>
-            <CreateBuzzrForm setTitle={setTitle} />
+            <CreateBuzrrForm setTitle={setTitle} />
           </div>
           <div className=" mt-4 w-1/2 bg-light-bg dark:bg-dark-bg p-8 rounded-3xl hidden md:block">
             <p className="text-3xl italic font-extrabold dark:text-white mb-6 w-11/12">

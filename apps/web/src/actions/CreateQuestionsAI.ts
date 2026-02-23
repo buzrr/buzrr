@@ -14,15 +14,20 @@ const rateLimit = new Ratelimit({
   limiter: Ratelimit.slidingWindow(3, "300s"),
 });
 
-function shuffleArray(array: any) {
+function shuffleArray<T>(array: T[]) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [array[i], array[j]] = [array[j], array[i]];
   }
 }
 
-function parseQuestions(content: string) {
-  const questions: any = [];
+interface ParsedQuestion {
+  question: string;
+  options: { title: string; isCorrect: boolean }[];
+}
+
+function parseQuestions(content: string): ParsedQuestion[] {
+  const questions: ParsedQuestion[] = [];
   const questionBlocks = content
     .split("\n\n")
     .filter((block) => block.trim() !== "");
@@ -30,7 +35,7 @@ function parseQuestions(content: string) {
   questionBlocks.forEach((block) => {
     const lines = block.split("\n").filter((line) => line.trim() !== "");
     let question = "";
-    const options: any = [];
+    const options: { title: string; isCorrect: boolean }[] = [];
 
     lines.forEach((line) => {
       if (line.startsWith("Question:")) {
@@ -61,7 +66,7 @@ const addQuestionsByAI = async (formData: FormData) => {
         throw new Error("IP not found");
       }
 
-      const { remaining, limit, success } = await rateLimit.limit(ip);
+      const { success } = await rateLimit.limit(ip);
 
       if (!success) {
         throw new Error("Rate limit reached wait for some time and try again.");
@@ -120,7 +125,7 @@ const addQuestionsByAI = async (formData: FormData) => {
     }
 
     const questionsData = questionsArray.map(
-      (question: any, index: number) => ({
+      (question: ParsedQuestion, index: number) => ({
         title: question.question,
         options: {
           create: question.options,
@@ -132,7 +137,7 @@ const addQuestionsByAI = async (formData: FormData) => {
     );
 
     await prisma.$transaction(
-      questionsData.map((question: any) =>
+      questionsData.map((question) =>
         prisma.question.create({
           data: question,
         }),
@@ -141,8 +146,8 @@ const addQuestionsByAI = async (formData: FormData) => {
 
     revalidatePath("/admin", "page");
     return { msg: "Quiz created successfully", quizId: quiz.id };
-  } catch (err: any) {
-    return { error: err.message };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : "Something went wrong" };
   }
 };
 

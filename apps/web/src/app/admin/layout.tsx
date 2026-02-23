@@ -9,8 +9,7 @@ import { auth } from "@/utils/auth";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Buzzr Admin",
-  description: "Buzzr Admin Panel",
+  title: "Admin Panel",
 };
 
 export default async function RootLayout({
@@ -33,7 +32,7 @@ export default async function RootLayout({
                   props={{
                     src: "/images/logo.svg",
                     darksrc: "/images/logo-dark.svg",
-                    alt: "Buzzr Logo",
+                    alt: "Buzrr Logo",
                     width: 80,
                     height: 80,
                   }}

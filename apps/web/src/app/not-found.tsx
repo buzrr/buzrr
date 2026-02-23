@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import ClientImage from "@/components/ClientImage";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 
 export default function NotFound() {
   return (
@@ -14,7 +12,7 @@ export default function NotFound() {
             props={{
               src: "/images/logo.svg",
               darksrc: "/images/logo-dark.svg",
-              alt: "Buzzr Logo",
+              alt: "Buzrr Logo",
               width: 80,
               height: 80,
             }}

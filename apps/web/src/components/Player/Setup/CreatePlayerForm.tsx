@@ -11,7 +11,7 @@ const CreatePlayerForm = (props: {
     name: string;
     image: string;
   };
-  setData: (data: any) => void;
+  setData: (data: { name: string; image: string }) => void;
 }) => {
   const router = useRouter();
 
@@ -38,7 +38,7 @@ const CreatePlayerForm = (props: {
   };
 
   return (
-    <form className="flex flex-col w-[90%] m-4" action={clientAction}>
+    <form className="flex flex-col" action={clientAction}>
       <h1 className="text-3xl md:text-5xl py-2 font-extrabold dark:text-white">
         Create a custom profile
       </h1>

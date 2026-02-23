@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useState } from "react";
 
 const style = {
-  position: "absolute" as "absolute",
+  position: "absolute" as const,
   top: "50%",
   left: "50%",
   transform: "translate(-50%, -50%)",

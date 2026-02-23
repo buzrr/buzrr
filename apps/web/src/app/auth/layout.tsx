@@ -10,7 +10,7 @@ const AuthLayout = ({ children }: { children: React.ReactNode }) => {
             props={{
               src: "/images/logo.svg",
               darksrc: "/images/logo-dark.svg",
-              alt: "Buzzr Logo",
+              alt: "Buzrr Logo",
               width: 80,
               height: 80,
             }}

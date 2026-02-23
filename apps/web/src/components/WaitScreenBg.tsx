@@ -15,7 +15,7 @@ export default function WaitScreen() {
                 1. Buzzer
               </div>
               <div className="cursor-pointer p-3 rounded-xl text-lg dark:text-white mt-4 dark:bg-dprimary bg-lprimary">
-                2. Buzzr
+                2. Buzrr
               </div>
               <div className="cursor-pointer p-3 rounded-xl text-lg dark:text-white mt-4 dark:bg-dprimary bg-lprimary">
                 3. Kahoot

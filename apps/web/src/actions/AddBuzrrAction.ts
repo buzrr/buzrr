@@ -5,7 +5,7 @@ import { prisma } from "@buzrr/prisma";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
-const addBuzzr = async (formData: FormData) => {
+const addBuzrr = async (formData: FormData) => {
   try {
     const title = formData.get("title") as string;
     const description = formData.get("description") as string;
@@ -28,9 +28,9 @@ const addBuzzr = async (formData: FormData) => {
 
     revalidatePath("/admin", "page");
     return { quizId: quiz.id };
-  } catch (err: any) {
-    return { error: err.message };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : "Something went wrong" };
   }
 };
 
-export default addBuzzr;
+export default addBuzrr;

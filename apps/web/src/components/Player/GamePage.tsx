@@ -4,7 +4,7 @@ import { io, Socket } from "socket.io-client";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/state/store";
 import { useRouter } from "next/navigation";
-import { GameSession } from "@buzrr/prisma";
+import type { GameSession } from "@/types/db";
 import {
   WaitGameStart,
   Question,
@@ -15,14 +15,24 @@ import {
 import { ScreenStatus, setScreenStatus } from "@/state/player/screenSlice";
 import { ResultStatus, setResultStatus } from "@/state/player/resultSlice";
 
-const GamePage = (params: { player: any; game: GameSession }) => {
-  const game = params.game as any;
+interface PlayerWithId {
+  id: string;
+  [key: string]: unknown;
+}
+
+interface GameSessionWithQuiz extends GameSession {
+  quiz: {
+    title?: string;
+    questions: { id: string; title?: string; options?: { id: string; title: string }[]; [key: string]: unknown }[];
+  };
+}
+
+const GamePage = (params: { player: PlayerWithId; game: GameSessionWithQuiz }) => {
+  const game = params.game;
   const [question, setQuestion] = useState(
     game.quiz.questions[game.currentQuestion],
   );
-  const [questionIndex, setQuestionIndex] = useState(
-    game.quiz.questions[game.currentQuestion],
-  );
+  const [questionIndex, setQuestionIndex] = useState(game.currentQuestion);
   const [socketState, setSocketState] = useState<Socket>({} as Socket);
   const [stats, setStats] = useState<{
     position: number | null;
@@ -47,7 +57,7 @@ const GamePage = (params: { player: any; game: GameSession }) => {
         setSocketState(socket);
       });
 
-      socket.on("player-removed", (player: any) => {
+      socket.on("player-removed", (player: PlayerWithId) => {
         if (player.id === params.player.id) {
           window.localStorage.removeItem("playerId");
           router.push("/player");
@@ -58,7 +68,7 @@ const GamePage = (params: { player: any; game: GameSession }) => {
         dispatch(setScreenStatus(ScreenStatus.wait));
       });
 
-      socket.on("timer-starts", (time: number) => {
+      socket.on("timer-starts", () => {
         dispatch(setScreenStatus(ScreenStatus.wait));
       });
 
@@ -69,15 +79,15 @@ const GamePage = (params: { player: any; game: GameSession }) => {
         dispatch(setScreenStatus(ScreenStatus.question));
       });
 
-      socket.on("displaying-result", (data: any) => {
+      socket.on("displaying-result", (data: { player?: { playerId: string; isCorrect?: boolean }[] }) => {
         console.log("Displaying result", data);
 
         // set result
-        const playerAnswers = data.player;
+        const playerAnswers = data.player ?? [];
 
         let playerAnswered = false;
 
-        playerAnswers.forEach((player: any) => {
+        playerAnswers.forEach((player: { playerId: string; isCorrect?: boolean }) => {
           if (player.playerId === params.player.id) {
             dispatch(
               setResultStatus(
@@ -101,8 +111,8 @@ const GamePage = (params: { player: any; game: GameSession }) => {
         router.push("/player");
       });
 
-      socket.on("displaying-final-leaderboard", (leaderboard: any) => {
-        leaderboard.map((player: any) => {
+      socket.on("displaying-final-leaderboard", (leaderboard: { playerId: string; position: number; score: number }[]) => {
+        leaderboard.forEach((player) => {
           if (player.playerId === params.player.id) {
             setStats({ position: player.position, score: player.score });
           }
@@ -128,20 +138,24 @@ const GamePage = (params: { player: any; game: GameSession }) => {
       {screen === ScreenStatus.lobby ? (
         <WaitGameStart player={params.player} game={params.game} />
       ) : screen === ScreenStatus.question ? (
-        <Question
-          question={question}
-          gameSessionId={params.game.id}
-          playerId={params.player.id}
-          socket={socketState}
-          currentQuestion={questionIndex}
-          quizTitle={game.quiz.title}
-          gameCode={params.game.gameCode}
-        />
+        question ? (
+          <Question
+            question={{ ...question, options: question.options ?? [] }}
+            gameSessionId={params.game.id}
+            playerId={params.player.id ?? ""}
+            socket={socketState}
+            currentQuestion={questionIndex}
+            quizTitle={game.quiz.title ?? ""}
+            gameCode={params.game.gameCode}
+          />
+        ) : (
+          <Loader />
+        )
       ) : screen === ScreenStatus.result ? (
         <Result
           result={result}
           gameCode={params.game.gameCode}
-          quizTitle={game.quiz.title}
+          quizTitle={game.quiz.title ?? ""}
         />
       ) : screen === ScreenStatus.wait ? (
         <Loader />
