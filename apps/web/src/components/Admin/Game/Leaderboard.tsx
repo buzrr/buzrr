@@ -79,7 +79,7 @@ export default function LeaderBoard(props: LeaderBoardProps) {
                     <div className="flex flex-row items-center gap-x-2 ml-3">
                       <Image
                         src={
-                          lead.Player.profilePic ||
+                          lead.Player?.profilePic ||
                           DEFAULT_AVATAR
                         }
                         className="w-12 h-12 rounded-full"
@@ -88,7 +88,7 @@ export default function LeaderBoard(props: LeaderBoardProps) {
                         alt="profile pic"
                       />
                       <p className="text-base md:text-xl font-black wrap-break-word md:w-fit w-[40%]">
-                        {lead.Player.name}
+                        {lead.Player?.name}
                       </p>
                     </div>
                     <p className="text-xs md:text-sm text-off-dark dark:text-off-white ml-auto md:ml-0">
@@ -111,7 +111,7 @@ export default function LeaderBoard(props: LeaderBoardProps) {
                     <div className="flex flex-row items-center gap-x-2 z-20">
                       <Image
                         src={
-                          lead.Player.profilePic ||
+                          lead.Player?.profilePic ||
                           DEFAULT_AVATAR
                         }
                         className="w-12 h-12 rounded-full"
@@ -119,7 +119,7 @@ export default function LeaderBoard(props: LeaderBoardProps) {
                         height={50}
                         alt="profile pic"
                       />
-                      <p>{lead.Player.name}</p>
+                      <p>{lead.Player?.name}</p>
                     </div>
                     <p className="ml-auto">{lead.score}</p>
                   </div>

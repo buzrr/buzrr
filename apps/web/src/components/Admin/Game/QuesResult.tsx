@@ -9,7 +9,7 @@ import { TiTick } from "react-icons/ti";
 import { useDispatch, useSelector } from "react-redux";
 import { Option } from "@buzrr/prisma";
 import { RootState } from "@/state/store";
-import { setCurrIndex, setLeaderboard } from "@/state/admin/playersSlice";
+import { setCurrIndex, setLeaderboard, type LeaderboardEntry } from "@/state/admin/playersSlice";
 import Image from "next/image";
 import { resetTimer } from "@/state/timer/timerSlice";
 
@@ -17,7 +17,7 @@ interface QuesResultProps {
   quizQuestions?: { questions?: { title?: string; options?: Option[] }[] };
   gameCode: string;
   players?: unknown[];
-  socket: { emit: (e: string, code: string) => void; on: (e: string, cb: (data: unknown) => void) => void };
+  socket: { emit: (e: string, ...args: unknown[]) => void; on: (e: string, cb: (data: unknown) => void) => void };
 }
 
 export default function QuesResult(props: QuesResultProps) {
@@ -29,7 +29,7 @@ export default function QuesResult(props: QuesResultProps) {
   const leaderboard = useSelector(
     (state: RootState) => state.player.leaderboard,
   );
-  const allQuestions = quizQuestions?.questions;
+  const allQuestions = quizQuestions?.questions ?? [];
   const question = allQuestions[currIndex];
   const result = useSelector((state: RootState) => state.player.quesResult);
   let response = 0;
@@ -43,15 +43,15 @@ export default function QuesResult(props: QuesResultProps) {
     dispatch(resetTimer(3));
     if (currIndex == allQuestions.length - 1) {
       socket.emit("final-leaderboard", gameCode);
-      socket.on("displaying-final-leaderboard", (leaderboard: unknown[]) => {
+      socket.on("displaying-final-leaderboard", (data: unknown) => {
         console.log("Final Leaderboard");
-        dispatch(setLeaderboard(leaderboard));
+        dispatch(setLeaderboard(data as LeaderboardEntry[]));
         dispatch(setScreenStatus(ScreenStatus.leaderboard));
       });
     } else {
       socket.emit("change-question", gameCode, currIndex + 1);
-      socket.on("question-changed", (index: number) => {
-        dispatch(setCurrIndex(index));
+      socket.on("question-changed", (data: unknown) => {
+        dispatch(setCurrIndex(data as number));
         dispatch(setScreenStatus(ScreenStatus.wait));
         socket.emit("start-timer", gameCode);
       });
@@ -71,7 +71,7 @@ export default function QuesResult(props: QuesResultProps) {
             <p className="capitalize text-dark dark:text-white">
               <span className="font-semibold">Question:</span> {question?.title}
             </p>
-            <Barchart result={result} options={question?.options} />
+            <Barchart result={result} options={question?.options ?? []} />
           </div>
 
           <div className="md:rounded-xl ">
@@ -93,7 +93,7 @@ export default function QuesResult(props: QuesResultProps) {
                               {" "}
                               <Image
                                 src={
-                                  lead.Player.profilePic ||
+                                  lead.Player?.profilePic ||
                                   DEFAULT_AVATAR
                                 }
                                 className="w-12 h-12 rounded-full"
@@ -103,7 +103,7 @@ export default function QuesResult(props: QuesResultProps) {
                               />
                             </span>
                             <span className="font-bold">
-                              {lead.Player.name}
+                              {lead.Player?.name}
                             </span>
                           </div>
                           <p>{lead.score}</p>
@@ -117,7 +117,7 @@ export default function QuesResult(props: QuesResultProps) {
               className="rounded-xl text-white dark:text-dark w-full bg-lprimary dark:bg-dprimary px-5 py-3 hover:cursor-pointer transition-all duration-300 ease-in-out disabled:cursor-default font-bold disabled:bg-gray"
               onClick={handleNext}
             >
-              {currIndex == allQuestions.length - 1
+              {currIndex == (allQuestions?.length ?? 0) - 1
                 ? "Final Leaderboard"
                 : "Next Question"}
             </button>

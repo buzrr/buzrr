@@ -23,6 +23,8 @@ interface QuestionWithOrder {
   title?: string;
   timeOut?: number;
   options?: { title?: string; isCorrect?: boolean }[];
+  media?: string | null;
+  mediaType?: string | null;
   [key: string]: unknown;
 }
 
@@ -78,10 +80,10 @@ export default function AllQues(props: { quizId: string }) {
 
     const result = questions.map((box) => {
       if (box.id === dragId) {
-        box.order = dropBoxOrder;
+        box.order = dropBoxOrder ?? 0;
       }
       if (box.id === dropId) {
-        box.order = dragBoxOrder;
+        box.order = dragBoxOrder ?? 0;
       }
       return box;
     });
@@ -89,7 +91,7 @@ export default function AllQues(props: { quizId: string }) {
     return result;
   };
 
-  function onDragEnd(result: { destination?: { index: number }; source: { index: number } }) {
+  function onDragEnd(result: { destination: { index: number } | null; source: { index: number } }) {
     if (!result.destination) {
       return;
     }
@@ -220,7 +222,7 @@ export default function AllQues(props: { quizId: string }) {
                                 {ques.media && (
                                   <ShowMedia
                                     media={ques.media}
-                                    mediaType={ques.mediaType || ""}
+                                    mediaType={ques.mediaType ?? ""}
                                   />
                                 )}
                               </div>

@@ -20,14 +20,19 @@ interface PlayerWithId {
   [key: string]: unknown;
 }
 
-const GamePage = (params: { player: PlayerWithId; game: GameSession }) => {
+interface GameSessionWithQuiz extends GameSession {
+  quiz: {
+    title?: string;
+    questions: { id: string; title?: string; options?: { id: string; title: string }[]; [key: string]: unknown }[];
+  };
+}
+
+const GamePage = (params: { player: PlayerWithId; game: GameSessionWithQuiz }) => {
   const game = params.game;
   const [question, setQuestion] = useState(
     game.quiz.questions[game.currentQuestion],
   );
-  const [questionIndex, setQuestionIndex] = useState(
-    game.quiz.questions[game.currentQuestion],
-  );
+  const [questionIndex, setQuestionIndex] = useState(game.currentQuestion);
   const [socketState, setSocketState] = useState<Socket>({} as Socket);
   const [stats, setStats] = useState<{
     position: number | null;
@@ -134,19 +139,19 @@ const GamePage = (params: { player: PlayerWithId; game: GameSession }) => {
         <WaitGameStart player={params.player} game={params.game} />
       ) : screen === ScreenStatus.question ? (
         <Question
-          question={question}
+          question={{ ...question, options: question.options ?? [] }}
           gameSessionId={params.game.id}
-          playerId={params.player.id}
+          playerId={params.player.id ?? ""}
           socket={socketState}
           currentQuestion={questionIndex}
-          quizTitle={game.quiz.title}
+          quizTitle={game.quiz.title ?? ""}
           gameCode={params.game.gameCode}
         />
       ) : screen === ScreenStatus.result ? (
         <Result
           result={result}
           gameCode={params.game.gameCode}
-          quizTitle={game.quiz.title}
+          quizTitle={game.quiz.title ?? ""}
         />
       ) : screen === ScreenStatus.wait ? (
         <Loader />

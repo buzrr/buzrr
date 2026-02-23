@@ -31,7 +31,7 @@ const Question = (params: {
     const timeout = setTimeout(() => {
       console.log("time up");
       dispatch(setScreenStatus(ScreenStatus.result));
-    }, params.question.timeOut * 1000);
+    }, (params.question.timeOut ?? 0) * 1000);
 
     const interval = setInterval(() => {
       setTimer(timer + 0.5);
@@ -62,7 +62,7 @@ const Question = (params: {
       <QuestionAndResult
         question={params.question}
         quizTitle={params.quizTitle}
-        quesTime={params.question.timeOut}
+        quesTime={params.question.timeOut ?? 0}
         gameCode={params.gameCode}
         screen="question"
         submitAnswer={submitAnswer}

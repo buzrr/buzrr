@@ -7,8 +7,8 @@ interface Player {
   [key: string]: unknown;
 }
 
-interface LeaderboardEntry {
-  Player?: { name?: string; profilePic?: string };
+export interface LeaderboardEntry {
+  Player?: { name?: string; profilePic?: string | null };
   score?: number;
   playerId?: string;
   position?: number;

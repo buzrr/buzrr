@@ -37,6 +37,11 @@ async function Play({ params }: { params: Promise<{ roomId: string }> }) {
     },
   });
 
+  const playersForLobby = players.map((p) => ({
+    ...p,
+    profilePic: p.profilePic ?? undefined,
+  }));
+
   return (
     <>
       <Lobby
@@ -45,8 +50,8 @@ async function Play({ params }: { params: Promise<{ roomId: string }> }) {
         roomId={roomId}
         userId={session.user.id}
         gameCode={room.gameCode}
-        players={players}
-        quizQuestions={quizQuestions}
+        players={playersForLobby}
+        quizQuestions={quizQuestions ?? {}}
         gameStarted={room.isPlaying}
         currentQues={room.currentQuestion}
       />

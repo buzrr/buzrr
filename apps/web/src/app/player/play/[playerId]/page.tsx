@@ -1,4 +1,4 @@
-import { prisma, GameSession } from "@buzrr/prisma";
+import { prisma } from "@buzrr/prisma";
 import GamePage from "@/components/Player/GamePage";
 import ValidatePlayer from "@/components/Player/ValidatePlayer";
 import ClientImage from "@/components/ClientImage";
@@ -62,7 +62,7 @@ const page = async ({ params }: { params: Promise<{ playerId: string }> }) => {
           }}
         />
       </div>
-      <GamePage player={player} game={game as GameSession} />
+      <GamePage player={player} game={game} />
     </>
   );
 };

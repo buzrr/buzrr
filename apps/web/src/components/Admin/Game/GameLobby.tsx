@@ -10,6 +10,7 @@ import {
   setPlayers,
 } from "@/state/admin/playersSlice";
 import { ScreenStatus } from "@/state/admin/screenSlice";
+import { Option } from "@buzrr/prisma";
 import WaitScreen from "./WaitScreen";
 import QuestionScreen from "./QuestionScreen";
 import QuesResult from "./QuesResult";
@@ -22,10 +23,18 @@ interface Player {
   [key: string]: unknown;
 }
 
+interface QuizQuestionItem {
+  title?: string;
+  options?: Option[];
+  id?: string;
+  media?: string | null;
+  mediaType?: string | null;
+}
+
 interface QuizQuestion {
   id?: string;
-  questions?: unknown[];
-  [key: string]: unknown;
+  title?: string;
+  questions?: QuizQuestionItem[];
 }
 
 const GameLobby = (params: {

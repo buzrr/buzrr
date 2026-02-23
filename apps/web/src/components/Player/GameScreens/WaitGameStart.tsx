@@ -13,6 +13,7 @@ interface PlayerWithProfile {
 
 interface GameWithQuiz extends GameSession {
   quiz: { title?: string };
+  creator?: { name?: string | null; image?: string | null };
 }
 
 const WaitGameStart = (params: { player: PlayerWithProfile; game: GameWithQuiz }) => {
@@ -49,14 +50,14 @@ const WaitGameStart = (params: { player: PlayerWithProfile; game: GameWithQuiz }
             <div className="mt-auto">
               <p className="text-sm dark:text-off-white py-2">Quiz By</p>
               <Image
-                src={game.creator.image || DEFAULT_AVATAR}
+                src={game.creator?.image ?? DEFAULT_AVATAR}
                 width={50}
                 height={50}
                 alt="Profile"
                 className="rounded-full h-8 w-8 inline"
               />
               <h2 className="dark:text-white inline p-2">
-                {game.creator.name}
+                {game.creator?.name}
               </h2>
             </div>
           </div>

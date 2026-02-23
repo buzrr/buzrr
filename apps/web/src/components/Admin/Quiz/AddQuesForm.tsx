@@ -12,22 +12,22 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
 interface Option {
-  id: string;
-  title: string;
-  isCorrect: boolean;
-  questionId: string;
-  createdAt: Date;
+  id?: string;
+  title?: string;
+  isCorrect?: boolean;
+  questionId?: string;
+  createdAt?: Date;
 }
 
 interface Question {
   id: string;
-  title: string;
-  quizId: string;
-  createdAt: Date;
-  timeOut: number;
-  media: string | null;
-  mediaType: string | null;
-  options: Option[];
+  title?: string;
+  quizId?: string;
+  createdAt?: Date;
+  timeOut?: number;
+  media?: string | null;
+  mediaType?: string | null;
+  options?: Option[];
 }
 
 const AddQuesForm = (props: { quizId: string; question?: Question }) => {
