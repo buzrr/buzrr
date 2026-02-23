@@ -1,3 +1,4 @@
+"use client";
 import addBuzrr from "../../../actions/AddBuzrrAction";
 import SubmitButton from "../../SubmitButton";
 import { InputField } from "@buzrr/ui";

@@ -12,7 +12,12 @@ import ShowLeaderboard from "@/actions/ShowLeaderboardAction";
 interface QuestionScreenProps {
   quizQuestions?: { title?: string; questions?: { title?: string; options?: { title: string }[]; media?: string | null; mediaType?: string | null; id?: string; timeOut?: number }[] };
   gameCode: string;
-  socket: { emit: (e: string, code: string, id?: string, opts?: unknown) => void; on: (e: string, cb: (data: unknown) => void) => void };
+  socket: {
+    emit: (e: string, code: string, id?: string, opts?: unknown) => void;
+    on: (e: string, cb: (data: unknown) => void) => void;
+    once?: (e: string, cb: (data: unknown) => void) => void;
+    off?: (e: string, cb?: (data: unknown) => void) => void;
+  };
 }
 
 export default function QuestionScreen(props: QuestionScreenProps) {
@@ -31,12 +36,21 @@ export default function QuestionScreen(props: QuestionScreenProps) {
     const leaderboard = await ShowLeaderboard(gameCode);
     dispatch(setLeaderboard(leaderboard));
     socket.emit("display-result", gameCode, question?.id, question?.options);
-    socket.on("displaying-result", (data: unknown) => {
+    const handleDisplayingResult = (data: unknown) => {
       const payload = data as { presenter?: unknown };
       console.log("Displaying result", JSON.stringify(data));
       dispatch(setResult((payload?.presenter as number[]) ?? []));
       dispatch(setScreenStatus(ScreenStatus.result));
-    });
+    };
+
+    if (socket.once) {
+      socket.once("displaying-result", handleDisplayingResult);
+    } else if (socket.off) {
+      socket.off("displaying-result");
+      socket.on("displaying-result", handleDisplayingResult);
+    } else {
+      socket.on("displaying-result", handleDisplayingResult);
+    }
   }, [gameCode, dispatch, socket, question?.id, question?.options]);
 
   useEffect(() => {
@@ -54,7 +68,7 @@ export default function QuestionScreen(props: QuestionScreenProps) {
       <div className="flex items-center m-auto h-fit w-full md:mx-4 dark:text-white *:bg-white dark:*:bg-dark">
         <div className="h-full w-[30vw] mx-2 hidden pt-8 md:block rounded-xl">
           <div className="flex justify-center">
-            <Countdown timer={question?.timeOut ?? 0} setTime={setTime} />
+            <Countdown key={question?.id ?? currIndex} timer={question?.timeOut ?? 0} setTime={setTime} />
           </div>
           <div className="pl-4 mt-2">
             <div className="text-red-light bg-[#f4d4d4] dark:bg-[#513232] rounded-full px-2 w-fit font-bold">

@@ -49,6 +49,10 @@ const page = async ({ params }: { params: Promise<{ roomId: string }> }) => {
     profilePic: p.profilePic ?? undefined,
   }));
 
+  if(!quizQuestions) {
+    return notFound();
+  }
+
   return (
     <div className="flex justify-center items-center h-fit md:h-[85vh] w-full bg-light-bg dark:bg-dark-bg">
       <GameLobby
@@ -56,7 +60,7 @@ const page = async ({ params }: { params: Promise<{ roomId: string }> }) => {
         userId={user.id}
         gameCode={room?.gameCode}
         players={playersForLobby}
-        quizQuestions={quizQuestions ?? {}}
+        quizQuestions={quizQuestions}
         currentQues={room?.currentQuestion}
       />
     </div>

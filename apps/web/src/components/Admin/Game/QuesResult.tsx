@@ -42,21 +42,21 @@ export default function QuesResult(props: QuesResultProps) {
   const socket = props.socket;
 
   function handleNext() {
-    console.log("123");
     dispatch(resetTimer(3));
     if (currIndex == allQuestions.length - 1) {
       socket.emit("final-leaderboard", gameCode);
       socket.on("displaying-final-leaderboard", (data: unknown) => {
-        console.log("Final Leaderboard");
         dispatch(setLeaderboard(data as LeaderboardEntry[]));
         dispatch(setScreenStatus(ScreenStatus.leaderboard));
       });
     } else {
       socket.emit("change-question", gameCode, currIndex + 1);
       socket.on("question-changed", (data: unknown) => {
-        dispatch(setCurrIndex(data as number));
-        dispatch(setScreenStatus(ScreenStatus.wait));
-        socket.emit("start-timer", gameCode);
+        if(typeof data === "number") {
+          dispatch(setCurrIndex(data));
+          dispatch(setScreenStatus(ScreenStatus.wait));
+          socket.emit("start-timer", gameCode);
+        }
       });
     }
   }

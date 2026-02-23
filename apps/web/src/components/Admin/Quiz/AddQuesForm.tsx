@@ -136,10 +136,10 @@ const AddQuesForm = (props: { quizId: string; question?: Question }) => {
         Choose any image or gif of size &lt; 10MB{" "}
       </p>
 
-      {fileLink || file ? (
+      {(previewUrl || fileLink) && (
         <div className="relative">
           <Image
-            src={previewUrl ?? fileLink}
+            src={previewUrl || fileLink}
             alt="media"
             width={160}
             height={80}
@@ -151,8 +151,6 @@ const AddQuesForm = (props: { quizId: string; question?: Question }) => {
             onClick={deleteFile}
           />
         </div>
-      ) : (
-        ""
       )}
 
       <FormLabel

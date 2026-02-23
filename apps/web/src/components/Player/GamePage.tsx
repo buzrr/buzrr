@@ -139,7 +139,7 @@ const GamePage = (params: { player: PlayerWithId; game: GameSessionWithQuiz }) =
         <WaitGameStart player={params.player} game={params.game} />
       ) : screen === ScreenStatus.question ? (
         <Question
-          question={{ ...question, options: question.options ?? [] }}
+          question={question ? { ...question, options: question.options ?? [] } : { id: "", options: [] }}
           gameSessionId={params.game.id}
           playerId={params.player.id ?? ""}
           socket={socketState}

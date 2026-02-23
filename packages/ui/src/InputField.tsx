@@ -112,7 +112,12 @@ export function InputField(props: InputFieldProps) {
         <textarea
           name={props.name}
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => {
+            if (props.onTitleChange) {
+              props.onTitleChange(e.target.value);
+            }
+            setValue(e.target.value);
+          }}
           autoCorrect="off"
           placeholder={props.placeholder}
           autoComplete={props.autoComplete}

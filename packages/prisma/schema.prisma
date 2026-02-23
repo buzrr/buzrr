@@ -1,7 +1,7 @@
 generator client {
   provider      = "prisma-client-js"
   output        = "./generated/client"
-  // Vercel Node.js runtime (Amazon Linux 2); native for local dev. Reduces deploy failures.
+  // Vercel Node.js runtime (Amazon Linux 2023 / RHEL 9+, OpenSSL 3.0.x); native for local dev. Reduces deploy failures.
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 

@@ -40,8 +40,9 @@ export default function AllQues(props: { quizId: string }) {
         if (result.status == 200) {
           setQuestions(result.questions ?? []);
         }
-      } catch {
-        // ignore
+      } catch (error) {
+        console.error(error);
+        toast.error("Failed to fetch questions");
       }
     }
     fetchQues();

@@ -5,7 +5,7 @@
  * Keeps @mui/x-charts out of the main admin bundle until the result screen is shown.
  */
 import { BarPlot, ChartContainer } from "@mui/x-charts";
-import { useEffect } from "react";
+import { useId } from "react";
 import { RxCross2 } from "react-icons/rx";
 import { TiTick } from "react-icons/ti";
 import type { Option } from "@/types/db";
@@ -13,22 +13,13 @@ import type { Option } from "@/types/db";
 export default function QuesResultChart(params: { result: number[]; options: Option[] }) {
   const uData = params?.result ? params?.result : [0, 0, 0, 0];
   const xLabels = ["Page A", "Page B", "Page C", "Page D"];
-
-  useEffect(() => {
-    const barsList = typeof document !== "undefined" ? document.getElementsByClassName("MuiBarElement-root") : [];
-    if (barsList.length >= 4) {
-      for (let i = 0; i < 4; i++) {
-        (barsList[i] as HTMLElement).style.fill = "url(#gradient)";
-        (barsList[i] as HTMLElement).style.borderRadius = "15px 0";
-      }
-    }
-  }, [params.options, params.result]);
+  const gradientId = `chart-gradient-${useId()}`;
 
   return (
     <>
       <svg width="0" height="0">
         <defs>
-          <linearGradient id="gradient" gradientTransform="rotate(90)">
+          <linearGradient id={gradientId} gradientTransform="rotate(90)">
             <stop offset="0%" stopColor="#7D49F8" />
             <stop offset="100%" stopColor="#A589FC" />
           </linearGradient>
@@ -39,10 +30,17 @@ export default function QuesResultChart(params: { result: number[]; options: Opt
           <ChartContainer
             width={550}
             height={300}
-            series={[{ data: uData, label: "", type: "bar" }]}
+            series={[
+              {
+                data: uData,
+                label: "",
+                type: "bar",
+                color: `url(#${gradientId})`,
+              },
+            ]}
             xAxis={[{ scaleType: "band", data: xLabels }]}
           >
-            <BarPlot />
+            <BarPlot borderRadius={15} />
           </ChartContainer>
         </div>
 
