@@ -90,7 +90,7 @@ const QuestionAndResult = (params: {
             </p>
 
             <div
-              className={clsx("grid grid-cols-1 gap-x-4 my-4", params.question.mediaType === "image" && "lg:grid-cols-2 my-2")}
+              className={clsx("grid grid-cols-1 gap-x-4", params.question.mediaType === "image" ? "lg:grid-cols-2 my-2" : "my-4")}
             >
               {options.map((option: any, index: number) => {
                 return (

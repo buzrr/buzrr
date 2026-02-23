@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { useFormStatus } from "react-dom";
 
 /** Visual style variant (maps to legacy `style` prop) */
@@ -53,7 +53,7 @@ const variantInputClasses: Record<InputFieldVariant, string> = {
 export function InputField(props: InputFieldProps) {
   const { pending } = useFormStatus();
   const [value, setValue] = useState("");
-
+  const inputId = useId();  
   const variant: InputFieldVariant =
     props.variant ?? (props.style as InputFieldVariant | undefined) ?? "default";
   const size = props.size ?? "md";
@@ -103,6 +103,7 @@ export function InputField(props: InputFieldProps) {
       {props.label && (
         <label
           className={clsx("text-sm text-dark dark:text-white mb-0", props.labelClass)}
+          htmlFor={inputId}
         >
           {props.label}
         </label>
@@ -112,6 +113,7 @@ export function InputField(props: InputFieldProps) {
           name={props.name}
           value={value}
           onChange={(e) => setValue(e.target.value)}
+          autoCorrect="off"
           placeholder={props.placeholder}
           autoComplete={props.autoComplete}
           required={props.required ?? false}
@@ -123,8 +125,10 @@ export function InputField(props: InputFieldProps) {
         />
       ) : (
         <input
+          id={inputId}
           type={props.type}
           name={props.name}
+          autoCorrect="off"
           value={value}
           onChange={handleInput}
           placeholder={props.placeholder}

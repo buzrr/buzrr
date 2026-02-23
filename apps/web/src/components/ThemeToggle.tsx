@@ -31,12 +31,15 @@ const ThemeToggle = () => {
         <span>MODE</span>
       </div>
       <div className="p-[6px] shadow-[0px_2px_4px_0px_rgba(0,0,0,0.15)] rounded-full bg-white dark:bg-[#27272a]">
-        <div
+        <button
+          role="switch"
+          aria-checked={theme === pageTheme.dark}
+          aria-label="Toggle dark mode"
           className="w-8 h-5 rounded-full bg-[#abacaf] dark:bg-dprimary flex items-center p-1 cursor-pointer"
           onClick={handler}
         >
-          <div className="w-3 h-3 bg-white dark:ml-[50%] rounded-full transition-all duration-200 ease-in-out"></div>
-        </div>
+          <div className="w-3 h-3 bg-white dark:ml-[50%] rounded-full transition-[margin-left] duration-200 ease-in-out"></div>
+        </button>
       </div>
     </div>
   );

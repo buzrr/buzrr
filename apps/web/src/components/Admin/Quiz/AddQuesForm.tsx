@@ -36,7 +36,20 @@ const AddQuesForm = (props: { quizId: string; question?: Question }) => {
   const [fileLink, setFileLink] = useState(
     question?.media ? question.media : "",
   );
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [file]);
 
   function handleFile(e: any) {
     const selectedFile = e.target.files?.[0] || null;
@@ -45,6 +58,7 @@ const AddQuesForm = (props: { quizId: string; question?: Question }) => {
 
   function deleteFile() {
     setFile(null);
+    setPreviewUrl(null);
     setFileLink("");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -125,7 +139,7 @@ const AddQuesForm = (props: { quizId: string; question?: Question }) => {
       {fileLink || file ? (
         <div className="relative">
           <Image
-            src={file ? URL.createObjectURL(file) : fileLink}
+            src={previewUrl ?? fileLink}
             alt="media"
             width={160}
             height={80}

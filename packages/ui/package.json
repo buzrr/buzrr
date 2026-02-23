@@ -20,7 +20,9 @@
     "build": "tsc",
     "check-types": "tsc --noEmit"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "dependencies": {
     "clsx": "^2.1.1"
   },

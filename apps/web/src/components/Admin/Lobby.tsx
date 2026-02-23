@@ -152,7 +152,7 @@ const Lobby = (params: {
           </span>
 
           <span className="p-2 dark:text-white border border-[#7D49F8] bg-light-bg dark:bg-cardhover-dark rounded-xl font-bold">
-            Join at: buzrr.in
+            Join at: {process.env.NEXT_PUBLIC_APP_URL ?? "buzrr.in"}
           </span>
         </div>
 

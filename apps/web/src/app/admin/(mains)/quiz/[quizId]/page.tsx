@@ -45,7 +45,7 @@ async function Quiz({ params }: { params: Promise<{ quizId: string }> }) {
         </div>
         <div className="w-[95%] mx-auto my-2 md:hidden">
           <form action={createRoom}>
-            <input type="hidden" name="quizId" value={quizId} />
+            <input type="hidden" name="quizId" value={quizId} readOnly/>
             <SubmitButton
               text="Host quiz"
               isQuiz={true}
