@@ -1,0 +1,5 @@
+# Reduce deploy payload and avoid copying cache/build artifacts (bundle size / deploy reliability).
+.next/cache
+.turbo
+node_modules
+*.tsbuildinfo

@@ -10,7 +10,7 @@ import {
   setPlayers,
 } from "@/state/admin/playersSlice";
 import { ScreenStatus } from "@/state/admin/screenSlice";
-import { Option } from "@buzrr/prisma";
+import type { Option } from "@/types/db";
 import WaitScreen from "./WaitScreen";
 import QuestionScreen from "./QuestionScreen";
 import QuesResult from "./QuesResult";

@@ -6107,6 +6107,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"server-only@npm:^0.0.1":
+  version: 0.0.1
+  resolution: "server-only@npm:0.0.1"
+  checksum: 10c0/4704f0ef85da0be981af6d4ed8e739d39bcfd265b9c246a684060acda5642d0fdc6daffc2308e71e2682c5f508090978802eae0a77623c9b90a49f9ae68048d6
+  languageName: node
+  linkType: hard
+
 "server@workspace:apps/server":
   version: 0.0.0-use.local
   resolution: "server@workspace:apps/server"
@@ -6979,6 +6986,7 @@ __metadata:
     react-redux: "npm:^9.2.0"
     react-toastify: "npm:^11.0.5"
     redux-persist: "npm:^6.0.0"
+    server-only: "npm:^0.0.1"
     socket.io-client: "npm:^4.8.3"
     tailwindcss: "npm:^4.2.0"
     typescript: "npm:^5"

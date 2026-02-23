@@ -1,5 +1,5 @@
 "use client";
-import type { Quiz } from "@buzrr/prisma";
+import type { Quiz } from "@/types/db";
 import clsx from "clsx";
 import Link from "next/link";
 import { useState } from "react";

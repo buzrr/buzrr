@@ -1,7 +1,7 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { RootState } from "@/state/store";
-import { CountdownCircleTimer } from "react-countdown-circle-timer";
 import { useCallback, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { ScreenStatus, setScreenStatus } from "@/state/admin/screenSlice";
@@ -116,6 +116,12 @@ export default function QuestionScreen(props: QuestionScreenProps) {
   );
 }
 
+// Lazy-load to keep react-countdown-circle-timer out of main admin bundle.
+const CountdownCircleTimer = dynamic(
+  () => import("react-countdown-circle-timer").then((m) => ({ default: m.CountdownCircleTimer })),
+  { ssr: false }
+);
+
 function Countdown(params: { timer: number; setTime: (t: number) => void }) {
   return (
     <div className="">
@@ -128,7 +134,7 @@ function Countdown(params: { timer: number; setTime: (t: number) => void }) {
         updateInterval={1}
         onUpdate={(remainingTime: number) => params.setTime(remainingTime)}
       >
-        {({ remainingTime }) => (
+        {({ remainingTime }: { remainingTime: number }) => (
           <span className="text-2xl font-bold">{remainingTime}</span>
         )}
       </CountdownCircleTimer>

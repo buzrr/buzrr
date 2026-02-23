@@ -1,7 +1,7 @@
 import Game from "@/components/Game";
 import BackNavButton from "@/components/BackNavButton";
 import { DEFAULT_AVATAR } from "@/constants";
-import { GameSession } from "@buzrr/prisma";
+import type { GameSession } from "@/types/db";
 import Image from "next/image";
 
 interface PlayerWithProfile {
