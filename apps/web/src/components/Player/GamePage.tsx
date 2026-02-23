@@ -138,15 +138,19 @@ const GamePage = (params: { player: PlayerWithId; game: GameSessionWithQuiz }) =
       {screen === ScreenStatus.lobby ? (
         <WaitGameStart player={params.player} game={params.game} />
       ) : screen === ScreenStatus.question ? (
-        <Question
-          question={question ? { ...question, options: question.options ?? [] } : { id: "", options: [] }}
-          gameSessionId={params.game.id}
-          playerId={params.player.id ?? ""}
-          socket={socketState}
-          currentQuestion={questionIndex}
-          quizTitle={game.quiz.title ?? ""}
-          gameCode={params.game.gameCode}
-        />
+        question ? (
+          <Question
+            question={{ ...question, options: question.options ?? [] }}
+            gameSessionId={params.game.id}
+            playerId={params.player.id ?? ""}
+            socket={socketState}
+            currentQuestion={questionIndex}
+            quizTitle={game.quiz.title ?? ""}
+            gameCode={params.game.gameCode}
+          />
+        ) : (
+          <Loader />
+        )
       ) : screen === ScreenStatus.result ? (
         <Result
           result={result}
