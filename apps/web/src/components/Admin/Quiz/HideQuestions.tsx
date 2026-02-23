@@ -13,10 +13,10 @@ const HideQuestions = () => {
   );
 
   useEffect(() => {
-    if (visibility === hideQuestions.show) {
-      dispatch(setHideQuestions(hideQuestions.hide));
-    }
-  }, [dispatch, visibility]);
+    dispatch(setHideQuestions(hideQuestions.hide));
+    // Only set hidden on initial mount when visiting the page
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handle = () => {
     dispatch(
