@@ -19,19 +19,32 @@ import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import ConfirmationModal from "./ConfirmationModal";
 
+interface LobbyPlayer {
+  id: string;
+  name?: string;
+  profilePic?: string;
+  [key: string]: unknown;
+}
+
+interface QuizQuestions {
+  id?: string;
+  questions?: unknown[];
+  [key: string]: unknown;
+}
+
 const Lobby = (params: {
   roomId: string;
   userId: string;
   gameCode: string;
-  players: any[];
-  quizQuestions: any;
+  players: LobbyPlayer[];
+  quizQuestions: QuizQuestions;
   currentQues: number;
   gameStarted: boolean;
   quizTitle: string;
   quizId: string;
 }) => {
   const dispatch = useDispatch();
-  const players: any[] = useSelector(
+  const players: LobbyPlayer[] = useSelector(
     (state: RootState) => state.player.players,
   );
   const socket = useSelector((state: RootState) => state.socket.socket);
@@ -59,12 +72,12 @@ const Lobby = (params: {
         dispatch(createConnection(socket));
       });
 
-      socket.on("player-joined", (player: any) => {
+      socket.on("player-joined", (player: LobbyPlayer) => {
         console.log(`Player ${player.id} Joined`);
         dispatch(addPlayer(player));
       });
 
-      socket.on("player-removed", (player: any) => {
+      socket.on("player-removed", (player: LobbyPlayer) => {
         console.log(`Player ${player.id} removed`);
         dispatch(removePlayer(player));
       });
@@ -75,9 +88,9 @@ const Lobby = (params: {
     }
   }, [dispatch, params.gameCode, params.userId, players]);
 
-  function handlePlayerRemove(player: any) {
+  function handlePlayerRemove(player: LobbyPlayer) {
     socket.emit("remove-player", player, params.gameCode);
-    socket.on("player-removed", (player: any) => {
+    socket.on("player-removed", (player: LobbyPlayer) => {
       console.log(`Player ${player.id} removed`);
       dispatch(removePlayer(player));
       toast.error(`You have removed ${player.name}`);
@@ -87,7 +100,7 @@ const Lobby = (params: {
   function handleGameStart() {
     setLoad(true);
     socket.emit("start-game", params.gameCode);
-    socket.on("game-started", (gameCode: string) => {
+    socket.on("game-started", () => {
       console.log("Game started");
       setLoad(false);
       dispatch(resetTimer(3));
@@ -162,7 +175,7 @@ const Lobby = (params: {
               Waiting for players to join...
             </div>
           ) : (
-            players.map((player: any) => {
+            players.map((player: LobbyPlayer) => {
               return (
                 <div
                   key={player.id}

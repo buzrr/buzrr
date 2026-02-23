@@ -1,15 +1,19 @@
 "use client";
-import { cssOptionColors } from "@/utils/optionColors";
 import { useEffect, useState } from "react";
 import { Socket } from "socket.io-client";
 import { useDispatch } from "react-redux";
 import { setScreenStatus, ScreenStatus } from "@/state/player/screenSlice";
 import submitAnswerAction from "@/actions/SubmitAnswerAction";
-import Image from "next/image";
 import QuestionAndResult from "./QuesAndResult";
 
+interface QuestionWithOptions {
+  title?: string;
+  timeOut?: number;
+  options: { id: string; title: string }[];
+}
+
 const Question = (params: {
-  question: any;
+  question: QuestionWithOptions;
   gameSessionId: string;
   playerId: string;
   socket: Socket;
@@ -17,7 +21,6 @@ const Question = (params: {
   quizTitle: string;
   gameCode: string;
 }) => {
-  const options = params.question.options;
   const dispatch = useDispatch();
   const [timer, setTimer] = useState(0);
   const [optionId, setOptionId] = useState("");

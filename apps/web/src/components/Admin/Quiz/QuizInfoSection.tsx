@@ -4,7 +4,15 @@ import createRoom from "@/actions/CreateRoomAction";
 import SubmitButton from "@/components/SubmitButton";
 import Link from "next/link";
 
-async function QuizInfoSection(props: { quiz: any }) {
+interface QuizWithSessions {
+  id: string;
+  title: string;
+  description: string | null;
+  questions?: unknown[];
+  gameSessions?: { id: string; createdAt: Date; gameCode?: string }[];
+}
+
+async function QuizInfoSection(props: { quiz: QuizWithSessions }) {
   const session = await auth();
 
   if (!session || !session.user) redirect("/api/auth/signin");
@@ -43,7 +51,7 @@ async function QuizInfoSection(props: { quiz: any }) {
           <div className="font-black p-4">Previously used</div>
           <div className="overflow-auto flex-1 min-h-0 mx-[-8px]">
             {allQuiz?.length > 0 ? (
-              allQuiz.map((quiz: any) => {
+              allQuiz.map((quiz: { id: string; createdAt: Date; gameCode?: string }) => {
                 return (
                   <div key={quiz.id}>
                     <div className="bg-card-light dark:bg-card-dark p-4 mt-2">

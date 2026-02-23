@@ -16,7 +16,7 @@ const HideQuestions = () => {
     if (visibility === hideQuestions.show) {
       dispatch(setHideQuestions(hideQuestions.hide));
     }
-  }, []);
+  }, [dispatch, visibility]);
 
   const handle = () => {
     dispatch(

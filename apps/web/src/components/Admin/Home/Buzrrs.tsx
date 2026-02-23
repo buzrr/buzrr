@@ -14,7 +14,7 @@ const Buzrrs = async () => {
     },
   });
 
-  let quizzes = await prisma.quiz.findMany({
+  const quizzes = await prisma.quiz.findMany({
     where: {
       userId: user?.id as string,
     },

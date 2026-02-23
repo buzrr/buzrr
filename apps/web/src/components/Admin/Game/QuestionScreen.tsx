@@ -2,15 +2,21 @@
 
 import { RootState } from "@/state/store";
 import { CountdownCircleTimer } from "react-countdown-circle-timer";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { ScreenStatus, setScreenStatus } from "@/state/admin/screenSlice";
 import { setLeaderboard, setResult } from "@/state/admin/playersSlice";
 import Image from "next/image";
 import ShowLeaderboard from "@/actions/ShowLeaderboardAction";
 
-export default function QuestionScreen(props: any) {
-  const { currentQues, quizQuestions, gameCode } = props;
+interface QuestionScreenProps {
+  quizQuestions?: { title?: string; questions?: { title?: string; options?: { title: string }[]; media?: string; mediaType?: string; id?: string }[] };
+  gameCode: string;
+  socket: { emit: (e: string, code: string, id?: string, opts?: unknown) => void };
+}
+
+export default function QuestionScreen(props: QuestionScreenProps) {
+  const { quizQuestions, gameCode } = props;
   const dispatch = useDispatch();
   const currIndex = useSelector(
     (state: RootState) => state.player.currentIndex,
@@ -18,24 +24,25 @@ export default function QuestionScreen(props: any) {
   const quizTitle = quizQuestions?.title;
   const allQuestions = quizQuestions?.questions;
   const socket = props.socket;
-  const question = allQuestions[currIndex];
+  const question = allQuestions?.[currIndex];
   const [time, setTime] = useState(question?.timeOut);
 
-  async function handleNext() {
+  const handleNext = useCallback(async () => {
     const leaderboard = await ShowLeaderboard(gameCode);
     dispatch(setLeaderboard(leaderboard));
     socket.emit("display-result", gameCode, question?.id, question?.options);
-    socket.on("displaying-result", (data: any) => {
+    socket.on("displaying-result", (data: { presenter?: unknown }) => {
       console.log("Displaying result", JSON.stringify(data));
       dispatch(setResult(data?.presenter));
       dispatch(setScreenStatus(ScreenStatus.result));
     });
-  }
+  }, [gameCode, dispatch, socket, question?.id, question?.options]);
+
   useEffect(() => {
     if (time == 0) {
       handleNext();
     }
-  }, [time]);
+  }, [time, handleNext]);
 
   return (
     <>
@@ -85,7 +92,7 @@ export default function QuestionScreen(props: any) {
           </div>
           <div className="flex flex-col md:grid md:grid-cols-2 gap-6 w-full p-8 pl-4 h-fit">
             {question.options.length > 0 &&
-              question.options.map((opt: any, index: number) => {
+              question.options.map((opt: { title: string }, index: number) => {
                 return (
                   <p
                     key={index}
@@ -104,7 +111,7 @@ export default function QuestionScreen(props: any) {
   );
 }
 
-function Countdown(params: { timer: number; setTime: any }) {
+function Countdown(params: { timer: number; setTime: (t: number) => void }) {
   return (
     <div className="">
       <CountdownCircleTimer

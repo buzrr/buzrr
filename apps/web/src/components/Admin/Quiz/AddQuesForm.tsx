@@ -51,7 +51,7 @@ const AddQuesForm = (props: { quizId: string; question?: Question }) => {
     };
   }, [file]);
 
-  function handleFile(e: any) {
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const selectedFile = e.target.files?.[0] || null;
     setFile(selectedFile);
   }

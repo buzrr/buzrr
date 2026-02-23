@@ -111,7 +111,7 @@ export default async function submitAnswer({
         },
       });
     }
-  } catch (error) {
+  } catch {
     throw new Error("Error Submitting Answer");
   }
 }

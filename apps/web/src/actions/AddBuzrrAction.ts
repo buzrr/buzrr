@@ -28,8 +28,8 @@ const addBuzrr = async (formData: FormData) => {
 
     revalidatePath("/admin", "page");
     return { quizId: quiz.id };
-  } catch (err: any) {
-    return { error: err.message };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : "Something went wrong" };
   }
 };
 

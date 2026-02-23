@@ -13,8 +13,15 @@ import { setCurrIndex, setLeaderboard } from "@/state/admin/playersSlice";
 import Image from "next/image";
 import { resetTimer } from "@/state/timer/timerSlice";
 
-export default function QuesResult(props: any) {
-  const { currentQues, quizQuestions, gameCode, players } = props;
+interface QuesResultProps {
+  quizQuestions?: { questions?: { title?: string; options?: Option[] }[] };
+  gameCode: string;
+  players?: unknown[];
+  socket: { emit: (e: string, code: string) => void; on: (e: string, cb: (data: unknown) => void) => void };
+}
+
+export default function QuesResult(props: QuesResultProps) {
+  const { quizQuestions, gameCode, players } = props;
   const dispatch = useDispatch();
   const currIndex = useSelector(
     (state: RootState) => state.player.currentIndex,
@@ -25,9 +32,9 @@ export default function QuesResult(props: any) {
   const allQuestions = quizQuestions?.questions;
   const question = allQuestions[currIndex];
   const result = useSelector((state: RootState) => state.player.quesResult);
-  var response = 0;
+  let response = 0;
 
-  for (var i = 0; i < result.length; i++) response += result[i];
+  for (let i = 0; i < result.length; i++) response += result[i];
 
   const socket = props.socket;
 
@@ -36,7 +43,7 @@ export default function QuesResult(props: any) {
     dispatch(resetTimer(3));
     if (currIndex == allQuestions.length - 1) {
       socket.emit("final-leaderboard", gameCode);
-      socket.on("displaying-final-leaderboard", (leaderboard: any[]) => {
+      socket.on("displaying-final-leaderboard", (leaderboard: unknown[]) => {
         console.log("Final Leaderboard");
         dispatch(setLeaderboard(leaderboard));
         dispatch(setScreenStatus(ScreenStatus.leaderboard));
@@ -130,16 +137,12 @@ function Barchart(params: { result: number[]; options: Option[] }) {
 
   useEffect(() => {
     if (bars.length >= 4) {
-      var index = 0;
-      for (var i = 0; i < params.options.length; i++) {
-        if (params.options[i].isCorrect === true) index = i;
-      }
-      for (var i = 0; i < 4; i++) {
+      for (let i = 0; i < 4; i++) {
         bars[i].style.fill = "url(#gradient)";
         bars[i].style.borderRadius = "15px 0";
       }
     }
-  }, [bars]);
+  }, [params.options, bars]);
 
   return (
     <>
@@ -165,7 +168,7 @@ function Barchart(params: { result: number[]; options: Option[] }) {
 
         <div className="flex flex-row justify-around w-[450px] text-lg relative z-20 ">
           {params.result.length > 0 &&
-            params.result.map((opt: any, index: number) => {
+            params.result.map((opt: number, index: number) => {
               const isCorrect = params.options[index].isCorrect === true;
               return (
                 <div className="flex flex-col" key={index}>

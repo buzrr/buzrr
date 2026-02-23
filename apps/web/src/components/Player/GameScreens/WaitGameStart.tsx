@@ -4,8 +4,19 @@ import { DEFAULT_AVATAR } from "@/constants";
 import { GameSession } from "@buzrr/prisma";
 import Image from "next/image";
 
-const WaitGameStart = (params: { player: any; game: GameSession }) => {
-  const game = params.game as any;
+interface PlayerWithProfile {
+  id?: string;
+  profilePic?: string;
+  name?: string;
+  [key: string]: unknown;
+}
+
+interface GameWithQuiz extends GameSession {
+  quiz: { title?: string };
+}
+
+const WaitGameStart = (params: { player: PlayerWithProfile; game: GameWithQuiz }) => {
+  const game = params.game;
 
   return (
     <>

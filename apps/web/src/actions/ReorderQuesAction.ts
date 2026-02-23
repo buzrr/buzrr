@@ -3,8 +3,6 @@
 import { auth } from "@/utils/auth";
 import { prisma } from "@buzrr/prisma";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
-
 async function reOrderQuestion({
   dragQuesId,
   dropQuesId,
@@ -53,10 +51,10 @@ async function reOrderQuestion({
       status: 200,
       message: "Success",
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
       status: 500,
-      error: err.message,
+      error: err instanceof Error ? err.message : "Something went wrong",
     };
   }
 }

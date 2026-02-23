@@ -15,7 +15,7 @@ const InputField = (props: {
   style?: string;
   accept?: string;
   textarea?: boolean;
-  onTitleChange?: any;
+  onTitleChange?: (value: string) => void;
   label?: string;
   labelClass?: string;
   fieldValue?: string;
@@ -32,7 +32,7 @@ const InputField = (props: {
     if (pending) setValue("");
   }, [pending]);
 
-  function handleInput(e: any) {
+  function handleInput(e: React.ChangeEvent<HTMLInputElement>) {
     if (props.onTitleChange) {
       props.onTitleChange(e.target.value);
     }

@@ -1,10 +1,25 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+
+interface Player {
+  id: string;
+  name?: string;
+  profilePic?: string;
+  [key: string]: unknown;
+}
+
+interface LeaderboardEntry {
+  Player?: { name?: string; profilePic?: string };
+  score?: number;
+  playerId?: string;
+  position?: number;
+  [key: string]: unknown;
+}
 
 interface InitialState {
-  players: any[];
+  players: Player[];
   quesResult: number[];
   currentIndex: number;
-  leaderboard: any[];
+  leaderboard: LeaderboardEntry[];
 }
 
 const initialState: InitialState = {
@@ -18,30 +33,30 @@ const playerSlice = createSlice({
   name: "player",
   initialState,
   reducers: {
-    addPlayer: (state, action) => {
+    addPlayer: (state, action: PayloadAction<Player>) => {
       const existingPlayer = state.players.find(
-        (player: any) => player.id === action.payload.id,
+        (player) => player.id === action.payload.id,
       );
       if (existingPlayer) {
         return;
       }
       state.players = [...state.players, action.payload];
     },
-    removePlayer: (state, action) => {
+    removePlayer: (state, action: PayloadAction<Player>) => {
       state.players = state.players.filter(
         (player) => player.id !== action.payload.id,
       );
     },
-    setPlayers: (state, action) => {
+    setPlayers: (state, action: PayloadAction<Player[]>) => {
       state.players = action.payload;
     },
-    setResult: (state, action) => {
+    setResult: (state, action: PayloadAction<number[]>) => {
       state.quesResult = action.payload;
     },
-    setCurrIndex: (state, action) => {
+    setCurrIndex: (state, action: PayloadAction<number>) => {
       state.currentIndex = action.payload;
     },
-    setLeaderboard: (state, action) => {
+    setLeaderboard: (state, action: PayloadAction<LeaderboardEntry[]>) => {
       state.leaderboard = action.payload;
     },
   },

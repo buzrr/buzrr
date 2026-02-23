@@ -1,4 +1,5 @@
 "use client";
+import type { Quiz } from "@buzrr/prisma";
 import clsx from "clsx";
 import Link from "next/link";
 import { useState } from "react";
@@ -12,7 +13,7 @@ import dltQuiz from "@/actions/DeleteQuizAction";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 
-export default function ClientBuzrrs({ quizzes }: { quizzes: any }) {
+export default function ClientBuzrrs({ quizzes }: { quizzes: Quiz[] }) {
   const router = useRouter();
 
   const view = useSelector((state: RootState) => state.gridListToggle.view);
@@ -111,7 +112,7 @@ export default function ClientBuzrrs({ quizzes }: { quizzes: any }) {
           </div>
         </Link>
         <CreateAIQuiz />
-        {quizzes.map((quiz: any) => (
+        {quizzes.map((quiz) => (
           <Link
             href={`/admin/quiz/${quiz.id}`}
             key={quiz.id}

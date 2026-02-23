@@ -5,7 +5,13 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 
-export default function LeaderBoard(props: any) {
+interface LeaderBoardProps {
+  gameCode: string;
+  quizQuestions?: { id?: string };
+  socket: { emit: (event: string, gameCode: string) => void };
+}
+
+export default function LeaderBoard(props: LeaderBoardProps) {
   const leaderboard = useSelector(
     (state: RootState) => state.player.leaderboard,
   );

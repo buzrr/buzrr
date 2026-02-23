@@ -9,7 +9,6 @@ import BackNavButton from "@/components/BackNavButton";
 function Player() {
   const [data, setData] = useState({
     name: "",
-    err: false,
     image: "",
   });
 

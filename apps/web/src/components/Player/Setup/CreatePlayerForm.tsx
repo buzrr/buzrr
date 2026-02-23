@@ -11,7 +11,7 @@ const CreatePlayerForm = (props: {
     name: string;
     image: string;
   };
-  setData: (data: any) => void;
+  setData: (data: { name: string; image: string }) => void;
 }) => {
   const router = useRouter();
 

@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useRouter } from "next/navigation";
 
-const CreateBuzrrForm = (params: { setTitle: any }) => {
+const CreateBuzrrForm = (params: { setTitle: (title: string) => void }) => {
   const router = useRouter();
   async function clientAction(formData: FormData) {
     const result = await addBuzrr(formData);

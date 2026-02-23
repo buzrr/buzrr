@@ -21,7 +21,7 @@ export default function WaitScreen(params: {
   const socket = params.socket;
 
   useEffect(() => {
-    const handleQuestionIndex = (_index: number) => {
+    const handleQuestionIndex = () => {
       dispatch(setScreenStatus(ScreenStatus.question));
     };
     const handleTimerStarts = () => {

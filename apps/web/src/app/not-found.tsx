@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import ClientImage from "@/components/ClientImage";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 
 export default function NotFound() {
   return (
