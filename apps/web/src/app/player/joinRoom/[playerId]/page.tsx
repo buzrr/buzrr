@@ -2,8 +2,8 @@ import { prisma } from "@buzrr/prisma";
 import SetLocalItem from "@/components/Player/setLocalItem";
 import ResetReduxStates from "@/components/Player/ResetReduxStates";
 import JoinRoomForm from "@/components/Player/Setup/JoinRoomForm";
+import JoinRoomProfileCard from "@/components/Player/Setup/JoinRoomProfileCard";
 import ClientImage from "@/components/ClientImage";
-import { DEFAULT_AVATAR } from "@/constants";
 
 async function JoinRoom({ params }: { params: Promise<{ playerId: string }> }) {
   const { playerId } = await params;
@@ -44,18 +44,11 @@ async function JoinRoom({ params }: { params: Promise<{ playerId: string }> }) {
         <div className="w-full md:w-fit py-4">
           <JoinRoomForm playerId={playerId} />
         </div>
-        <div className="w-[40vw] hidden md:flex md:flex-col items-center justify-center gap-4">
-          <ClientImage
-            props={{
-              src: player.profilePic || DEFAULT_AVATAR,
-              alt: "player avatar",
-              width: 200,
-              height: 200,
-              classname: "rounded-full",
-            }}
-          />
-          <p className="text-2xl font-bold dark:text-white">{player.name}</p>
-        </div>
+        <JoinRoomProfileCard
+          playerId={playerId}
+          initialPlayerName={player.name}
+          profilePic={player.profilePic}
+        />
       </div>
     </>
   );

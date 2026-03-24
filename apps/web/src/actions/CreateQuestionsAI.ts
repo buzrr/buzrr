@@ -82,7 +82,7 @@ const addQuestionsByAI = async (formData: FormData) => {
     if (!session || !session.user) redirect("/api/auth/signin");
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `Create a multiple choice question for the following description: ${description}.
         The question should have 4 options and the correct answer should be the first option.

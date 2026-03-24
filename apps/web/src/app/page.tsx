@@ -17,7 +17,7 @@ export default function Home() {
           />
         </Link>
       </div>
-      <div className="flex justify-start items-center gap-x-4 *:h-[80vh] *:rounded-xl *:bg-white *:dark:bg-dark p-4 md:px-8">
+      <div className="flex justify-start items-center gap-x-4 *:h-[80vh] *:rounded-xl *:bg-white *:dark:bg-dark p-4 md:px-8 mx-auto">
         <div className="flex flex-col w-full md:w-[55vw] p-10">
           <h1 className="text-dark dark:text-white text-3xl text-center md:text-start md:text-6xl font-black my-6">
             Buzz In for a Brain Workout
