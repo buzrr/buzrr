@@ -7,6 +7,7 @@ import "react-toastify/dist/ReactToastify.css";
 
 const JoinRoomForm = (params: { playerId: string }) => {
   const router = useRouter();
+
   async function clientAction(formData: FormData) {
     const result = await joinRoom(formData);
     if (result?.error) {
