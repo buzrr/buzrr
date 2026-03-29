@@ -1,5 +1,13 @@
 import type { AxiosInstance } from "axios";
-import type { GameLeaderboard, Player } from "@/types/db";
+import type {
+  GameLeaderboard,
+  GameSession,
+  Option,
+  Player,
+  Question,
+  Quiz,
+  User,
+} from "@/types/db";
 import { authApi, publicApi } from "@/lib/api/client";
 
 export async function createGameSession(
@@ -31,6 +39,56 @@ export async function submitAnswer(
 
 export type LeaderboardRow = GameLeaderboard & { Player: Player };
 
+export type AdminLobbyPayload = {
+  room: GameSession;
+  players: Player[];
+  quiz: Quiz & { questions: (Question & { options: Option[] })[] };
+};
+
+export async function getAdminLobby(
+  client: AxiosInstance,
+  roomId: string,
+) {
+  const { data } = await client.get<AdminLobbyPayload>(
+    `/game-sessions/${encodeURIComponent(roomId)}/lobby`,
+  );
+  return data;
+}
+
+export async function getLeaderboardByRoom(
+  client: AxiosInstance,
+  roomId: string,
+) {
+  const { data } = await client.get<LeaderboardRow[]>(
+    `/game-sessions/${encodeURIComponent(roomId)}/leaderboard`,
+  );
+  return data;
+}
+
+export type PlayerPlayGame = GameSession & {
+  quiz: Quiz & {
+    questions: (Question & {
+      options: Pick<Option, "id" | "title">[];
+    })[];
+  };
+  creator: Pick<User, "name" | "image">;
+};
+
+export type PlayerPlayPayload = {
+  player: Player;
+  game: PlayerPlayGame | null;
+};
+
+export async function getPlayerPlay(
+  client: AxiosInstance,
+  playerId: string,
+) {
+  const { data } = await client.get<PlayerPlayPayload>(
+    `/game-sessions/player-play/${encodeURIComponent(playerId)}`,
+  );
+  return data;
+}
+
 export async function getLeaderboard(
   client: AxiosInstance,
   gameCode: string,
@@ -50,4 +108,8 @@ export const gameSessionsApi = {
     body: Parameters<typeof submitAnswer>[2],
   ) => submitAnswer(publicApi, gameSessionId, body),
   leaderboard: (gameCode: string) => getLeaderboard(authApi, gameCode),
+  adminLobby: (roomId: string) => getAdminLobby(authApi, roomId),
+  leaderboardByRoom: (roomId: string) =>
+    getLeaderboardByRoom(authApi, roomId),
+  playerPlay: (playerId: string) => getPlayerPlay(publicApi, playerId),
 };

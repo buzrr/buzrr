@@ -24,6 +24,9 @@ export function useUpsertQuestionMutation(quizId: string) {
       questionsApi.upsertMultipart(quizId, formData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.questions(quizId) });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.quizzes.detail(quizId),
+      });
     },
   });
 }
@@ -34,6 +37,9 @@ export function useReorderQuestionsMutation(quizId: string) {
     mutationFn: questionsApi.reorder,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.questions(quizId) });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.quizzes.detail(quizId),
+      });
     },
   });
 }
@@ -44,6 +50,9 @@ export function useDeleteQuestionMutation(quizId: string) {
     mutationFn: questionsApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.questions(quizId) });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.quizzes.detail(quizId),
+      });
     },
   });
 }

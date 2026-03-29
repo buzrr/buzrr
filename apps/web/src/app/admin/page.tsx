@@ -1,10 +1,7 @@
-import { Suspense } from "react";
 import NavbarToggle from "@/components/Admin/NavbarToggle";
 import Navbar from "@/components/Admin/Navbar";
 import GridListToggle from "@/components/Admin/GridListToggle";
 import Buzrrs from "@/components/Admin/Home/Buzrrs";
-import LoaderBuzrrs from "@/components/Admin/Home/LoaderBuzrrs";
-
 export default function Home() {
   return (
     <div className="flex">
@@ -24,9 +21,7 @@ export default function Home() {
           </span>
           <GridListToggle />
         </div>
-        <Suspense fallback={<LoaderBuzrrs cardCount={3} />}>
-          <Buzrrs />
-        </Suspense>
+        <Buzrrs />
       </div>
     </div>
   );

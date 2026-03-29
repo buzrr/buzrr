@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -163,6 +164,83 @@ export class GameSessionsService {
       where: { gameSessionId: room.id },
       include: { Player: true },
       orderBy: { score: "desc" },
+    });
+  }
+
+  async getAdminLobby(user: AuthUser, roomId: string) {
+    const room = await this.prisma.db.gameSession.findUnique({
+      where: { id: roomId },
+    });
+    if (!room) {
+      throw new NotFoundException("Room not found");
+    }
+    if (room.creatorId !== user.userId) {
+      throw new ForbiddenException("Unauthorized");
+    }
+    const players = await this.prisma.db.player.findMany({
+      where: { gameId: roomId },
+    });
+    const quiz = await this.prisma.db.quiz.findUnique({
+      where: { id: room.quizId },
+      include: {
+        questions: {
+          include: { options: true },
+        },
+      },
+    });
+    if (!quiz) {
+      throw new NotFoundException("Quiz not found");
+    }
+    return { room, players, quiz };
+  }
+
+  async leaderboardByRoomId(roomId: string) {
+    const room = await this.prisma.db.gameSession.findUnique({
+      where: { id: roomId },
+    });
+    if (!room) {
+      throw new NotFoundException("Room not found");
+    }
+    return this.prisma.db.gameLeaderboard.findMany({
+      where: { gameSessionId: roomId },
+      include: { Player: true },
+      orderBy: { score: "desc" },
+    });
+  }
+
+  async getPlayerPlayContext(playerId: string) {
+    const player = await this.prisma.db.player.findUnique({
+      where: { id: playerId },
+    });
+    if (!player) {
+      throw new NotFoundException("Player not found");
+    }
+    if (!player.gameId) {
+      return { player, game: null };
+    }
+    const game = await this.loadGameForPlay(player.gameId);
+    return { player, game };
+  }
+
+  private async loadGameForPlay(gameSessionId: string) {
+    return this.prisma.db.gameSession.findUnique({
+      where: { id: gameSessionId },
+      include: {
+        quiz: {
+          include: {
+            questions: {
+              include: {
+                options: {
+                  select: { id: true, title: true },
+                },
+              },
+            },
+          },
+        },
+        creator: {
+          select: { name: true, image: true },
+        },
+      },
     });
   }
 }

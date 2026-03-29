@@ -1,27 +1,23 @@
-import { prisma } from "@buzrr/prisma";
-import { auth } from "@/utils/auth";
-import { redirect } from "next/navigation";
+"use client";
+
 import ClientBuzrrs from "./ClientBuzrrs";
+import LoaderBuzrrs from "./LoaderBuzrrs";
+import { useQuizzesQuery } from "@/lib/modules/quizzes/hooks";
 
-const Buzrrs = async () => {
-  const session = await auth();
+const Buzrrs = () => {
+  const { data: quizzes, isPending, isError } = useQuizzesQuery();
 
-  if (!session || !session.user) redirect("/api/auth/signin");
+  if (isPending) {
+    return <LoaderBuzrrs cardCount={3} />;
+  }
 
-  const user = await prisma.user.findUnique({
-    where: {
-      email: session.user.email as string,
-    },
-  });
-
-  const quizzes = await prisma.quiz.findMany({
-    where: {
-      userId: user?.id as string,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+  if (isError || !quizzes) {
+    return (
+      <p className="text-dark dark:text-white text-sm">
+        Could not load quizzes. Check your connection and API configuration.
+      </p>
+    );
+  }
 
   return <ClientBuzrrs quizzes={quizzes} />;
 };

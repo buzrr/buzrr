@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   HttpCode,
   HttpStatus,
   Param,
@@ -19,6 +20,16 @@ import { QuizzesService } from "./quizzes.service";
 @Controller("quizzes")
 export class QuizzesController {
   constructor(private readonly quizzes: QuizzesService) {}
+
+  @Get()
+  list(@CurrentUser() user: AuthUser) {
+    return this.quizzes.findAllForUser(user);
+  }
+
+  @Get(":id")
+  findOne(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.quizzes.findOneForUser(user, id);
+  }
 
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateQuizDto) {

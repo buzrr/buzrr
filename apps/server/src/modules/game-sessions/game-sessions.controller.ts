@@ -28,6 +28,31 @@ export class GameSessionsController {
     return this.gameSessions.join(dto);
   }
 
+  @Public()
+  @UseGuards(RateLimitGuard)
+  @Get("player-play/:playerId")
+  playerPlay(@Param("playerId") playerId: string) {
+    return this.gameSessions.getPlayerPlayContext(playerId);
+  }
+
+  @Get("by-code/:gameCode/leaderboard")
+  leaderboardByCode(@Param("gameCode") gameCode: string) {
+    return this.gameSessions.leaderboardByCode(gameCode);
+  }
+
+  @Get(":roomId/lobby")
+  adminLobby(
+    @CurrentUser() user: AuthUser,
+    @Param("roomId") roomId: string,
+  ) {
+    return this.gameSessions.getAdminLobby(user, roomId);
+  }
+
+  @Get(":roomId/leaderboard")
+  leaderboardByRoom(@Param("roomId") roomId: string) {
+    return this.gameSessions.leaderboardByRoomId(roomId);
+  }
+
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateRoomDto) {
     return this.gameSessions.createRoom(user, dto);
@@ -41,10 +66,5 @@ export class GameSessionsController {
     @Body() dto: SubmitAnswerDto,
   ) {
     return this.gameSessions.submitAnswer(id, dto);
-  }
-
-  @Get("by-code/:gameCode/leaderboard")
-  leaderboard(@Param("gameCode") gameCode: string) {
-    return this.gameSessions.leaderboardByCode(gameCode);
   }
 }

@@ -2283,6 +2283,25 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tanstack/query-devtools@npm:5.95.2":
+  version: 5.95.2
+  resolution: "@tanstack/query-devtools@npm:5.95.2"
+  checksum: 10c0/33b9dc74b4807a9316d3c43df9acf3b99c19e72424f3efd78984350f114d6b03ccba3ca3a01e5ad01d9fb78c32b719fee4aa5dfd2c62c641430838903e2f7576
+  languageName: node
+  linkType: hard
+
+"@tanstack/react-query-devtools@npm:^5.95.2":
+  version: 5.95.2
+  resolution: "@tanstack/react-query-devtools@npm:5.95.2"
+  dependencies:
+    "@tanstack/query-devtools": "npm:5.95.2"
+  peerDependencies:
+    "@tanstack/react-query": ^5.95.2
+    react: ^18 || ^19
+  checksum: 10c0/8675efaa1f55ada399471e0083cdff0ea0967ee51da2f156f191edaeee0a3e15246a5a2f64f99617b79eed2d50c8393f848496f81e2ea41b4aaa636dcbf9524c
+  languageName: node
+  linkType: hard
+
 "@tanstack/react-query@npm:^5.95.2":
   version: 5.95.2
   resolution: "@tanstack/react-query@npm:5.95.2"
@@ -9153,6 +9172,7 @@ __metadata:
     "@reduxjs/toolkit": "npm:^2.11.2"
     "@tailwindcss/postcss": "npm:^4.2.0"
     "@tanstack/react-query": "npm:^5.95.2"
+    "@tanstack/react-query-devtools": "npm:^5.95.2"
     "@types/node": "npm:^20"
     "@types/react": "npm:^19"
     "@types/react-dom": "npm:^19"

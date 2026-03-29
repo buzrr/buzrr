@@ -36,4 +36,25 @@ export class PlayersService {
       throw new NotFoundException("Player not found");
     }
   }
+
+  async findById(id: string) {
+    const player = await this.prisma.db.player.findUnique({
+      where: { id },
+    });
+    if (!player) {
+      throw new NotFoundException("Player not found");
+    }
+    return player;
+  }
+
+  async clearGameId(id: string) {
+    try {
+      return await this.prisma.db.player.update({
+        where: { id },
+        data: { gameId: null },
+      });
+    } catch {
+      throw new NotFoundException("Player not found");
+    }
+  }
 }

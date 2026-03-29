@@ -38,3 +38,30 @@ export function useLeaderboardQuery(gameCode: string, enabled = true) {
     staleTime: 0,
   });
 }
+
+export function useAdminLobbyQuery(roomId: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.gameSessions.lobby(roomId),
+    queryFn: () => gameSessionsApi.adminLobby(roomId),
+    enabled: Boolean(roomId) && enabled,
+    staleTime: 5_000,
+  });
+}
+
+export function useLeaderboardByRoomQuery(roomId: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.gameSessions.leaderboardRoom(roomId),
+    queryFn: () => gameSessionsApi.leaderboardByRoom(roomId),
+    enabled: Boolean(roomId) && enabled,
+    staleTime: 15_000,
+  });
+}
+
+export function usePlayerPlayQuery(playerId: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.gameSessions.playerPlay(playerId),
+    queryFn: () => gameSessionsApi.playerPlay(playerId),
+    enabled: Boolean(playerId) && enabled,
+    staleTime: 5_000,
+  });
+}

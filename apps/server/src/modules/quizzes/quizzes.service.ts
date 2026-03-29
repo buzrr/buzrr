@@ -80,6 +80,29 @@ export class QuizzesService {
     await this.prisma.db.quiz.delete({ where: { id: quizId } });
   }
 
+  async findAllForUser(user: AuthUser) {
+    return this.prisma.db.quiz.findMany({
+      where: { userId: user.userId },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async findOneForUser(user: AuthUser, quizId: string) {
+    const quiz = await this.prisma.db.quiz.findFirst({
+      where: { id: quizId, userId: user.userId },
+      include: {
+        gameSessions: {
+          orderBy: { createdAt: "desc" },
+        },
+        _count: { select: { questions: true } },
+      },
+    });
+    if (!quiz) {
+      throw new NotFoundException("Unauthorized or quiz not found");
+    }
+    return quiz;
+  }
+
   async createWithAi(
     user: AuthUser,
     dto: CreateAiQuizDto,

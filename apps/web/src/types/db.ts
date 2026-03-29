@@ -11,4 +11,5 @@ export type {
   Player,
   GameLeaderboard,
   PlayerAnswer,
+  User,
 } from "@buzrr/prisma";

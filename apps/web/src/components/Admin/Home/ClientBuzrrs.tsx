@@ -31,7 +31,6 @@ export default function ClientBuzrrs({ quizzes }: { quizzes: Quiz[] }) {
         toast.success("Successfully deleted quiz");
         setDelModalOpen(false);
         setClicked(false);
-        router.refresh();
       },
       onError: (err) => {
         toast.error(getApiErrorMessage(err));

@@ -1,4 +1,14 @@
-import { Body, Controller, Patch, Post, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from "@nestjs/common";
 import { Public } from "../../common/decorators/public.decorator";
 import { RateLimitGuard } from "../../common/guards/rate-limit.guard";
 import { CreatePlayerDto } from "./dto/create-player.dto";
@@ -21,5 +31,20 @@ export class PlayersController {
   @Patch("name")
   updateName(@Body() dto: UpdatePlayerNameDto) {
     return this.players.updateName(dto);
+  }
+
+  @Public()
+  @UseGuards(RateLimitGuard)
+  @Get(":id")
+  findOne(@Param("id") id: string) {
+    return this.players.findById(id);
+  }
+
+  @Public()
+  @UseGuards(RateLimitGuard)
+  @Patch(":id/clear-game")
+  @HttpCode(HttpStatus.OK)
+  clearGame(@Param("id") id: string) {
+    return this.players.clearGameId(id);
   }
 }
