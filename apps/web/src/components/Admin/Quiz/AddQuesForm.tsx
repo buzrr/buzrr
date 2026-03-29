@@ -1,15 +1,20 @@
 "use client";
 
 import SubmitButton from "../../SubmitButton";
-import { InputField } from "@buzrr/ui";
+import { InputField } from "@/components/InputField";
 import { FormLabel } from "@mui/material";
-import { RadioField } from "@/components/RadioField";
-import addQues from "@/actions/AddQuesAction";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Controller, useForm } from "react-hook-form";
+import type { Resolver } from "react-hook-form";
+import { z } from "zod";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { RxCross2 } from "react-icons/rx";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { getApiErrorMessage } from "@/lib/api/errors";
+import { addQuestionSchema } from "@/lib/modules/forms/schemas";
+import { useUpsertQuestionMutation } from "@/lib/modules/questions/hooks";
 
 interface Option {
   id?: string;
@@ -30,14 +35,54 @@ interface Question {
   options?: Option[];
 }
 
+type FormValues = z.infer<typeof addQuestionSchema>;
+
+function defaultCorrectLetter(options?: Option[]): "a" | "b" | "c" | "d" {
+  if (!options?.length) return "a";
+  const idx = options.findIndex((o) => o.isCorrect);
+  const letters: ("a" | "b" | "c" | "d")[] = ["a", "b", "c", "d"];
+  return letters[idx] ?? "a";
+}
+
 const AddQuesForm = (props: { quizId: string; question?: Question }) => {
   const { question } = props;
+  const options = question?.options;
+  const mutation = useUpsertQuestionMutation(props.quizId);
   const [file, setFile] = useState<File | null>();
   const [fileLink, setFileLink] = useState(
     question?.media ? question.media : "",
   );
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { control, handleSubmit, reset } = useForm<FormValues>({
+    resolver: zodResolver(addQuestionSchema) as Resolver<FormValues>,
+    defaultValues: {
+      title: question?.title ?? "",
+      option1: options?.[0]?.title ?? "",
+      option2: options?.[1]?.title ?? "",
+      option3: options?.[2]?.title ?? "",
+      option4: options?.[3]?.title ?? "",
+      choose_option: defaultCorrectLetter(options),
+      time: question?.timeOut ?? 15,
+    },
+  });
+
+  useEffect(() => {
+    reset({
+      title: question?.title ?? "",
+      option1: options?.[0]?.title ?? "",
+      option2: options?.[1]?.title ?? "",
+      option3: options?.[2]?.title ?? "",
+      option4: options?.[3]?.title ?? "",
+      choose_option: defaultCorrectLetter(options),
+      time: question?.timeOut ?? 15,
+    });
+    setFile(null);
+    setFileLink(question?.media ? question.media : "");
+    setPreviewUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, [question, options, reset]);
 
   useEffect(() => {
     if (!file) {
@@ -65,45 +110,70 @@ const AddQuesForm = (props: { quizId: string; question?: Question }) => {
     }
   }
 
-  async function clientAction(formData: FormData) {
-    const result = await addQues(formData);
-    if (result?.error) {
-      const errorMsg = result.error || "Something went wrong";
-      toast.error(errorMsg);
-    } else {
-      toast.success("Successfully added");
-    }
-  }
+  const onSubmit = handleSubmit((data) => {
+    const fd = new FormData();
+    fd.append("title", data.title);
+    fd.append("option1", data.option1);
+    fd.append("option2", data.option2);
+    fd.append("option3", data.option3);
+    fd.append("option4", data.option4);
+    fd.append("choose_option", data.choose_option);
+    fd.append(
+      "time",
+      String(data.time !== undefined && !Number.isNaN(data.time) ? data.time : 15),
+    );
+    fd.append("file_link", fileLink);
+    fd.append("media_type", file ? "" : (question?.mediaType ?? ""));
+    if (question?.id) fd.append("ques_id", question.id);
+    if (file) fd.append("file", file);
 
-  const options = question?.options;
+    mutation.mutate(fd, {
+      onSuccess: () => {
+        toast.success("Successfully added");
+        if (!question?.id) {
+          reset({
+            title: "",
+            option1: "",
+            option2: "",
+            option3: "",
+            option4: "",
+            choose_option: "a",
+            time: 15,
+          });
+          deleteFile();
+        }
+      },
+      onError: (err) => {
+        toast.error(getApiErrorMessage(err));
+      },
+    });
+  });
+
   return (
     <form
-      action={clientAction}
+      onSubmit={onSubmit}
       className="flex flex-col justify-center mx-auto"
     >
-      <input
-        type="text"
-        className="hidden"
-        name="quiz_id"
-        value={props.quizId}
-      />
-      <input
-        type="text"
-        className="hidden"
-        name="ques_id"
-        value={question?.id}
-      />
-      <InputField
-        type="text"
+      <Controller
         name="title"
-        placeholder="Title"
-        className="text-dark dark:text-white dark:bg-dark my-2 rounded-xl mt-1 border"
-        required
-        autoComplete="off"
-        label="Question"
-        labelClass="text-lg"
-        fieldValue={question?.title}
-        maxLength={150}
+        control={control}
+        render={({ field, fieldState }) => (
+          <InputField
+            type="text"
+            name="title"
+            placeholder="Title"
+            className="text-dark dark:text-white dark:bg-dark my-2 rounded-xl mt-1 border"
+            required
+            autoComplete="off"
+            label="Question"
+            labelClass="text-lg"
+            fieldValue={field.value}
+            onTitleChange={field.onChange}
+            maxLength={150}
+            error={!!fieldState.error}
+            errorMessage={fieldState.error?.message}
+          />
+        )}
       />
       <div className="flex flex-col mb-3">
         <label className="text-sm text-dark dark:text-white mb-0">
@@ -118,18 +188,6 @@ const AddQuesForm = (props: { quizId: string; question?: Question }) => {
           autoComplete="off"
           ref={fileInputRef}
           onChange={handleFile}
-        />
-        <input
-          type="text"
-          className="hidden"
-          name="file_link"
-          value={fileLink}
-        />
-        <input
-          type="text"
-          className="hidden"
-          name="media_type"
-          value={question?.mediaType ? question.mediaType : ""}
         />
       </div>
       <p className="text-xs mt-[-12px] text-dark dark:text-white mb-2">
@@ -160,84 +218,74 @@ const AddQuesForm = (props: { quizId: string; question?: Question }) => {
         Enter options
       </FormLabel>
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-0">
-        <div className="relative">
-          <InputField
-            type="text"
-            name="option1"
-            placeholder="Enter option 1"
-            autoComplete="off"
-            className="text-dark dark:text-white dark:bg-dark rounded-xl outline-none border w-full my-0 pr-4"
-            style="question"
-            required
-            fieldValue={options && options[0]?.title}
-          />
-          <RadioField
-            defaultvalue={options && options[0]?.isCorrect ? "a" : ""}
-            val="a"
-          />
-        </div>
-        <div className="relative">
-          <InputField
-            type="text"
-            name="option2"
-            placeholder="Enter option 2"
-            autoComplete="off"
-            className="text-dark dark:text-white dark:bg-dark rounded-xl outline-none my-0 border w-full pr-4"
-            style="question"
-            required
-            fieldValue={options && options[1]?.title}
-          />
-          <RadioField
-            defaultvalue={options && options[1]?.isCorrect ? "b" : ""}
-            val="b"
-          />
-        </div>
-        <div className="relative">
-          <InputField
-            type="text"
-            name="option3"
-            placeholder="Enter option 3"
-            autoComplete="off"
-            className="text-dark dark:text-white dark:bg-dark rounded-xl outline-none border my-0 w-full pr-4"
-            style="question"
-            required
-            fieldValue={options && options[2]?.title}
-          />
-          <RadioField
-            defaultvalue={options && options[2]?.isCorrect ? "c" : ""}
-            val="c"
-          />
-        </div>
-        <div className="relative">
-          <InputField
-            type="text"
-            name="option4"
-            placeholder="Enter option 4"
-            autoComplete="off"
-            className="text-dark dark:text-white dark:bg-dark rounded-xl outline-none border my-0 w-full pr-4"
-            style="question"
-            required
-            fieldValue={options && options[3]?.title}
-          />
-          <RadioField
-            defaultvalue={options && options[3]?.isCorrect ? "d" : ""}
-            val="d"
-          />
-        </div>
+        {(
+          [
+            ["option1", "a"],
+            ["option2", "b"],
+            ["option3", "c"],
+            ["option4", "d"],
+          ] as const
+        ).map(([name, letter], i) => (
+          <div key={name} className="relative">
+            <Controller
+              name={name}
+              control={control}
+              render={({ field, fieldState }) => (
+                <InputField
+                  type="text"
+                  name={name}
+                  placeholder={`Enter option ${i + 1}`}
+                  autoComplete="off"
+                  className="text-dark dark:text-white dark:bg-dark rounded-xl outline-none border w-full my-0 pr-4"
+                  style="question"
+                  required
+                  fieldValue={field.value}
+                  onTitleChange={field.onChange}
+                  error={!!fieldState.error}
+                  errorMessage={fieldState.error?.message}
+                />
+              )}
+            />
+            <Controller
+              name="choose_option"
+              control={control}
+              render={({ field }) => (
+                <input
+                  type="radio"
+                  className="absolute top-[26px] right-2"
+                  value={letter}
+                  checked={field.value === letter}
+                  onChange={() => field.onChange(letter)}
+                />
+              )}
+            />
+          </div>
+        ))}
       </div>
-      <InputField
-        type="number"
+      <Controller
         name="time"
-        placeholder="question time"
-        className="text-dark dark:text-white my-2 rounded-xl border dark:bg-dark"
-        required={false}
-        autoComplete="off"
-        label="Question Time (in seconds)"
-        fieldValue={question?.timeOut ? question.timeOut.toString() : ""}
+        control={control}
+        render={({ field, fieldState }) => (
+          <InputField
+            type="number"
+            name="time"
+            placeholder="question time"
+            className="text-dark dark:text-white my-2 rounded-xl border dark:bg-dark"
+            required={false}
+            autoComplete="off"
+            label="Question Time (in seconds)"
+            fieldValue={field.value?.toString() ?? ""}
+            onTitleChange={(v) =>
+              field.onChange(v === "" ? undefined : Number(v))
+            }
+            error={!!fieldState.error}
+            errorMessage={fieldState.error?.message}
+          />
+        )}
       />
 
       <div className="text-center mt-2">
-        <SubmitButton />
+        <SubmitButton isPending={mutation.isPending} />
       </div>
     </form>
   );

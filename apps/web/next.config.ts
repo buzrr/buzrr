@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // Monorepo: trace server deps from repo root so Prisma and workspace packages resolve.
   outputFileTracingRoot: path.join(__dirname, "../../"),
-  transpilePackages: ["@buzrr/prisma", "@buzrr/ui"],
+  transpilePackages: ["@buzrr/prisma"],
   images: {
     remotePatterns: [
       {

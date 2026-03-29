@@ -1,7 +1,11 @@
 "use client";
 
 import clsx from "clsx";
-import { InputField } from "@buzrr/ui";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Controller, useForm } from "react-hook-form";
+import type { Resolver } from "react-hook-form";
+import { z } from "zod";
+import { InputField } from "@/components/InputField";
 import SubmitButton from "@/components/SubmitButton";
 import { Box, Modal } from "@mui/material";
 import Image from "next/image";
@@ -11,23 +15,48 @@ import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useSelector } from "react-redux";
 import { RootState } from "@/state/store";
-import addQuestionsByAI from "@/actions/CreateQuestionsAI";
 import { useRouter } from "next/navigation";
+import { getApiErrorMessage } from "@/lib/api/errors";
+import { createAiQuizSchema } from "@/lib/modules/forms/schemas";
+import { useCreateAiQuizMutation } from "@/lib/modules/quizzes/hooks";
+
+type FormValues = z.infer<typeof createAiQuizSchema>;
 
 export default function CreateAIQuiz() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const view = useSelector((state: RootState) => state.gridListToggle.view);
+  const mutation = useCreateAiQuizMutation();
+  const { control, handleSubmit, reset } = useForm<FormValues>({
+    resolver: zodResolver(createAiQuizSchema) as Resolver<FormValues>,
+    defaultValues: {
+      title: "",
+      description: "",
+      questions: undefined,
+      time: undefined,
+    },
+  });
 
-  async function clientAction(formData: FormData) {
-    const result = await addQuestionsByAI(formData);
-    if (result?.error) {
-      const errorMsg = result.error || "Something went wrong";
-      toast.error(errorMsg);
-    } else {
-      router.push(`/admin/quiz/${result.quizId}`);
-    }
-  }
+  const onSubmit = handleSubmit((data) => {
+    mutation.mutate(
+      {
+        title: data.title,
+        description: data.description,
+        questions: data.questions,
+        time: data.time,
+      },
+      {
+        onSuccess: (res) => {
+          setOpen(false);
+          reset();
+          router.push(`/admin/quiz/${res.quizId}`);
+        },
+        onError: (err) => {
+          toast.error(getApiErrorMessage(err));
+        },
+      },
+    );
+  });
 
   return (
     <>
@@ -81,51 +110,94 @@ export default function CreateAIQuiz() {
               Ready to get started? Just jot down your requirements below to
               begin the quiz!
             </p>
-            <form action={clientAction}>
-              <InputField
-                type="text"
+            <form onSubmit={onSubmit}>
+              <Controller
                 name="title"
-                placeholder="Example: “My 20th Bday Quiz”"
-                className="text-dark dark:text-white dark:bg-dark my-2 rounded-xl mt-1 border"
-                required
-                autoComplete="off"
-                label="Name your quiz"
+                control={control}
+                render={({ field, fieldState }) => (
+                  <InputField
+                    type="text"
+                    name="title"
+                    placeholder="Example: “My 20th Bday Quiz”"
+                    className="text-dark dark:text-white dark:bg-dark my-2 rounded-xl mt-1 border"
+                    required
+                    autoComplete="off"
+                    label="Name your quiz"
+                    fieldValue={field.value ?? ""}
+                    onTitleChange={field.onChange}
+                    error={!!fieldState.error}
+                    errorMessage={fieldState.error?.message}
+                  />
+                )}
               />
-              <InputField
-                type="text"
+              <Controller
                 name="description"
-                placeholder="Example: quiz on gravitational forces."
-                autoComplete="off"
-                required
-                className="text-dark dark:text-white dark:bg-dark mt-1 border rounded-xl "
-                textarea={true}
-                label="Quiz questions description"
+                control={control}
+                render={({ field, fieldState }) => (
+                  <InputField
+                    type="text"
+                    name="description"
+                    placeholder="Example: quiz on gravitational forces."
+                    autoComplete="off"
+                    required
+                    className="text-dark dark:text-white dark:bg-dark mt-1 border rounded-xl "
+                    textarea={true}
+                    label="Quiz questions description"
+                    fieldValue={field.value ?? ""}
+                    onTitleChange={field.onChange}
+                    error={!!fieldState.error}
+                    errorMessage={fieldState.error?.message}
+                  />
+                )}
               />
 
               <div className="grid grid-cols-2 gap-x-3">
-                <InputField
-                  type="number"
+                <Controller
                   name="questions"
-                  maxNum={15}
-                  placeholder="Example: 15"
-                  className="text-dark dark:text-white dark:bg-dark my-2 rounded-xl mt-1 border"
-                  required
-                  autoComplete="off"
-                  label="Write number of quiz questions.(max 15)"
+                  control={control}
+                  render={({ field, fieldState }) => (
+                    <InputField
+                      type="number"
+                      name="questions"
+                      maxNum={15}
+                      placeholder="Example: 15"
+                      className="text-dark dark:text-white dark:bg-dark my-2 rounded-xl mt-1 border"
+                      required
+                      autoComplete="off"
+                      label="Write number of quiz questions.(max 15)"
+                      fieldValue={field.value?.toString() ?? ""}
+                      onTitleChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                      error={!!fieldState.error}
+                      errorMessage={fieldState.error?.message}
+                    />
+                  )}
                 />
-                <InputField
-                  type="number"
+                <Controller
                   name="time"
-                  placeholder="Example: 15"
-                  className="text-dark dark:text-white dark:bg-dark my-2 rounded-xl mt-1 border"
-                  required
-                  autoComplete="off"
-                  label="Write down default question time (in seconds)"
+                  control={control}
+                  render={({ field, fieldState }) => (
+                    <InputField
+                      type="number"
+                      name="time"
+                      placeholder="Example: 15"
+                      className="text-dark dark:text-white dark:bg-dark my-2 rounded-xl mt-1 border"
+                      required
+                      autoComplete="off"
+                      label="Write down default question time (in seconds)"
+                      fieldValue={field.value?.toString() ?? ""}
+                      onTitleChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                      error={!!fieldState.error}
+                      errorMessage={fieldState.error?.message}
+                    />
+                  )}
                 />
               </div>
-              <SubmitButton text="Generate" loader="Generating..." />
+              <SubmitButton
+                text="Generate"
+                loader="Generating..."
+                isPending={mutation.isPending}
+              />
             </form>
-            {/* <div>Coming Soon...</div> */}
           </div>
         </Box>
       </Modal>

@@ -47,13 +47,13 @@ export default function ConfirmationModal({
                 onClick={() => {
                   setOpen(false);
                 }}
-                className="text-white bg-red-light rounded-lg py-2"
+                className="text-white bg-red-light rounded-lg py-2 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={onClick}
-                className="bg-white text-red-light dark:text-red-dark dark:border-red-dark border-2 font-semibold py-2 border-red-light rounded-lg dark:bg-[#27272A]"
+                className="bg-white text-red-light dark:text-red-dark dark:border-red-dark border-2 font-semibold py-2 border-red-light rounded-lg dark:bg-[#27272A] cursor-pointer"
               >
                 Submit
               </button>

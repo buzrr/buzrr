@@ -5,9 +5,8 @@ import QuizInfoSection from "@/components/Admin/Quiz/QuizInfoSection";
 import { prisma } from "@buzrr/prisma";
 import { auth } from "@/utils/auth";
 import { redirect, notFound } from "next/navigation";
-import SubmitButton from "@/components/SubmitButton";
-import createRoom from "@/actions/CreateRoomAction";
 import HideQuestions from "@/components/Admin/Quiz/HideQuestions";
+import HostQuizForm from "@/components/Admin/Quiz/HostQuizForm";
 
 async function Quiz({ params }: { params: Promise<{ quizId: string }> }) {
   const { quizId } = await params;
@@ -44,14 +43,11 @@ async function Quiz({ params }: { params: Promise<{ quizId: string }> }) {
           </span>
         </div>
         <div className="w-[95%] mx-auto my-2 md:hidden">
-          <form action={createRoom}>
-            <input type="hidden" name="quizId" value={quizId} readOnly/>
-            <SubmitButton
-              text="Host quiz"
-              isQuiz={true}
-              error={quiz?.questions.length === 0}
-            />
-          </form>
+          <HostQuizForm
+            quizId={quizId}
+            disabled={quiz?.questions.length === 0}
+            className="w-full"
+          />
         </div>
         <div className="flex flex-col overflow-y-auto md:h-[calc(100vh-120px)] p-4 gap-4">
           <div className="flex justify-center items-center gap-2">

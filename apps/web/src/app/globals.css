@@ -5,7 +5,6 @@
 
 /* Ensure all source files are scanned (helps in monorepos) */
 @source "../";
-@source "../../../../packages/ui/src";
 
 /* Extend the default theme so spacing, radius, etc. are preserved */
 @theme default {

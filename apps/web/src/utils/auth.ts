@@ -4,6 +4,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import type { Adapter } from "next-auth/adapters";
 import { prisma } from "@buzrr/prisma";
 import NextAuth from "next-auth";
+
 export const { auth, handlers, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma) as Adapter,
   providers: [
@@ -20,4 +21,12 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       },
     }),
   ],
+  callbacks: {
+    session({ session, user }) {
+      if (session.user && user) {
+        session.user.id = user.id;
+      }
+      return session;
+    },
+  },
 });

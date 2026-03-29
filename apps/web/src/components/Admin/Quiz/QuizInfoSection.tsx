@@ -1,8 +1,7 @@
 import { auth } from "@/utils/auth";
 import { redirect } from "next/navigation";
-import createRoom from "@/actions/CreateRoomAction";
-import SubmitButton from "@/components/SubmitButton";
 import Link from "next/link";
+import HostQuizForm from "@/components/Admin/Quiz/HostQuizForm";
 
 interface QuizWithSessions {
   id: string;
@@ -21,10 +20,7 @@ async function QuizInfoSection(props: { quiz: QuizWithSessions }) {
 
   return (
     <>
-      <form
-        className="w-[40vw] h-[83vh] bg-white dark:bg-dark p-4 hidden md:flex flex-col"
-        action={createRoom}
-      >
+      <div className="w-[40vw] h-[83vh] bg-white dark:bg-dark p-4 hidden md:flex flex-col">
         <div className="flex flex-col w-[90%] mx-auto text-dark dark:text-white">
           <div className="text-sm">
             <span className="p-1 py-2 underline underline-offset-1">
@@ -38,12 +34,11 @@ async function QuizInfoSection(props: { quiz: QuizWithSessions }) {
           <p className="text-xs p-1 border border-[#8FB72E] bg-[#C4F849] rounded w-fit my-1 dark:text-dark">
             Total number of questions : {props.quiz.questions?.length ?? 0}
           </p>
-          <input type="hidden" name="quizId" value={props.quiz.id} readOnly/>
           <div className="w-full mt-4">
-            <SubmitButton
-              text="Host quiz"
-              isQuiz={true}
-              error={!props.quiz.questions?.length}
+            <HostQuizForm
+              quizId={props.quiz.id}
+              disabled={!props.quiz.questions?.length}
+              className="w-full"
             />
           </div>
         </div>
@@ -89,7 +84,7 @@ async function QuizInfoSection(props: { quiz: QuizWithSessions }) {
             )}
           </div>
         </div>
-      </form>
+      </div>
     </>
   );
 }
