@@ -61,7 +61,7 @@ export default function JoinRoomClient({ playerId }: { playerId: string }) {
       </div>
       <div className="w-full h-[81vh] flex gap-4 px-4 *:bg-white dark:*:bg-dark *:rounded-xl">
         <div className="w-full md:w-fit py-4">
-          <JoinRoomForm playerId={playerId} />
+          <JoinRoomForm />
         </div>
         <JoinRoomProfileCard
           playerId={playerId}

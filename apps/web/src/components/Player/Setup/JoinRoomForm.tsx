@@ -13,7 +13,7 @@ import { useJoinRoomMutation } from "@/lib/modules/game-sessions/hooks";
 
 type FormValues = z.infer<typeof joinRoomSchema>;
 
-const JoinRoomForm = (params: { playerId: string }) => {
+const JoinRoomForm = () => {
   const router = useRouter();
   const mutation = useJoinRoomMutation();
   const { register, handleSubmit } = useForm<FormValues>({

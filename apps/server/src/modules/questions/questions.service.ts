@@ -4,7 +4,6 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import type { Express } from "express";
 import { CloudinaryService } from "../../common/services/cloudinary.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
