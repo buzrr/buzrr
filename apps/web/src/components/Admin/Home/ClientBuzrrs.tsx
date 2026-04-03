@@ -9,12 +9,14 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/state/store";
 import useContextMenu from "@/hooks/useContextMenu";
 import ConfirmationModal from "../ConfirmationModal";
-import dltQuiz from "@/actions/DeleteQuizAction";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
+import { getApiErrorMessage } from "@/lib/api/errors";
+import { useDeleteQuizMutation } from "@/lib/modules/quizzes/hooks";
 
 export default function ClientBuzrrs({ quizzes }: { quizzes: Quiz[] }) {
   const router = useRouter();
+  const deleteQuizMutation = useDeleteQuizMutation();
 
   const view = useSelector((state: RootState) => state.gridListToggle.view);
   const className = view === "grid" ? "w-11 h-11" : "w-6 h-6";
@@ -23,15 +25,17 @@ export default function ClientBuzrrs({ quizzes }: { quizzes: Quiz[] }) {
   const [delModalOpen, setDelModalOpen] = useState(false);
   const [quizId, setQuizId] = useState("");
 
-  async function deleteQuiz(quizId: string) {
-    const result = await dltQuiz(quizId);
-    if (result?.error) {
-      const errorMsg = result.error || "Something went wrong";
-      toast.error(errorMsg);
-    } else {
-      toast.success("Successfully deleted quiz");
-    }
-    setDelModalOpen(false);
+  function deleteQuiz(id: string) {
+    deleteQuizMutation.mutate(id, {
+      onSuccess: () => {
+        toast.success("Successfully deleted quiz");
+        setDelModalOpen(false);
+        setClicked(false);
+      },
+      onError: (err) => {
+        toast.error(getApiErrorMessage(err));
+      },
+    });
   }
 
   return (

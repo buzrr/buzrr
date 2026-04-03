@@ -14,8 +14,11 @@ const SubmitButton = (params: {
   style?: string;
   isQuiz?: boolean;
   error?: boolean;
+  /** When set, overrides react-dom useFormStatus (needed for React Hook Form + mutations). */
+  isPending?: boolean;
 }) => {
   const { pending } = useFormStatus();
+  const isLoading = params.isPending ?? pending;
   const dispatch = useDispatch();
 
   function handleRedux() {
@@ -28,12 +31,13 @@ const SubmitButton = (params: {
   }
   return (
     <button
-      disabled={params.error || pending}
+      type="submit"
+      disabled={params.error || isLoading}
       value="submit"
       className="rounded-xl text-white dark:text-dark w-full bg-lprimary dark:bg-dprimary px-5 py-3 hover:cursor-pointer transition-all duration-300 ease-in-out disabled:cursor-default font-bold disabled:bg-gray dark:disabled:bg-gray"
       onClick={handleRedux}
     >
-      {pending ? params.loader || "Loading..." : params.text || "Next"}
+      {isLoading ? params.loader || "Loading..." : params.text || "Next"}
     </button>
   );
 };

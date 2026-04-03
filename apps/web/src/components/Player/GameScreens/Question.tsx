@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { Socket } from "socket.io-client";
 import { useDispatch } from "react-redux";
 import { setScreenStatus, ScreenStatus } from "@/state/player/screenSlice";
-import submitAnswerAction from "@/actions/SubmitAnswerAction";
 import QuestionAndResult from "./QuesAndResult";
+import { useSubmitAnswerMutation } from "@/lib/modules/game-sessions/hooks";
 
 interface QuestionWithOptions {
   title?: string;
@@ -24,34 +24,29 @@ const Question = (params: {
   const dispatch = useDispatch();
   const [timer, setTimer] = useState(0);
   const [optionId, setOptionId] = useState("");
-
-  console.log(params.question);
+  const submitMutation = useSubmitAnswerMutation();
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      console.log("time up");
       dispatch(setScreenStatus(ScreenStatus.result));
     }, (params.question.timeOut ?? 0) * 1000);
 
     const interval = setInterval(() => {
-      setTimer(timer + 0.5);
+      setTimer((t) => t + 0.5);
     }, 500);
 
     return () => {
       clearTimeout(timeout);
       clearInterval(interval);
     };
-  }, [dispatch, params.question.timeOut, timer]);
+  }, [dispatch, params.question.timeOut]);
 
-  const submitAnswer = (optionId: string) => {
-    console.log("submitting answer", optionId);
-    setOptionId(optionId);
-    // Socket submit Answer
-    // params.socket.emit("submit-answer", params.gameSessionId, params.playerId, optionId, timer);
-    submitAnswerAction({
+  const submitAnswer = (optId: string) => {
+    setOptionId(optId);
+    submitMutation.mutate({
       gameSessionId: params.gameSessionId,
       playerId: params.playerId,
-      optionId: optionId,
+      optionId: optId,
       timeTaken: timer,
     });
     dispatch(setScreenStatus(ScreenStatus.wait));

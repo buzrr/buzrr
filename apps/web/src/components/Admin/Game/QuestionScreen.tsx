@@ -7,7 +7,9 @@ import { useDispatch, useSelector } from "react-redux";
 import { ScreenStatus, setScreenStatus } from "@/state/admin/screenSlice";
 import { setLeaderboard, setResult } from "@/state/admin/playersSlice";
 import Image from "next/image";
-import ShowLeaderboard from "@/actions/ShowLeaderboardAction";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/modules/query-keys";
+import { gameSessionsApi } from "@/lib/modules/game-sessions/api";
 
 interface QuestionScreenProps {
   quizQuestions?: { title?: string; questions?: { title?: string; options?: { title: string }[]; media?: string | null; mediaType?: string | null; id?: string; timeOut?: number }[] };
@@ -23,6 +25,7 @@ interface QuestionScreenProps {
 export default function QuestionScreen(props: QuestionScreenProps) {
   const { quizQuestions, gameCode } = props;
   const dispatch = useDispatch();
+  const queryClient = useQueryClient();
   const currIndex = useSelector(
     (state: RootState) => state.player.currentIndex,
   );
@@ -33,7 +36,10 @@ export default function QuestionScreen(props: QuestionScreenProps) {
   const [time, setTime] = useState(question?.timeOut);
 
   const handleNext = useCallback(async () => {
-    const leaderboard = await ShowLeaderboard(gameCode);
+    const leaderboard = await queryClient.fetchQuery({
+      queryKey: queryKeys.leaderboard(gameCode),
+      queryFn: () => gameSessionsApi.leaderboard(gameCode),
+    });
     dispatch(setLeaderboard(leaderboard));
     socket.emit("display-result", gameCode, question?.id, question?.options);
     const handleDisplayingResult = (data: unknown) => {
@@ -51,7 +57,7 @@ export default function QuestionScreen(props: QuestionScreenProps) {
     } else {
       socket.on("displaying-result", handleDisplayingResult);
     }
-  }, [gameCode, dispatch, socket, question?.id, question?.options]);
+  }, [gameCode, dispatch, socket, question?.id, question?.options, queryClient]);
 
   useEffect(() => {
     if (time == 0) {

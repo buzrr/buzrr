@@ -1,22 +1,43 @@
 {
   "name": "server",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "private": true,
   "scripts": {
-    "start": "node dist/index",
-    "build": "tsc -p .",
-    "dev": "tsc-watch --onSuccess \"node dist/index.js\""
-  },
-  "devDependencies": {
-    "@types/express": "^5.0.6",
-    "tsc-watch": "^6.2.1",
-    "typescript": "^5.8.2"
+    "build": "nest build",
+    "dev": "nest start --watch",
+    "start": "node dist/main",
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@buzrr/prisma": "workspace:*",
-    "cors": "^2.8.6",
+    "@google/generative-ai": "^0.24.1",
+    "@nestjs/common": "^11.0.12",
+    "@nestjs/config": "^4.0.1",
+    "@nestjs/core": "^11.0.12",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/passport": "^11.0.5",
+    "@nestjs/platform-express": "^11.0.12",
+    "@nestjs/platform-socket.io": "^11.1.17",
+    "@nestjs/websockets": "^11.1.17",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.36.2",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "cloudinary": "^2.9.0",
     "dotenv": "^17.3.1",
-    "express": "^5.2.1",
-    "socket.io": "^4.8.1"
+    "nanoid": "^5.1.2",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.5",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^20.17.14",
+    "@types/passport-jwt": "^4.0.1",
+    "typescript": "5.8.2"
   }
 }

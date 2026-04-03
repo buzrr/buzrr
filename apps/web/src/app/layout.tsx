@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import clsx from "clsx";
 import { IBM_Plex_Sans } from "next/font/google";
 import ReduxProvider from "@/state/ReduxProvider";
+import QueryProvider from "@/providers/QueryProvider";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import Footer from "@/components/Footer";
 import "./globals.css";
 
@@ -116,8 +118,11 @@ export default async function RootLayout({
           }}
         />
         <ReduxProvider>
-          {children}
-          <Footer />
+          <QueryProvider>
+            {children}
+            <ReactQueryDevtools initialIsOpen={false} buttonPosition="top-right" />
+            <Footer />
+          </QueryProvider>
         </ReduxProvider>
       </body>
     </html>

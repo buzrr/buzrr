@@ -1,30 +1,21 @@
-import { auth } from "@/utils/auth";
-import { redirect } from "next/navigation";
-import createRoom from "@/actions/CreateRoomAction";
-import SubmitButton from "@/components/SubmitButton";
-import Link from "next/link";
+"use client";
 
-interface QuizWithSessions {
-  id: string;
-  title: string;
-  description: string | null;
-  questions?: unknown[];
-  gameSessions?: { id: string; createdAt: Date; gameCode?: string }[];
+import Link from "next/link";
+import HostQuizForm from "@/components/Admin/Quiz/HostQuizForm";
+import type { QuizDetail } from "@/lib/modules/quizzes/api";
+
+function formatSessionDate(createdAt: string | Date) {
+  const d = typeof createdAt === "string" ? new Date(createdAt) : createdAt;
+  return d.toLocaleString("en-US", { timeZoneName: "short" });
 }
 
-async function QuizInfoSection(props: { quiz: QuizWithSessions }) {
-  const session = await auth();
-
-  if (!session || !session.user) redirect("/api/auth/signin");
-
-  const allQuiz = props.quiz.gameSessions ? props.quiz.gameSessions : [];
+export default function QuizInfoSection(props: { quiz: QuizDetail }) {
+  const allQuiz = props.quiz.gameSessions ?? [];
+  const questionCount = props.quiz._count?.questions ?? 0;
 
   return (
     <>
-      <form
-        className="w-[40vw] h-[83vh] bg-white dark:bg-dark p-4 hidden md:flex flex-col"
-        action={createRoom}
-      >
+      <div className="w-[40vw] h-[83vh] bg-white dark:bg-dark p-4 hidden md:flex flex-col">
         <div className="flex flex-col w-[90%] mx-auto text-dark dark:text-white">
           <div className="text-sm">
             <span className="p-1 py-2 underline underline-offset-1">
@@ -36,14 +27,13 @@ async function QuizInfoSection(props: { quiz: QuizWithSessions }) {
           <h2 className="text-3xl my-3 font-bold">{props.quiz.title}</h2>
           <p className="capitalize mb-4">{props.quiz.description}</p>
           <p className="text-xs p-1 border border-[#8FB72E] bg-[#C4F849] rounded w-fit my-1 dark:text-dark">
-            Total number of questions : {props.quiz.questions?.length ?? 0}
+            Total number of questions : {questionCount}
           </p>
-          <input type="hidden" name="quizId" value={props.quiz.id} readOnly/>
           <div className="w-full mt-4">
-            <SubmitButton
-              text="Host quiz"
-              isQuiz={true}
-              error={!props.quiz.questions?.length}
+            <HostQuizForm
+              quizId={props.quiz.id}
+              disabled={questionCount === 0}
+              className="w-full"
             />
           </div>
         </div>
@@ -51,30 +41,32 @@ async function QuizInfoSection(props: { quiz: QuizWithSessions }) {
           <div className="font-black p-4">Previously used</div>
           <div className="overflow-auto flex-1 min-h-0 mx-[-8px]">
             {allQuiz?.length > 0 ? (
-              allQuiz.map((quiz: { id: string; createdAt: Date; gameCode?: string }) => {
-                return (
-                  <div key={quiz.id}>
-                    <div className="bg-card-light dark:bg-card-dark p-4 mt-2">
-                      <div className="text-xs w-full flex justify-between">
-                        <div>
-                          {quiz.createdAt
-                            .toLocaleString("en-US", { timeZoneName: "short" })
-                            .toString()}
+              allQuiz.map(
+                (session: {
+                  id: string;
+                  createdAt: string | Date;
+                  gameCode?: string;
+                }) => {
+                  return (
+                    <div key={session.id}>
+                      <div className="bg-card-light dark:bg-card-dark p-4 mt-2">
+                        <div className="text-xs w-full flex justify-between">
+                          <div>{formatSessionDate(session.createdAt)}</div>
+                          <div className="text-lprimary dark:text-dprimary font-black">
+                            {session.gameCode}
+                          </div>
                         </div>
-                        <div className="text-lprimary dark:text-dprimary font-black">
-                          {quiz.gameCode}
+                        <div className="text-xs mt-3 *:bg-[#f87d49] *:text-white *:dark:text-dark *:font-black *:rounded-md *:p-[6px] *:ml-1">
+                          <Link href="#">Import Questions</Link>
+                          <Link href={`/admin/quiz/leaderboard/${session.id}`}>
+                            See leaderboard
+                          </Link>
                         </div>
-                      </div>
-                      <div className="text-xs mt-3 *:bg-[#f87d49] *:text-white *:dark:text-dark *:font-black *:rounded-md *:p-[6px] *:ml-1">
-                        <Link href="#">Import Questions</Link>
-                        <Link href={`/admin/quiz/leaderboard/${quiz.id}`}>
-                          See leaderboard
-                        </Link>
                       </div>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                },
+              )
             ) : (
               <div className="h-fit w-[95%] mx-auto border border-gray border-dashed rounded-lg p-4 text-dark dark:text-white">
                 <div className="p-2 text-lg font-black text-center">
@@ -89,9 +81,7 @@ async function QuizInfoSection(props: { quiz: QuizWithSessions }) {
             )}
           </div>
         </div>
-      </form>
+      </div>
     </>
   );
 }
-
-export default QuizInfoSection;
