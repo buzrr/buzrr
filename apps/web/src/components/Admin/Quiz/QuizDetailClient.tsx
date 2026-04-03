@@ -13,14 +13,29 @@ import { notFound } from "next/navigation";
 export default function QuizDetailClient({ quizId }: { quizId: string }) {
   const { data: quiz, isPending, isError, error } = useQuizDetailQuery(quizId);
 
-  if (isError && isAxiosError(error) && error.response?.status === 404) {
-    notFound();
+  if (isError) {
+    if (isAxiosError(error) && error.response?.status === 404) {
+      notFound();
+    }
+    return (
+      <div className="text-dark dark:text-white w-full h-full flex items-center justify-center p-8">
+        Could not load this quiz. Try again later.
+      </div>
+    );
   }
 
-  if (isPending || !quiz) {
+  if (isPending) {
     return (
       <div className="text-dark dark:text-white w-full h-full flex items-center justify-center p-8">
         Loading quiz…
+      </div>
+    );
+  }
+
+  if (!quiz) {
+    return (
+      <div className="text-dark dark:text-white w-full h-full flex items-center justify-center p-8">
+        Could not load this quiz. Try again later.
       </div>
     );
   }

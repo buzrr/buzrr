@@ -23,8 +23,15 @@ export default function JoinRoomClient({ playerId }: { playerId: string }) {
     clearGame();
   }, [player?.gameId, player?.id, clearGame]);
 
-  if (isError && isAxiosError(error) && error.response?.status === 404) {
-    notFound();
+  if (isError) {
+    if (isAxiosError(error) && error.response?.status === 404) {
+      notFound();
+    }
+    return (
+      <div className="p-8 text-center text-dark dark:text-white">
+        Could not load your player profile. Try again later.
+      </div>
+    );
   }
 
   const needsClear = Boolean(player?.gameId);

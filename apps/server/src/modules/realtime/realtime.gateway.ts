@@ -120,66 +120,70 @@ export class RealtimeGateway implements OnGatewayConnection {
       io.to(gameCode).emit("player-joined", player);
     }
 
-    socket.on("remove-player", async (p: { id: string }, gc: string) => {
+    socket.on("remove-player", async (p: { id: string }) => {
       try {
         await this.prisma.db.player.update({
           where: { id: p.id },
           data: { gameId: null },
         });
 
-        this.logger.log(`Player ${p.id} removed from ${gc}`);
+        this.logger.log(`Player ${p.id} removed from ${gameCode}`);
 
-        io.to(gc).emit("player-removed", p);
+        io.to(gameCode).emit("player-removed", p);
       } catch (error) {
         this.logger.error("Error removing player:", error);
       }
     });
 
-    socket.on("start-game", async (gc: string) => {
-      await this.prisma.db.gameSession.update({
-        where: { gameCode: gc },
-        data: { isPlaying: true },
-      });
-
-      this.logger.log(`Game ${gc} started`);
-
-      io.to(gc).emit("game-started");
-    });
-
-    socket.on("start-timer", async (gc: string) => {
-      this.logger.log("start timer");
-      io.to(gc).emit("timer-starts");
-    });
-
-    socket.on("set-question-index", async (gc: string, index: number) => {
+    socket.on("start-game", async () => {
       try {
         await this.prisma.db.gameSession.update({
-          where: { gameCode: gc },
+          where: { gameCode },
+          data: { isPlaying: true },
+        });
+
+        this.logger.log(`Game ${gameCode} started`);
+
+        io.to(gameCode).emit("game-started");
+      } catch (error) {
+        this.logger.error("Error starting game:", error);
+      }
+    });
+
+    socket.on("start-timer", async () => {
+      this.logger.log("start timer");
+      io.to(gameCode).emit("timer-starts");
+    });
+
+    socket.on("set-question-index", async (_gc: string, index: number) => {
+      try {
+        await this.prisma.db.gameSession.update({
+          where: { gameCode },
           data: { currentQuestion: index },
         });
 
         this.logger.log(
-          `Current question index is ${index} of Game ${gc}`,
+          `Current question index is ${index} of Game ${gameCode}`,
         );
 
-        io.to(gc).emit("get-question-index", index);
+        io.to(gameCode).emit("get-question-index", index);
       } catch (error) {
         this.logger.error("Error setting question index:", error);
       }
     });
 
-    socket.on("change-question", async (gc: string, index: number) => {
+    socket.on("change-question", async (_gc: string, index: number) => {
       try {
         await this.prisma.db.gameSession.update({
-          where: { gameCode: gc },
+          where: { gameCode },
           data: { currentQuestion: index },
         });
 
         this.logger.log(
-          `Current question index is ${index} of Game ${gc}`,
+          `Current question index is ${index} of Game ${gameCode}`,
         );
 
-        io.to(gc).emit("question-changed", index);
+        io.to(gameCode).emit("question-changed", index);
       } catch (error) {
         this.logger.error("Error setting question index:", error);
       }
@@ -188,13 +192,13 @@ export class RealtimeGateway implements OnGatewayConnection {
     socket.on(
       "display-result",
       async (
-        gc: string,
+        _gc: string,
         quesId: string,
         options: { id: string }[],
       ) => {
         try {
           const room = await this.prisma.db.gameSession.update({
-            where: { gameCode: gc },
+            where: { gameCode },
             data: { gameState: GameStates.answer },
           });
 
@@ -229,22 +233,22 @@ export class RealtimeGateway implements OnGatewayConnection {
           this.logger.log(
             `Result displaying with data ${JSON.stringify(data)}`,
           );
-          io.to(gc).emit("displaying-result", data);
+          io.to(gameCode).emit("displaying-result", data);
         } catch (error) {
           this.logger.error("Error displaying result:", error);
         }
       },
     );
 
-    socket.on("display-leaderboard", async (gc: string) => {
+    socket.on("display-leaderboard", async () => {
       this.logger.log("Present leaderboard");
-      io.to(gc).emit("displaying-leaderboard");
+      io.to(gameCode).emit("displaying-leaderboard");
     });
 
-    socket.on("final-leaderboard", async (gc: string) => {
+    socket.on("final-leaderboard", async () => {
       try {
         const room = await this.prisma.db.gameSession.update({
-          where: { gameCode: gc },
+          where: { gameCode },
           data: { gameState: GameStates.leaderboard },
         });
         const leaderboard = await this.prisma.db.gameLeaderboard.findMany({
@@ -264,20 +268,20 @@ export class RealtimeGateway implements OnGatewayConnection {
           position: index + 1,
         }));
 
-        io.to(gc).emit("displaying-final-leaderboard", newleaderboard);
+        io.to(gameCode).emit("displaying-final-leaderboard", newleaderboard);
       } catch (error) {
         this.logger.error("Error displaying final leaderboard:", error);
       }
     });
 
-    socket.on("end-game-session", async (gc: string) => {
+    socket.on("end-game-session", async () => {
       try {
         const gameSession = await this.prisma.db.gameSession.findUnique({
-          where: { gameCode: gc },
+          where: { gameCode },
         });
 
         if (!gameSession) {
-          this.logger.error(`Game Session by id: ${gc} not found!`);
+          this.logger.error(`Game Session ${gameCode} not found!`);
           return;
         }
 
@@ -289,7 +293,7 @@ export class RealtimeGateway implements OnGatewayConnection {
       } catch (error) {
         this.logger.error("Error deleting player answers:", error);
       }
-      io.to(gc).emit("game-session-ended");
+      io.to(gameCode).emit("game-session-ended");
     });
   }
 }

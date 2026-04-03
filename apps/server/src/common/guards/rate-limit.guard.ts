@@ -22,11 +22,7 @@ export class RateLimitGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     if (!this.rateLimit.isEnabled()) return true;
     const request = context.switchToHttp().getRequest<Request>();
-    const forwarded = request.headers["x-forwarded-for"];
-    const ip =
-      typeof forwarded === "string"
-        ? forwarded.split(",")[0]?.trim()
-        : request.ip;
+    const ip = request.ip;
     if (!ip) {
       throw new BadRequestException("IP not found");
     }

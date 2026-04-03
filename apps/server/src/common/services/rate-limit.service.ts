@@ -1,4 +1,9 @@
-import { Injectable, ServiceUnavailableException, BadRequestException } from "@nestjs/common";
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
@@ -46,8 +51,9 @@ export class RateLimitService {
     }
     const { success } = await limiter.limit(identifier);
     if (!success) {
-      throw new BadRequestException(
+      throw new HttpException(
         "Rate limit reached wait for some time and try again.",
+        HttpStatus.TOO_MANY_REQUESTS,
       );
     }
   }

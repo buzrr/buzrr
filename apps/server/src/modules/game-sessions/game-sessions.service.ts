@@ -62,48 +62,27 @@ export class GameSessionsService {
     gameSessionId: string,
     dto: SubmitAnswerDto,
   ): Promise<void> {
-    const option = await this.prisma.db.option.findUnique({
-      where: { id: dto.optionId },
-      include: { question: true },
-    });
-    if (!option?.questionId) {
-      throw new BadRequestException("Invalid option");
-    }
-
-    let score = option.isCorrect ? 1000 : 0;
-    if (option.isCorrect) {
-      const timeLimit = option.question.timeOut;
-      if (dto.timeTaken < timeLimit) {
-        score -= (dto.timeTaken / timeLimit) * 900;
-      } else {
-        score = 100;
-      }
-    }
-
-    const prevAns = await this.prisma.db.playerAnswer.findUnique({
-      where: {
-        playerId_questionId_gameSessionId: {
-          playerId: dto.playerId,
-          questionId: option.questionId,
-          gameSessionId,
-        },
-      },
-    });
-
-    if (!prevAns) {
-      await this.prisma.db.playerAnswer.create({
-        data: {
-          playerId: dto.playerId,
-          questionId: option.questionId,
-          gameSessionId,
-          optionId: dto.optionId,
-          timeTaken: dto.timeTaken,
-          isCorrect: option.isCorrect,
-          score,
-        },
+    await this.prisma.db.$transaction(async (tx) => {
+      const option = await tx.option.findUnique({
+        where: { id: dto.optionId },
+        include: { question: true },
       });
-    } else {
-      await this.prisma.db.playerAnswer.update({
+      if (!option?.questionId) {
+        throw new BadRequestException("Invalid option");
+      }
+
+      let score = option.isCorrect ? 1000 : 0;
+      if (option.isCorrect) {
+        const timeLimit = option.question.timeOut;
+        if (dto.timeTaken < timeLimit) {
+          score -= (dto.timeTaken / timeLimit) * 900;
+        } else {
+          score = 100;
+        }
+      }
+      const roundedScore = Math.round(score);
+
+      const prevAns = await tx.playerAnswer.findUnique({
         where: {
           playerId_questionId_gameSessionId: {
             playerId: dto.playerId,
@@ -111,46 +90,64 @@ export class GameSessionsService {
             gameSessionId,
           },
         },
-        data: {
+      });
+
+      await tx.playerAnswer.upsert({
+        where: {
+          playerId_questionId_gameSessionId: {
+            playerId: dto.playerId,
+            questionId: option.questionId,
+            gameSessionId,
+          },
+        },
+        create: {
+          playerId: dto.playerId,
+          questionId: option.questionId,
+          gameSessionId,
           optionId: dto.optionId,
           timeTaken: dto.timeTaken,
           isCorrect: option.isCorrect,
-          score,
+          score: roundedScore,
+        },
+        update: {
+          optionId: dto.optionId,
+          timeTaken: dto.timeTaken,
+          isCorrect: option.isCorrect,
+          score: roundedScore,
         },
       });
-    }
 
-    const prevScore = prevAns ? prevAns.score : 0;
-    const newScore = score - prevScore;
+      const delta = roundedScore - (prevAns?.score ?? 0);
 
-    const leaderboard = await this.prisma.db.gameLeaderboard.findUnique({
-      where: {
-        playerId_gameSessionId: {
-          playerId: dto.playerId,
-          gameSessionId,
-        },
-      },
-    });
-
-    if (leaderboard) {
-      await this.prisma.db.gameLeaderboard.update({
+      const leaderboard = await tx.gameLeaderboard.findUnique({
         where: {
           playerId_gameSessionId: {
             playerId: dto.playerId,
             gameSessionId,
           },
         },
-        data: { score: leaderboard.score + newScore },
       });
-    } else {
-      await this.prisma.db.gameLeaderboard.create({
-        data: {
-          playerId: dto.playerId,
-          gameSessionId,
-          score: newScore,
-        },
-      });
-    }
+
+      if (leaderboard) {
+        await tx.gameLeaderboard.update({
+          where: {
+            playerId_gameSessionId: {
+              playerId: dto.playerId,
+              gameSessionId,
+            },
+          },
+          data: { score: leaderboard.score + delta },
+        });
+      } else {
+        await tx.gameLeaderboard.create({
+          data: {
+            playerId: dto.playerId,
+            gameSessionId,
+            score: delta,
+          },
+        });
+      }
+    });
   }
 
   async leaderboardByCode(gameCode: string) {

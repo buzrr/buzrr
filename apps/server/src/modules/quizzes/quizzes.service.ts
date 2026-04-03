@@ -136,29 +136,23 @@ export class QuizzesService {
       );
     }
 
-    const quiz = await this.prisma.db.quiz.create({
-      data: {
-        title: dto.title,
-        description: dto.description,
-        userId: user.userId,
-      },
+    const quiz = await this.prisma.db.$transaction(async (tx) => {
+      return tx.quiz.create({
+        data: {
+          title: dto.title,
+          description: dto.description,
+          userId: user.userId,
+          questions: {
+            create: questionsArray.map((q: ParsedQuestion, index: number) => ({
+              title: q.question,
+              options: { create: q.options },
+              timeOut: dto.time,
+              order: index + 1,
+            })),
+          },
+        },
+      });
     });
-
-    const questionsData = questionsArray.map(
-      (q: ParsedQuestion, index: number) => ({
-        title: q.question,
-        options: { create: q.options },
-        quizId: quiz.id,
-        timeOut: dto.time,
-        order: index + 1,
-      }),
-    );
-
-    await this.prisma.db.$transaction(
-      questionsData.map((data) =>
-        this.prisma.db.question.create({ data }),
-      ),
-    );
 
     return { msg: "Quiz created successfully", quizId: quiz.id };
   }

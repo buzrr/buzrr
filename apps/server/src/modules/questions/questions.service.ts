@@ -60,14 +60,16 @@ export class QuestionsService {
     const dragOrder = dragQues.order;
     const dropOrder = dropQues.order;
 
-    await this.prisma.db.question.update({
-      where: { id: dto.dragQuesId },
-      data: { order: dropOrder },
-    });
-    await this.prisma.db.question.update({
-      where: { id: dto.dropQuesId },
-      data: { order: dragOrder },
-    });
+    await this.prisma.db.$transaction([
+      this.prisma.db.question.update({
+        where: { id: dto.dragQuesId },
+        data: { order: dropOrder },
+      }),
+      this.prisma.db.question.update({
+        where: { id: dto.dropQuesId },
+        data: { order: dragOrder },
+      }),
+    ]);
 
     return { status: 200, message: "Success" };
   }
@@ -116,11 +118,16 @@ export class QuestionsService {
       throw new BadRequestException("Missing required fields");
     }
 
+    const correctKey = correct_option.trim().toLowerCase();
+    if (!["a", "b", "c", "d"].includes(correctKey)) {
+      throw new BadRequestException("choose_option must be a, b, c, or d");
+    }
+
     const options = [
-      { title: option1, isCorrect: correct_option === "a" },
-      { title: option2, isCorrect: correct_option === "b" },
-      { title: option3, isCorrect: correct_option === "c" },
-      { title: option4, isCorrect: correct_option === "d" },
+      { title: option1, isCorrect: correctKey === "a" },
+      { title: option2, isCorrect: correctKey === "b" },
+      { title: option3, isCorrect: correctKey === "c" },
+      { title: option4, isCorrect: correctKey === "d" },
     ];
 
     let fileLink = "";
@@ -149,23 +156,25 @@ export class QuestionsService {
         throw new ForbiddenException("Unauthorized");
       }
 
-      await this.prisma.db.question.update({
-        where: { id: quesId },
-        data: {
-          title,
-          quizId,
-          timeOut,
-          media: fileLink || null,
-          mediaType: mediaType || null,
-        },
-      });
-      await this.prisma.db.option.deleteMany({ where: { questionId: quesId } });
-      await this.prisma.db.option.createMany({
-        data: options.map((o) => ({
-          title: o.title,
-          isCorrect: o.isCorrect,
-          questionId: quesId,
-        })),
+      await this.prisma.db.$transaction(async (tx) => {
+        await tx.question.update({
+          where: { id: quesId },
+          data: {
+            title,
+            quizId,
+            timeOut,
+            media: fileLink || null,
+            mediaType: mediaType || null,
+          },
+        });
+        await tx.option.deleteMany({ where: { questionId: quesId } });
+        await tx.option.createMany({
+          data: options.map((o) => ({
+            title: o.title,
+            isCorrect: o.isCorrect,
+            questionId: quesId,
+          })),
+        });
       });
     } else {
       const total_questions = await this.prisma.db.question.findMany({

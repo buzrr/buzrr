@@ -14,18 +14,33 @@ export default function AdminPlayClient({
 }) {
   const { data, isPending, isError, error } = useAdminLobbyQuery(roomId);
 
-  if (isError && isAxiosError(error)) {
-    if (error.response?.status === 404) notFound();
-    if (error.response?.status === 403) {
-      return (
-        <p className="p-6 text-dark dark:text-white">Unauthorized</p>
-      );
+  if (isError) {
+    if (isAxiosError(error)) {
+      if (error.response?.status === 404) notFound();
+      if (error.response?.status === 403) {
+        return (
+          <p className="p-6 text-dark dark:text-white">Unauthorized</p>
+        );
+      }
     }
+    return (
+      <p className="p-6 text-dark dark:text-white">
+        Could not load this game. Try again later.
+      </p>
+    );
   }
 
-  if (isPending || !data) {
+  if (isPending) {
     return (
       <p className="p-6 text-dark dark:text-white">Loading…</p>
+    );
+  }
+
+  if (!data) {
+    return (
+      <p className="p-6 text-dark dark:text-white">
+        Could not load this game. Try again later.
+      </p>
     );
   }
 
