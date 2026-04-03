@@ -25,7 +25,6 @@ const JoinRoomForm = (params: { playerId: string }) => {
     mutation.mutate(
       {
         gameCode: data.gameCode.replace(/\s/g, "").toUpperCase(),
-        playerId: params.playerId,
       },
       {
         onSuccess: (res) => {

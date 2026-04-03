@@ -2,8 +2,10 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from "@nestjs/common";
+import { Prisma } from "@buzrr/prisma";
 import { customAlphabet } from "nanoid";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
@@ -20,7 +22,10 @@ const generateGameCode = customAlphabet(
 export class GameSessionsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async join(dto: JoinRoomDto): Promise<{ roomId: string; playerId: string }> {
+  async join(
+    playerId: string,
+    dto: JoinRoomDto,
+  ): Promise<{ roomId: string; playerId: string }> {
     const game = await this.prisma.db.gameSession.findUnique({
       where: { gameCode: dto.gameCode },
     });
@@ -28,16 +33,16 @@ export class GameSessionsService {
       throw new NotFoundException("Game not found");
     }
     const player = await this.prisma.db.player.findUnique({
-      where: { id: dto.playerId },
+      where: { id: playerId },
     });
     if (!player) {
       throw new NotFoundException("Player not found");
     }
     await this.prisma.db.player.update({
-      where: { id: dto.playerId },
+      where: { id: playerId },
       data: { gameId: game.id },
     });
-    return { roomId: game.id, playerId: dto.playerId };
+    return { roomId: game.id, playerId };
   }
 
   async createRoom(user: AuthUser, dto: CreateRoomDto): Promise<{ id: string }> {
@@ -47,15 +52,31 @@ export class GameSessionsService {
     if (!quiz) {
       throw new NotFoundException("Unauthorized or quiz not found");
     }
-    const gameCode = generateGameCode();
-    const room = await this.prisma.db.gameSession.create({
-      data: {
-        gameCode,
-        quizId: dto.quizId,
-        creatorId: user.userId,
-      },
-    });
-    return { id: room.id };
+    const maxAttempts = 5;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const gameCode = generateGameCode();
+      try {
+        const room = await this.prisma.db.gameSession.create({
+          data: {
+            gameCode,
+            quizId: dto.quizId,
+            creatorId: user.userId,
+          },
+        });
+        return { id: room.id };
+      } catch (e) {
+        if (
+          e instanceof Prisma.PrismaClientKnownRequestError &&
+          e.code === "P2002"
+        ) {
+          continue;
+        }
+        throw e;
+      }
+    }
+    throw new InternalServerErrorException(
+      "Could not allocate a unique room code. Please try again.",
+    );
   }
 
   async submitAnswer(
@@ -63,12 +84,33 @@ export class GameSessionsService {
     dto: SubmitAnswerDto,
   ): Promise<void> {
     await this.prisma.db.$transaction(async (tx) => {
+      const session = await tx.gameSession.findUnique({
+        where: { id: gameSessionId },
+        select: { id: true, quizId: true },
+      });
+      if (!session) {
+        throw new NotFoundException("Game session not found");
+      }
+
       const option = await tx.option.findUnique({
         where: { id: dto.optionId },
         include: { question: true },
       });
-      if (!option?.questionId) {
+      if (!option?.questionId || !option.question) {
         throw new BadRequestException("Invalid option");
+      }
+      if (option.question.quizId !== session.quizId) {
+        throw new BadRequestException("Option does not belong to this quiz");
+      }
+
+      const player = await tx.player.findUnique({
+        where: { id: dto.playerId },
+      });
+      if (!player) {
+        throw new NotFoundException("Player not found");
+      }
+      if (player.gameId !== session.id) {
+        throw new ForbiddenException("Player is not in this game session");
       }
 
       let score = option.isCorrect ? 1000 : 0;
@@ -119,34 +161,22 @@ export class GameSessionsService {
 
       const delta = roundedScore - (prevAns?.score ?? 0);
 
-      const leaderboard = await tx.gameLeaderboard.findUnique({
+      await tx.gameLeaderboard.upsert({
         where: {
           playerId_gameSessionId: {
             playerId: dto.playerId,
             gameSessionId,
           },
         },
+        create: {
+          playerId: dto.playerId,
+          gameSessionId,
+          score: delta,
+        },
+        update: {
+          score: { increment: delta },
+        },
       });
-
-      if (leaderboard) {
-        await tx.gameLeaderboard.update({
-          where: {
-            playerId_gameSessionId: {
-              playerId: dto.playerId,
-              gameSessionId,
-            },
-          },
-          data: { score: leaderboard.score + delta },
-        });
-      } else {
-        await tx.gameLeaderboard.create({
-          data: {
-            playerId: dto.playerId,
-            gameSessionId,
-            score: delta,
-          },
-        });
-      }
     });
   }
 

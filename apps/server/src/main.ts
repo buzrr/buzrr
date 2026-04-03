@@ -4,6 +4,7 @@ import { NestExpressApplication } from "@nestjs/platform-express";
 import { IoAdapter } from "@nestjs/platform-socket.io";
 import { AppModule } from "./app.module";
 import { AllExceptionsFilter } from "./common/filters/http-exception.filter";
+import { parseCorsOrigin } from "./common/utils/parse-cors-origin";
 
 function applyTrustProxy(app: NestExpressApplication): void {
   const raw = process.env.TRUST_PROXY?.trim();
@@ -26,9 +27,8 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   applyTrustProxy(app);
   app.useWebSocketAdapter(new IoAdapter(app));
-  const origin = process.env.WEB_ORIGIN ?? true;
   app.enableCors({
-    origin,
+    origin: parseCorsOrigin(process.env.WEB_ORIGIN),
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
   });

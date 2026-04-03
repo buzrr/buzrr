@@ -18,7 +18,10 @@ export async function createPlayer(
   client: AxiosInstance,
   body: { username: string; profile: string },
 ) {
-  const { data } = await client.post<{ playerId: string }>("/players", body);
+  const { data } = await client.post<{
+    playerId: string;
+    accessToken: string;
+  }>("/players", body);
   return data;
 }
 

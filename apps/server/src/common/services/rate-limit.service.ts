@@ -2,6 +2,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -11,6 +12,7 @@ import type { RateLimitProfile } from "../decorators/rate-limit-profile.decorato
 
 @Injectable()
 export class RateLimitService {
+  private readonly logger = new Logger(RateLimitService.name);
   private readonly defaultLimit: Ratelimit | null;
   private readonly aiLimit: Ratelimit | null;
 
@@ -49,11 +51,22 @@ export class RateLimitService {
         "Rate limiting is ON but Upstash is not configured",
       );
     }
-    const { success } = await limiter.limit(identifier);
-    if (!success) {
+    try {
+      const { success } = await limiter.limit(identifier);
+      if (!success) {
+        throw new HttpException(
+          "Rate limit reached wait for some time and try again.",
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+    } catch (err) {
+      if (err instanceof HttpException) {
+        throw err;
+      }
+      this.logger.error("Rate limit upstream error", err);
       throw new HttpException(
-        "Rate limit reached wait for some time and try again.",
-        HttpStatus.TOO_MANY_REQUESTS,
+        "Rate limit service unavailable, please try again later.",
+        HttpStatus.SERVICE_UNAVAILABLE,
       );
     }
   }

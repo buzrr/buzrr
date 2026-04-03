@@ -3,22 +3,32 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CreatePlayerDto } from "./dto/create-player.dto";
 import { UpdatePlayerNameDto } from "./dto/update-player-name.dto";
 
 @Injectable()
 export class PlayersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
+  ) {}
 
-  async create(dto: CreatePlayerDto): Promise<{ playerId: string }> {
+  async create(
+    dto: CreatePlayerDto,
+  ): Promise<{ playerId: string; accessToken: string }> {
     const player = await this.prisma.db.player.create({
       data: {
         name: dto.username,
         profilePic: dto.profile,
       },
     });
-    return { playerId: player.id };
+    const accessToken = await this.jwt.signAsync({
+      sub: player.id,
+      typ: "player",
+    });
+    return { playerId: player.id, accessToken };
   }
 
   async updateName(dto: UpdatePlayerNameDto): Promise<{ playerId: string; name: string }> {

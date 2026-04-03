@@ -3,27 +3,11 @@ import { OnGatewayConnection, WebSocketGateway, WebSocketServer } from "@nestjs/
 import { GameStates, type Player } from "@buzrr/prisma";
 import { Server, Socket } from "socket.io";
 import { PrismaService } from "../../prisma/prisma.service";
-
-function socketCorsOrigin(): boolean | string | string[] {
-  const raw = process.env.WEB_ORIGIN;
-  if (raw === undefined || raw === "") {
-    return true;
-  }
-  if (raw === "true") {
-    return true;
-  }
-  if (raw === "false") {
-    return false;
-  }
-  if (raw.includes(",")) {
-    return raw.split(",").map((s) => s.trim());
-  }
-  return raw;
-}
+import { parseCorsOrigin } from "../../common/utils/parse-cors-origin";
 
 @WebSocketGateway({
   cors: {
-    origin: socketCorsOrigin(),
+    origin: parseCorsOrigin(process.env.WEB_ORIGIN),
     credentials: true,
     allowedHeaders: ["*"],
   },
@@ -46,8 +30,26 @@ export class RealtimeGateway implements OnGatewayConnection {
 
     let player: Player | null = null;
     let gameCode: string;
+    let gameSessionId: string;
+    let isRoomHost = false;
 
     try {
+      gameCode = socket.handshake.query.gameCode as string;
+
+      const game = await this.prisma.db.gameSession.findUnique({
+        where: { gameCode },
+      });
+
+      if (!game) {
+        this.logger.log(
+          `Game ${gameCode} not found... Disconnecting Socket: ${socket.id}`,
+        );
+        socket.disconnect();
+        return;
+      }
+
+      gameSessionId = game.id;
+
       if (userType === "player") {
         player = await this.prisma.db.player.findUnique({
           where: { id: playerId },
@@ -56,6 +58,16 @@ export class RealtimeGateway implements OnGatewayConnection {
         if (!player) {
           this.logger.log(
             `Player ${playerId} not found... Disconnecting Socket: ${socket.id}`,
+          );
+          socket.disconnect();
+          return;
+        }
+
+        const inSession =
+          player.gameId == null || player.gameId === gameSessionId;
+        if (!inSession) {
+          this.logger.log(
+            `Player ${playerId} is not a member of game ${gameCode}... Disconnecting Socket: ${socket.id}`,
           );
           socket.disconnect();
           return;
@@ -72,23 +84,19 @@ export class RealtimeGateway implements OnGatewayConnection {
           socket.disconnect();
           return;
         }
+
+        if (adminId !== game.creatorId) {
+          this.logger.log(
+            `Admin ${adminId} is not the host of game ${gameCode}... Disconnecting Socket: ${socket.id}`,
+          );
+          socket.disconnect();
+          return;
+        }
+
+        isRoomHost = true;
       } else {
         this.logger.log(
           `Invalid userType: ${userType} — Disconnecting Socket: ${socket.id}`,
-        );
-        socket.disconnect();
-        return;
-      }
-
-      gameCode = socket.handshake.query.gameCode as string;
-
-      const game = await this.prisma.db.gameSession.findUnique({
-        where: { gameCode },
-      });
-
-      if (!game) {
-        this.logger.log(
-          `Game ${gameCode} not found... Disconnecting Socket: ${socket.id}`,
         );
         socket.disconnect();
         return;
@@ -120,12 +128,20 @@ export class RealtimeGateway implements OnGatewayConnection {
       io.to(gameCode).emit("player-joined", player);
     }
 
+    if (!isRoomHost) {
+      return;
+    }
+
     socket.on("remove-player", async (p: { id: string }) => {
       try {
-        await this.prisma.db.player.update({
-          where: { id: p.id },
+        const result = await this.prisma.db.player.updateMany({
+          where: { id: p.id, gameId: gameSessionId },
           data: { gameId: null },
         });
+
+        if (result.count < 1) {
+          return;
+        }
 
         this.logger.log(`Player ${p.id} removed from ${gameCode}`);
 
@@ -290,10 +306,11 @@ export class RealtimeGateway implements OnGatewayConnection {
             gameSessionId: gameSession.id,
           },
         });
+
+        io.to(gameCode).emit("game-session-ended");
       } catch (error) {
         this.logger.error("Error deleting player answers:", error);
       }
-      io.to(gameCode).emit("game-session-ended");
     });
   }
 }

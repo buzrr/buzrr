@@ -7,7 +7,7 @@ import {
   Param,
   Patch,
 } from "@nestjs/common";
-import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { CurrentAccountUser } from "../../common/decorators/current-user.decorator";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
 import { ReorderQuestionsDto } from "./dto/reorder-questions.dto";
 import { QuestionsService } from "./questions.service";
@@ -17,13 +17,13 @@ export class QuestionsController {
   constructor(private readonly questions: QuestionsService) {}
 
   @Patch("reorder")
-  reorder(@CurrentUser() user: AuthUser, @Body() dto: ReorderQuestionsDto) {
+  reorder(@CurrentAccountUser() user: AuthUser, @Body() dto: ReorderQuestionsDto) {
     return this.questions.reorder(user, dto);
   }
 
   @Delete(":id")
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+  remove(@CurrentAccountUser() user: AuthUser, @Param("id") id: string) {
     return this.questions.delete(user, id);
   }
 }

@@ -11,7 +11,7 @@ import {
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import type { Express } from "express";
-import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { CurrentAccountUser } from "../../common/decorators/current-user.decorator";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
 import { QuestionsService } from "./questions.service";
 
@@ -20,7 +20,7 @@ export class QuizQuestionsController {
   constructor(private readonly questions: QuestionsService) {}
 
   @Get(":quizId/questions")
-  list(@CurrentUser() user: AuthUser, @Param("quizId") quizId: string) {
+  list(@CurrentAccountUser() user: AuthUser, @Param("quizId") quizId: string) {
     return this.questions.findAllForQuiz(user, quizId);
   }
 
@@ -28,7 +28,7 @@ export class QuizQuestionsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseInterceptors(FileInterceptor("file"))
   upsert(
-    @CurrentUser() user: AuthUser,
+    @CurrentAccountUser() user: AuthUser,
     @Param("quizId") quizId: string,
     @Body() body: Record<string, string>,
     @UploadedFile() file?: Express.Multer.File,

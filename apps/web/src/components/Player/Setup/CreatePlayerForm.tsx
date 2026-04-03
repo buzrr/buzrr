@@ -49,6 +49,7 @@ const CreatePlayerForm = (props: {
   };
 
   const onSubmit = handleSubmit((data) => {
+    console.log("data", data);
     mutation.mutate(
       {
         username: data.username,
@@ -56,6 +57,9 @@ const CreatePlayerForm = (props: {
       },
       {
         onSuccess: (res) => {
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem("playerToken", res.accessToken);
+          }
           router.push(`/player/joinRoom/${res.playerId}`);
         },
         onError: (err) => {

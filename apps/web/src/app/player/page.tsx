@@ -9,7 +9,8 @@ import BackNavButton from "@/components/BackNavButton";
 function Player() {
   const [data, setData] = useState({
     name: "",
-    image: "",
+    // Must match default selection in SelectProfile so RHF `profile` validates without an extra click.
+    image: "/images/player_profile/profile1.png",
   });
 
   return (

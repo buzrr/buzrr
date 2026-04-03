@@ -23,6 +23,8 @@ export default function JoinRoomClient({ playerId }: { playerId: string }) {
     clearGame();
   }, [player?.gameId, player?.id, clearGame]);
 
+  const blockJoin = Boolean(player?.gameId) || clearingGame;
+
   if (isError) {
     if (isAxiosError(error) && error.response?.status === 404) {
       notFound();
@@ -34,8 +36,7 @@ export default function JoinRoomClient({ playerId }: { playerId: string }) {
     );
   }
 
-  const needsClear = Boolean(player?.gameId);
-  if (isPending || !player || (needsClear && clearingGame)) {
+  if (isPending || !player || blockJoin) {
     return (
       <div className="p-8 text-center text-dark dark:text-white">
         Loading…

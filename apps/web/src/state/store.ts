@@ -10,9 +10,19 @@ import hideQuestionsReducer from "./hideQuestionsSlice";
 import navToggleReducer from "./admin/navtoggleSlice";
 import gridListToggleReducer from "./admin/gridListSlice";
 
-import { persistReducer } from "redux-persist";
+import {
+  FLUSH,
+  PAUSE,
+  PERSIST,
+  PURGE,
+  REGISTER,
+  REHYDRATE,
+  persistReducer,
+} from "redux-persist";
 import storage from "redux-persist/lib/storage";
 import persistStore from "redux-persist/es/persistStore";
+
+import { createConnection } from "./socket/socketSlice";
 
 const rootReducer = combineReducers({
   socket: socketReducer,
@@ -30,12 +40,29 @@ const rootReducer = combineReducers({
 const persistConfig = {
   key: "root",
   storage,
+  /** Live Socket.IO clients must not be persisted to storage. */
+  blacklist: ["socket"],
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
 
 export const store = configureStore({
   reducer: persistedReducer,
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: {
+        ignoredActions: [
+          FLUSH,
+          REHYDRATE,
+          PAUSE,
+          PERSIST,
+          PURGE,
+          REGISTER,
+          createConnection.type,
+        ],
+        ignoredPaths: ["socket.socket", "_persist"],
+      },
+    }),
 });
 
 export const persistor = persistStore(store);

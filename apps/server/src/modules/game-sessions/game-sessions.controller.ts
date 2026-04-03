@@ -8,8 +8,14 @@ import {
   Post,
   UseGuards,
 } from "@nestjs/common";
-import { CurrentUser } from "../../common/decorators/current-user.decorator";
-import type { AuthUser } from "../../common/decorators/current-user.decorator";
+import {
+  CurrentAccountUser,
+  CurrentPlayerUser,
+} from "../../common/decorators/current-user.decorator";
+import type {
+  AuthUser,
+  PlayerAuthUser,
+} from "../../common/decorators/current-user.decorator";
 import { Public } from "../../common/decorators/public.decorator";
 import { RateLimitGuard } from "../../common/guards/rate-limit.guard";
 import { CreateRoomDto } from "./dto/create-room.dto";
@@ -21,11 +27,10 @@ import { GameSessionsService } from "./game-sessions.service";
 export class GameSessionsController {
   constructor(private readonly gameSessions: GameSessionsService) {}
 
-  @Public()
   @UseGuards(RateLimitGuard)
   @Post("join")
-  join(@Body() dto: JoinRoomDto) {
-    return this.gameSessions.join(dto);
+  join(@CurrentPlayerUser() player: PlayerAuthUser, @Body() dto: JoinRoomDto) {
+    return this.gameSessions.join(player.playerId, dto);
   }
 
   @Public()
@@ -42,7 +47,7 @@ export class GameSessionsController {
 
   @Get(":roomId/lobby")
   adminLobby(
-    @CurrentUser() user: AuthUser,
+    @CurrentAccountUser() user: AuthUser,
     @Param("roomId") roomId: string,
   ) {
     return this.gameSessions.getAdminLobby(user, roomId);
@@ -54,7 +59,7 @@ export class GameSessionsController {
   }
 
   @Post()
-  create(@CurrentUser() user: AuthUser, @Body() dto: CreateRoomDto) {
+  create(@CurrentAccountUser() user: AuthUser, @Body() dto: CreateRoomDto) {
     return this.gameSessions.createRoom(user, dto);
   }
 

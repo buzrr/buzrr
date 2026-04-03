@@ -37,3 +37,20 @@ export function createAuthApiClient() {
 
 export const publicApi = createPublicApiClient();
 export const authApi = createAuthApiClient();
+
+/** Bearer token from `localStorage` (`playerToken`) for player-scoped routes (e.g. join room). */
+export function createPlayerAuthedApiClient() {
+  const client = axios.create({
+    baseURL: getApiBaseUrl(),
+  });
+  client.interceptors.request.use((config) => {
+    if (typeof window !== "undefined") {
+      const token = window.localStorage.getItem("playerToken");
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+    return config;
+  });
+  return client;
+}

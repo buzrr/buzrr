@@ -8,7 +8,11 @@ import type {
   Quiz,
   User,
 } from "@/types/db";
-import { authApi, publicApi } from "@/lib/api/client";
+import {
+  authApi,
+  createPlayerAuthedApiClient,
+  publicApi,
+} from "@/lib/api/client";
 
 export async function createGameSession(
   client: AxiosInstance,
@@ -20,7 +24,7 @@ export async function createGameSession(
 
 export async function joinRoom(
   client: AxiosInstance,
-  body: { gameCode: string; playerId: string },
+  body: { gameCode: string },
 ) {
   const { data } = await client.post<{ roomId: string; playerId: string }>(
     "/game-sessions/join",
@@ -102,7 +106,8 @@ export async function getLeaderboard(
 export const gameSessionsApi = {
   create: (body: Parameters<typeof createGameSession>[1]) =>
     createGameSession(authApi, body),
-  join: (body: Parameters<typeof joinRoom>[1]) => joinRoom(publicApi, body),
+  join: (body: Parameters<typeof joinRoom>[1]) =>
+    joinRoom(createPlayerAuthedApiClient(), body),
   submitAnswer: (
     gameSessionId: string,
     body: Parameters<typeof submitAnswer>[2],

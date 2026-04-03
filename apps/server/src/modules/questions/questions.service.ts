@@ -85,7 +85,15 @@ export class QuestionsService {
     if (question.quiz.userId !== user.userId) {
       throw new ForbiddenException("Unauthorized");
     }
-    await this.prisma.db.question.delete({ where: { id: quesId } });
+    const deletedOrder = question.order;
+    const quizId = question.quizId;
+    await this.prisma.db.$transaction([
+      this.prisma.db.question.delete({ where: { id: quesId } }),
+      this.prisma.db.question.updateMany({
+        where: { quizId, order: { gt: deletedOrder } },
+        data: { order: { decrement: 1 } },
+      }),
+    ]);
   }
 
   async upsertFromMultipart(
@@ -134,10 +142,10 @@ export class QuestionsService {
     let mediaType = "";
 
     if (file && file.size > 0) {
+      const uploaded = await this.cloudinary.uploadBuffer(file.buffer);
       if (file_link) {
         await this.cloudinary.destroyIfPresent(file_link);
       }
-      const uploaded = await this.cloudinary.uploadBuffer(file.buffer);
       fileLink = uploaded.url;
       mediaType = uploaded.mediaType;
     } else if (file_link) {
@@ -177,20 +185,19 @@ export class QuestionsService {
         });
       });
     } else {
-      const total_questions = await this.prisma.db.question.findMany({
-        where: { quizId },
-      });
-
-      await this.prisma.db.question.create({
-        data: {
-          title,
-          options: { create: options },
-          quizId,
-          timeOut,
-          media: fileLink || null,
-          mediaType: mediaType || null,
-          order: total_questions.length + 1,
-        },
+      await this.prisma.db.$transaction(async (tx) => {
+        const count = await tx.question.count({ where: { quizId } });
+        await tx.question.create({
+          data: {
+            title,
+            options: { create: options },
+            quizId,
+            timeOut,
+            media: fileLink || null,
+            mediaType: mediaType || null,
+            order: count + 1,
+          },
+        });
       });
     }
   }

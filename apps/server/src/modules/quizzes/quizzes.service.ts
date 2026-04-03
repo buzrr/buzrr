@@ -1,7 +1,10 @@
 import {
+  BadGatewayException,
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -42,7 +45,7 @@ function parseQuestions(content: string): ParsedQuestion[] {
       }
     });
 
-    if (question && options.length > 0) {
+    if (question && options.length === 4) {
       options[0]!.isCorrect = true;
       shuffleArray(options);
       questions.push({ question, options });
@@ -54,6 +57,8 @@ function parseQuestions(content: string): ParsedQuestion[] {
 
 @Injectable()
 export class QuizzesService {
+  private readonly logger = new Logger(QuizzesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
@@ -71,13 +76,12 @@ export class QuizzesService {
   }
 
   async delete(user: AuthUser, quizId: string): Promise<void> {
-    const quiz = await this.prisma.db.quiz.findFirst({
+    const result = await this.prisma.db.quiz.deleteMany({
       where: { id: quizId, userId: user.userId },
     });
-    if (!quiz) {
+    if (result.count === 0) {
       throw new NotFoundException("Unauthorized or quiz not found");
     }
-    await this.prisma.db.quiz.delete({ where: { id: quizId } });
   }
 
   async findAllForUser(user: AuthUser) {
@@ -126,7 +130,28 @@ export class QuizzesService {
         don't add any extra text other than the question and options.
         Generate a total of ${dto.questions} questions only`;
 
-    const result = await model.generateContent(prompt);
+    let result: Awaited<ReturnType<typeof model.generateContent>>;
+    try {
+      result = await model.generateContent(prompt);
+    } catch (err) {
+      this.logger.debug(
+        `Gemini generateContent failed: ${err instanceof Error ? err.message : String(err)}`,
+        err instanceof Error ? err.stack : undefined,
+      );
+      const msg = err instanceof Error ? err.message : String(err);
+      const lower = msg.toLowerCase();
+      const isTimeout =
+        lower.includes("timeout") || lower.includes("timed out");
+      if (isTimeout) {
+        throw new ServiceUnavailableException(
+          "The AI service took too long to respond. Please try again.",
+        );
+      }
+      throw new BadGatewayException(
+        "The AI service failed to generate questions. Please try again later.",
+      );
+    }
+
     const response = result.response.text();
     const questionsArray = parseQuestions(response);
 
@@ -143,12 +168,14 @@ export class QuizzesService {
           description: dto.description,
           userId: user.userId,
           questions: {
-            create: questionsArray.map((q: ParsedQuestion, index: number) => ({
-              title: q.question,
-              options: { create: q.options },
-              timeOut: dto.time,
-              order: index + 1,
-            })),
+            create: questionsArray
+              .slice(0, dto.questions)
+              .map((q: ParsedQuestion, index: number) => ({
+                title: q.question,
+                options: { create: q.options },
+                timeOut: dto.time,
+                order: index + 1,
+              })),
           },
         },
       });

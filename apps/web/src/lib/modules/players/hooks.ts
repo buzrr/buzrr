@@ -17,7 +17,8 @@ export function useClearPlayerGameMutation(playerId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => playersApi.clearGame(playerId),
-    onSuccess: () => {
+    onSuccess: (updated) => {
+      queryClient.setQueryData(queryKeys.players.detail(playerId), updated);
       queryClient.invalidateQueries({
         queryKey: queryKeys.players.detail(playerId),
       });

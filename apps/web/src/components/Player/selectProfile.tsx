@@ -53,16 +53,13 @@ export default function SelectProfile(props: {
         {PROFILES.map((pr, index) => {
           return (
               <div className="inline-block p-3" key={index}>
-                <input
-                  name="profile"
-                  id="profile"
-                  value={avatar.profile}
-                  className="hidden"
-                />
-                <label htmlFor="profile" className="bg-transparent">
+                <button
+                  type="button"
+                  className="bg-transparent p-0 border-0 cursor-pointer"
+                  onClick={() => handleProfile(pr, index)}
+                >
                   <Image
-                    key={index}
-                    alt="image"
+                    alt="profile option"
                     width={128}
                     height={128}
                     src={pr}
@@ -70,11 +67,8 @@ export default function SelectProfile(props: {
                       "rounded-full w-20 h-20 border-black cursor-pointer",
                       avatar.index === index && "border-[3px] border-lprimary ease-linear duration-150 scale-[1.2] shadow-lg"
                     )}
-                    onClick={() => {
-                      handleProfile(pr, index);
-                    }}
                   />
-                </label>
+                </button>
               </div>
           );
         })}
