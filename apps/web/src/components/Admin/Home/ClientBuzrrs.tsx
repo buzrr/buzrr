@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import CreateAIQuiz from "../Gemini/CreateAIQuiz";
 import ClientImage from "@/components/ClientImage";
-import { useSelector } from "react-redux";
-import { RootState } from "@/state/store";
+import { useAppSelector } from "@/state/hooks";
 import useContextMenu from "@/hooks/useContextMenu";
 import ConfirmationModal from "../ConfirmationModal";
 import { useRouter } from "next/navigation";
@@ -18,7 +17,7 @@ export default function ClientBuzrrs({ quizzes }: { quizzes: Quiz[] }) {
   const router = useRouter();
   const deleteQuizMutation = useDeleteQuizMutation();
 
-  const view = useSelector((state: RootState) => state.gridListToggle.view);
+  const view = useAppSelector((state) => state.gridListToggle.view);
   const className = view === "grid" ? "w-11 h-11" : "w-6 h-6";
   const { clicked, setClicked, points, setPoints } = useContextMenu();
 
@@ -125,7 +124,7 @@ export default function ClientBuzrrs({ quizzes }: { quizzes: Quiz[] }) {
               setClicked(true);
               setPoints({ x: e.pageX, y: e.pageY });
               setQuizId(quiz.id);
-              console.log("right click", e.pageX, e.pageY);
+
             }}
             className={clsx(
               "border border-[#c2b4fe] dark:border-transparent w-full bg-card-light hover:bg-cardhover-light dark:bg-card-dark hover:dark:bg-cardhover-dark transition-all duration-300 ease-in-out text-dark dark:text-white rounded flex items-center",
@@ -144,23 +143,26 @@ export default function ClientBuzrrs({ quizzes }: { quizzes: Quiz[] }) {
         ))}
         {clicked && (
           <div
+            role="menu"
             className="absolute z-50 text-sm bg-white dark:bg-dark rounded-lg shadow-lg border border-[#DADADD] dark:border-[#3A3A3A]"
             style={{ top: points.y, left: points.x }}
           >
-            <div
-              className="px-8 py-1 m-1 rounded-md text-dark dark:text-white hover:bg-card-light dark:hover:bg-off-dark cursor-pointer"
-              onClick={() => {
-                router.push(`/admin/quiz/${quizId}`);
-              }}
+            <button
+              role="menuitem"
+              type="button"
+              className="px-8 py-1 m-1 rounded-md text-dark dark:text-white hover:bg-card-light dark:hover:bg-off-dark cursor-pointer w-full text-left"
+              onClick={() => router.push(`/admin/quiz/${quizId}`)}
             >
               Open
-            </div>
-            <div
-              className="px-8 py-1 rounded-md text-red-light m-1 hover:bg-card-light dark:hover:bg-off-dark cursor-pointer"
+            </button>
+            <button
+              role="menuitem"
+              type="button"
+              className="px-8 py-1 rounded-md text-red-light m-1 hover:bg-card-light dark:hover:bg-off-dark cursor-pointer w-full text-left"
               onClick={() => setDelModalOpen(true)}
             >
               Delete
-            </div>
+            </button>
           </div>
         )}
       </div>

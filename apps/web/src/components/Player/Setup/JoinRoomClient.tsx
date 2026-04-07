@@ -1,7 +1,8 @@
 "use client";
 
-import SetLocalItem from "@/components/Player/setLocalItem";
+import SetLocalItem from "@/components/Player/SetLocalItem";
 import ResetReduxStates from "@/components/Player/ResetReduxStates";
+import Skeleton from "@/components/ui/Skeleton";
 import JoinRoomForm from "@/components/Player/Setup/JoinRoomForm";
 import JoinRoomProfileCard from "@/components/Player/Setup/JoinRoomProfileCard";
 import ClientImage from "@/components/ClientImage";
@@ -62,8 +63,12 @@ export default function JoinRoomClient({ playerId }: { playerId: string }) {
 
   if (isPending || !player || blockJoin) {
     return (
-      <div className="p-8 text-center text-dark dark:text-white">
-        Loading…
+      <div className="p-4 md:p-8">
+        <Skeleton className="mb-6 h-20 w-20 rounded bg-white dark:bg-card-dark" />
+        <div className="flex h-[81vh] w-full gap-4">
+          <Skeleton className="h-full w-full md:w-80 rounded-xl bg-white dark:bg-card-dark" />
+          <Skeleton className="hidden md:block h-full flex-1 rounded-xl bg-white dark:bg-card-dark" />
+        </div>
       </div>
     );
   }

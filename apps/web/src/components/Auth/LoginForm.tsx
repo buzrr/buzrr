@@ -6,6 +6,8 @@ import { LoginSchema } from "@/schemas";
 import Link from "next/link";
 import Image from "next/image";
 import * as z from "zod";
+import { TextInput } from "@/components/ui/TextInput";
+import { Button } from "@/components/ui/Button";
 
 const LoginForm = () => {
   const {
@@ -19,49 +21,47 @@ const LoginForm = () => {
     shouldFocusError: true,
   });
 
-  const onSubmit = (values: z.infer<typeof LoginSchema>) => {
-    console.log(values);
+  const onSubmit = (_values: z.infer<typeof LoginSchema>) => {
+    // TODO: implement credential-based login
   };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
-      <input
+      <label htmlFor="email" className="sr-only">Email</label>
+      <TextInput
         id="email"
-        className="dark:text-white bg-white dark:bg-dark border border-gray p-2 w-full my-2 rounded-xl"
         {...register("email")}
         placeholder="Enter Email"
         required
+        containerClassName="my-2"
+        autoComplete="email"
+        error={errors.email?.message as string | undefined}
       />
-      <br />
-      {errors.email?.message && (
-        <p className="text-xs">{errors.email?.message as string}</p>
-      )}
-      <input
+      <label htmlFor="password" className="sr-only">Password</label>
+      <TextInput
         id="password"
-        className="dark:text-white bg-white dark:bg-dark border border-gray p-2 w-full my-2 rounded-xl"
         type="password"
         {...register("password")}
         placeholder="Enter Password"
         required
+        containerClassName="my-2"
+        autoComplete="current-password"
+        error={errors.password?.message as string | undefined}
       />
-      <br />
-      {errors.password?.message && <p>{errors.password?.message as string}</p>}
       <Link
         href="#"
         className="w-fit float-right text-sm text-lprimary dark:text-dprimary"
       >
         Forgot Password?
       </Link>
-      <input
-        className="p-2 my-4 w-full bg-lprimary dark:bg-dprimary hover:cursor-pointer text-white font-bold rounded-xl"
-        type="submit"
-        value="Continue"
-      />
-      <button
-        className="p-2 w-full border-2 flex items-center justify-center border-lprimary dark:border-dprimary hover:cursor-pointer text-lprimary dark:text-dprimary font-bold rounded-xl"
+      <Button className="my-4" fullWidth type="submit">
+        Continue
+      </Button>
+      <Button
+        variant="outline"
+        fullWidth
         onClick={(e) => {
           e.preventDefault();
-          console.log("login");
         }}
       >
         <Image
@@ -72,7 +72,7 @@ const LoginForm = () => {
           alt="Google Logo"
         />
         Continue with Google
-      </button>
+      </Button>
     </form>
   );
 };

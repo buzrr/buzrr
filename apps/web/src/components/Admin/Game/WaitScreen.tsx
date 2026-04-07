@@ -1,22 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { RootState } from "@/state/store";
+import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import { setTimer } from "@/state/timer/timerSlice";
 import { Socket } from "socket.io-client";
 import { ScreenStatus, setScreenStatus } from "@/state/admin/screenSlice";
+import { Button } from "@/components/ui/Button";
 
 export default function WaitScreen(params: {
   currentQues: number;
   socket: Socket;
   gameCode: string;
 }) {
-  const dispatch = useDispatch();
-  const time = useSelector((state: RootState) => state.timer.value);
-  const currIndex = useSelector(
-    (state: RootState) => state.player.currentIndex,
-  );
+  const dispatch = useAppDispatch();
+  const time = useAppSelector((state) => state.timer.value);
+  const currIndex = useAppSelector((state) => state.player.currentIndex);
   const [start, setStart] = useState(false);
   const socket = params.socket;
 
@@ -25,7 +23,6 @@ export default function WaitScreen(params: {
       dispatch(setScreenStatus(ScreenStatus.question));
     };
     const handleTimerStarts = () => {
-      console.log("Timer started");
       setStart(true);
     };
 
@@ -62,14 +59,15 @@ export default function WaitScreen(params: {
 
   return (
     <>
-      <div className="w-[100vw] h-[100vh] bg-lprimary dark:bg-dprimary absolute top-0 flex flex-col-reverse pb-8 justify-center items-center">
+      <div className="w-screen h-screen bg-lprimary dark:bg-dprimary absolute top-0 flex flex-col-reverse pb-8 justify-center items-center">
         {!start && currIndex == 0 && (
-          <button
+          <Button
             onClick={() => handleSocket()}
-            className="w-24 h-10 shadow hover:scale-105 transition-all bg-white dark:bg-dark border rounded"
+            variant="ghost"
+            className="w-24 h-10 shadow hover:scale-105 bg-white dark:bg-dark border rounded!"
           >
             Start Quiz
-          </button>
+          </Button>
         )}
         {(start || currIndex != 0) && (
           <div className="flex flex-col justify-center items-center text-dark dark:text-white w-full container h-32 m-auto">

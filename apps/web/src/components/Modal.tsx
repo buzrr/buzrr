@@ -14,6 +14,9 @@ export default function BasicModal(props: {
   const [open, setOpen] = React.useState(false);
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
+  const id = React.useId();
+  const titleId = `${id}-title`;
+  const descId = `${id}-desc`;
 
   return (
     <>
@@ -29,19 +32,19 @@ export default function BasicModal(props: {
       <Modal
         open={open}
         onClose={handleClose}
-        aria-labelledby="modal-modal-title"
-        aria-describedby="modal-modal-description"
+        aria-labelledby={titleId}
+        aria-describedby={descId}
       >
         <Box
           sx={style}
           className="dark:bg-dark-bg bg-light-bg rounded-xl w-4/5 md:w-1/2 p-6 overflow-y-auto max-h-[90vh]"
         >
-          <Typography id="modal-modal-title" variant="h6" component="h2">
+          <Typography id={titleId} variant="h6" component="h2">
             <div className="font-bold text-center w-full mb-4 dark:text-white">
               {props.btnTitle}
             </div>
           </Typography>
-          {props.children}
+          <div id={descId}>{props.children}</div>
         </Box>
       </Modal>
     </>

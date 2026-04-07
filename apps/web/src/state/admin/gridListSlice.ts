@@ -1,10 +1,12 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
-interface InitialState {
-  view: string;
+type ViewMode = "grid" | "list";
+
+interface GridListState {
+  view: ViewMode;
 }
 
-const initialState: InitialState = {
+const initialState: GridListState = {
   view: "grid",
 };
 
@@ -12,7 +14,7 @@ const gridListToggleSlice = createSlice({
   name: "gridListToggle",
   initialState,
   reducers: {
-    setGridListToggle: (state, action) => {
+    setGridListToggle: (state, action: PayloadAction<ViewMode>) => {
       state.view = action.payload;
     },
   },

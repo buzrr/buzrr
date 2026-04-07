@@ -1,8 +1,4 @@
-import { createSlice } from "@reduxjs/toolkit";
-
-interface InitialState {
-  resultStatus: ResultStatus;
-}
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 export enum ResultStatus {
   correct,
@@ -10,7 +6,11 @@ export enum ResultStatus {
   timeout,
 }
 
-const initialState: InitialState = {
+interface PlayerResultState {
+  resultStatus: ResultStatus;
+}
+
+const initialState: PlayerResultState = {
   resultStatus: ResultStatus.timeout,
 };
 
@@ -18,7 +18,7 @@ const resultSlice = createSlice({
   name: "result",
   initialState,
   reducers: {
-    setResultStatus: (state, action) => {
+    setResultStatus: (state, action: PayloadAction<ResultStatus>) => {
       state.resultStatus = action.payload;
     },
   },

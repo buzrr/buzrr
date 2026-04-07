@@ -1,23 +1,23 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
-interface InitialState {
-  toggle: navToggle;
-}
-
-export enum navToggle {
+export enum NavToggle {
   expand,
   collapse,
 }
 
-const initialState: InitialState = {
-  toggle: navToggle.collapse,
+interface NavToggleState {
+  toggle: NavToggle;
+}
+
+const initialState: NavToggleState = {
+  toggle: NavToggle.collapse,
 };
 
 const navToggleSlice = createSlice({
   name: "navToggle",
   initialState,
   reducers: {
-    setNavToggle: (state, action) => {
+    setNavToggle: (state, action: PayloadAction<NavToggle>) => {
       state.toggle = action.payload;
     },
   },

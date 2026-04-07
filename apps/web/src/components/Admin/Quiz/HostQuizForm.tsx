@@ -7,6 +7,13 @@ import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import SubmitButton from "@/components/SubmitButton";
+import { useAppDispatch } from "@/state/hooks";
+import {
+  setCurrIndex,
+  setLeaderboard,
+  setPlayers,
+  setResult,
+} from "@/state/admin/playersSlice";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { hostQuizSchema } from "@/lib/modules/forms/schemas";
 import { useCreateGameSessionMutation } from "@/lib/modules/game-sessions/hooks";
@@ -19,6 +26,7 @@ export default function HostQuizForm(props: {
   className?: string;
 }) {
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const mutation = useCreateGameSessionMutation();
   const { register, handleSubmit, reset } = useForm<HostQuizValues>({
     resolver: zodResolver(hostQuizSchema),
@@ -28,6 +36,13 @@ export default function HostQuizForm(props: {
   React.useEffect(() => {
     reset({ quizId: props.quizId });
   }, [props.quizId, reset]);
+
+  function resetGameState() {
+    dispatch(setPlayers([]));
+    dispatch(setLeaderboard([]));
+    dispatch(setResult([]));
+    dispatch(setCurrIndex(0));
+  }
 
   const onSubmit = handleSubmit((data) => {
     mutation.mutate(
@@ -48,9 +63,9 @@ export default function HostQuizForm(props: {
       <input type="hidden" {...register("quizId")} />
       <SubmitButton
         text="Host quiz"
-        isQuiz={true}
         error={props.disabled}
         isPending={mutation.isPending}
+        onClick={resetGameState}
       />
     </form>
   );

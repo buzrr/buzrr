@@ -1,8 +1,4 @@
-import { createSlice } from "@reduxjs/toolkit";
-
-interface InitialState {
-  screenStatus: ScreenStatus;
-}
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 export enum ScreenStatus {
   question,
@@ -12,7 +8,11 @@ export enum ScreenStatus {
   lobby,
 }
 
-const initialState: InitialState = {
+interface AdminScreenState {
+  screenStatus: ScreenStatus;
+}
+
+const initialState: AdminScreenState = {
   screenStatus: ScreenStatus.lobby,
 };
 
@@ -20,7 +20,7 @@ const screenSlice = createSlice({
   name: "adminScreen",
   initialState,
   reducers: {
-    setScreenStatus: (state, action) => {
+    setScreenStatus: (state, action: PayloadAction<ScreenStatus>) => {
       state.screenStatus = action.payload;
     },
   },

@@ -1,12 +1,12 @@
 "use client";
 import { useEffect } from "react";
-import { useDispatch } from "react-redux";
+import { useAppDispatch } from "@/state/hooks";
 import { setScreenStatus, ScreenStatus } from "@/state/player/screenSlice";
 
 const ResetReduxStates = () => {
-  const dispatch = useDispatch();
+  const dispatch = useAppDispatch();
   useEffect(() => {
-    if (window !== undefined) {
+    if (typeof window !== "undefined") {
       dispatch(setScreenStatus(ScreenStatus.lobby));
     }
   }, [dispatch]);

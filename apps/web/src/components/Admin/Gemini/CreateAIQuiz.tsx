@@ -13,8 +13,7 @@ import { useState } from "react";
 import style from "@/utils/modalStyle";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { useSelector } from "react-redux";
-import { RootState } from "@/state/store";
+import { useAppSelector } from "@/state/hooks";
 import { useRouter } from "next/navigation";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { createAiQuizSchema } from "@/lib/modules/forms/schemas";
@@ -25,7 +24,7 @@ type FormValues = z.infer<typeof createAiQuizSchema>;
 export default function CreateAIQuiz() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const view = useSelector((state: RootState) => state.gridListToggle.view);
+  const view = useAppSelector((state) => state.gridListToggle.view);
   const mutation = useCreateAiQuizMutation();
   const { control, handleSubmit, reset } = useForm<FormValues>({
     resolver: zodResolver(createAiQuizSchema) as Resolver<FormValues>,

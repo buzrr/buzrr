@@ -1,23 +1,23 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
-interface InitialState {
-  visibility: hideQuestions;
-}
-
-export enum hideQuestions {
+export enum HideQuestions {
   show,
   hide,
 }
 
-const initialState: InitialState = {
-  visibility: hideQuestions.hide,
+interface HideQuestionsState {
+  visibility: HideQuestions;
+}
+
+const initialState: HideQuestionsState = {
+  visibility: HideQuestions.hide,
 };
 
 const hideQuestionsSlice = createSlice({
   name: "hide questions",
   initialState,
   reducers: {
-    setHideQuestions: (state, action) => {
+    setHideQuestions: (state, action: PayloadAction<HideQuestions>) => {
       state.visibility = action.payload;
     },
   },

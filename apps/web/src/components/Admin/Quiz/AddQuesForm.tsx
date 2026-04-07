@@ -2,6 +2,7 @@
 
 import SubmitButton from "../../SubmitButton";
 import { InputField } from "@/components/InputField";
+import { DEFAULT_QUESTION_TIMEOUT } from "@/constants";
 import { FormLabel } from "@mui/material";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
@@ -64,7 +65,7 @@ const AddQuesForm = (props: { quizId: string; question?: Question }) => {
       option3: options?.[2]?.title ?? "",
       option4: options?.[3]?.title ?? "",
       choose_option: defaultCorrectLetter(options),
-      time: question?.timeOut ?? 15,
+      time: question?.timeOut ?? DEFAULT_QUESTION_TIMEOUT,
     },
   });
 
@@ -76,7 +77,7 @@ const AddQuesForm = (props: { quizId: string; question?: Question }) => {
       option3: options?.[2]?.title ?? "",
       option4: options?.[3]?.title ?? "",
       choose_option: defaultCorrectLetter(options),
-      time: question?.timeOut ?? 15,
+      time: question?.timeOut ?? DEFAULT_QUESTION_TIMEOUT,
     });
     setFile(null);
     setFileLink(question?.media ? question.media : "");

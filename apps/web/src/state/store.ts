@@ -32,7 +32,7 @@ const rootReducer = combineReducers({
   pageTheme: pageThemeReducer,
   hideQuestions: hideQuestionsReducer,
   navToggle: navToggleReducer,
-  adminscreen: adminScreenReducer,
+  adminScreen: adminScreenReducer,
   playerResult: playerResultReducer,
   gridListToggle: gridListToggleReducer,
 });

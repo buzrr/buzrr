@@ -105,22 +105,20 @@ const QuestionAndResult = (params: {
             <div
               className={clsx("grid grid-cols-1 gap-x-4", params.question?.mediaType === "image" ? "lg:grid-cols-2 my-2" : "my-4")}
             >
-              {options.map((option: QuestionOption, index: number) => {
-                return (
-                  <div
-                    key={option.id}
-                    className={clsx(
-                    "cursor-pointer p-4 rounded-xl text-lg dark:text-white mt-4",
+              {options.map((option: QuestionOption, index: number) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={clsx(
+                    "cursor-pointer p-4 rounded-xl text-lg dark:text-white mt-4 text-left w-full",
                     option.id === params.optionId ? "dark:bg-dprimary bg-lprimary" : "bg-light-bg dark:bg-off-dark"
                   )}
-                    onClick={() => {
-                      handleSubmit(option.id);
-                    }}
-                  >
-                    {index + 1}. {option.title}
-                  </div>
-                );
-              })}
+                  onClick={() => handleSubmit(option.id)}
+                  aria-pressed={option.id === params.optionId}
+                >
+                  {index + 1}. {option.title}
+                </button>
+              ))}
             </div>
 
             <p className="dark:text-white mb-1 md:hidden font-bold text-center my-6 text-lg">

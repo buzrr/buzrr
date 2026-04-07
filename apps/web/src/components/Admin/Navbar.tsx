@@ -6,9 +6,8 @@ import Image from "next/image";
 import ClientImage from "../ClientImage";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { RootState } from "@/state/store";
-import { useSelector, useDispatch } from "react-redux";
-import { navToggle, setNavToggle } from "@/state/admin/navtoggleSlice";
+import { useAppSelector, useAppDispatch } from "@/state/hooks";
+import { NavToggle, setNavToggle } from "@/state/admin/navtoggleSlice";
 import BasicModal from "../Modal";
 
 const NavLinks = [
@@ -20,22 +19,22 @@ export default function Navbar() {
   const { data: session } = useSession();
   const pathname = usePathname();
 
-  const toggle = useSelector((state: RootState) => state.navToggle.toggle);
-  const dispatch = useDispatch();
+  const toggle = useAppSelector((state) => state.navToggle.toggle);
+  const dispatch = useAppDispatch();
 
   return (
     <>
       <div
         className={clsx(
           "absolute top-0 left-0 w-screen h-screen z-10 bg-[#0000006a] md:hidden",
-          toggle === navToggle.collapse && "hidden"
+          toggle === NavToggle.collapse && "hidden"
         )}
-        onClick={() => dispatch(setNavToggle(navToggle.collapse))}
+        onClick={() => dispatch(setNavToggle(NavToggle.collapse))}
       ></div>
       <div
         className={clsx(
           "z-20 p-6 px-8 flex bg-light-bg dark:bg-dark-bg flex-col h-screen md:h-[85vh] absolute md:relative w-[80vw] md:w-[25%] left-0",
-          toggle === navToggle.collapse && "hidden md:flex"
+          toggle === NavToggle.collapse && "hidden md:flex"
         )}
       >
         <div className="flex justify-center items-center md:hidden p-5 mb-2 border-b border-gray">
@@ -62,10 +61,10 @@ export default function Navbar() {
                     : "bg-lprimary text-white dark:bg-dprimary dark:text-dark dark:font-extrabold"
                 )}
                 onClick={() => {
-                  if (toggle === navToggle.collapse) {
-                    dispatch(setNavToggle(navToggle.expand));
+                  if (toggle === NavToggle.collapse) {
+                    dispatch(setNavToggle(NavToggle.expand));
                   } else {
-                    dispatch(setNavToggle(navToggle.collapse));
+                    dispatch(setNavToggle(NavToggle.collapse));
                   }
                 }}
               >

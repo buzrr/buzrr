@@ -5,13 +5,14 @@ import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { useEffect } from "react";
 import SubmitButton from "@/components/SubmitButton";
-import SelectProfile from "@/components/Player/selectProfile";
+import SelectProfile from "@/components/Player/SelectProfile";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
 import "react-toastify/dist/ReactToastify.css";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { createPlayerSchema } from "@/lib/modules/forms/schemas";
 import { useCreatePlayerMutation } from "@/lib/modules/players/hooks";
+import { TextInput } from "@/components/ui/TextInput";
 
 type FormValues = z.infer<typeof createPlayerSchema>;
 
@@ -24,7 +25,7 @@ const CreatePlayerForm = (props: {
 }) => {
   const router = useRouter();
   const mutation = useCreatePlayerMutation();
-  const { control, handleSubmit, reset, formState } = useForm<FormValues>({
+  const { control, handleSubmit, reset } = useForm<FormValues>({
     resolver: zodResolver(createPlayerSchema),
     defaultValues: {
       username: props.data.name,
@@ -49,7 +50,6 @@ const CreatePlayerForm = (props: {
   };
 
   const onSubmit = handleSubmit((data) => {
-    console.log("data", data);
     mutation.mutate(
       {
         username: data.username,
@@ -82,10 +82,10 @@ const CreatePlayerForm = (props: {
         name="username"
         control={control}
         render={({ field, fieldState }) => (
-          <input
+          <TextInput
             type="text"
             placeholder="Enter Display Name"
-            className="w-full border-gray border focus:border-blue-600 rounded-lg outline-none md:w-4/5 text-dark dark:text-gray dark:bg-dark-bg my-2 px-4 py-3"
+            className="md:w-4/5 my-2"
             required
             autoComplete="off"
             maxLength={30}
@@ -97,15 +97,10 @@ const CreatePlayerForm = (props: {
                 .slice(0, 30);
               field.onChange(cleaned);
             }}
-            aria-invalid={!!fieldState.error}
+            error={fieldState.error?.message}
           />
         )}
       />
-      {formState.errors.username?.message && (
-        <p className="text-sm text-red-500">
-          {formState.errors.username.message}
-        </p>
-      )}
 
       <div className="w-full md:w-[40%] mt-10">
         <SubmitButton style="game" isPending={mutation.isPending} />

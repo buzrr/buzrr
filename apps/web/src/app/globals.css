@@ -57,4 +57,12 @@
     height: 100dvh;
     width: 100%;
   }
+
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: default;
+  }
 }

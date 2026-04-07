@@ -1,23 +1,27 @@
 "use client";
-import { RootState } from "@/state/store";
 import Image from "next/image";
-import { useSelector } from "react-redux";
-import { pageTheme } from "@/state/pageThemeSlice";
+import { useAppSelector } from "@/state/hooks";
+import { PageTheme } from "@/state/pageThemeSlice";
+import { IconButton } from "@/components/ui/IconButton";
 
 const BackNavButton = () => {
-  const theme = useSelector((state: RootState) => state.pageTheme.theme);
+  const theme = useAppSelector((state) => state.pageTheme.theme);
 
   return (
-      <Image
-        src={`${theme === pageTheme.light ? "images/arrow-back.svg" : "images/arrow-back-light.svg"}`}
-        width={30}
-        height={30}
-        alt="Logo"
-        className="hover:cursor-pointer dark:text-white"
-        onClick={() => {
-          window.history.back();
-        }}
-      />
+    <IconButton
+      aria-label="Go back"
+      className="cursor-pointer"
+      onClick={() => window.history.back()}
+      icon={
+        <Image
+          src={theme === PageTheme.light ? "images/arrow-back.svg" : "images/arrow-back-light.svg"}
+          width={30}
+          height={30}
+          alt=""
+          className="dark:text-white"
+        />
+      }
+    />
   );
 };
 

@@ -1,9 +1,8 @@
 import clsx from "clsx";
 import { DEFAULT_AVATAR } from "@/constants";
-import { RootState } from "@/state/store";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useSelector } from "react-redux";
+import { useAppSelector } from "@/state/hooks";
 
 interface LeaderBoardProps {
   gameCode: string;
@@ -12,9 +11,7 @@ interface LeaderBoardProps {
 }
 
 export default function LeaderBoard(props: LeaderBoardProps) {
-  const leaderboard = useSelector(
-    (state: RootState) => state.player.leaderboard,
-  );
+  const leaderboard = useAppSelector((state) => state.player.leaderboard);
   const { gameCode, quizQuestions } = props;
   const socket = props.socket;
   const router = useRouter();

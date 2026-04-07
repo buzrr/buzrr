@@ -6,7 +6,7 @@ export default function SetLocalItem(params: {
   value: string;
 }) {
   useEffect(() => {
-    if (window !== undefined) {
+    if (typeof window !== "undefined") {
       window.localStorage.setItem(params.mapKey, params.value);
     }
   }, [params.mapKey, params.value]);

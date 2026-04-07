@@ -1,50 +1,42 @@
 "use client";
-import clsx from "clsx";
 import { useEffect } from "react";
-import { RootState } from "@/state/store";
-import { useSelector, useDispatch } from "react-redux";
-import { hideQuestions, setHideQuestions } from "@/state/hideQuestionsSlice";
+import { useAppSelector, useAppDispatch } from "@/state/hooks";
+import { HideQuestions as HideQuestionsEnum, setHideQuestions } from "@/state/hideQuestionsSlice";
+import { Switch } from "@/components/ui/Switch";
 
 const HideQuestions = () => {
-  const dispatch = useDispatch();
+  const dispatch = useAppDispatch();
 
-  const visibility = useSelector(
-    (state: RootState) => state.hideQuestions.visibility,
+  const visibility = useAppSelector(
+    (state) => state.hideQuestions.visibility,
   );
 
   useEffect(() => {
-    dispatch(setHideQuestions(hideQuestions.hide));
-    // Only set hidden on initial mount when visiting the page
+    dispatch(setHideQuestions(HideQuestionsEnum.hide));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handle = () => {
     dispatch(
       setHideQuestions(
-        visibility === hideQuestions.hide
-          ? hideQuestions.show
-          : hideQuestions.hide,
+        visibility === HideQuestionsEnum.hide
+          ? HideQuestionsEnum.show
+          : HideQuestionsEnum.hide,
       ),
     );
   };
 
+  const isHidden = visibility === HideQuestionsEnum.hide;
+
   return (
     <div className="flex items-center px-4 py-2 rounded-md hover:bg-cardhover-light dark:hover:bg-cardhover-dark gap-2">
-      <div className="text-nowrap">Hide Questions</div>
-      <div
-        className={clsx(
-          "w-8 h-5 rounded-full hideques:bg-dprimary flex items-center p-1 cursor-pointer",
-          visibility === hideQuestions.show ? "bg-[#abacaf]" : "bg-lprimary"
-        )}
+      <span className="text-nowrap">Hide Questions</span>
+      <Switch
+        checked={isHidden}
+        aria-label="Hide questions"
+        className="cursor-pointer"
         onClick={handle}
-      >
-        <div
-          className={clsx(
-            "w-3 h-3 bg-white rounded-full transition-all duration-200 ease-in-out",
-            visibility === hideQuestions.hide ? "ml-[50%]" : "ml-0"
-          )}
-        ></div>
-      </div>
+      />
     </div>
   );
 };

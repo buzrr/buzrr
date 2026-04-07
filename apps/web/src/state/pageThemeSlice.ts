@@ -1,28 +1,28 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
-interface InitialState {
-  theme: pageTheme;
-}
-
-export enum pageTheme {
+export enum PageTheme {
   dark,
   light,
 }
 
-const initialState: InitialState = {
-  theme: pageTheme.light,
+interface PageThemeState {
+  theme: PageTheme;
+}
+
+const initialState: PageThemeState = {
+  theme: PageTheme.light,
 };
 
 const pageThemeSlice = createSlice({
   name: "theme",
   initialState,
   reducers: {
-    setpageTheme: (state, action) => {
+    setPageTheme: (state, action: PayloadAction<PageTheme>) => {
       state.theme = action.payload;
     },
   },
 });
 
-export const { setpageTheme } = pageThemeSlice.actions;
+export const { setPageTheme } = pageThemeSlice.actions;
 
 export default pageThemeSlice.reducer;

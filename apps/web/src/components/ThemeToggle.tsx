@@ -1,15 +1,15 @@
 "use client";
 import { useEffect } from "react";
-import { RootState } from "@/state/store";
-import { useSelector, useDispatch } from "react-redux";
-import { pageTheme, setpageTheme } from "@/state/pageThemeSlice";
+import { useAppSelector, useAppDispatch } from "@/state/hooks";
+import { PageTheme, setPageTheme } from "@/state/pageThemeSlice";
+import { Switch } from "@/components/ui/Switch";
 
 const ThemeToggle = () => {
-  const theme = useSelector((state: RootState) => state.pageTheme.theme);
-  const dispatch = useDispatch();
+  const theme = useAppSelector((state) => state.pageTheme.theme);
+  const dispatch = useAppDispatch();
 
   useEffect(() => {
-    if (theme === pageTheme.dark) {
+    if (theme === PageTheme.dark) {
       document.documentElement.classList.add("dark");
     } else {
       document.documentElement.classList.remove("dark");
@@ -18,8 +18,8 @@ const ThemeToggle = () => {
 
   const handler = () => {
     dispatch(
-      setpageTheme(
-        theme === pageTheme.light ? pageTheme.dark : pageTheme.light,
+      setPageTheme(
+        theme === PageTheme.light ? PageTheme.dark : PageTheme.light,
       ),
     );
   };
@@ -31,15 +31,12 @@ const ThemeToggle = () => {
         <span>MODE</span>
       </div>
       <div className="p-[6px] shadow-[0px_2px_4px_0px_rgba(0,0,0,0.15)] rounded-full bg-white dark:bg-[#27272a]">
-        <button
-          role="switch"
-          aria-checked={theme === pageTheme.dark}
+        <Switch
+          checked={theme === PageTheme.dark}
           aria-label="Toggle dark mode"
-          className="w-8 h-5 rounded-full bg-[#abacaf] dark:bg-dprimary flex items-center p-1 cursor-pointer"
+          className="cursor-pointer"
           onClick={handler}
-        >
-          <div className="w-3 h-3 bg-white dark:ml-[50%] rounded-full transition-[margin-left] duration-200 ease-in-out"></div>
-        </button>
+        />
       </div>
     </div>
   );

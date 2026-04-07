@@ -3,6 +3,7 @@
 import GamePage from "@/components/Player/GamePage";
 import ValidatePlayer from "@/components/Player/ValidatePlayer";
 import ClientImage from "@/components/ClientImage";
+import Skeleton from "@/components/ui/Skeleton";
 import { usePlayerPlayQuery } from "@/lib/modules/game-sessions/hooks";
 import { isAxiosError } from "axios";
 import { notFound, redirect } from "next/navigation";
@@ -16,8 +17,9 @@ export default function PlayPageClient({ playerId }: { playerId: string }) {
 
   if (isPending || !data) {
     return (
-      <div className="p-8 text-center text-dark dark:text-white">
-        Loading…
+      <div className="p-4 md:p-8">
+        <Skeleton className="mb-6 h-20 w-20 rounded bg-white dark:bg-card-dark" />
+        <Skeleton className="h-[75vh] w-full rounded-2xl bg-white dark:bg-card-dark" />
       </div>
     );
   }

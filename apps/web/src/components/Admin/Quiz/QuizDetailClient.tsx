@@ -6,6 +6,7 @@ import AllQues from "@/components/Admin/Quiz/AllQues";
 import QuizInfoSection from "@/components/Admin/Quiz/QuizInfoSection";
 import HideQuestions from "@/components/Admin/Quiz/HideQuestions";
 import HostQuizForm from "@/components/Admin/Quiz/HostQuizForm";
+import Skeleton from "@/components/ui/Skeleton";
 import { useQuizDetailQuery } from "@/lib/modules/quizzes/hooks";
 import { isAxiosError } from "axios";
 import { notFound } from "next/navigation";
@@ -26,8 +27,9 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
 
   if (isPending) {
     return (
-      <div className="text-dark dark:text-white w-full h-full flex items-center justify-center p-8">
-        Loading quiz…
+      <div className="w-full h-full flex gap-2 p-2">
+        <Skeleton className="hidden md:block w-72 h-[83vh] rounded-xl bg-white dark:bg-card-dark" />
+        <Skeleton className="w-full h-[83vh] rounded-xl bg-white dark:bg-card-dark" />
       </div>
     );
   }

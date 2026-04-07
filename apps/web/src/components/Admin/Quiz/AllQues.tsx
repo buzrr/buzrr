@@ -10,9 +10,9 @@ import { useMemo, useState } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import ConfirmationModal from "../ConfirmationModal";
 import ClientImage from "@/components/ClientImage";
-import { RootState } from "@/state/store";
-import { useSelector } from "react-redux";
-import { hideQuestions } from "@/state/hideQuestionsSlice";
+import Skeleton from "@/components/ui/Skeleton";
+import { useAppSelector } from "@/state/hooks";
+import { HideQuestions } from "@/state/hideQuestionsSlice";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import type { QuestionWithOptions } from "@/lib/modules/questions/api";
 import {
@@ -70,8 +70,8 @@ export default function AllQues(props: { quizId: string }) {
     }
   }
 
-  const visibility = useSelector(
-    (state: RootState) => state.hideQuestions.visibility,
+  const visibility = useAppSelector(
+    (state) => state.hideQuestions.visibility,
   );
 
   if (isError) {
@@ -82,7 +82,16 @@ export default function AllQues(props: { quizId: string }) {
 
   if (isPending) {
     return (
-      <div className="p-4 text-dark dark:text-white">Loading questions…</div>
+      <div className="p-4">
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton
+              key={index}
+              className="h-36 w-full rounded-xl bg-[#f5f5f5] dark:bg-[#3b3c3f]"
+            />
+          ))}
+        </div>
+      </div>
     );
   }
 
@@ -94,7 +103,7 @@ export default function AllQues(props: { quizId: string }) {
             <div
               {...provided.droppableProps}
               ref={provided.innerRef}
-              className={clsx("overflow-x-auto md:h-[90%]", visibility === hideQuestions.hide && "blur-lg pointer-events-none")}
+              className={clsx("overflow-x-auto md:h-[90%]", visibility === HideQuestions.hide && "blur-lg pointer-events-none")}
             >
               {questions.length > 0 ? (
                 questions.map((ques, index) => (
