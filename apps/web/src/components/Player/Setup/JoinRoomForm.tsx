@@ -10,6 +10,8 @@ import "react-toastify/dist/ReactToastify.css";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { joinRoomSchema } from "@/lib/modules/forms/schemas";
 import { useJoinRoomMutation } from "@/lib/modules/game-sessions/hooks";
+import { clearPlayerLocalSession } from "@/lib/player-session";
+import { isAxiosError } from "axios";
 
 type FormValues = z.infer<typeof joinRoomSchema>;
 
@@ -31,6 +33,12 @@ const JoinRoomForm = (params: { playerId: string }) => {
           router.push(`/player/play/${res.playerId}`);
         },
         onError: (err) => {
+          if (isAxiosError(err) && err.response?.status === 401) {
+            clearPlayerLocalSession();
+            toast.error("Your session expired. Create your player again.");
+            router.replace("/player");
+            return;
+          }
           toast.error(getApiErrorMessage(err));
         },
       },
