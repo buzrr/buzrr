@@ -1,28 +1,14 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import type { PlayerPayload, LeaderboardEntry } from "@/types/socket-events";
 
-interface Player {
-  id: string;
-  name?: string;
-  profilePic?: string;
-  [key: string]: unknown;
-}
-
-export interface LeaderboardEntry {
-  Player?: { name?: string; profilePic?: string | null };
-  score?: number;
-  playerId?: string;
-  position?: number;
-  [key: string]: unknown;
-}
-
-interface InitialState {
-  players: Player[];
+interface PlayersState {
+  players: PlayerPayload[];
   quesResult: number[];
   currentIndex: number;
   leaderboard: LeaderboardEntry[];
 }
 
-const initialState: InitialState = {
+const initialState: PlayersState = {
   players: [],
   quesResult: [],
   currentIndex: 0,
@@ -33,21 +19,18 @@ const playerSlice = createSlice({
   name: "player",
   initialState,
   reducers: {
-    addPlayer: (state, action: PayloadAction<Player>) => {
-      const existingPlayer = state.players.find(
-        (player) => player.id === action.payload.id,
-      );
-      if (existingPlayer) {
-        return;
+    addPlayer: (state, action: PayloadAction<PlayerPayload>) => {
+      const exists = state.players.some((p) => p.id === action.payload.id);
+      if (!exists) {
+        state.players.push(action.payload);
       }
-      state.players = [...state.players, action.payload];
     },
-    removePlayer: (state, action: PayloadAction<Player>) => {
+    removePlayer: (state, action: PayloadAction<{ id: string }>) => {
       state.players = state.players.filter(
         (player) => player.id !== action.payload.id,
       );
     },
-    setPlayers: (state, action: PayloadAction<Player[]>) => {
+    setPlayers: (state, action: PayloadAction<PlayerPayload[]>) => {
       state.players = action.payload;
     },
     setResult: (state, action: PayloadAction<number[]>) => {

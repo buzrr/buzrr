@@ -1,9 +1,8 @@
 "use client";
 import clsx from "clsx";
 import Image from "next/image";
-import { useSelector } from "react-redux";
-import { pageTheme } from "@/state/pageThemeSlice";
-import { RootState } from "@/state/store";
+import { useAppSelector } from "@/state/hooks";
+import { PageTheme } from "@/state/pageThemeSlice";
 
 const ClientImage = ({
   props,
@@ -17,12 +16,12 @@ const ClientImage = ({
     classname?: string;
   };
 }) => {
-  const theme = useSelector((state: RootState) => state.pageTheme.theme);
+  const theme = useAppSelector((state) => state.pageTheme.theme);
 
   return (
     <>
       <Image
-        src={`${theme === pageTheme.light ? props.src : props.darksrc || props.src}`}
+        src={theme === PageTheme.light ? props.src : props.darksrc || props.src}
         alt={props.alt}
         width={props.width}
         height={props.height}

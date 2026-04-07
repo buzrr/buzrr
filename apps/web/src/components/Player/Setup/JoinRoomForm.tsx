@@ -10,6 +10,9 @@ import "react-toastify/dist/ReactToastify.css";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { joinRoomSchema } from "@/lib/modules/forms/schemas";
 import { useJoinRoomMutation } from "@/lib/modules/game-sessions/hooks";
+import { clearPlayerLocalSession } from "@/lib/player-session";
+import { isAxiosError } from "axios";
+import { TextInput } from "@/components/ui/TextInput";
 
 type FormValues = z.infer<typeof joinRoomSchema>;
 
@@ -31,6 +34,12 @@ const JoinRoomForm = () => {
           router.push(`/player/play/${res.playerId}`);
         },
         onError: (err) => {
+          if (isAxiosError(err) && err.response?.status === 401) {
+            clearPlayerLocalSession();
+            toast.error("Your session expired. Create your player again.");
+            router.replace("/player");
+            return;
+          }
           toast.error(getApiErrorMessage(err));
         },
       },
@@ -45,14 +54,18 @@ const JoinRoomForm = () => {
       <h1 className="text-3xl md:text-5xl py-2 font-extrabold dark:text-white">
         Enter room code
       </h1>
-      <h2 className="text-md md:text-lg py-2 dark:text-white">
+      <p className="text-md md:text-lg py-2 dark:text-white">
         Enter room code provided by the admin
-      </h2>
-      <input
+      </p>
+      <label htmlFor="gameCode" className="sr-only">
+        Room Code
+      </label>
+      <TextInput
+        id="gameCode"
         type="text"
         {...register("gameCode")}
         placeholder="Enter Code"
-        className="w-full border-gray dark:bg-dark-bg dark:text-white border focus:border-blue-600 rounded-lg outline-none md:w-4/5 text-slate-900 my-12 px-4 py-3 uppercase tracking-widest font-mono"
+        className="md:w-4/5 uppercase tracking-widest font-mono my-12"
         autoComplete="off"
         required
         onInput={(e: React.FormEvent<HTMLInputElement>) => {

@@ -2,11 +2,10 @@
 import clsx from "clsx";
 import React from "react";
 import { Skeleton } from "@mui/material";
-import { useSelector } from "react-redux";
-import { RootState } from "@/state/store";
+import { useAppSelector } from "@/state/hooks";
 
 const CardSkeleton = (): React.ReactNode => {
-  const view = useSelector((state: RootState) => state.gridListToggle.view);
+  const view = useAppSelector((state) => state.gridListToggle.view);
   return (
     <div
       className={clsx(
@@ -28,10 +27,10 @@ const CardSkeleton = (): React.ReactNode => {
 
 const LoaderBuzrrs = ({ cardCount }: { cardCount: number }) => {
   const cards: Array<React.ReactNode> = [];
-  const view = useSelector((state: RootState) => state.gridListToggle.view);
+  const view = useAppSelector((state) => state.gridListToggle.view);
 
   for (let i = 0; i < cardCount; i++) {
-    cards.push(<CardSkeleton />);
+    cards.push(<CardSkeleton key={`card-skel-${i}`} />);
   }
   return (
     <div

@@ -1,6 +1,7 @@
 "use client";
 
 import GameLobby from "@/components/Admin/Game/GameLobby";
+import Skeleton from "@/components/ui/Skeleton";
 import { useAdminLobbyQuery } from "@/lib/modules/game-sessions/hooks";
 import { isAxiosError } from "axios";
 import { notFound } from "next/navigation";
@@ -32,7 +33,9 @@ export default function AdminGameLobbyClient({
 
   if (isPending) {
     return (
-      <p className="p-6 text-dark dark:text-white">Loading…</p>
+      <div className="w-full p-6">
+        <Skeleton className="mx-auto h-[85vh] w-full max-w-5xl rounded-2xl bg-white dark:bg-card-dark" />
+      </div>
     );
   }
 

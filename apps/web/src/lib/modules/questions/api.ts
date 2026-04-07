@@ -1,6 +1,6 @@
 import type { AxiosInstance } from "axios";
 import type { Option, Question } from "@/types/db";
-import { authApi } from "@/lib/api/client";
+import { getAuthApiClient } from "@/lib/api/client";
 
 export type QuestionWithOptions = Question & { options: Option[] };
 
@@ -34,10 +34,10 @@ export async function deleteQuestion(client: AxiosInstance, questionId: string) 
 }
 
 export const questionsApi = {
-  list: (quizId: string) => listQuestions(authApi, quizId),
+  list: (quizId: string) => listQuestions(getAuthApiClient(), quizId),
   upsertMultipart: (quizId: string, formData: FormData) =>
-    upsertQuestionMultipart(authApi, quizId, formData),
+    upsertQuestionMultipart(getAuthApiClient(), quizId, formData),
   reorder: (body: Parameters<typeof reorderQuestions>[1]) =>
-    reorderQuestions(authApi, body),
-  delete: (questionId: string) => deleteQuestion(authApi, questionId),
+    reorderQuestions(getAuthApiClient(), body),
+  delete: (questionId: string) => deleteQuestion(getAuthApiClient(), questionId),
 };

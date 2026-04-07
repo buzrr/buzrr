@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Socket } from "socket.io-client";
-import { useDispatch } from "react-redux";
+import { useAppDispatch } from "@/state/hooks";
 import { setScreenStatus, ScreenStatus } from "@/state/player/screenSlice";
 import QuestionAndResult from "./QuesAndResult";
 import { useSubmitAnswerMutation } from "@/lib/modules/game-sessions/hooks";
@@ -21,7 +21,7 @@ const Question = (params: {
   quizTitle: string;
   gameCode: string;
 }) => {
-  const dispatch = useDispatch();
+  const dispatch = useAppDispatch();
   const [timer, setTimer] = useState(0);
   const [optionId, setOptionId] = useState("");
   const submitMutation = useSubmitAnswerMutation();

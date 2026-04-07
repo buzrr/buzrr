@@ -35,8 +35,22 @@ export function createAuthApiClient() {
   return client;
 }
 
-export const publicApi = createPublicApiClient();
-export const authApi = createAuthApiClient();
+let publicApiInstance: ReturnType<typeof createPublicApiClient> | null = null;
+let authApiInstance: ReturnType<typeof createAuthApiClient> | null = null;
+
+export function getPublicApiClient() {
+  if (!publicApiInstance) {
+    publicApiInstance = createPublicApiClient();
+  }
+  return publicApiInstance;
+}
+
+export function getAuthApiClient() {
+  if (!authApiInstance) {
+    authApiInstance = createAuthApiClient();
+  }
+  return authApiInstance;
+}
 
 /** Bearer token from `localStorage` (`playerToken`) for player-scoped routes (e.g. join room). */
 export function createPlayerAuthedApiClient() {

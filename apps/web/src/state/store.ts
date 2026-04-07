@@ -21,6 +21,7 @@ import {
 } from "redux-persist";
 import storage from "redux-persist/lib/storage";
 import persistStore from "redux-persist/es/persistStore";
+import type { PersistConfig, PersistedState } from "redux-persist";
 
 import { createConnection } from "./socket/socketSlice";
 
@@ -32,14 +33,26 @@ const rootReducer = combineReducers({
   pageTheme: pageThemeReducer,
   hideQuestions: hideQuestionsReducer,
   navToggle: navToggleReducer,
-  adminscreen: adminScreenReducer,
+  adminScreen: adminScreenReducer,
   playerResult: playerResultReducer,
   gridListToggle: gridListToggleReducer,
 });
 
-const persistConfig = {
+const persistConfig: PersistConfig<ReturnType<typeof rootReducer>> = {
   key: "root",
   storage,
+  version: 1,
+  migrate: async (state): Promise<PersistedState> => {
+    if (!state) return state;
+    const legacy = state as PersistedState & Record<string, unknown>;
+    if ("adminscreen" in legacy && !("adminScreen" in legacy)) {
+      return {
+        ...legacy,
+        adminScreen: legacy.adminscreen,
+      } as PersistedState;
+    }
+    return legacy;
+  },
   /** Live Socket.IO clients must not be persisted to storage. */
   blacklist: ["socket"],
 };

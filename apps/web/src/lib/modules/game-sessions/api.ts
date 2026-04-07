@@ -9,9 +9,9 @@ import type {
   User,
 } from "@/types/db";
 import {
-  authApi,
   createPlayerAuthedApiClient,
-  publicApi,
+  getAuthApiClient,
+  getPublicApiClient,
 } from "@/lib/api/client";
 
 export async function createGameSession(
@@ -105,16 +105,17 @@ export async function getLeaderboard(
 
 export const gameSessionsApi = {
   create: (body: Parameters<typeof createGameSession>[1]) =>
-    createGameSession(authApi, body),
+    createGameSession(getAuthApiClient(), body),
   join: (body: Parameters<typeof joinRoom>[1]) =>
     joinRoom(createPlayerAuthedApiClient(), body),
   submitAnswer: (
     gameSessionId: string,
     body: Parameters<typeof submitAnswer>[2],
-  ) => submitAnswer(publicApi, gameSessionId, body),
-  leaderboard: (gameCode: string) => getLeaderboard(authApi, gameCode),
-  adminLobby: (roomId: string) => getAdminLobby(authApi, roomId),
+  ) => submitAnswer(getPublicApiClient(), gameSessionId, body),
+  leaderboard: (gameCode: string) =>
+    getLeaderboard(getAuthApiClient(), gameCode),
+  adminLobby: (roomId: string) => getAdminLobby(getAuthApiClient(), roomId),
   leaderboardByRoom: (roomId: string) =>
-    getLeaderboardByRoom(authApi, roomId),
-  playerPlay: (playerId: string) => getPlayerPlay(publicApi, playerId),
+    getLeaderboardByRoom(getAuthApiClient(), roomId),
+  playerPlay: (playerId: string) => getPlayerPlay(getPublicApiClient(), playerId),
 };

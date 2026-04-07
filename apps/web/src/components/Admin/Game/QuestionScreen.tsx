@@ -1,15 +1,15 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { RootState } from "@/state/store";
 import { useCallback, useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import { ScreenStatus, setScreenStatus } from "@/state/admin/screenSlice";
 import { setLeaderboard, setResult } from "@/state/admin/playersSlice";
 import Image from "next/image";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/modules/query-keys";
 import { gameSessionsApi } from "@/lib/modules/game-sessions/api";
+import { Button } from "@/components/ui/Button";
 
 interface QuestionScreenProps {
   quizQuestions?: { title?: string; questions?: { title?: string; options?: { title: string }[]; media?: string | null; mediaType?: string | null; id?: string; timeOut?: number }[] };
@@ -24,11 +24,9 @@ interface QuestionScreenProps {
 
 export default function QuestionScreen(props: QuestionScreenProps) {
   const { quizQuestions, gameCode } = props;
-  const dispatch = useDispatch();
+  const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
-  const currIndex = useSelector(
-    (state: RootState) => state.player.currentIndex,
-  );
+  const currIndex = useAppSelector((state) => state.player.currentIndex);
   const quizTitle = quizQuestions?.title;
   const allQuestions = quizQuestions?.questions;
   const socket = props.socket;
@@ -44,7 +42,6 @@ export default function QuestionScreen(props: QuestionScreenProps) {
     socket.emit("display-result", gameCode, question?.id, question?.options);
     const handleDisplayingResult = (data: unknown) => {
       const payload = data as { presenter?: unknown };
-      console.log("Displaying result", JSON.stringify(data));
       dispatch(setResult((payload?.presenter as number[]) ?? []));
       dispatch(setScreenStatus(ScreenStatus.result));
     };
@@ -108,12 +105,9 @@ export default function QuestionScreen(props: QuestionScreenProps) {
             {question?.title}
           </h1>
           <div className="absolute bottom-2 md:bottom-10 right-12 w-fit">
-            <button
-              className="w-24 h-10 font-black bg-lprimary text-white dark:bg-dprimary dark:text-dark rounded"
-              onClick={handleNext}
-            >
+            <Button className="w-24 h-10 rounded!" size="sm" onClick={handleNext}>
               Next
-            </button>
+            </Button>
           </div>
           <div className="flex flex-col md:grid md:grid-cols-2 gap-6 w-full p-8 pl-4 h-fit">
             {options.length > 0 &&

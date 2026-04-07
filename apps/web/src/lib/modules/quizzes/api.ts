@@ -1,6 +1,6 @@
 import type { AxiosInstance } from "axios";
 import type { GameSession, Quiz } from "@/types/db";
-import { authApi } from "@/lib/api/client";
+import { getAuthApiClient } from "@/lib/api/client";
 
 export type QuizDetail = Quiz & {
   gameSessions: GameSession[];
@@ -46,10 +46,11 @@ export async function deleteQuiz(client: AxiosInstance, quizId: string) {
 }
 
 export const quizzesApi = {
-  list: () => listQuizzes(authApi),
-  getById: (quizId: string) => getQuizById(authApi, quizId),
-  create: (body: Parameters<typeof createQuiz>[1]) => createQuiz(authApi, body),
+  list: () => listQuizzes(getAuthApiClient()),
+  getById: (quizId: string) => getQuizById(getAuthApiClient(), quizId),
+  create: (body: Parameters<typeof createQuiz>[1]) =>
+    createQuiz(getAuthApiClient(), body),
   createAi: (body: Parameters<typeof createAiQuiz>[1]) =>
-    createAiQuiz(authApi, body),
-  delete: (quizId: string) => deleteQuiz(authApi, quizId),
+    createAiQuiz(getAuthApiClient(), body),
+  delete: (quizId: string) => deleteQuiz(getAuthApiClient(), quizId),
 };

@@ -1,6 +1,7 @@
 "use client";
 
 import { DEFAULT_AVATAR } from "@/constants";
+import Skeleton from "@/components/ui/Skeleton";
 import { useLeaderboardByRoomQuery } from "@/lib/modules/game-sessions/hooks";
 import Image from "next/image";
 
@@ -10,7 +11,17 @@ export default function QuizLeaderboardClient({ roomId }: { roomId: string }) {
 
   if (isPending) {
     return (
-      <p className="text-center text-dark dark:text-white py-8">Loading…</p>
+      <div className="flex flex-col items-center m-auto w-full px-4 my-8 gap-4">
+        <Skeleton className="h-10 w-40 rounded" />
+        <div className="flex flex-col gap-4 my-6 w-full max-w-4xl">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton
+              key={index}
+              className="h-16 w-full rounded bg-white dark:bg-card-dark"
+            />
+          ))}
+        </div>
+      </div>
     );
   }
 

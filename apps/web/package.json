@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "analyze": "ANALYZE=true next build",
     "start": "next start",
     "lint": "next lint"
   },
@@ -17,7 +18,9 @@
     "@hello-pangea/dnd": "^18.0.1",
     "@hookform/resolvers": "^5.2.2",
     "@mui/material": "^7.3.8",
+    "@mui/system": "^7.3.9",
     "@mui/x-charts": "^8.27.0",
+    "@prisma/client": "^7.6.0",
     "@reduxjs/toolkit": "^2.11.2",
     "@tanstack/react-query": "^5.95.2",
     "@upstash/ratelimit": "^2.0.8",
@@ -35,6 +38,7 @@
     "react-icons": "^5.5.0",
     "react-redux": "^9.2.0",
     "react-toastify": "^11.0.5",
+    "redux": "^5.0.1",
     "redux-persist": "^6.0.0",
     "server-only": "^0.0.1",
     "socket.io-client": "^4.8.3",
@@ -42,6 +46,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@next/bundle-analyzer": "^15.2.8",
     "@tailwindcss/postcss": "^4.2.0",
     "@tanstack/react-query-devtools": "^5.95.2",
     "@types/node": "^20",

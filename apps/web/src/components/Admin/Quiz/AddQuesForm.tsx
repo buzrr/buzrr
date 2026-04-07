@@ -2,6 +2,7 @@
 
 import SubmitButton from "../../SubmitButton";
 import { InputField } from "@/components/InputField";
+import { DEFAULT_QUESTION_TIMEOUT } from "@/constants";
 import { FormLabel } from "@mui/material";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
@@ -64,7 +65,7 @@ const AddQuesForm = (props: { quizId: string; question?: Question }) => {
       option3: options?.[2]?.title ?? "",
       option4: options?.[3]?.title ?? "",
       choose_option: defaultCorrectLetter(options),
-      time: question?.timeOut ?? 15,
+      time: question?.timeOut ?? DEFAULT_QUESTION_TIMEOUT,
     },
   });
 
@@ -76,7 +77,7 @@ const AddQuesForm = (props: { quizId: string; question?: Question }) => {
       option3: options?.[2]?.title ?? "",
       option4: options?.[3]?.title ?? "",
       choose_option: defaultCorrectLetter(options),
-      time: question?.timeOut ?? 15,
+      time: question?.timeOut ?? DEFAULT_QUESTION_TIMEOUT,
     });
     setFile(null);
     setFileLink(question?.media ? question.media : "");
@@ -120,7 +121,11 @@ const AddQuesForm = (props: { quizId: string; question?: Question }) => {
     fd.append("choose_option", data.choose_option);
     fd.append(
       "time",
-      String(data.time !== undefined && !Number.isNaN(data.time) ? data.time : 15),
+      String(
+        data.time !== undefined && !Number.isNaN(data.time)
+          ? data.time
+          : DEFAULT_QUESTION_TIMEOUT,
+      ),
     );
     fd.append("file_link", fileLink);
     fd.append("media_type", file ? "" : (question?.mediaType ?? ""));
@@ -138,7 +143,7 @@ const AddQuesForm = (props: { quizId: string; question?: Question }) => {
             option3: "",
             option4: "",
             choose_option: "a",
-            time: 15,
+            time: DEFAULT_QUESTION_TIMEOUT,
           });
           deleteFile();
         }

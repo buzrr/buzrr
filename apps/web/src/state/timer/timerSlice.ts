@@ -1,10 +1,10 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
-interface CounterState {
+interface TimerState {
   value: number;
 }
 
-const initialState: CounterState = {
+const initialState: TimerState = {
   value: 3,
 };
 
@@ -13,10 +13,10 @@ const timerSlice = createSlice({
   initialState,
   reducers: {
     setTimer: (state) => {
-      state.value = state.value - 1;
+      state.value = Math.max(0, state.value - 1);
     },
-    resetTimer: (state, action) => {
-      state.value = action.payload;
+    resetTimer: (state, action: PayloadAction<number>) => {
+      state.value = Math.max(0, action.payload);
     },
   },
 });

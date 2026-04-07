@@ -1,14 +1,16 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useState } from "react";
 import { DEFAULT_AVATAR } from "@/constants";
 import { ScreenStatus, setScreenStatus } from "@/state/admin/screenSlice";
-import { useDispatch, useSelector } from "react-redux";
+import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import type { Option } from "@/types/db";
-import { RootState } from "@/state/store";
-import { setCurrIndex, setLeaderboard, type LeaderboardEntry } from "@/state/admin/playersSlice";
+import { setCurrIndex, setLeaderboard } from "@/state/admin/playersSlice";
+import type { LeaderboardEntry } from "@/types/socket-events";
 import Image from "next/image";
 import { resetTimer } from "@/state/timer/timerSlice";
+import { Button } from "@/components/ui/Button";
 
 // Lazy-load chart to keep @mui/x-charts out of main bundle until result screen is shown.
 const Barchart = dynamic(
@@ -20,44 +22,57 @@ interface QuesResultProps {
   quizQuestions?: { questions?: { title?: string; options?: Option[] }[] };
   gameCode: string;
   players?: unknown[];
-  socket: { emit: (e: string, ...args: unknown[]) => void; on: (e: string, cb: (data: unknown) => void) => void };
+  socket: {
+    emit: (e: string, ...args: unknown[]) => void;
+    on: (e: string, cb: (data: unknown) => void) => void;
+    once: (e: string, cb: (data: unknown) => void) => void;
+  };
 }
 
 export default function QuesResult(props: QuesResultProps) {
   const { quizQuestions, gameCode, players } = props;
-  const dispatch = useDispatch();
-  const currIndex = useSelector(
-    (state: RootState) => state.player.currentIndex,
-  );
-  const leaderboard = useSelector(
-    (state: RootState) => state.player.leaderboard,
-  );
+  const dispatch = useAppDispatch();
+  const currIndex = useAppSelector((state) => state.player.currentIndex);
+  const leaderboard = useAppSelector((state) => state.player.leaderboard);
   const allQuestions = quizQuestions?.questions ?? [];
   const question = allQuestions[currIndex];
-  const result = useSelector((state: RootState) => state.player.quesResult);
+  const result = useAppSelector((state) => state.player.quesResult);
   let response = 0;
 
   for (let i = 0; i < result.length; i++) response += result[i];
 
   const socket = props.socket;
+  const [isTransitionPending, setIsTransitionPending] = useState(false);
+
+  const clearTransitionPending = () => {
+    setIsTransitionPending(false);
+  };
 
   function handleNext() {
+    if (isTransitionPending) return;
+    setIsTransitionPending(true);
     dispatch(resetTimer(3));
+    const timeout = window.setTimeout(clearTransitionPending, 3000);
+
     if (currIndex == allQuestions.length - 1) {
-      socket.emit("final-leaderboard", gameCode);
-      socket.on("displaying-final-leaderboard", (data: unknown) => {
+      socket.once("displaying-final-leaderboard", (data: unknown) => {
+        window.clearTimeout(timeout);
+        clearTransitionPending();
         dispatch(setLeaderboard(data as LeaderboardEntry[]));
         dispatch(setScreenStatus(ScreenStatus.leaderboard));
       });
+      socket.emit("final-leaderboard", gameCode);
     } else {
-      socket.emit("change-question", gameCode, currIndex + 1);
-      socket.on("question-changed", (data: unknown) => {
+      socket.once("question-changed", (data: unknown) => {
+        window.clearTimeout(timeout);
+        clearTransitionPending();
         if(typeof data === "number") {
           dispatch(setCurrIndex(data));
           dispatch(setScreenStatus(ScreenStatus.wait));
           socket.emit("start-timer", gameCode);
         }
       });
+      socket.emit("change-question", gameCode, currIndex + 1);
     }
   }
   return (
@@ -116,14 +131,11 @@ export default function QuesResult(props: QuesResultProps) {
                   : null}
               </div>
             </div>
-            <button
-              className="rounded-xl text-white dark:text-dark w-full bg-lprimary dark:bg-dprimary px-5 py-3 hover:cursor-pointer transition-all duration-300 ease-in-out disabled:cursor-default font-bold disabled:bg-gray"
-              onClick={handleNext}
-            >
+            <Button fullWidth onClick={handleNext} disabled={isTransitionPending}>
               {currIndex == (allQuestions?.length ?? 0) - 1
                 ? "Final Leaderboard"
                 : "Next Question"}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

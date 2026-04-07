@@ -1,5 +1,5 @@
 "use client";
-import CheckLocalPlayer from "@/components/Player/checkLocalPlayer";
+import CheckLocalPlayer from "@/components/Player/CheckLocalPlayer";
 import CreatePlayerForm from "@/components/Player/Setup/CreatePlayerForm";
 import ClientImage from "@/components/ClientImage";
 import Image from "next/image";

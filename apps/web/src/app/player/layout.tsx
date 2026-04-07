@@ -1,6 +1,6 @@
 import "../globals.css";
 import "./styles.css";
-import { ToastContainer } from "react-toastify";
+import ToastViewport from "@/components/ToastViewport";
 
 export default function RootLayout({
   children,
@@ -10,7 +10,7 @@ export default function RootLayout({
   return (
     <div className="flex flex-col h-full">
       {children}
-      <ToastContainer />
+      <ToastViewport />
     </div>
   );
 }

@@ -1,9 +1,8 @@
 import clsx from "clsx";
 import { DEFAULT_AVATAR } from "@/constants";
-import { RootState } from "@/state/store";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useSelector } from "react-redux";
+import { useAppSelector } from "@/state/hooks";
 
 interface LeaderBoardProps {
   gameCode: string;
@@ -12,9 +11,7 @@ interface LeaderBoardProps {
 }
 
 export default function LeaderBoard(props: LeaderBoardProps) {
-  const leaderboard = useSelector(
-    (state: RootState) => state.player.leaderboard,
-  );
+  const leaderboard = useAppSelector((state) => state.player.leaderboard);
   const { gameCode, quizQuestions } = props;
   const socket = props.socket;
   const router = useRouter();
@@ -24,8 +21,8 @@ export default function LeaderBoard(props: LeaderBoardProps) {
     router.push(`/admin/quiz/${quizQuestions?.id}`);
   }
 
-  const firstThree = leaderboard?.slice(0, 3);
-  const leaderboardRest = leaderboard?.slice(3);
+  const firstThree = leaderboard.slice(0, 3);
+  const leaderboardRest = leaderboard.slice(3);
 
   return (
     <>
@@ -40,7 +37,7 @@ export default function LeaderBoard(props: LeaderBoardProps) {
           </button>
         </div>
         <div className="w-[95vw] my-3 flex flex-col md:flex-row md:justify-between items-center">
-          {firstThree?.length > 0
+          {firstThree.length > 0
             ? firstThree.map((lead, index) => {
                 return (
                   <div
@@ -100,7 +97,7 @@ export default function LeaderBoard(props: LeaderBoardProps) {
             : ""}
         </div>
         <div className="flex flex-col items-center gap-4 my-3 py-3 px-2 w-[95vw] max-h-[35vh] overflow-y-auto rounded-2xl">
-          {leaderboardRest?.length > 0
+          {leaderboardRest.length > 0
             ? leaderboardRest.map((lead, index) => {
                 return (
                   <div
