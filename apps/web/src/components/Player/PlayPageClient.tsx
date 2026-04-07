@@ -15,11 +15,19 @@ export default function PlayPageClient({ playerId }: { playerId: string }) {
     notFound();
   }
 
-  if (isPending || !data) {
+  if (isPending) {
     return (
       <div className="p-4 md:p-8">
         <Skeleton className="mb-6 h-20 w-20 rounded bg-white dark:bg-card-dark" />
         <Skeleton className="h-[75vh] w-full rounded-2xl bg-white dark:bg-card-dark" />
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="p-8 text-center text-dark dark:text-white">
+        Could not load game data. Please try again.
       </div>
     );
   }

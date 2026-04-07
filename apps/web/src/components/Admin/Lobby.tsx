@@ -64,8 +64,39 @@ const Lobby = (params: {
   }
 
   function handleGameStart() {
+    if (!socket) {
+      toast.error("Socket not connected. Please try again.");
+      return;
+    }
     setLoad(true);
-    socket?.emit("start-game", params.gameCode);
+    socket.emit("start-game", params.gameCode);
+  }
+
+  async function handleStopHosting() {
+    if (!socket) {
+      toast.error("Socket not connected. Please try again.");
+      setEndGame(false);
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      const timeout = window.setTimeout(() => {
+        socket.off("game-session-ended", onEnded);
+        toast.error("Could not end game session. Please try again.");
+        setEndGame(false);
+        resolve();
+      }, 5000);
+
+      function onEnded() {
+        window.clearTimeout(timeout);
+        setEndGame(false);
+        router.push(`/admin/quiz/${params.quizId}`);
+        resolve();
+      }
+
+      socket.once("game-session-ended", onEnded);
+      socket.emit("end-game-session", params.gameCode);
+    });
   }
 
   return (
@@ -164,7 +195,7 @@ const Lobby = (params: {
       <ConfirmationModal
         open={endGame}
         setOpen={setEndGame}
-        onClick={() => router.push(`/admin/quiz/${params.quizId}`)}
+        onClick={handleStopHosting}
         desc="Do you really want to stop this quiz session? This action cannot be undone."
       />
     </>

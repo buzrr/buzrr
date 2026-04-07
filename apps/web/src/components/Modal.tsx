@@ -39,10 +39,13 @@ export default function BasicModal(props: {
           sx={style}
           className="dark:bg-dark-bg bg-light-bg rounded-xl w-4/5 md:w-1/2 p-6 overflow-y-auto max-h-[90vh]"
         >
-          <Typography id={titleId} variant="h6" component="h2">
-            <div className="font-bold text-center w-full mb-4 dark:text-white">
-              {props.btnTitle}
-            </div>
+          <Typography
+            id={titleId}
+            variant="h6"
+            component="h2"
+            className="font-bold text-center w-full mb-4 dark:text-white"
+          >
+            {props.btnTitle}
           </Typography>
           <div id={descId}>{props.children}</div>
         </Box>

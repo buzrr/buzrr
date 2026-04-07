@@ -21,7 +21,7 @@ const ClientImage = ({
   return (
     <>
       <Image
-        src={`${theme === PageTheme.light ? props.src : props.darksrc || props.src}`}
+        src={theme === PageTheme.light ? props.src : props.darksrc || props.src}
         alt={props.alt}
         width={props.width}
         height={props.height}

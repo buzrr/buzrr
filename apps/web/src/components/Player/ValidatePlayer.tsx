@@ -14,7 +14,7 @@ const ValidatePlayer = (params: { playerId: string }) => {
         router.push("/player");
       }
     }
-  });
+  }, [params.playerId, router]);
   return <></>;
 };
 

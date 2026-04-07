@@ -3,10 +3,17 @@
 import clsx from "clsx";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
-export interface IconButtonProps
-  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
-  icon: ReactNode;
-}
+type IconLabelProps =
+  | { "aria-label": string; "aria-labelledby"?: string }
+  | { "aria-label"?: string; "aria-labelledby": string };
+
+export type IconButtonProps = Omit<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  "children"
+> &
+  IconLabelProps & {
+    icon: ReactNode;
+  };
 
 export function IconButton({ icon, className, type = "button", ...props }: IconButtonProps) {
   return (

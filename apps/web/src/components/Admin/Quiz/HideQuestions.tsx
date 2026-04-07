@@ -13,15 +13,12 @@ const HideQuestions = () => {
 
   useEffect(() => {
     dispatch(setHideQuestions(HideQuestionsEnum.hide));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [dispatch]);
 
-  const handle = () => {
+  const handle = (checked: boolean) => {
     dispatch(
       setHideQuestions(
-        visibility === HideQuestionsEnum.hide
-          ? HideQuestionsEnum.show
-          : HideQuestionsEnum.hide,
+        checked ? HideQuestionsEnum.hide : HideQuestionsEnum.show,
       ),
     );
   };
@@ -35,7 +32,7 @@ const HideQuestions = () => {
         checked={isHidden}
         aria-label="Hide questions"
         className="cursor-pointer"
-        onClick={handle}
+        onCheckedChange={handle}
       />
     </div>
   );

@@ -61,11 +61,7 @@ export default function Navbar() {
                     : "bg-lprimary text-white dark:bg-dprimary dark:text-dark dark:font-extrabold"
                 )}
                 onClick={() => {
-                  if (toggle === NavToggle.collapse) {
-                    dispatch(setNavToggle(NavToggle.expand));
-                  } else {
-                    dispatch(setNavToggle(NavToggle.collapse));
-                  }
+                  dispatch(setNavToggle(NavToggle.collapse));
                 }}
               >
                 {link.label}

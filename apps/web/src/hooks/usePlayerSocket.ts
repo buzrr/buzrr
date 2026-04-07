@@ -35,9 +35,14 @@ export function usePlayerSocket({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const token = window.localStorage.getItem("playerToken");
+    if (!token) return;
 
     const conn = io(
-      `${process.env.NEXT_PUBLIC_SOCKET_URL}/?userType=player&playerId=${playerId}&gameCode=${gameCode}`,
+      `${process.env.NEXT_PUBLIC_SOCKET_URL}/?userType=player&gameCode=${gameCode}`,
+      {
+        auth: { token },
+      },
     );
 
     conn.on("connect", () => {
@@ -60,6 +65,11 @@ export function usePlayerSocket({
     });
 
     conn.on("get-question-index", (index: number) => {
+      setQuestionIndex(index);
+      dispatch(setScreenStatus(ScreenStatus.question));
+    });
+
+    conn.on("question-changed", (index: number) => {
       setQuestionIndex(index);
       dispatch(setScreenStatus(ScreenStatus.question));
     });

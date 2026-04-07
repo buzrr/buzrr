@@ -14,7 +14,7 @@ export default function CheckLocalPlayer() {
       return;
     }
     if (playerId && playerToken) {
-      router.push(`player/joinRoom/${playerId}`);
+      router.push(`/player/joinRoom/${playerId}`);
     }
   }, [router]);
   return <></>;

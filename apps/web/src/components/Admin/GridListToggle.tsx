@@ -18,6 +18,7 @@ export default function GridListToggle() {
       className="grid grid-cols-2 bg-card-light dark:bg-[#332D40] rounded-lg shadow-[0px_4px_4px_-1px_rgba(36,104,147,0.04)] h-fit p-2 gap-x-2"
     >
       <IconButton
+        aria-label="Grid view"
         aria-pressed={view === "grid"}
         className={clsx(
           "cursor-pointer flex gap-x-1 items-center rounded-md p-2",
@@ -32,6 +33,7 @@ export default function GridListToggle() {
         }
       />
       <IconButton
+        aria-label="List view"
         aria-pressed={view === "list"}
         className={clsx(
           "cursor-pointer flex gap-x-1 items-center p-2 rounded-md",

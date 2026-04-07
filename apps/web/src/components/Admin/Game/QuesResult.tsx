@@ -21,7 +21,11 @@ interface QuesResultProps {
   quizQuestions?: { questions?: { title?: string; options?: Option[] }[] };
   gameCode: string;
   players?: unknown[];
-  socket: { emit: (e: string, ...args: unknown[]) => void; on: (e: string, cb: (data: unknown) => void) => void };
+  socket: {
+    emit: (e: string, ...args: unknown[]) => void;
+    on: (e: string, cb: (data: unknown) => void) => void;
+    once: (e: string, cb: (data: unknown) => void) => void;
+  };
 }
 
 export default function QuesResult(props: QuesResultProps) {
@@ -41,20 +45,20 @@ export default function QuesResult(props: QuesResultProps) {
   function handleNext() {
     dispatch(resetTimer(3));
     if (currIndex == allQuestions.length - 1) {
-      socket.emit("final-leaderboard", gameCode);
-      socket.on("displaying-final-leaderboard", (data: unknown) => {
+      socket.once("displaying-final-leaderboard", (data: unknown) => {
         dispatch(setLeaderboard(data as LeaderboardEntry[]));
         dispatch(setScreenStatus(ScreenStatus.leaderboard));
       });
+      socket.emit("final-leaderboard", gameCode);
     } else {
-      socket.emit("change-question", gameCode, currIndex + 1);
-      socket.on("question-changed", (data: unknown) => {
+      socket.once("question-changed", (data: unknown) => {
         if(typeof data === "number") {
           dispatch(setCurrIndex(data));
           dispatch(setScreenStatus(ScreenStatus.wait));
           socket.emit("start-timer", gameCode);
         }
       });
+      socket.emit("change-question", gameCode, currIndex + 1);
     }
   }
   return (

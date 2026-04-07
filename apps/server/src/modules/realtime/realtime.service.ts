@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
 import { GameStates } from "@buzrr/prisma";
 import { PrismaService } from "../../prisma/prisma.service";
 
@@ -6,7 +7,10 @@ import { PrismaService } from "../../prisma/prisma.service";
 export class RealtimeService {
   private readonly logger = new Logger(RealtimeService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
+  ) {}
 
   async removePlayer(playerId: string, gameSessionId: string) {
     const result = await this.prisma.db.player.updateMany({
@@ -33,15 +37,34 @@ export class RealtimeService {
   async getResultData(
     gameCode: string,
     quesId: string,
-    options: { id: string }[],
+    _options: { id: string }[],
   ) {
     const room = await this.prisma.db.gameSession.update({
       where: { gameCode },
       data: { gameState: GameStates.answer },
     });
 
+    const question = await this.prisma.db.question.findFirst({
+      where: {
+        id: quesId,
+        quiz: {
+          gameSessions: {
+            some: { id: room.id },
+          },
+        },
+      },
+      include: {
+        options: {
+          orderBy: { createdAt: "asc" },
+          select: { id: true },
+        },
+      },
+    });
+
+    const canonicalOptions = question?.options ?? [];
+
     const optionCounts = await Promise.all(
-      options.map((opt) =>
+      canonicalOptions.map((opt) =>
         this.prisma.db.playerAnswer.count({
           where: {
             questionId: quesId,
@@ -88,20 +111,52 @@ export class RealtimeService {
       return false;
     }
 
-    await this.prisma.db.playerAnswer.deleteMany({
-      where: { gameSessionId: gameSession.id },
-    });
+    await this.prisma.db.$transaction([
+      this.prisma.db.playerAnswer.deleteMany({
+        where: { gameSessionId: gameSession.id },
+      }),
+      this.prisma.db.player.updateMany({
+        where: { gameId: gameSession.id },
+        data: { gameId: null },
+      }),
+      this.prisma.db.gameSession.delete({
+        where: { id: gameSession.id },
+      }),
+    ]);
 
     return true;
   }
 
   async validateConnection(socket: {
-    handshake: { query: Record<string, string | string[] | undefined> };
+    handshake: {
+      query: Record<string, string | string[] | undefined>;
+      auth?: Record<string, unknown>;
+      headers?: Record<string, string | string[] | undefined>;
+    };
   }) {
     const userType = socket.handshake.query.userType as string;
-    const playerId = socket.handshake.query.playerId as string;
-    const adminId = socket.handshake.query.adminId as string;
     const gameCode = socket.handshake.query.gameCode as string;
+    const authHeader = socket.handshake.headers?.authorization;
+    const cookieHeader = socket.handshake.headers?.cookie;
+    const bearerToken =
+      typeof authHeader === "string" && authHeader.startsWith("Bearer ")
+        ? authHeader.slice(7)
+        : undefined;
+    const authToken =
+      (typeof socket.handshake.auth?.token === "string"
+        ? socket.handshake.auth.token
+        : undefined) ?? bearerToken;
+
+    let payload: { sub?: string; typ?: string } | null = null;
+    if (authToken) {
+      try {
+        payload = await this.jwt.verifyAsync<{ sub?: string; typ?: string }>(
+          authToken,
+        );
+      } catch {
+        return { valid: false as const, reason: "Invalid auth token" };
+      }
+    }
 
     const game = await this.prisma.db.gameSession.findUnique({
       where: { gameCode },
@@ -112,19 +167,26 @@ export class RealtimeService {
     }
 
     if (userType === "player") {
+      if (!payload?.sub || payload.typ !== "player") {
+        return {
+          valid: false as const,
+          reason: "Token role mismatch for player connection",
+        };
+      }
+
       const player = await this.prisma.db.player.findUnique({
-        where: { id: playerId },
+        where: { id: payload.sub },
       });
 
       if (!player) {
-        return { valid: false as const, reason: `Player ${playerId} not found` };
+        return { valid: false as const, reason: `Player ${payload.sub} not found` };
       }
 
       const inSession = player.gameId == null || player.gameId === game.id;
       if (!inSession) {
         return {
           valid: false as const,
-          reason: `Player ${playerId} is not in game ${gameCode}`,
+          reason: `Player ${payload.sub} is not in game ${gameCode}`,
         };
       }
 
@@ -139,6 +201,35 @@ export class RealtimeService {
     }
 
     if (userType === "admin") {
+      let adminId = payload?.sub;
+
+      if (!adminId && typeof cookieHeader === "string") {
+        const cookies = cookieHeader
+          .split(";")
+          .map((cookie) => cookie.trim().split("="))
+          .reduce<Record<string, string>>((acc, [key, value]) => {
+            if (key && value) acc[key] = decodeURIComponent(value);
+            return acc;
+          }, {});
+        const sessionToken =
+          cookies["authjs.session-token"] ??
+          cookies["__Secure-authjs.session-token"];
+        if (sessionToken) {
+          const session = await this.prisma.db.session.findUnique({
+            where: { sessionToken },
+            select: { userId: true },
+          });
+          adminId = session?.userId;
+        }
+      }
+
+      if (!adminId || payload?.typ === "player") {
+        return {
+          valid: false as const,
+          reason: "Token role mismatch for admin connection",
+        };
+      }
+
       const admin = await this.prisma.db.user.findUnique({
         where: { id: adminId },
       });

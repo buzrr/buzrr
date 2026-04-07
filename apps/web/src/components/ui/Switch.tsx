@@ -6,14 +6,25 @@ import type { ButtonHTMLAttributes } from "react";
 export interface SwitchProps
   extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onChange"> {
   checked: boolean;
+  onCheckedChange?: (checked: boolean) => void;
 }
 
-export function Switch({ checked, className, ...props }: SwitchProps) {
+export function Switch({
+  checked,
+  className,
+  onClick,
+  onCheckedChange,
+  ...props
+}: SwitchProps) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      onClick={(event) => {
+        onCheckedChange?.(!checked);
+        onClick?.(event);
+      }}
       className={clsx(
         "w-8 h-5 rounded-full flex items-center p-1 transition-colors",
         checked ? "bg-lprimary dark:bg-dprimary" : "bg-[#abacaf]",

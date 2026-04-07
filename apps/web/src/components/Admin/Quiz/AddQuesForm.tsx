@@ -121,7 +121,11 @@ const AddQuesForm = (props: { quizId: string; question?: Question }) => {
     fd.append("choose_option", data.choose_option);
     fd.append(
       "time",
-      String(data.time !== undefined && !Number.isNaN(data.time) ? data.time : 15),
+      String(
+        data.time !== undefined && !Number.isNaN(data.time)
+          ? data.time
+          : DEFAULT_QUESTION_TIMEOUT,
+      ),
     );
     fd.append("file_link", fileLink);
     fd.append("media_type", file ? "" : (question?.mediaType ?? ""));
@@ -139,7 +143,7 @@ const AddQuesForm = (props: { quizId: string; question?: Question }) => {
             option3: "",
             option4: "",
             choose_option: "a",
-            time: 15,
+            time: DEFAULT_QUESTION_TIMEOUT,
           });
           deleteFile();
         }

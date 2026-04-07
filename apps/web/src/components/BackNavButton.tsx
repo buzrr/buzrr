@@ -14,7 +14,7 @@ const BackNavButton = () => {
       onClick={() => window.history.back()}
       icon={
         <Image
-          src={theme === PageTheme.light ? "images/arrow-back.svg" : "images/arrow-back-light.svg"}
+          src={theme === PageTheme.light ? "/images/arrow-back.svg" : "/images/arrow-back-light.svg"}
           width={30}
           height={30}
           alt=""

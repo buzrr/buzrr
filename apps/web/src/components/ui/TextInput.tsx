@@ -1,7 +1,11 @@
 "use client";
 
 import clsx from "clsx";
-import type { InputHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type {
+  InputHTMLAttributes,
+  ReactNode,
+  TextareaHTMLAttributes,
+} from "react";
 
 type BaseProps = {
   label?: string;
@@ -21,6 +25,48 @@ type TextAreaProps = BaseProps &
   };
 
 export type TextInputProps = InputProps | TextAreaProps;
+
+type RenderFieldProps = {
+  label?: string;
+  labelClassName?: string;
+  error?: string;
+  containerClassName?: string;
+  className?: string;
+  fieldId?: string;
+  describedBy?: string;
+  renderControl: () => ReactNode;
+};
+
+function renderField({
+  label,
+  labelClassName,
+  error,
+  containerClassName,
+  fieldId,
+  renderControl,
+}: RenderFieldProps) {
+  return (
+    <div className={clsx("flex flex-col", containerClassName)}>
+      {label ? (
+        <label
+          htmlFor={fieldId}
+          className={clsx("text-sm text-dark dark:text-white mb-1", labelClassName)}
+        >
+          {label}
+        </label>
+      ) : null}
+      {renderControl()}
+      {error ? (
+        <p
+          {...(fieldId ? { id: `${fieldId}-error`, role: "alert" as const } : {})}
+          className="text-sm text-red-500 mt-1"
+        >
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 export function TextInput(props: TextInputProps) {
   const baseClassName =
@@ -42,16 +88,14 @@ export function TextInput(props: TextInputProps) {
     const fieldId = id ?? (typeof props.name === "string" ? props.name : undefined);
     const describedBy = error && fieldId ? `${fieldId}-error` : undefined;
 
-    return (
-      <div className={clsx("flex flex-col", containerClassName)}>
-        {label ? (
-          <label
-            htmlFor={fieldId}
-            className={clsx("text-sm text-dark dark:text-white mb-1", labelClassName)}
-          >
-            {label}
-          </label>
-        ) : null}
+    return renderField({
+      label,
+      labelClassName,
+      error,
+      containerClassName,
+      fieldId,
+      describedBy,
+      renderControl: () => (
         <textarea
           id={fieldId}
           className={clsx(baseClassName, "min-h-20 max-h-40", className)}
@@ -59,13 +103,8 @@ export function TextInput(props: TextInputProps) {
           aria-describedby={describedBy}
           {...textareaProps}
         />
-        {error && fieldId ? (
-          <p id={`${fieldId}-error`} className="text-sm text-red-500 mt-1" role="alert">
-            {error}
-          </p>
-        ) : null}
-      </div>
-    );
+      ),
+    });
   }
 
   const {
@@ -82,16 +121,14 @@ export function TextInput(props: TextInputProps) {
   const fieldId = id ?? (typeof props.name === "string" ? props.name : undefined);
   const describedBy = error && fieldId ? `${fieldId}-error` : undefined;
 
-  return (
-    <div className={clsx("flex flex-col", containerClassName)}>
-      {label ? (
-        <label
-          htmlFor={fieldId}
-          className={clsx("text-sm text-dark dark:text-white mb-1", labelClassName)}
-        >
-          {label}
-        </label>
-      ) : null}
+  return renderField({
+    label,
+    labelClassName,
+    error,
+    containerClassName,
+    fieldId,
+    describedBy,
+    renderControl: () => (
       <input
         id={fieldId}
         className={clsx(baseClassName, className)}
@@ -99,13 +136,8 @@ export function TextInput(props: TextInputProps) {
         aria-describedby={describedBy}
         {...inputProps}
       />
-      {error && fieldId ? (
-        <p id={`${fieldId}-error`} className="text-sm text-red-500 mt-1" role="alert">
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
+    ),
+  });
 }
 
 export default TextInput;

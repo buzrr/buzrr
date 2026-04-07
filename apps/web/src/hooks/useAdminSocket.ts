@@ -25,7 +25,10 @@ export function useAdminSocket({
     if (typeof window === "undefined") return;
 
     const socket = io(
-      `${process.env.NEXT_PUBLIC_SOCKET_URL}/?userType=admin&adminId=${userId}&gameCode=${gameCode}`,
+      `${process.env.NEXT_PUBLIC_SOCKET_URL}/?userType=admin&gameCode=${gameCode}`,
+      {
+        withCredentials: true,
+      },
     );
 
     socket.on("connect", () => {

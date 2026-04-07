@@ -10,7 +10,6 @@ import {
   useClearPlayerGameMutation,
   usePlayerQuery,
 } from "@/lib/modules/players/hooks";
-import { clearPlayerLocalSession } from "@/lib/player-session";
 import { isAxiosError } from "axios";
 import { notFound, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -26,9 +25,7 @@ export default function JoinRoomClient({ playerId }: { playerId: string }) {
     useClearPlayerGameMutation(playerId);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
     if (!window.localStorage.getItem("playerToken")) {
-      clearPlayerLocalSession();
       router.replace("/player");
       return;
     }
@@ -44,8 +41,12 @@ export default function JoinRoomClient({ playerId }: { playerId: string }) {
 
   if (!sessionAllowed) {
     return (
-      <div className="p-8 text-center text-dark dark:text-white">
-        Loading…
+      <div className="p-4 md:p-8">
+        <Skeleton className="mb-6 h-20 w-20 rounded bg-white dark:bg-card-dark" />
+        <div className="flex h-[81vh] w-full gap-4">
+          <Skeleton className="h-full w-full md:w-80 rounded-xl bg-white dark:bg-card-dark" />
+          <Skeleton className="hidden md:block h-full flex-1 rounded-xl bg-white dark:bg-card-dark" />
+        </div>
       </div>
     );
   }

@@ -16,6 +16,9 @@ import { TextInput } from "@/components/ui/TextInput";
 
 type FormValues = z.infer<typeof createPlayerSchema>;
 
+const sanitizeName = (value: string) =>
+  value.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 30);
+
 const CreatePlayerForm = (props: {
   data: {
     name: string;
@@ -41,8 +44,7 @@ const CreatePlayerForm = (props: {
   }, [props.data.name, props.data.image, reset]);
 
   const handleNameChange = (value: string) => {
-    const cleaned = value.replace(/[^a-zA-Z0-9_]/g, "");
-    const trimmed = cleaned.slice(0, 30);
+    const trimmed = sanitizeName(value);
     props.setData({
       ...props.data,
       name: trimmed,
@@ -84,6 +86,8 @@ const CreatePlayerForm = (props: {
         render={({ field, fieldState }) => (
           <TextInput
             type="text"
+            id="displayName"
+            name={field.name}
             placeholder="Enter Display Name"
             className="md:w-4/5 my-2"
             required
@@ -92,10 +96,7 @@ const CreatePlayerForm = (props: {
             value={field.value}
             onChange={(e) => {
               handleNameChange(e.target.value);
-              const cleaned = e.target.value
-                .replace(/[^a-zA-Z0-9_]/g, "")
-                .slice(0, 30);
-              field.onChange(cleaned);
+              field.onChange(sanitizeName(e.target.value));
             }}
             error={fieldState.error?.message}
           />

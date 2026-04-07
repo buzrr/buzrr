@@ -32,6 +32,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 export function Button({
   children,
   className,
+  type = "button",
   variant = "primary",
   size = "md",
   fullWidth = false,
@@ -45,6 +46,7 @@ export function Button({
 
   return (
     <button
+      type={type}
       className={clsx(
         "rounded-xl font-bold transition-all duration-300 ease-in-out disabled:cursor-default",
         "inline-flex items-center justify-center gap-2",

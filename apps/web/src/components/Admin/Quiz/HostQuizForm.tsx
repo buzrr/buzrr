@@ -49,6 +49,7 @@ export default function HostQuizForm(props: {
       { quizId: data.quizId },
       {
         onSuccess: (res) => {
+          resetGameState();
           router.push(`/admin/play/${res.id}`);
         },
         onError: (err) => {
@@ -65,7 +66,6 @@ export default function HostQuizForm(props: {
         text="Host quiz"
         error={props.disabled}
         isPending={mutation.isPending}
-        onClick={resetGameState}
       />
     </form>
   );
