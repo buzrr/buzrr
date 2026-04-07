@@ -16,7 +16,7 @@ import { TextInput } from "@/components/ui/TextInput";
 
 type FormValues = z.infer<typeof joinRoomSchema>;
 
-const JoinRoomForm = (params: { playerId: string }) => {
+const JoinRoomForm = () => {
   const router = useRouter();
   const mutation = useJoinRoomMutation();
   const { register, handleSubmit } = useForm<FormValues>({

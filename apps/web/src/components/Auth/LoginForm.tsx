@@ -23,6 +23,7 @@ const LoginForm = () => {
 
   const onSubmit = (_values: z.infer<typeof LoginSchema>) => {
     // TODO: implement credential-based login
+    console.log(_values);
   };
 
   return (

@@ -61,7 +61,6 @@ export default function AdminPlayClient({
       userId={userId}
       gameCode={room.gameCode}
       players={playersForLobby}
-      quizQuestions={quiz}
       gameStarted={room.isPlaying}
       currentQues={room.currentQuestion}
     />

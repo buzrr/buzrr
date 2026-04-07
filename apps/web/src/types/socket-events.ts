@@ -18,7 +18,7 @@ export interface PlayerAnswerResult {
 
 export interface LeaderboardEntry {
   playerId: string;
-  position: number;
+  position?: number;
   score: number;
   Player?: Pick<Player, "name" | "profilePic">;
 }

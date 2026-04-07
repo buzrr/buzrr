@@ -46,6 +46,10 @@ const GameLobby = (params: {
     gameCode: params.gameCode,
   });
 
+  if (!socket) {
+    return null;
+  }
+
   return (
     <>
       {screen === ScreenStatus.wait ? (
