@@ -60,11 +60,15 @@ const Lobby = (params: {
   });
 
   function handlePlayerRemove(player: PlayerPayload) {
-    socket?.emit("remove-player", player, params.gameCode);
+    if (!socket?.connected) {
+      toast.error("Socket not connected. Please try again.");
+      return;
+    }
+    socket.emit("remove-player", player, params.gameCode);
   }
 
   function handleGameStart() {
-    if (!socket) {
+    if (!socket?.connected) {
       toast.error("Socket not connected. Please try again.");
       return;
     }
@@ -73,7 +77,7 @@ const Lobby = (params: {
   }
 
   async function handleStopHosting() {
-    if (!socket) {
+    if (!socket?.connected) {
       toast.error("Socket not connected. Please try again.");
       setEndGame(false);
       return;
@@ -183,7 +187,7 @@ const Lobby = (params: {
 
         <Button
           className="mt-10 w-64 sm:w-96 absolute bottom-10"
-          disabled={players.length === 0 || load}
+          disabled={players.length === 0 || load || !socket?.connected}
           isLoading={load}
           loadingText="Loading..."
           onClick={handleGameStart}

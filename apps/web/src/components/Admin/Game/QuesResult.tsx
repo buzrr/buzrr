@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useState } from "react";
 import { DEFAULT_AVATAR } from "@/constants";
 import { ScreenStatus, setScreenStatus } from "@/state/admin/screenSlice";
 import { useAppDispatch, useAppSelector } from "@/state/hooks";
@@ -41,17 +42,30 @@ export default function QuesResult(props: QuesResultProps) {
   for (let i = 0; i < result.length; i++) response += result[i];
 
   const socket = props.socket;
+  const [isTransitionPending, setIsTransitionPending] = useState(false);
+
+  const clearTransitionPending = () => {
+    setIsTransitionPending(false);
+  };
 
   function handleNext() {
+    if (isTransitionPending) return;
+    setIsTransitionPending(true);
     dispatch(resetTimer(3));
+    const timeout = window.setTimeout(clearTransitionPending, 3000);
+
     if (currIndex == allQuestions.length - 1) {
       socket.once("displaying-final-leaderboard", (data: unknown) => {
+        window.clearTimeout(timeout);
+        clearTransitionPending();
         dispatch(setLeaderboard(data as LeaderboardEntry[]));
         dispatch(setScreenStatus(ScreenStatus.leaderboard));
       });
       socket.emit("final-leaderboard", gameCode);
     } else {
       socket.once("question-changed", (data: unknown) => {
+        window.clearTimeout(timeout);
+        clearTransitionPending();
         if(typeof data === "number") {
           dispatch(setCurrIndex(data));
           dispatch(setScreenStatus(ScreenStatus.wait));
@@ -117,7 +131,7 @@ export default function QuesResult(props: QuesResultProps) {
                   : null}
               </div>
             </div>
-            <Button fullWidth onClick={handleNext}>
+            <Button fullWidth onClick={handleNext} disabled={isTransitionPending}>
               {currIndex == (allQuestions?.length ?? 0) - 1
                 ? "Final Leaderboard"
                 : "Next Question"}

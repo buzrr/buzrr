@@ -3,11 +3,17 @@
 import clsx from "clsx";
 import type { ButtonHTMLAttributes } from "react";
 
-export interface SwitchProps
-  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onChange"> {
+type AccessibleSwitchName =
+  | { "aria-label": string; "aria-labelledby"?: never }
+  | { "aria-labelledby": string; "aria-label"?: never };
+
+export type SwitchProps = Omit<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  "onChange"
+> & {
   checked: boolean;
   onCheckedChange?: (checked: boolean) => void;
-}
+} & AccessibleSwitchName;
 
 export function Switch({
   checked,

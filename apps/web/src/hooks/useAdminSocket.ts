@@ -1,8 +1,8 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 import { useAppDispatch } from "@/state/hooks";
-import { createConnection } from "@/state/socket/socketSlice";
+import { clearConnection, createConnection } from "@/state/socket/socketSlice";
 import { addPlayer, removePlayer } from "@/state/admin/playersSlice";
 import type { PlayerPayload } from "@/types/socket-events";
 
@@ -20,6 +20,13 @@ export function useAdminSocket({
   onGameStarted,
 }: UseAdminSocketOptions) {
   const dispatch = useAppDispatch();
+  const onPlayerRemovedRef = useRef(onPlayerRemoved);
+  const onGameStartedRef = useRef(onGameStarted);
+
+  useEffect(() => {
+    onPlayerRemovedRef.current = onPlayerRemoved;
+    onGameStartedRef.current = onGameStarted;
+  }, [onPlayerRemoved, onGameStarted]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -41,15 +48,20 @@ export function useAdminSocket({
 
     socket.on("player-removed", (player: PlayerPayload) => {
       dispatch(removePlayer(player));
-      onPlayerRemoved?.(player);
+      onPlayerRemovedRef.current?.(player);
     });
 
-    if (onGameStarted) {
-      socket.on("game-started", onGameStarted);
-    }
+    socket.on("game-started", () => {
+      onGameStartedRef.current?.();
+    });
+
+    socket.on("disconnect", () => {
+      dispatch(clearConnection());
+    });
 
     return () => {
       socket.disconnect();
+      dispatch(clearConnection());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch, gameCode, userId]);

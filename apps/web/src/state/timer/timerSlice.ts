@@ -16,7 +16,7 @@ const timerSlice = createSlice({
       state.value = Math.max(0, state.value - 1);
     },
     resetTimer: (state, action: PayloadAction<number>) => {
-      state.value = action.payload;
+      state.value = Math.max(0, action.payload);
     },
   },
 });

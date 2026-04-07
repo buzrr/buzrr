@@ -45,13 +45,18 @@ export function usePlayerSocket({
       },
     );
 
+    const clearLocalPlayerSession = () => {
+      window.localStorage.removeItem("playerToken");
+      window.localStorage.removeItem("playerId");
+    };
+
     conn.on("connect", () => {
       setSocket(conn);
     });
 
     conn.on("player-removed", (player: { id: string }) => {
       if (player.id === playerId) {
-        window.localStorage.removeItem("playerId");
+        clearLocalPlayerSession();
         onRemoved?.();
       }
     });
@@ -92,6 +97,7 @@ export function usePlayerSocket({
     });
 
     conn.on("game-session-ended", () => {
+      clearLocalPlayerSession();
       dispatch(setScreenStatus(ScreenStatus.lobby));
       onRemoved?.();
     });

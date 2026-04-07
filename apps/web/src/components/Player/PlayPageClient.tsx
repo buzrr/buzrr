@@ -26,7 +26,11 @@ export default function PlayPageClient({ playerId }: { playerId: string }) {
 
   if (!data) {
     return (
-      <div className="p-8 text-center text-dark dark:text-white">
+      <div
+        className="p-8 text-center text-dark dark:text-white"
+        role="alert"
+        aria-atomic="true"
+      >
         Could not load game data. Please try again.
       </div>
     );

@@ -94,6 +94,8 @@ const CreatePlayerForm = (props: {
             autoComplete="off"
             maxLength={30}
             value={field.value}
+            onBlur={field.onBlur}
+            ref={field.ref}
             onChange={(e) => {
               handleNameChange(e.target.value);
               field.onChange(sanitizeName(e.target.value));

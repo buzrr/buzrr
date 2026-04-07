@@ -1,6 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { clearPlayerLocalSession } from "@/lib/player-session";
 
 const ValidatePlayer = (params: { playerId: string }) => {
   const router = useRouter();
@@ -8,9 +9,7 @@ const ValidatePlayer = (params: { playerId: string }) => {
     if (typeof window !== "undefined") {
       const playerId = window.localStorage.getItem("playerId");
       if (!playerId || playerId !== params.playerId) {
-        if (playerId) {
-          window.localStorage.removeItem("playerId");
-        }
+        clearPlayerLocalSession();
         router.push("/player");
       }
     }

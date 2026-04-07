@@ -2,10 +2,11 @@
 
 import clsx from "clsx";
 import type {
-  InputHTMLAttributes,
+  ComponentPropsWithRef,
+  ForwardedRef,
   ReactNode,
-  TextareaHTMLAttributes,
 } from "react";
+import { forwardRef } from "react";
 
 type BaseProps = {
   label?: string;
@@ -15,12 +16,12 @@ type BaseProps = {
 };
 
 type InputProps = BaseProps &
-  InputHTMLAttributes<HTMLInputElement> & {
+  ComponentPropsWithRef<"input"> & {
     textarea?: false;
   };
 
 type TextAreaProps = BaseProps &
-  TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  ComponentPropsWithRef<"textarea"> & {
     textarea: true;
   };
 
@@ -68,7 +69,10 @@ function renderField({
   );
 }
 
-export function TextInput(props: TextInputProps) {
+const TextInputInner = (
+  props: TextInputProps,
+  ref: ForwardedRef<HTMLInputElement | HTMLTextAreaElement>,
+) => {
   const baseClassName =
     "w-full border border-gray rounded-lg outline-none text-dark dark:text-white dark:bg-dark-bg focus:border-blue-600 px-4 py-3";
 
@@ -97,6 +101,7 @@ export function TextInput(props: TextInputProps) {
       describedBy,
       renderControl: () => (
         <textarea
+          ref={ref as ForwardedRef<HTMLTextAreaElement>}
           id={fieldId}
           className={clsx(baseClassName, "min-h-20 max-h-40", className)}
           aria-invalid={!!error}
@@ -130,6 +135,7 @@ export function TextInput(props: TextInputProps) {
     describedBy,
     renderControl: () => (
       <input
+        ref={ref as ForwardedRef<HTMLInputElement>}
         id={fieldId}
         className={clsx(baseClassName, className)}
         aria-invalid={!!error}
@@ -138,6 +144,9 @@ export function TextInput(props: TextInputProps) {
       />
     ),
   });
-}
+};
+
+export const TextInput = forwardRef(TextInputInner);
+TextInput.displayName = "TextInput";
 
 export default TextInput;

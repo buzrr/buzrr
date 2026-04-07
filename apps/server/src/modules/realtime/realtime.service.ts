@@ -134,8 +134,22 @@ export class RealtimeService {
       headers?: Record<string, string | string[] | undefined>;
     };
   }) {
-    const userType = socket.handshake.query.userType as string;
-    const gameCode = socket.handshake.query.gameCode as string;
+    const normalizeQueryValue = (
+      value: string | string[] | undefined,
+    ): string => {
+      if (Array.isArray(value)) {
+        return (value[0] ?? "").trim();
+      }
+      return (value ?? "").trim();
+    };
+
+    const userType = normalizeQueryValue(socket.handshake.query.userType);
+    const gameCode = normalizeQueryValue(socket.handshake.query.gameCode);
+    const validUserType = userType === "player" || userType === "admin";
+    const validGameCode = /^[a-zA-Z0-9_-]{4,20}$/.test(gameCode);
+    if (!validUserType || !validGameCode) {
+      return { valid: false as const };
+    }
     const authHeader = socket.handshake.headers?.authorization;
     const cookieHeader = socket.handshake.headers?.cookie;
     const bearerToken =
@@ -182,7 +196,7 @@ export class RealtimeService {
         return { valid: false as const, reason: `Player ${payload.sub} not found` };
       }
 
-      const inSession = player.gameId == null || player.gameId === game.id;
+      const inSession = player.gameId !== null && player.gameId === game.id;
       if (!inSession) {
         return {
           valid: false as const,

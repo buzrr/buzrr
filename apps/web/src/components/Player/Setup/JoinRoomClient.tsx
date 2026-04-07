@@ -14,6 +14,18 @@ import { isAxiosError } from "axios";
 import { notFound, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+function JoinRoomSkeleton() {
+  return (
+    <div className="p-4 md:p-8">
+      <Skeleton className="mb-6 h-20 w-20 rounded bg-white dark:bg-card-dark" />
+      <div className="flex h-[81vh] w-full gap-4">
+        <Skeleton className="h-full w-full md:w-80 rounded-xl bg-white dark:bg-card-dark" />
+        <Skeleton className="hidden md:block h-full flex-1 rounded-xl bg-white dark:bg-card-dark" />
+      </div>
+    </div>
+  );
+}
+
 export default function JoinRoomClient({ playerId }: { playerId: string }) {
   const router = useRouter();
   const [sessionAllowed, setSessionAllowed] = useState(false);
@@ -35,20 +47,12 @@ export default function JoinRoomClient({ playerId }: { playerId: string }) {
   useEffect(() => {
     if (!player?.gameId) return;
     clearGame();
-  }, [player?.gameId, player?.id, clearGame]);
+  }, [player?.gameId, clearGame]);
 
   const blockJoin = Boolean(player?.gameId) || clearingGame;
 
   if (!sessionAllowed) {
-    return (
-      <div className="p-4 md:p-8">
-        <Skeleton className="mb-6 h-20 w-20 rounded bg-white dark:bg-card-dark" />
-        <div className="flex h-[81vh] w-full gap-4">
-          <Skeleton className="h-full w-full md:w-80 rounded-xl bg-white dark:bg-card-dark" />
-          <Skeleton className="hidden md:block h-full flex-1 rounded-xl bg-white dark:bg-card-dark" />
-        </div>
-      </div>
-    );
+    return <JoinRoomSkeleton />;
   }
 
   if (isError) {
@@ -63,15 +67,7 @@ export default function JoinRoomClient({ playerId }: { playerId: string }) {
   }
 
   if (isPending || !player || blockJoin) {
-    return (
-      <div className="p-4 md:p-8">
-        <Skeleton className="mb-6 h-20 w-20 rounded bg-white dark:bg-card-dark" />
-        <div className="flex h-[81vh] w-full gap-4">
-          <Skeleton className="h-full w-full md:w-80 rounded-xl bg-white dark:bg-card-dark" />
-          <Skeleton className="hidden md:block h-full flex-1 rounded-xl bg-white dark:bg-card-dark" />
-        </div>
-      </div>
-    );
+    return <JoinRoomSkeleton />;
   }
 
   return (
