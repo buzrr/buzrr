@@ -1,32 +1,53 @@
 import "server-only";
-import GoogleProvider from "next-auth/providers/google";
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import type { Adapter } from "next-auth/adapters";
-import { prisma } from "@buzrr/prisma";
-import NextAuth from "next-auth";
+import { authConfig } from "@/auth/config";
+import type { Session } from "next-auth";
 
-export const { auth, handlers, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma) as Adapter,
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID ?? "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-      profile(profile) {
-        return {
-          id: profile.sub,
-          name: profile.name,
-          email: profile.email,
-          image: profile.picture,
-        };
-      },
-    }),
-  ],
-  callbacks: {
-    session({ session, user }) {
-      if (session.user && user) {
-        session.user.id = user.id;
-      }
-      return session;
-    },
-  },
-});
+type AuthInstance = {
+  auth: (...args: unknown[]) => Promise<unknown>;
+  signIn: (...args: unknown[]) => Promise<unknown>;
+  signOut: (...args: unknown[]) => Promise<unknown>;
+  handlers: {
+    GET: (...args: unknown[]) => Promise<Response>;
+    POST: (...args: unknown[]) => Promise<Response>;
+  };
+};
+
+let authInstancePromise: Promise<AuthInstance> | null = null;
+
+async function getAuthInstance(): Promise<AuthInstance> {
+  if (!authInstancePromise) {
+    authInstancePromise = (async () => {
+      const [{ default: NextAuth }, { PrismaAdapter }, { prisma }] =
+        await Promise.all([
+          import("next-auth"),
+          import("@auth/prisma-adapter"),
+          import("@buzrr/prisma"),
+        ]);
+
+      return NextAuth({
+        ...authConfig,
+        adapter: PrismaAdapter(prisma),
+      }) as AuthInstance;
+    })();
+  }
+  return authInstancePromise;
+}
+
+export const handlers = {
+  GET: async (...args: unknown[]) =>
+    (await getAuthInstance()).handlers.GET(...args),
+  POST: async (...args: unknown[]) =>
+    (await getAuthInstance()).handlers.POST(...args),
+};
+
+export async function auth(): Promise<Session | null> {
+  return (await getAuthInstance()).auth() as Promise<Session | null>;
+}
+
+export async function signIn(...args: unknown[]) {
+  return (await getAuthInstance()).signIn(...args);
+}
+
+export async function signOut(...args: unknown[]) {
+  return (await getAuthInstance()).signOut(...args);
+}

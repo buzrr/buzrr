@@ -1,7 +1,7 @@
 import SessionProvider from "@/components/SessionProvider";
 import { redirect } from "next/navigation";
 import ClientImage from "@/components/ClientImage";
-import { ToastContainer } from "react-toastify";
+import ToastViewport from "@/components/ToastViewport";
 import type { Metadata } from "next";
 
 import { auth } from "@/utils/auth";
@@ -37,7 +37,7 @@ export default async function RootLayout({
           </Link>
         </div>
         {children}
-        <ToastContainer />
+        <ToastViewport />
       </div>
     </SessionProvider>
   );

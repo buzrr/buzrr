@@ -1,6 +1,6 @@
 import type { AxiosInstance } from "axios";
 import type { Player } from "@/types/db";
-import { publicApi } from "@/lib/api/client";
+import { getPublicApiClient } from "@/lib/api/client";
 
 export async function getPlayer(client: AxiosInstance, playerId: string) {
   const { data } = await client.get<Player>(`/players/${playerId}`);
@@ -37,10 +37,11 @@ export async function updatePlayerName(
 }
 
 export const playersApi = {
-  getById: (playerId: string) => getPlayer(publicApi, playerId),
-  clearGame: (playerId: string) => clearPlayerGame(publicApi, playerId),
+  getById: (playerId: string) => getPlayer(getPublicApiClient(), playerId),
+  clearGame: (playerId: string) =>
+    clearPlayerGame(getPublicApiClient(), playerId),
   create: (body: Parameters<typeof createPlayer>[1]) =>
-    createPlayer(publicApi, body),
+    createPlayer(getPublicApiClient(), body),
   updateName: (body: Parameters<typeof updatePlayerName>[1]) =>
-    updatePlayerName(publicApi, body),
+    updatePlayerName(getPublicApiClient(), body),
 };
