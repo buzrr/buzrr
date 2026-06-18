@@ -8,6 +8,7 @@ import Image from "next/image";
 import * as z from "zod";
 import { TextInput } from "@/components/ui/TextInput";
 import { Button } from "@/components/ui/Button";
+import { authClient } from "@/lib/auth-client";
 
 const LoginForm = () => {
   const {
@@ -61,8 +62,9 @@ const LoginForm = () => {
       <Button
         variant="outline"
         fullWidth
-        onClick={(e) => {
+        onClick={async (e) => {
           e.preventDefault();
+          await authClient.signIn.social({ provider: "google", callbackURL: "/admin" });
         }}
       >
         <Image

@@ -7,10 +7,12 @@
     "build": "next build",
     "analyze": "ANALYZE=true next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "dev:vinext": "vinext dev --port 3001",
+    "build:vinext": "vinext build",
+    "start:vinext": "vinext start"
   },
   "dependencies": {
-    "@auth/prisma-adapter": "^2.11.1",
     "@buzrr/prisma": "workspace:*",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
@@ -26,14 +28,14 @@
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.36.2",
     "axios": "^1.14.0",
+    "better-auth": "^1.6.14",
     "cloudinary": "^2.9.0",
     "clsx": "^2.1.1",
     "jose": "^6.2.2",
     "next": "15.2.8",
-    "next-auth": "^5.0.0-beta.30",
-    "react": "^19.0.0",
+    "react": "^19.2.7",
     "react-countdown-circle-timer": "^3.2.1",
-    "react-dom": "^19.0.0",
+    "react-dom": "^19.2.7",
     "react-hook-form": "^7.71.1",
     "react-icons": "^5.5.0",
     "react-redux": "^9.2.0",
@@ -52,9 +54,15 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.2",
+    "@vitejs/plugin-rsc": "^0.5.27",
     "eslint": "^9",
     "eslint-config-next": "15.2.2",
+    "react-server-dom-webpack": "^19.2.7",
     "tailwindcss": "^4.2.0",
-    "typescript": "^5"
-  }
+    "typescript": "^5",
+    "vinext": "^0.0.55",
+    "vite": "^8.0.16"
+  },
+  "type": "module"
 }

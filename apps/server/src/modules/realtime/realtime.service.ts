@@ -226,11 +226,11 @@ export class RealtimeService {
             return acc;
           }, {});
         const sessionToken =
-          cookies["authjs.session-token"] ??
-          cookies["__Secure-authjs.session-token"];
+          cookies["better-auth.session_token"] ??
+          cookies["__Secure-better-auth.session_token"];
         if (sessionToken) {
           const session = await this.prisma.db.session.findUnique({
-            where: { sessionToken },
+            where: { token: sessionToken },
             select: { userId: true },
           });
           adminId = session?.userId;

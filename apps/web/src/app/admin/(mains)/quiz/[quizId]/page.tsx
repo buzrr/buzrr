@@ -1,5 +1,6 @@
 import QuizDetailClient from "@/components/Admin/Quiz/QuizDetailClient";
-import { auth } from "@/utils/auth";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 export default async function Quiz({
@@ -8,9 +9,9 @@ export default async function Quiz({
   params: Promise<{ quizId: string }>;
 }) {
   const { quizId } = await params;
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
 
-  if (!session?.user?.id) redirect("/api/auth/signin");
+  if (!session?.user?.id) redirect("/auth/login");
 
   return <QuizDetailClient quizId={quizId} />;
 }

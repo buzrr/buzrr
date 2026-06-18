@@ -1,7 +1,7 @@
 "use client";
 import clsx from "clsx";
 import { DEFAULT_AVATAR } from "@/constants";
-import { useSession, signOut } from "next-auth/react";
+import { authClient } from "@/lib/auth-client";
 import Image from "next/image";
 import ClientImage from "../ClientImage";
 import Link from "next/link";
@@ -16,7 +16,7 @@ const NavLinks = [
 ];
 
 export default function Navbar() {
-  const { data: session } = useSession();
+  const { data: session } = authClient.useSession();
   const pathname = usePathname();
 
   const toggle = useAppSelector((state) => state.navToggle.toggle);
@@ -93,7 +93,7 @@ export default function Navbar() {
                 </p>
                 <button
                   className="text-sm text-white dark:text-dark dark:font-bold rounded-lg py-2 px-4 my-2 bg-red-light dark:bg-red-dark w-full"
-                  onClick={() => signOut()}
+                  onClick={() => authClient.signOut()}
                 >
                   Sign out
                 </button>

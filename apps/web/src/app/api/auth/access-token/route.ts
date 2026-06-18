@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { SignJWT } from "jose";
-import { getToken } from "next-auth/jwt";
-import { auth } from "@/utils/auth";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 
-export async function GET(req: NextRequest) {
-  const secret = process.env.NEXTAUTH_SECRET;
+export async function GET(_req: NextRequest) {
+  const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
   if (!secret) {
     return NextResponse.json(
       { error: "Server misconfiguration" },
@@ -12,18 +12,8 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const session = await auth();
-  const sessionUserId = session?.user?.id;
-
-  // With Prisma adapter, NextAuth defaults to DB sessions, so `getToken` may be
-  // empty. Keep `getToken` as a fallback for JWT-session setups.
-  const tokenData = sessionUserId
-    ? null
-    : await getToken({
-        req,
-        secret,
-      });
-  const subject = sessionUserId ?? tokenData?.sub;
+  const session = await auth.api.getSession({ headers: await headers() });
+  const subject = session?.user?.id;
 
   if (!subject) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -31,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   const token = await new SignJWT({
     sub: subject,
-    email: typeof tokenData?.email === "string" ? tokenData.email : undefined,
+    email: session.user.email,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
