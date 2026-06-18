@@ -63,6 +63,5 @@ export function useAdminSocket({
       socket.disconnect();
       dispatch(clearConnection());
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch, gameCode, userId]);
 }

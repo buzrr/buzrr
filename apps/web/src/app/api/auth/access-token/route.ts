@@ -1,9 +1,9 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { SignJWT } from "jose";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
   if (!secret) {
     return NextResponse.json(
