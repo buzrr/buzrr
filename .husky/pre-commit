@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 #!/usr/bin/env sh
 
 yarn lint
 yarn check-types
+=======
+yarn turbo run lint
+>>>>>>> 8bf3c96 (feat: add pre commit hook)

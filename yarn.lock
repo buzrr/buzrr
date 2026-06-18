@@ -6943,6 +6943,7 @@ __metadata:
   languageName: node
   linkType: hard
 
+<<<<<<< HEAD
 "httpxy@npm:^0.5.3":
   version: 0.5.3
   resolution: "httpxy@npm:0.5.3"
@@ -6950,6 +6951,8 @@ __metadata:
   languageName: node
   linkType: hard
 
+=======
+>>>>>>> 8bf3c96 (feat: add pre commit hook)
 "husky@npm:^9.1.7":
   version: 9.1.7
   resolution: "husky@npm:9.1.7"

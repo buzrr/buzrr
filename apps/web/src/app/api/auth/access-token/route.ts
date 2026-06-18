@@ -3,11 +3,7 @@ import { SignJWT } from "jose";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 
-<<<<<<< HEAD
 export async function GET() {
-=======
-export async function GET(_req: NextRequest) {
->>>>>>> 25354cd (feat: vinext migration)
   const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
   if (!secret) {
     return NextResponse.json(
