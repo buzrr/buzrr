@@ -1,4 +1,9 @@
+<<<<<<< HEAD
 #!/usr/bin/env sh
 
 yarn lint
 yarn check-types
+=======
+yarn lint
+yarn check-types
+>>>>>>> ff1ecd1 (fix: build error)
