@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import SessionProvider from "@/components/SessionProvider";
 import { redirect } from "next/navigation";
 import ClientImage from "@/components/ClientImage";
