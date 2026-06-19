@@ -427,10 +427,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@emnapi/core@npm:1.11.1, @emnapi/core@npm:^1.10.0":
   version: 1.11.1
   resolution: "@emnapi/core@npm:1.11.1"
@@ -441,11 +437,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@emnapi/core@npm:^1.3.1, @emnapi/core@npm:^1.7.1, @emnapi/core@npm:^1.8.1":
   version: 1.8.1
   resolution: "@emnapi/core@npm:1.8.1"
@@ -465,10 +456,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@emnapi/runtime@npm:1.11.1, @emnapi/runtime@npm:^1.10.0":
   version: 1.11.1
   resolution: "@emnapi/runtime@npm:1.11.1"
@@ -478,11 +465,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@emnapi/runtime@npm:^1.2.0, @emnapi/runtime@npm:^1.3.1, @emnapi/runtime@npm:^1.7.1, @emnapi/runtime@npm:^1.8.1":
   version: 1.8.1
   resolution: "@emnapi/runtime@npm:1.8.1"
@@ -510,10 +492,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@emnapi/wasi-threads@npm:1.2.2, @emnapi/wasi-threads@npm:^1.2.1":
   version: 1.2.2
   resolution: "@emnapi/wasi-threads@npm:1.2.2"
@@ -523,11 +501,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@emotion/babel-plugin@npm:^11.13.5":
   version: 11.13.5
   resolution: "@emotion/babel-plugin@npm:11.13.5"
@@ -1731,10 +1704,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@napi-rs/wasm-runtime@npm:^1.1.5":
   version: 1.1.5
   resolution: "@napi-rs/wasm-runtime@npm:1.1.5"
@@ -1747,11 +1716,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@nestjs/cli@npm:^11.0.5":
   version: 11.0.16
   resolution: "@nestjs/cli@npm:11.0.16"
@@ -2094,10 +2058,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@oxc-project/types@npm:=0.137.0":
   version: 0.137.0
   resolution: "@oxc-project/types@npm:0.137.0"
@@ -2105,11 +2065,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@oxc-resolver/binding-darwin-arm64@npm:5.0.0":
   version: 5.0.0
   resolution: "@oxc-resolver/binding-darwin-arm64@npm:5.0.0"
@@ -2448,10 +2403,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-android-arm64@npm:1.1.2":
   version: 1.1.2
   resolution: "@rolldown/binding-android-arm64@npm:1.1.2"
@@ -2459,11 +2410,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-darwin-arm64@npm:1.0.3":
   version: 1.0.3
   resolution: "@rolldown/binding-darwin-arm64@npm:1.0.3"
@@ -2471,10 +2417,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-darwin-arm64@npm:1.1.2":
   version: 1.1.2
   resolution: "@rolldown/binding-darwin-arm64@npm:1.1.2"
@@ -2482,11 +2424,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-darwin-x64@npm:1.0.3":
   version: 1.0.3
   resolution: "@rolldown/binding-darwin-x64@npm:1.0.3"
@@ -2494,10 +2431,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-darwin-x64@npm:1.1.2":
   version: 1.1.2
   resolution: "@rolldown/binding-darwin-x64@npm:1.1.2"
@@ -2505,11 +2438,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-freebsd-x64@npm:1.0.3":
   version: 1.0.3
   resolution: "@rolldown/binding-freebsd-x64@npm:1.0.3"
@@ -2517,10 +2445,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-freebsd-x64@npm:1.1.2":
   version: 1.1.2
   resolution: "@rolldown/binding-freebsd-x64@npm:1.1.2"
@@ -2528,11 +2452,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-linux-arm-gnueabihf@npm:1.0.3":
   version: 1.0.3
   resolution: "@rolldown/binding-linux-arm-gnueabihf@npm:1.0.3"
@@ -2540,10 +2459,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-linux-arm-gnueabihf@npm:1.1.2":
   version: 1.1.2
   resolution: "@rolldown/binding-linux-arm-gnueabihf@npm:1.1.2"
@@ -2551,11 +2466,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-linux-arm64-gnu@npm:1.0.3":
   version: 1.0.3
   resolution: "@rolldown/binding-linux-arm64-gnu@npm:1.0.3"
@@ -2563,10 +2473,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-linux-arm64-gnu@npm:1.1.2":
   version: 1.1.2
   resolution: "@rolldown/binding-linux-arm64-gnu@npm:1.1.2"
@@ -2574,11 +2480,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-linux-arm64-musl@npm:1.0.3":
   version: 1.0.3
   resolution: "@rolldown/binding-linux-arm64-musl@npm:1.0.3"
@@ -2586,10 +2487,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-linux-arm64-musl@npm:1.1.2":
   version: 1.1.2
   resolution: "@rolldown/binding-linux-arm64-musl@npm:1.1.2"
@@ -2597,11 +2494,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-linux-ppc64-gnu@npm:1.0.3":
   version: 1.0.3
   resolution: "@rolldown/binding-linux-ppc64-gnu@npm:1.0.3"
@@ -2609,10 +2501,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-linux-ppc64-gnu@npm:1.1.2":
   version: 1.1.2
   resolution: "@rolldown/binding-linux-ppc64-gnu@npm:1.1.2"
@@ -2620,11 +2508,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-linux-s390x-gnu@npm:1.0.3":
   version: 1.0.3
   resolution: "@rolldown/binding-linux-s390x-gnu@npm:1.0.3"
@@ -2632,10 +2515,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-linux-s390x-gnu@npm:1.1.2":
   version: 1.1.2
   resolution: "@rolldown/binding-linux-s390x-gnu@npm:1.1.2"
@@ -2643,11 +2522,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-linux-x64-gnu@npm:1.0.3":
   version: 1.0.3
   resolution: "@rolldown/binding-linux-x64-gnu@npm:1.0.3"
@@ -2655,10 +2529,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-linux-x64-gnu@npm:1.1.2":
   version: 1.1.2
   resolution: "@rolldown/binding-linux-x64-gnu@npm:1.1.2"
@@ -2666,11 +2536,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-linux-x64-musl@npm:1.0.3":
   version: 1.0.3
   resolution: "@rolldown/binding-linux-x64-musl@npm:1.0.3"
@@ -2678,10 +2543,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-linux-x64-musl@npm:1.1.2":
   version: 1.1.2
   resolution: "@rolldown/binding-linux-x64-musl@npm:1.1.2"
@@ -2689,11 +2550,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-openharmony-arm64@npm:1.0.3":
   version: 1.0.3
   resolution: "@rolldown/binding-openharmony-arm64@npm:1.0.3"
@@ -2701,10 +2557,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-openharmony-arm64@npm:1.1.2":
   version: 1.1.2
   resolution: "@rolldown/binding-openharmony-arm64@npm:1.1.2"
@@ -2712,11 +2564,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-wasm32-wasi@npm:1.0.3":
   version: 1.0.3
   resolution: "@rolldown/binding-wasm32-wasi@npm:1.0.3"
@@ -2728,10 +2575,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-wasm32-wasi@npm:1.1.2":
   version: 1.1.2
   resolution: "@rolldown/binding-wasm32-wasi@npm:1.1.2"
@@ -2743,11 +2586,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-win32-arm64-msvc@npm:1.0.3":
   version: 1.0.3
   resolution: "@rolldown/binding-win32-arm64-msvc@npm:1.0.3"
@@ -2755,10 +2593,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-win32-arm64-msvc@npm:1.1.2":
   version: 1.1.2
   resolution: "@rolldown/binding-win32-arm64-msvc@npm:1.1.2"
@@ -2766,11 +2600,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-win32-x64-msvc@npm:1.0.3":
   version: 1.0.3
   resolution: "@rolldown/binding-win32-x64-msvc@npm:1.0.3"
@@ -2778,10 +2607,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/binding-win32-x64-msvc@npm:1.1.2":
   version: 1.1.2
   resolution: "@rolldown/binding-win32-x64-msvc@npm:1.1.2"
@@ -2789,11 +2614,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "@rolldown/pluginutils@npm:^1.0.0, @rolldown/pluginutils@npm:^1.0.1":
   version: 1.0.1
   resolution: "@rolldown/pluginutils@npm:1.0.1"
@@ -5200,10 +5020,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "crossws@npm:^0.4.5, crossws@npm:^0.4.6":
   version: 0.4.6
   resolution: "crossws@npm:0.4.6"
@@ -5216,11 +5032,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "css-background-parser@npm:^0.1.0":
   version: 0.1.0
   resolution: "css-background-parser@npm:0.1.0"
@@ -5779,10 +5590,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "env-runner@npm:^0.1.12":
   version: 0.1.14
   resolution: "env-runner@npm:0.1.14"
@@ -5811,11 +5618,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "error-ex@npm:^1.3.1":
   version: 1.3.4
   resolution: "error-ex@npm:1.3.4"
@@ -7075,10 +6877,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "httpxy@npm:^0.5.3":
   version: 0.5.3
   resolution: "httpxy@npm:0.5.3"
@@ -7086,11 +6884,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 8bf3c96 (feat: add pre commit hook)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "husky@npm:^9.1.7":
   version: 9.1.7
   resolution: "husky@npm:9.1.7"
@@ -7547,10 +7340,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "jiti@npm:^2.7.0":
   version: 2.7.0
   resolution: "jiti@npm:2.7.0"
@@ -7560,11 +7349,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "jose@npm:^6.1.3":
   version: 6.2.3
   resolution: "jose@npm:6.2.3"
@@ -7985,15 +7769,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 "lightningcss@npm:1.32.0, lightningcss@npm:^1.32.0":
-=======
-"lightningcss@npm:^1.32.0":
->>>>>>> 25354cd (feat: vinext migration)
-=======
-"lightningcss@npm:1.32.0, lightningcss@npm:^1.32.0":
->>>>>>> 32ecb38 (fix: deployment errors)
   version: 1.32.0
   resolution: "lightningcss@npm:1.32.0"
   dependencies:
@@ -9819,10 +9595,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "rolldown@npm:^1.1.0":
   version: 1.1.2
   resolution: "rolldown@npm:1.1.2"
@@ -9881,11 +9653,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "rou3@npm:^0.7.12":
   version: 0.7.12
   resolution: "rou3@npm:0.7.12"
@@ -9893,10 +9660,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "rou3@npm:^0.8.1":
   version: 0.8.1
   resolution: "rou3@npm:0.8.1"
@@ -9904,11 +9667,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "router@npm:^2.2.0":
   version: 2.2.0
   resolution: "router@npm:2.2.0"
@@ -10470,15 +10228,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 "srvx@npm:^0.11.15, srvx@npm:^0.11.16":
-=======
-"srvx@npm:^0.11.15":
->>>>>>> 25354cd (feat: vinext migration)
-=======
-"srvx@npm:^0.11.15, srvx@npm:^0.11.16":
->>>>>>> 32ecb38 (fix: deployment errors)
   version: 0.11.16
   resolution: "srvx@npm:0.11.16"
   bin:
@@ -10746,10 +10496,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "tapable@npm:^2.3.3":
   version: 2.3.3
   resolution: "tapable@npm:2.3.3"
@@ -10757,11 +10503,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "tar@npm:^7.5.4":
   version: 7.5.16
   resolution: "tar@npm:7.5.16"
@@ -11193,10 +10934,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "unenv@npm:2.0.0-rc.24":
   version: 2.0.0-rc.24
   resolution: "unenv@npm:2.0.0-rc.24"
@@ -11206,11 +10943,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
->>>>>>> 32ecb38 (fix: deployment errors)
 "unicode-trie@npm:^2.0.0":
   version: 2.0.0
   resolution: "unicode-trie@npm:2.0.0"
@@ -11592,14 +11324,7 @@ __metadata:
     eslint-config-next: "npm:15.2.2"
     jose: "npm:^6.2.2"
     next: "npm:15.2.8"
-<<<<<<< HEAD
-<<<<<<< HEAD
     nitro: "npm:3.0.260610-beta"
-=======
->>>>>>> 25354cd (feat: vinext migration)
-=======
-    nitro: "npm:3.0.260610-beta"
->>>>>>> 32ecb38 (fix: deployment errors)
     react: "npm:^19.2.7"
     react-countdown-circle-timer: "npm:^3.2.1"
     react-dom: "npm:^19.2.7"
