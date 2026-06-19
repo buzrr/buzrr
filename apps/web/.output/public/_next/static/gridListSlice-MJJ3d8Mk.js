@@ -1,0 +1,1 @@
+import{n as e}from"./redux-toolkit.modern-DKn3my4d.js";var t=e({name:`gridListToggle`,initialState:{view:`grid`},reducers:{setGridListToggle:(e,t)=>{e.view=t.payload}}}),{setGridListToggle:n}=t.actions,r=t.reducer;export{n,r as t};

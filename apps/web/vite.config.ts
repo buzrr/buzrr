@@ -26,6 +26,6 @@ export default defineConfig({
     exclude: ["better-auth"],
   },
   ssr: {
-    external: ["better-auth"],
+    external: serverExternals,
   },
 });

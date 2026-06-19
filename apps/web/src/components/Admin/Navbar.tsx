@@ -94,7 +94,6 @@ export default function Navbar() {
                 </p>
                 <button
                   className="text-sm text-white dark:text-dark dark:font-bold rounded-lg py-2 px-4 my-2 bg-red-light dark:bg-red-dark w-full"
-<<<<<<< HEAD
                   onClick={() =>
                     authClient.signOut({
                       fetchOptions: {
@@ -104,9 +103,6 @@ export default function Navbar() {
                       },
                     })
                   }
-=======
-                  onClick={() => authClient.signOut()}
->>>>>>> 25354cd (feat: vinext migration)
                 >
                   Sign out
                 </button>
