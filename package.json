@@ -8,7 +8,7 @@
     "dev:server": "turbo run dev --filter=server",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,md}\"",
-    "check-types": "turbo run check-types",
+    "check-types": "tsc -b --noEmit && yarn workspace web check-types",
     "prisma:generate": "prisma generate",
     "prepare": "husky"
   },

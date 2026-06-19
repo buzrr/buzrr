@@ -15,12 +15,10 @@ export default defineConfig({
   plugins: [
     vinext(),
     nitro({
-      config: {
-        // Keep node_modules external in the final Nitro bundle (vinext clears
-        // SSR externals when Nitro is present; without this, Rolldown re-bundles
-        // packages like better-auth/kysely and fails on CJS interop).
-        noExternals: false,
-      },
+      // Keep node_modules external in the final Nitro bundle (vinext clears
+      // SSR externals when Nitro is present; without this, Rolldown re-bundles
+      // packages like better-auth/kysely and fails on CJS interop).
+      noExternals: false,
     }),
     tailwindcss(),
   ],

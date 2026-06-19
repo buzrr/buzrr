@@ -1,8 +1,9 @@
 import type { NextConfig } from "next";
+import { fileURLToPath } from "url";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  outputFileTracingRoot: new URL("../../", import.meta.url).pathname,
+  outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
   outputFileTracingExcludes: {
     "*": [
       "**/__tests__/**",
