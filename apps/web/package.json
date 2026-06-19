@@ -10,6 +10,7 @@
     "lint": "next lint",
     "dev:vinext": "vinext dev --port 3001",
     "build:vinext": "vinext build",
+    "build:vercel": "vite build",
     "start:vinext": "vinext start"
   },
   "dependencies": {
@@ -50,6 +51,7 @@
     "@eslint/eslintrc": "^3",
     "@next/bundle-analyzer": "^15.2.8",
     "@tailwindcss/postcss": "^4.2.0",
+    "@tailwindcss/vite": "^4.3.1",
     "@tanstack/react-query-devtools": "^5.95.2",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -58,6 +60,7 @@
     "@vitejs/plugin-rsc": "^0.5.27",
     "eslint": "^9",
     "eslint-config-next": "15.2.2",
+    "nitro": "3.0.260610-beta",
     "react-server-dom-webpack": "^19.2.7",
     "tailwindcss": "^4.2.0",
     "typescript": "^5",

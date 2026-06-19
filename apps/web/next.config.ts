@@ -13,7 +13,13 @@ const nextConfig: NextConfig = {
       "**/*.log",
     ],
   },
-  serverExternalPackages: ["@prisma/client", "@prisma/adapter-pg", "pg", "better-auth"],
+  serverExternalPackages: [
+    "@prisma/client",
+    "@prisma/adapter-pg",
+    "pg",
+    "better-auth",
+    "kysely",
+  ],
   transpilePackages: ["@buzrr/prisma"],
   images: {
     remotePatterns: [

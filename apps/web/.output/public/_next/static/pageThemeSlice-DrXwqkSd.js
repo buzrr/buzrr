@@ -1,0 +1,1 @@
+import{n as e}from"./redux-toolkit.modern-DKn3my4d.js";var t=function(e){return e[e.dark=0]=`dark`,e[e.light=1]=`light`,e}({}),n=e({name:`theme`,initialState:{theme:1},reducers:{setPageTheme:(e,t)=>{e.theme=t.payload}}}),{setPageTheme:r}=n.actions,i=n.reducer;export{i as n,r,t};
