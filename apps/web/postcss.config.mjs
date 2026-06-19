@@ -1,4 +1,6 @@
-const isNextJs = process.argv.some((arg) => /(?:^|\/)next(?:$|\/.)/.test(arg));
+const isNextJs = process.argv.some((arg) =>
+  /(?:^|[\\/])next(?:$|[\\/.])/.test(arg),
+);
 
 const config = {
   // Next.js uses PostCSS for Tailwind; Vite uses @tailwindcss/vite in vite.config.ts.
