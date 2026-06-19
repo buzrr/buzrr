@@ -15,8 +15,10 @@ CREATE TABLE "verification" (
 );
 
 -- Backfill: token → value, expires → expires_at.
--- gen_random_uuid() provides the surrogate PK (available in PostgreSQL 13+;
--- enable pgcrypto on older versions via: CREATE EXTENSION IF NOT EXISTS pgcrypto;).
+-- gen_random_uuid() provides the surrogate PK (built-in on PostgreSQL 13+;
+-- pgcrypto supplies it on older versions).
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 INSERT INTO "verification" ("id", "identifier", "value", "expires_at", "created_at", "updated_at")
 SELECT
     gen_random_uuid()::TEXT,
