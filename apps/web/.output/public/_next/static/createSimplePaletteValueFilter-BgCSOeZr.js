@@ -1,1 +1,0 @@
-import{A as e}from"./mergeSlotProps-D2fW2zPi.js";var t=e;function n(e){return typeof e.main==`string`}function r(e,t=[]){if(!n(e))return!1;for(let n of t)if(!e.hasOwnProperty(n)||typeof e[n]!=`string`)return!1;return!0}function i(e=[]){return([,t])=>t&&r(t,e)}export{t as n,i as t};

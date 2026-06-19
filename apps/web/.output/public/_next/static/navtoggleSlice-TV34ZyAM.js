@@ -1,1 +1,0 @@
-import{n as e}from"./redux-toolkit.modern-DKn3my4d.js";var t=function(e){return e[e.expand=0]=`expand`,e[e.collapse=1]=`collapse`,e}({}),n=e({name:`navToggle`,initialState:{toggle:1},reducers:{setNavToggle:(e,t)=>{e.toggle=t.payload}}}),{setNavToggle:r}=n.actions,i=n.reducer;export{i as n,r,t};

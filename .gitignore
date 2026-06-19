@@ -23,6 +23,7 @@ coverage
 
 # Build Outputs
 .next/
+.output/
 .vinext/
 out/
 build

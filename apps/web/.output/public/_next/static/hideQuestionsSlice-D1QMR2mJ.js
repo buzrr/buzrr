@@ -1,1 +1,0 @@
-import{n as e}from"./redux-toolkit.modern-DKn3my4d.js";var t=function(e){return e[e.show=0]=`show`,e[e.hide=1]=`hide`,e}({}),n=e({name:`hide questions`,initialState:{visibility:1},reducers:{setHideQuestions:(e,t)=>{e.visibility=t.payload}}}),{setHideQuestions:r}=n.actions,i=n.reducer;export{i as n,r,t};

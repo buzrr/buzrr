@@ -1,1 +1,0 @@
-var e=`/images/avatar-1577909_1280.webp`;export{e as t};

@@ -1,1 +1,0 @@
-import{r as e}from"./framework-Dq6KxOwa.js";var t=e();function n({error:e}){return(0,t.jsx)(`div`,{className:`h-screen w-screen flex justify-center items-center`,children:(0,t.jsx)(`div`,{className:`p-2 mx-auto w-fit bg-slate-200 rounded-md text-sm`,children:e.message})})}export{n as default};
