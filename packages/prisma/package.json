@@ -7,6 +7,7 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "generate": "prisma generate",
+    "postinstall": "prisma generate",
     "build": "prisma generate && tsc",
     "check-types": "tsc --noEmit"
   },
