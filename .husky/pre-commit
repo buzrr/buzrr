@@ -1,2 +1,2 @@
-yarn turbo run lint
+yarn lint
 yarn check-types
