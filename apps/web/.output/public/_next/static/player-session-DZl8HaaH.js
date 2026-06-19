@@ -1,1 +1,0 @@
-function e(){typeof window>`u`||(window.localStorage.removeItem(`playerId`),window.localStorage.removeItem(`playerToken`))}export{e as t};

@@ -1,1 +1,0 @@
-import{r as e}from"./framework-Dq6KxOwa.js";import{t}from"./clsx-CjueKrWZ.js";var n=e();function r({icon:e,className:r,type:i=`button`,...a}){return(0,n.jsx)(`button`,{type:i,className:t(`inline-flex items-center justify-center rounded-md p-2 transition-colors`,`disabled:opacity-60 disabled:cursor-not-allowed`,r),...a,children:e})}export{r as t};

@@ -1,1 +1,0 @@
-import{r as e}from"./framework-Dq6KxOwa.js";var t=e();function n({children:e}){return(0,t.jsx)(t.Fragment,{children:e})}export{n as default};

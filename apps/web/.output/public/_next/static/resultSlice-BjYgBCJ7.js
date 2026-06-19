@@ -1,1 +1,0 @@
-import{n as e}from"./redux-toolkit.modern-DKn3my4d.js";var t=function(e){return e[e.correct=0]=`correct`,e[e.incorrect=1]=`incorrect`,e[e.timeout=2]=`timeout`,e}({}),n=e({name:`result`,initialState:{resultStatus:2},reducers:{setResultStatus:(e,t)=>{e.resultStatus=t.payload}}}),{setResultStatus:r}=n.actions,i=n.reducer;export{i as n,r,t};
