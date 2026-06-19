@@ -4,10 +4,10 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 
 export async function GET() {
-  const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+  const secret = process.env.BETTER_AUTH_SECRET;
   if (!secret) {
     return NextResponse.json(
-      { error: "Server misconfiguration" },
+      { error: "Server misconfiguration - missing BETTER_AUTH_SECRET environment variable" },
       { status: 500 },
     );
   }

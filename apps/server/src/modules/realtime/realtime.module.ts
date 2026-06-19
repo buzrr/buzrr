@@ -10,7 +10,7 @@ import { RealtimeService } from "./realtime.service";
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.getOrThrow<string>("NEXTAUTH_SECRET"),
+        secret: config.getOrThrow<string>("BETTER_AUTH_SECRET"),
       }),
     }),
   ],

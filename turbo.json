@@ -5,8 +5,7 @@
   "globalEnv": [
     "DATABASE_URL",
     "DIRECT_URL",
-    "NEXTAUTH_URL",
-    "NEXTAUTH_SECRET",
+    "BETTER_AUTH_SECRET",
     "NODE_ENV"
   ],
   "tasks": {
