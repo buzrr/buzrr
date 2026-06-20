@@ -1,6 +1,9 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "prisma/config";
 import { loadEnv } from "./src/loadEnv";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 loadEnv();
 
