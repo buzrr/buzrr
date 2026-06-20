@@ -17,8 +17,8 @@ model Account {
   accessToken           String?   @map("access_token")
   refreshToken          String?   @map("refresh_token")
   idToken               String?   @map("id_token")
-  accessTokenExpiresAt  DateTime?
-  refreshTokenExpiresAt DateTime?
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
   scope                 String?
   password              String?
   createdAt             DateTime  @default(now()) @map("created_at")
@@ -34,8 +34,8 @@ model Session {
   token     String   @unique @map("session_token")
   expiresAt DateTime @map("expires")
   userId    String   @map("user_id")
-  ipAddress String?
-  userAgent String?
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -64,9 +64,9 @@ model Verification {
   id         String    @id @default(cuid())
   identifier String
   value      String
-  expiresAt  DateTime  @map("expires_at")
-  createdAt  DateTime? @default(now()) @map("created_at")
-  updatedAt  DateTime? @updatedAt @map("updated_at")
+  expiresAt  DateTime
+  createdAt  DateTime? @default(now())
+  updatedAt  DateTime? @updatedAt
 
   @@map("verification")
 }

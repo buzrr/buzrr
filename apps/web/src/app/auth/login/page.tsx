@@ -8,7 +8,7 @@ const LoginPage = () => {
         sideImage="/images/login.svg"
         sideImageDark="/images/login-dark.svg"
       >
-        <div className="dark:text-white bg-white dark:bg-dark rounded-2xl p-2 px-6 max-w-[90%] md:max-w-[30%]">
+        <div className="dark:text-white bg-white dark:bg-dark rounded-2xl p-2 px-6 max-w-[90%] lg:max-w-[30%]">
           <h1 className="text-3xl font-black py-2">Login</h1>
           <p className="">
             Dive back into your learning journey by exploring our latest

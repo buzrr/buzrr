@@ -7,17 +7,18 @@ const SplitWrapper = (props: {
   children: React.ReactNode;
 }) => {
   return (
-    <div className="md:h-[85vh] flex justify-around items-center">
-      <ClientImage
-        props={{
-          src: props.sideImage,
-          darksrc: props.sideImageDark,
-          alt: "Side Placeholder Image",
-          classname: "hidden md:block",
-          width: 450,
-          height: 450,
-        }}
-      />
+    <div className="min-h-[85vh] flex justify-center lg:justify-around items-center">
+      <div className="hidden lg:block">
+        <ClientImage
+          props={{
+            src: props.sideImage,
+            darksrc: props.sideImageDark,
+            alt: "Side Placeholder Image",
+            width: 450,
+            height: 450,
+          }}
+        />
+      </div>
       {props.children}
     </div>
   );
