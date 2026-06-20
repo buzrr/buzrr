@@ -5,7 +5,14 @@
   "globalEnv": [
     "DATABASE_URL",
     "DIRECT_URL",
+    "BETTER_AUTH_URL",
     "BETTER_AUTH_SECRET",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "GEMINI_API_KEY",
+    "UPSTASH_REDIS_URL",
+    "UPSTASH_REDIS_TOKEN",
+    "RATELIMIT",
     "NODE_ENV"
   ],
   "tasks": {
