@@ -1,55 +1,46 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Socket } from "socket.io-client";
-import { useAppDispatch } from "@/state/hooks";
-import { setScreenStatus, ScreenStatus } from "@/state/player/screenSlice";
+import { useAppSelector } from "@/state/hooks";
+import { toast } from "react-toastify";
 import QuestionAndResult from "./QuesAndResult";
-import { useSubmitAnswerMutation } from "@/lib/modules/game-sessions/hooks";
+import type { GameSocket, PublicQuestion } from "@/types/socket-events";
 
-interface QuestionWithOptions {
-  title?: string;
-  timeOut?: number;
-  options: { id: string; title: string }[];
-}
-
+/**
+ * Answers go over the socket and the server measures the time taken; the
+ * client no longer reports its own clock. The screen stays on the question
+ * until the server pushes the reveal.
+ */
 const Question = (params: {
-  question: QuestionWithOptions;
-  gameSessionId: string;
-  playerId: string;
-  socket: Socket;
-  currentQuestion: number;
+  question: PublicQuestion;
+  socket: GameSocket;
   quizTitle: string;
   gameCode: string;
 }) => {
-  const dispatch = useAppDispatch();
-  const [timer, setTimer] = useState(0);
+  const qIndex = useAppSelector((state) => state.game.qIndex);
   const [optionId, setOptionId] = useState("");
-  const submitMutation = useSubmitAnswerMutation();
+  const [submitted, setSubmitted] = useState(false);
 
+  // A new question means a fresh answer state.
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      dispatch(setScreenStatus(ScreenStatus.result));
-    }, (params.question.timeOut ?? 0) * 1000);
-
-    const interval = setInterval(() => {
-      setTimer((t) => t + 0.5);
-    }, 500);
-
-    return () => {
-      clearTimeout(timeout);
-      clearInterval(interval);
-    };
-  }, [dispatch, params.question.timeOut]);
+    setOptionId("");
+    setSubmitted(false);
+  }, [params.question.id]);
 
   const submitAnswer = (optId: string) => {
+    if (submitted) return;
     setOptionId(optId);
-    submitMutation.mutate({
-      gameSessionId: params.gameSessionId,
-      playerId: params.playerId,
-      optionId: optId,
-      timeTaken: timer,
-    });
-    dispatch(setScreenStatus(ScreenStatus.wait));
+    setSubmitted(true);
+    params.socket.emit(
+      "submit-answer",
+      { qIndex, optionId: optId },
+      (result) => {
+        if (!result.accepted) {
+          setSubmitted(false);
+          setOptionId("");
+          toast.error(result.reason ?? "Answer was not accepted");
+        }
+      },
+    );
   };
 
   return (
@@ -57,11 +48,11 @@ const Question = (params: {
       <QuestionAndResult
         question={params.question}
         quizTitle={params.quizTitle}
-        quesTime={params.question.timeOut ?? 0}
         gameCode={params.gameCode}
         screen="question"
         submitAnswer={submitAnswer}
         optionId={optionId}
+        locked={submitted}
       />
     </>
   );

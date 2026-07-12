@@ -9,7 +9,8 @@
     "generate": "prisma generate",
     "postinstall": "prisma generate",
     "build": "prisma generate && tsc",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "seed:duel": "node scripts/seed-duel-starter.mjs"
   },
   "files": [
     "dist",

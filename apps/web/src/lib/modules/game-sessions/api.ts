@@ -1,6 +1,5 @@
 import type { AxiosInstance } from "axios";
 import type {
-  GameLeaderboard,
   GameSession,
   Option,
   Player,
@@ -33,15 +32,33 @@ export async function joinRoom(
   return data;
 }
 
-export async function submitAnswer(
-  client: AxiosInstance,
-  gameSessionId: string,
-  body: { playerId: string; optionId: string; timeTaken: number },
-) {
-  await client.post(`/game-sessions/${gameSessionId}/answers`, body);
-}
+export type GameResultEntry = {
+  id: string;
+  gameResultId: string;
+  playerName: string;
+  profilePic: string | null;
+  userId: string | null;
+  score: number;
+  rank: number;
+  correctCount: number;
+  eloBefore: number | null;
+  eloAfter: number | null;
+};
 
-export type LeaderboardRow = GameLeaderboard & { Player: Player };
+export type GameResult = {
+  id: string;
+  gameCode: string;
+  mode: "classic" | "duel";
+  quizId: string | null;
+  quizTitle: string;
+  hostId: string | null;
+  playerCount: number;
+  questionCount: number;
+  startedAt: string;
+  endedAt: string;
+};
+
+export type GameResultWithEntries = GameResult & { entries: GameResultEntry[] };
 
 export type AdminLobbyPayload = {
   room: GameSession;
@@ -59,12 +76,16 @@ export async function getAdminLobby(
   return data;
 }
 
-export async function getLeaderboardByRoom(
-  client: AxiosInstance,
-  roomId: string,
-) {
-  const { data } = await client.get<LeaderboardRow[]>(
-    `/game-sessions/${encodeURIComponent(roomId)}/leaderboard`,
+export async function getHistory(client: AxiosInstance) {
+  const { data } = await client.get<
+    (GameResult & { _count: { entries: number } })[]
+  >("/game-sessions/history");
+  return data;
+}
+
+export async function getResult(client: AxiosInstance, resultId: string) {
+  const { data } = await client.get<GameResultWithEntries>(
+    `/game-sessions/results/${encodeURIComponent(resultId)}`,
   );
   return data;
 }
@@ -93,29 +114,13 @@ export async function getPlayerPlay(
   return data;
 }
 
-export async function getLeaderboard(
-  client: AxiosInstance,
-  gameCode: string,
-) {
-  const { data } = await client.get<LeaderboardRow[]>(
-    `/game-sessions/by-code/${encodeURIComponent(gameCode)}/leaderboard`,
-  );
-  return data;
-}
-
 export const gameSessionsApi = {
   create: (body: Parameters<typeof createGameSession>[1]) =>
     createGameSession(getAuthApiClient(), body),
   join: (body: Parameters<typeof joinRoom>[1]) =>
     joinRoom(createPlayerAuthedApiClient(), body),
-  submitAnswer: (
-    gameSessionId: string,
-    body: Parameters<typeof submitAnswer>[2],
-  ) => submitAnswer(getPublicApiClient(), gameSessionId, body),
-  leaderboard: (gameCode: string) =>
-    getLeaderboard(getAuthApiClient(), gameCode),
   adminLobby: (roomId: string) => getAdminLobby(getAuthApiClient(), roomId),
-  leaderboardByRoom: (roomId: string) =>
-    getLeaderboardByRoom(getAuthApiClient(), roomId),
+  history: () => getHistory(getAuthApiClient()),
+  result: (resultId: string) => getResult(getAuthApiClient(), resultId),
   playerPlay: (playerId: string) => getPlayerPlay(getPublicApiClient(), playerId),
 };

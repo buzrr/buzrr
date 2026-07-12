@@ -9,7 +9,5 @@ export type {
   Quiz,
   Question,
   Player,
-  GameLeaderboard,
-  PlayerAnswer,
   User,
 } from "@buzrr/prisma";

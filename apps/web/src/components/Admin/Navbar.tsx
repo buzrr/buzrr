@@ -5,20 +5,21 @@ import { authClient } from "@/lib/auth-client";
 import Image from "next/image";
 import ClientImage from "../ClientImage";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useAppSelector, useAppDispatch } from "@/state/hooks";
 import { NavToggle, setNavToggle } from "@/state/admin/navtoggleSlice";
+import { persistor } from "@/state/store";
 import BasicModal from "../Modal";
 
 const NavLinks = [
   { href: "/admin", label: "Quizzes" },
+  { href: "/admin/history", label: "History" },
   { href: "/admin/settings", label: "Settings" },
 ];
 
 export default function Navbar() {
   const { data: session } = authClient.useSession();
   const pathname = usePathname();
-  const router = useRouter();
 
   const toggle = useAppSelector((state) => state.navToggle.toggle);
   const dispatch = useAppDispatch();
@@ -97,8 +98,11 @@ export default function Navbar() {
                   onClick={() =>
                     authClient.signOut({
                       fetchOptions: {
-                        onSuccess: () => {
-                          router.push("/");
+                        onSuccess: async () => {
+                          await persistor.purge();
+                          // Hard navigation so the router cache drops the
+                          // logged-in /admin payload along with client state.
+                          window.location.href = "/";
                         },
                       },
                     })

@@ -1,67 +1,45 @@
 "use client";
-import { useEffect, useRef } from "react";
-import { io } from "socket.io-client";
+import { useRef } from "react";
 import { useAppDispatch } from "@/state/hooks";
-import { clearConnection, createConnection } from "@/state/socket/socketSlice";
 import { addPlayer, removePlayer } from "@/state/admin/playersSlice";
-import type { PlayerPayload } from "@/types/socket-events";
+import type { GameSocket, PlayerPayload } from "@/types/socket-events";
+import { useGameSocket } from "./useGameSocket";
 
 interface UseAdminSocketOptions {
   userId: string;
   gameCode: string;
   onPlayerRemoved?: (player: PlayerPayload) => void;
   onGameStarted?: () => void;
+  onGameOver?: () => void;
 }
 
 export function useAdminSocket({
-  userId,
   gameCode,
   onPlayerRemoved,
   onGameStarted,
-}: UseAdminSocketOptions) {
+  onGameOver,
+}: UseAdminSocketOptions): { socket: GameSocket | null } {
   const dispatch = useAppDispatch();
-  const onPlayerRemovedRef = useRef(onPlayerRemoved);
-  const onGameStartedRef = useRef(onGameStarted);
+  const callbacks = useRef({ onPlayerRemoved, onGameStarted, onGameOver });
+  callbacks.current = { onPlayerRemoved, onGameStarted, onGameOver };
 
-  useEffect(() => {
-    onPlayerRemovedRef.current = onPlayerRemoved;
-    onGameStartedRef.current = onGameStarted;
-  }, [onPlayerRemoved, onGameStarted]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const socket = io(
-      `${process.env.NEXT_PUBLIC_SOCKET_URL}/?userType=admin&gameCode=${gameCode}`,
-      {
-        withCredentials: true,
-      },
-    );
-
-    socket.on("connect", () => {
-      dispatch(createConnection(socket));
-    });
-
-    socket.on("player-joined", (player: PlayerPayload) => {
-      dispatch(addPlayer(player));
-    });
-
-    socket.on("player-removed", (player: PlayerPayload) => {
-      dispatch(removePlayer(player));
-      onPlayerRemovedRef.current?.(player);
-    });
-
-    socket.on("game-started", () => {
-      onGameStartedRef.current?.();
-    });
-
-    socket.on("disconnect", () => {
-      dispatch(clearConnection());
-    });
-
-    return () => {
-      socket.disconnect();
-      dispatch(clearConnection());
-    };
-  }, [dispatch, gameCode, userId]);
+  return useGameSocket({
+    userType: "admin",
+    gameCode,
+    bind: (socket) => {
+      socket.on("player-joined", (player) => {
+        dispatch(addPlayer(player));
+      });
+      socket.on("player-removed", (player) => {
+        dispatch(removePlayer(player));
+        callbacks.current.onPlayerRemoved?.(player);
+      });
+      socket.on("game-started", () => {
+        callbacks.current.onGameStarted?.();
+      });
+      socket.on("game-over", () => {
+        callbacks.current.onGameOver?.();
+      });
+    },
+  });
 }

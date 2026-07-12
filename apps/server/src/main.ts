@@ -1,10 +1,10 @@
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { NestExpressApplication } from "@nestjs/platform-express";
-import { IoAdapter } from "@nestjs/platform-socket.io";
 import { AppModule } from "./app.module";
 import { AllExceptionsFilter } from "./common/filters/http-exception.filter";
 import { parseCorsOrigin } from "./common/utils/parse-cors-origin";
+import { RedisIoAdapter } from "./redis/redis-io.adapter";
 
 function applyTrustProxy(app: NestExpressApplication): void {
   const raw = process.env.TRUST_PROXY?.trim();
@@ -26,7 +26,7 @@ function applyTrustProxy(app: NestExpressApplication): void {
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   applyTrustProxy(app);
-  app.useWebSocketAdapter(new IoAdapter(app));
+  app.useWebSocketAdapter(new RedisIoAdapter(app));
   app.enableCors({
     origin: parseCorsOrigin(process.env.WEB_ORIGIN),
     credentials: true,

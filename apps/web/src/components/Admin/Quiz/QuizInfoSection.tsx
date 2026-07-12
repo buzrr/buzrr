@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import HostQuizForm from "@/components/Admin/Quiz/HostQuizForm";
+import Switch from "@/components/ui/Switch";
+import { useUpdateQuizMutation } from "@/lib/modules/quizzes/hooks";
 import type { QuizDetail } from "@/lib/modules/quizzes/api";
 
 function formatSessionDate(createdAt: string | Date) {
@@ -10,8 +12,9 @@ function formatSessionDate(createdAt: string | Date) {
 }
 
 export default function QuizInfoSection(props: { quiz: QuizDetail }) {
-  const allQuiz = props.quiz.gameSessions ?? [];
+  const pastGames = props.quiz.gameResults ?? [];
   const questionCount = props.quiz._count?.questions ?? 0;
+  const updateQuiz = useUpdateQuizMutation();
 
   return (
     <>
@@ -29,6 +32,19 @@ export default function QuizInfoSection(props: { quiz: QuizDetail }) {
           <p className="text-xs p-1 border border-[#8FB72E] bg-[#C4F849] rounded w-fit my-1 dark:text-dark">
             Total number of questions : {questionCount}
           </p>
+          <div className="flex items-center gap-2 my-2">
+            <Switch
+              aria-label="Make quiz public for duels"
+              checked={Boolean(props.quiz.isPublic)}
+              disabled={updateQuiz.isPending}
+              onCheckedChange={(checked) =>
+                updateQuiz.mutate({ quizId: props.quiz.id, isPublic: checked })
+              }
+            />
+            <span className="text-sm">
+              Public — questions may appear in 1v1 duels
+            </span>
+          </div>
           <div className="w-full mt-4">
             <HostQuizForm
               quizId={props.quiz.id}
@@ -40,33 +56,32 @@ export default function QuizInfoSection(props: { quiz: QuizDetail }) {
         <div className="flex-1 flex flex-col min-h-0">
           <div className="font-black p-4">Previously used</div>
           <div className="overflow-auto flex-1 min-h-0 mx-[-8px]">
-            {allQuiz?.length > 0 ? (
-              allQuiz.map(
-                (session: {
-                  id: string;
-                  createdAt: string | Date;
-                  gameCode?: string;
-                }) => {
-                  return (
-                    <div key={session.id}>
-                      <div className="bg-card-light dark:bg-card-dark p-4 mt-2">
-                        <div className="text-xs w-full flex justify-between">
-                          <div>{formatSessionDate(session.createdAt)}</div>
-                          <div className="text-lprimary dark:text-dprimary font-black">
-                            {session.gameCode}
-                          </div>
-                        </div>
-                        <div className="text-xs mt-3 *:bg-[#f87d49] *:text-white *:dark:text-dark *:font-black *:rounded-md *:p-[6px] *:ml-1">
-                          <Link href="#">Import Questions</Link>
-                          <Link href={`/admin/quiz/leaderboard/${session.id}`}>
-                            See leaderboard
-                          </Link>
+            {pastGames.length > 0 ? (
+              pastGames.map((result) => {
+                return (
+                  <div key={result.id}>
+                    <div className="bg-card-light dark:bg-card-dark p-4 mt-2">
+                      <div className="text-xs w-full flex justify-between">
+                        <div>{formatSessionDate(result.endedAt)}</div>
+                        <div className="text-lprimary dark:text-dprimary font-black">
+                          {result.gameCode}
                         </div>
                       </div>
+                      <div className="text-xs mt-2">
+                        {result.playerCount} player
+                        {result.playerCount === 1 ? "" : "s"} ·{" "}
+                        {result.questionCount} question
+                        {result.questionCount === 1 ? "" : "s"}
+                      </div>
+                      <div className="text-xs mt-3 *:bg-[#f87d49] *:text-white *:dark:text-dark *:font-black *:rounded-md *:p-[6px] *:ml-1">
+                        <Link href={`/admin/quiz/leaderboard/${result.id}`}>
+                          See leaderboard
+                        </Link>
+                      </div>
                     </div>
-                  );
-                },
-              )
+                  </div>
+                );
+              })
             ) : (
               <div className="h-fit w-[95%] mx-auto border border-gray border-dashed rounded-lg p-4 text-dark dark:text-white">
                 <div className="p-2 text-lg font-black text-center">

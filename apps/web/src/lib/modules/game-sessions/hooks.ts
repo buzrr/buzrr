@@ -16,29 +16,6 @@ export function useJoinRoomMutation() {
   });
 }
 
-export function useSubmitAnswerMutation() {
-  return useMutation({
-    mutationFn: ({
-      gameSessionId,
-      ...body
-    }: {
-      gameSessionId: string;
-      playerId: string;
-      optionId: string;
-      timeTaken: number;
-    }) => gameSessionsApi.submitAnswer(gameSessionId, body),
-  });
-}
-
-export function useLeaderboardQuery(gameCode: string, enabled = true) {
-  return useQuery({
-    queryKey: queryKeys.leaderboard(gameCode),
-    queryFn: () => gameSessionsApi.leaderboard(gameCode),
-    enabled: Boolean(gameCode) && enabled,
-    staleTime: 0,
-  });
-}
-
 export function useAdminLobbyQuery(roomId: string, enabled = true) {
   return useQuery({
     queryKey: queryKeys.gameSessions.lobby(roomId),
@@ -48,12 +25,22 @@ export function useAdminLobbyQuery(roomId: string, enabled = true) {
   });
 }
 
-export function useLeaderboardByRoomQuery(roomId: string, enabled = true) {
+export function useHistoryQuery(enabled = true) {
   return useQuery({
-    queryKey: queryKeys.gameSessions.leaderboardRoom(roomId),
-    queryFn: () => gameSessionsApi.leaderboardByRoom(roomId),
-    enabled: Boolean(roomId) && enabled,
+    queryKey: queryKeys.gameSessions.history,
+    queryFn: () => gameSessionsApi.history(),
+    enabled,
     staleTime: 15_000,
+  });
+}
+
+export function useResultQuery(resultId: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.gameSessions.result(resultId),
+    queryFn: () => gameSessionsApi.result(resultId),
+    enabled: Boolean(resultId) && enabled,
+    // Results are immutable once written.
+    staleTime: Infinity,
   });
 }
 

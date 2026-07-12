@@ -1,6 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { GameStates } from "@buzrr/prisma";
 import { PrismaService } from "../../prisma/prisma.service";
 
 @Injectable()
@@ -18,113 +17,6 @@ export class RealtimeService {
       data: { gameId: null },
     });
     return result.count > 0;
-  }
-
-  async startGame(gameCode: string) {
-    await this.prisma.db.gameSession.update({
-      where: { gameCode },
-      data: { isPlaying: true },
-    });
-  }
-
-  async setQuestionIndex(gameCode: string, index: number) {
-    await this.prisma.db.gameSession.update({
-      where: { gameCode },
-      data: { currentQuestion: index },
-    });
-  }
-
-  async getResultData(
-    gameCode: string,
-    quesId: string,
-    _options: { id: string }[],
-  ) {
-    const room = await this.prisma.db.gameSession.update({
-      where: { gameCode },
-      data: { gameState: GameStates.answer },
-    });
-
-    const question = await this.prisma.db.question.findFirst({
-      where: {
-        id: quesId,
-        quiz: {
-          gameSessions: {
-            some: { id: room.id },
-          },
-        },
-      },
-      include: {
-        options: {
-          orderBy: { createdAt: "asc" },
-          select: { id: true },
-        },
-      },
-    });
-
-    const canonicalOptions = question?.options ?? [];
-
-    const optionCounts = await Promise.all(
-      canonicalOptions.map((opt) =>
-        this.prisma.db.playerAnswer.count({
-          where: {
-            questionId: quesId,
-            optionId: opt.id,
-            gameSessionId: room.id,
-          },
-        }),
-      ),
-    );
-
-    const playerAnswers = await this.prisma.db.playerAnswer.findMany({
-      where: { gameSessionId: room.id, questionId: quesId },
-      select: { isCorrect: true, playerId: true },
-    });
-
-    return { presenter: optionCounts, player: playerAnswers };
-  }
-
-  async getFinalLeaderboard(gameCode: string) {
-    const room = await this.prisma.db.gameSession.update({
-      where: { gameCode },
-      data: { gameState: GameStates.leaderboard },
-    });
-
-    const leaderboard = await this.prisma.db.gameLeaderboard.findMany({
-      where: { gameSessionId: room.id },
-      include: { Player: true },
-      orderBy: { score: "desc" },
-    });
-
-    return leaderboard.map((entry, index) => ({
-      ...entry,
-      position: index + 1,
-    }));
-  }
-
-  async endGameSession(gameCode: string) {
-    const gameSession = await this.prisma.db.gameSession.findUnique({
-      where: { gameCode },
-    });
-
-    if (!gameSession) {
-      this.logger.error(`Game Session ${gameCode} not found!`);
-      return false;
-    }
-
-    await this.prisma.db.$transaction([
-      this.prisma.db.playerAnswer.deleteMany({
-        where: { gameSessionId: gameSession.id },
-      }),
-      this.prisma.db.player.updateMany({
-        where: { gameId: gameSession.id },
-        data: { gameId: null },
-      }),
-      this.prisma.db.gameSession.delete({
-        where: { id: gameSession.id },
-      }),
-    ]);
-
-    return true;
   }
 
   async validateConnection(socket: {
@@ -145,9 +37,11 @@ export class RealtimeService {
 
     const userType = normalizeQueryValue(socket.handshake.query.userType);
     const gameCode = normalizeQueryValue(socket.handshake.query.gameCode);
-    const validUserType = userType === "player" || userType === "admin";
+    const validUserType =
+      userType === "player" || userType === "admin" || userType === "duel";
     const validGameCode = /^[a-zA-Z0-9_-]{4,20}$/.test(gameCode);
-    if (!validUserType || !validGameCode) {
+    // Duel-queue connections carry no game code; everything else must.
+    if (!validUserType || (!validGameCode && userType !== "duel")) {
       return { valid: false as const };
     }
     const authHeader = socket.handshake.headers?.authorization;
@@ -170,6 +64,38 @@ export class RealtimeService {
       } catch {
         return { valid: false as const, reason: "Invalid auth token" };
       }
+    }
+
+    // Duels require a logged-in account (JWT access token or session cookie);
+    // there is no GameSession row — the game lives entirely in Redis.
+    if (userType === "duel") {
+      const userId = await this.resolveAccountUserId(payload, cookieHeader);
+      if (!userId) {
+        return {
+          valid: false as const,
+          reason: "Duel connections require a signed-in account",
+        };
+      }
+      const user = await this.prisma.db.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          name: true,
+          image: true,
+          eloRating: true,
+          duelsPlayed: true,
+        },
+      });
+      if (!user) {
+        return { valid: false as const, reason: `User ${userId} not found` };
+      }
+      return {
+        valid: true as const,
+        userType: "duel" as const,
+        user,
+        // Empty gameCode = matchmaking-queue connection.
+        gameCode: validGameCode ? gameCode : "",
+      };
     }
 
     const game = await this.prisma.db.gameSession.findUnique({
@@ -210,32 +136,14 @@ export class RealtimeService {
         player,
         gameCode,
         gameSessionId: game.id,
+        quizId: game.quizId,
+        hostId: game.creatorId,
         isRoomHost: false,
       };
     }
 
     if (userType === "admin") {
-      let adminId = payload?.sub;
-
-      if (!adminId && typeof cookieHeader === "string") {
-        const cookies = cookieHeader
-          .split(";")
-          .map((cookie) => cookie.trim().split("="))
-          .reduce<Record<string, string>>((acc, [key, value]) => {
-            if (key && value) acc[key] = decodeURIComponent(value);
-            return acc;
-          }, {});
-        const sessionToken =
-          cookies["better-auth.session_token"] ??
-          cookies["__Secure-better-auth.session_token"];
-        if (sessionToken) {
-          const session = await this.prisma.db.session.findUnique({
-            where: { token: sessionToken },
-            select: { userId: true },
-          });
-          adminId = session?.userId;
-        }
-      }
+      const adminId = await this.resolveAccountUserId(payload, cookieHeader);
 
       if (!adminId || payload?.typ === "player") {
         return {
@@ -265,10 +173,42 @@ export class RealtimeService {
         player: null,
         gameCode,
         gameSessionId: game.id,
+        quizId: game.quizId,
+        hostId: game.creatorId,
         isRoomHost: true,
       };
     }
 
     return { valid: false as const, reason: `Invalid userType: ${userType}` };
+  }
+
+  /**
+   * Resolves a signed-in account from either a verified JWT access token
+   * (typ must not be "player") or the better-auth session cookie.
+   */
+  private async resolveAccountUserId(
+    payload: { sub?: string; typ?: string } | null,
+    cookieHeader: string | string[] | undefined,
+  ): Promise<string | undefined> {
+    if (payload?.sub && payload.typ !== "player") {
+      return payload.sub;
+    }
+    if (typeof cookieHeader !== "string") return undefined;
+    const cookies = cookieHeader
+      .split(";")
+      .map((cookie) => cookie.trim().split("="))
+      .reduce<Record<string, string>>((acc, [key, value]) => {
+        if (key && value) acc[key] = decodeURIComponent(value);
+        return acc;
+      }, {});
+    const sessionToken =
+      cookies["better-auth.session_token"] ??
+      cookies["__Secure-better-auth.session_token"];
+    if (!sessionToken) return undefined;
+    const session = await this.prisma.db.session.findUnique({
+      where: { token: sessionToken },
+      select: { userId: true },
+    });
+    return session?.userId;
   }
 }

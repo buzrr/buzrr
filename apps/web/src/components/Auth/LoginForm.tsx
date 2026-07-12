@@ -1,71 +1,49 @@
 "use client";
 
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { LoginSchema } from "@/schemas";
-import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
-import * as z from "zod";
-import { TextInput } from "@/components/ui/TextInput";
 import { Button } from "@/components/ui/Button";
 import { authClient } from "@/lib/auth-client";
 
 const LoginForm = () => {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<z.infer<typeof LoginSchema>>({
-    resolver: zodResolver(LoginSchema),
-    mode: "onBlur",
-    reValidateMode: "onChange",
-    shouldFocusError: true,
-  });
+  const searchParams = useSearchParams();
+  const oauthError = searchParams.get("error");
+  const autoTriggered = useRef(false);
+  const [redirecting, setRedirecting] = useState(false);
 
-  const onSubmit = (_values: z.infer<typeof LoginSchema>) => {
-    // TODO: implement credential-based login
-    console.log(_values);
+  const signInWithGoogle = async () => {
+    setRedirecting(true);
+    try {
+      await authClient.signIn.social({
+        provider: "google",
+        callbackURL: "/admin",
+      });
+    } catch {
+      setRedirecting(false);
+    }
   };
 
+  useEffect(() => {
+    // Skip auto-trigger when returning from a failed/cancelled OAuth attempt,
+    // otherwise the page would bounce straight back to Google in a loop.
+    if (autoTriggered.current || oauthError) return;
+    autoTriggered.current = true;
+    void signInWithGoogle();
+  }, [oauthError]);
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <label htmlFor="email" className="sr-only">Email</label>
-      <TextInput
-        id="email"
-        {...register("email")}
-        placeholder="Enter Email"
-        required
-        containerClassName="my-2"
-        autoComplete="email"
-        error={errors.email?.message as string | undefined}
-      />
-      <label htmlFor="password" className="sr-only">Password</label>
-      <TextInput
-        id="password"
-        type="password"
-        {...register("password")}
-        placeholder="Enter Password"
-        required
-        containerClassName="my-2"
-        autoComplete="current-password"
-        error={errors.password?.message as string | undefined}
-      />
-      <Link
-        href="#"
-        className="w-fit float-right text-sm text-lprimary dark:text-dprimary"
-      >
-        Forgot Password?
-      </Link>
-      <Button className="my-4" fullWidth type="submit">
-        Continue
-      </Button>
+    <div className="py-4">
+      {oauthError && (
+        <p className="text-sm text-red-light dark:text-red-dark my-2">
+          Sign in was cancelled or failed. Please try again.
+        </p>
+      )}
       <Button
         variant="outline"
         fullWidth
-        onClick={async (e) => {
-          e.preventDefault();
-          await authClient.signIn.social({ provider: "google", callbackURL: "/admin" });
-        }}
+        disabled={redirecting}
+        onClick={() => void signInWithGoogle()}
       >
         <Image
           src="/images/google-icon.svg"
@@ -74,9 +52,9 @@ const LoginForm = () => {
           height={20}
           alt="Google Logo"
         />
-        Continue with Google
+        {redirecting ? "Redirecting to Google…" : "Continue with Google"}
       </Button>
-    </form>
+    </div>
   );
 };
 

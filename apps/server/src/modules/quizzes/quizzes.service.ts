@@ -75,6 +75,27 @@ export class QuizzesService {
     return { quizId: quiz.id };
   }
 
+  async update(
+    user: AuthUser,
+    quizId: string,
+    dto: { title?: string; description?: string; isPublic?: boolean },
+  ) {
+    const result = await this.prisma.db.quiz.updateMany({
+      where: { id: quizId, userId: user.userId },
+      data: {
+        ...(dto.title !== undefined ? { title: dto.title } : {}),
+        ...(dto.description !== undefined
+          ? { description: dto.description }
+          : {}),
+        ...(dto.isPublic !== undefined ? { isPublic: dto.isPublic } : {}),
+      },
+    });
+    if (result.count === 0) {
+      throw new NotFoundException("Unauthorized or quiz not found");
+    }
+    return this.prisma.db.quiz.findUnique({ where: { id: quizId } });
+  }
+
   async delete(user: AuthUser, quizId: string): Promise<void> {
     const result = await this.prisma.db.quiz.deleteMany({
       where: { id: quizId, userId: user.userId },
@@ -97,6 +118,9 @@ export class QuizzesService {
       include: {
         gameSessions: {
           orderBy: { createdAt: "desc" },
+        },
+        gameResults: {
+          orderBy: { endedAt: "desc" },
         },
         _count: { select: { questions: true } },
       },

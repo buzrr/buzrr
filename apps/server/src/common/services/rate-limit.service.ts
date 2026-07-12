@@ -17,8 +17,8 @@ export class RateLimitService {
   private readonly aiLimit: Ratelimit | null;
 
   constructor(private readonly config: ConfigService) {
-    const url = config.get<string>("UPSTASH_REDIS_URL");
-    const token = config.get<string>("UPSTASH_REDIS_TOKEN");
+    const url = config.get<string>("UPSTASH_REDIS_REST_URL");
+    const token = config.get<string>("UPSTASH_REDIS_REST_TOKEN");
     if (!url || !token) {
       this.defaultLimit = null;
       this.aiLimit = null;

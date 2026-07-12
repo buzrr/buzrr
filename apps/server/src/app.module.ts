@@ -8,12 +8,15 @@ import { GameSessionsModule } from "./modules/game-sessions/game-sessions.module
 import { PlayersModule } from "./modules/players/players.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { QuestionsModule } from "./modules/questions/questions.module";
+import { DuelModule } from "./modules/duel/duel.module";
 import { QuizzesModule } from "./modules/quizzes/quizzes.module";
 import { RealtimeModule } from "./modules/realtime/realtime.module";
+import { RedisModule } from "./redis/redis.module";
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    RedisModule,
     CommonModule,
     PrismaModule,
     AuthModule,
@@ -21,6 +24,7 @@ import { RealtimeModule } from "./modules/realtime/realtime.module";
     GameSessionsModule,
     QuizzesModule,
     QuestionsModule,
+    DuelModule,
     RealtimeModule,
   ],
   providers: [

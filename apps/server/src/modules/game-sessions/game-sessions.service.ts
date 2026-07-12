@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { Prisma } from "@buzrr/prisma";
 import { customAlphabet } from "nanoid";
+import { GameEngineService } from "../game-engine/game-engine.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
 import { CreateRoomDto } from "./dto/create-room.dto";
@@ -20,7 +21,10 @@ const generateGameCode = customAlphabet(
 
 @Injectable()
 export class GameSessionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly engine: GameEngineService,
+  ) {}
 
   async join(
     playerId: string,
@@ -79,119 +83,66 @@ export class GameSessionsService {
     );
   }
 
+  /**
+   * Legacy fallback route. Scoring and timing are owned by the game engine —
+   * `dto.timeTaken` is deliberately ignored; the server measures time from
+   * the moment it opened the question. Prefer the `submit-answer` socket
+   * event. This route is removed once all clients are migrated.
+   */
   async submitAnswer(
     gameSessionId: string,
     dto: SubmitAnswerDto,
   ): Promise<void> {
-    await this.prisma.db.$transaction(async (tx) => {
-      const session = await tx.gameSession.findUnique({
-        where: { id: gameSessionId },
-        select: { id: true, quizId: true },
-      });
-      if (!session) {
-        throw new NotFoundException("Game session not found");
-      }
+    const session = await this.prisma.db.gameSession.findUnique({
+      where: { id: gameSessionId },
+      select: { id: true, gameCode: true },
+    });
+    if (!session) {
+      throw new NotFoundException("Game session not found");
+    }
 
-      const option = await tx.option.findUnique({
-        where: { id: dto.optionId },
-        include: { question: true },
-      });
-      if (!option?.questionId || !option.question) {
-        throw new BadRequestException("Invalid option");
-      }
-      if (option.question.quizId !== session.quizId) {
-        throw new BadRequestException("Option does not belong to this quiz");
-      }
+    const player = await this.prisma.db.player.findUnique({
+      where: { id: dto.playerId },
+    });
+    if (!player) {
+      throw new NotFoundException("Player not found");
+    }
+    if (player.gameId !== session.id) {
+      throw new ForbiddenException("Player is not in this game session");
+    }
 
-      const player = await tx.player.findUnique({
-        where: { id: dto.playerId },
-      });
-      if (!player) {
-        throw new NotFoundException("Player not found");
-      }
-      if (player.gameId !== session.id) {
-        throw new ForbiddenException("Player is not in this game session");
-      }
+    const result = await this.engine.submitAnswerCurrent(
+      session.gameCode,
+      dto.playerId,
+      dto.optionId,
+    );
+    if (!result.accepted) {
+      throw new BadRequestException(result.reason ?? "Answer rejected");
+    }
+  }
 
-      let score = option.isCorrect ? 1000 : 0;
-      if (option.isCorrect) {
-        const timeLimit = option.question.timeOut;
-        if (dto.timeTaken < timeLimit) {
-          score -= (dto.timeTaken / timeLimit) * 900;
-        } else {
-          score = 100;
-        }
-      }
-      const roundedScore = Math.round(score);
-
-      const prevAns = await tx.playerAnswer.findUnique({
-        where: {
-          playerId_questionId_gameSessionId: {
-            playerId: dto.playerId,
-            questionId: option.questionId,
-            gameSessionId,
-          },
-        },
-      });
-
-      await tx.playerAnswer.upsert({
-        where: {
-          playerId_questionId_gameSessionId: {
-            playerId: dto.playerId,
-            questionId: option.questionId,
-            gameSessionId,
-          },
-        },
-        create: {
-          playerId: dto.playerId,
-          questionId: option.questionId,
-          gameSessionId,
-          optionId: dto.optionId,
-          timeTaken: dto.timeTaken,
-          isCorrect: option.isCorrect,
-          score: roundedScore,
-        },
-        update: {
-          optionId: dto.optionId,
-          timeTaken: dto.timeTaken,
-          isCorrect: option.isCorrect,
-          score: roundedScore,
-        },
-      });
-
-      const delta = roundedScore - (prevAns?.score ?? 0);
-
-      await tx.gameLeaderboard.upsert({
-        where: {
-          playerId_gameSessionId: {
-            playerId: dto.playerId,
-            gameSessionId,
-          },
-        },
-        create: {
-          playerId: dto.playerId,
-          gameSessionId,
-          score: delta,
-        },
-        update: {
-          score: { increment: delta },
-        },
-      });
+  /** Finished games hosted by this user, newest first. */
+  async getHistory(user: AuthUser) {
+    return this.prisma.db.gameResult.findMany({
+      where: { hostId: user.userId },
+      orderBy: { endedAt: "desc" },
+      include: { _count: { select: { entries: true } } },
     });
   }
 
-  async leaderboardByCode(gameCode: string) {
-    const room = await this.prisma.db.gameSession.findUnique({
-      where: { gameCode },
+  /** A single finished game with its final standings. */
+  async getResult(user: AuthUser, resultId: string) {
+    const result = await this.prisma.db.gameResult.findUnique({
+      where: { id: resultId },
+      include: { entries: { orderBy: { rank: "asc" } } },
     });
-    if (!room) {
-      throw new NotFoundException("Room not found");
+    if (!result) {
+      throw new NotFoundException("Result not found");
     }
-    return this.prisma.db.gameLeaderboard.findMany({
-      where: { gameSessionId: room.id },
-      include: { Player: true },
-      orderBy: { score: "desc" },
-    });
+    if (result.hostId && result.hostId !== user.userId) {
+      throw new ForbiddenException("Unauthorized");
+    }
+    return result;
   }
 
   async getAdminLobby(user: AuthUser, roomId: string) {
@@ -219,20 +170,6 @@ export class GameSessionsService {
       throw new NotFoundException("Quiz not found");
     }
     return { room, players, quiz };
-  }
-
-  async leaderboardByRoomId(roomId: string) {
-    const room = await this.prisma.db.gameSession.findUnique({
-      where: { id: roomId },
-    });
-    if (!room) {
-      throw new NotFoundException("Room not found");
-    }
-    return this.prisma.db.gameLeaderboard.findMany({
-      where: { gameSessionId: roomId },
-      include: { Player: true },
-      orderBy: { score: "desc" },
-    });
   }
 
   async getPlayerPlayContext(playerId: string) {

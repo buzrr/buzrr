@@ -1,66 +1,29 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useState } from "react";
-import { useAppDispatch, useAppSelector } from "@/state/hooks";
-import { ScreenStatus, setScreenStatus } from "@/state/admin/screenSlice";
-import { setLeaderboard, setResult } from "@/state/admin/playersSlice";
 import Image from "next/image";
-import { useQueryClient } from "@tanstack/react-query";
-import { queryKeys } from "@/lib/modules/query-keys";
-import { gameSessionsApi } from "@/lib/modules/game-sessions/api";
+import { useAppSelector } from "@/state/hooks";
+import { useServerCountdown } from "@/hooks/useServerCountdown";
 import { Button } from "@/components/ui/Button";
+import type { GameSocket } from "@/types/socket-events";
 
 interface QuestionScreenProps {
-  quizQuestions?: { title?: string; questions?: { title?: string; options?: { title: string }[]; media?: string | null; mediaType?: string | null; id?: string; timeOut?: number }[] };
   gameCode: string;
-  socket: {
-    emit: (e: string, code: string, id?: string, opts?: unknown) => void;
-    on: (e: string, cb: (data: unknown) => void) => void;
-    once?: (e: string, cb: (data: unknown) => void) => void;
-    off?: (e: string, cb?: (data: unknown) => void) => void;
-  };
+  quizTitle?: string;
+  socket: GameSocket;
 }
 
+/**
+ * Renders the server-pushed question. The countdown is display-only — the
+ * server ends the question at its own deadline; "Next" just asks the server
+ * to skip ahead.
+ */
 export default function QuestionScreen(props: QuestionScreenProps) {
-  const { quizQuestions, gameCode } = props;
-  const dispatch = useAppDispatch();
-  const queryClient = useQueryClient();
-  const currIndex = useAppSelector((state) => state.player.currentIndex);
-  const quizTitle = quizQuestions?.title;
-  const allQuestions = quizQuestions?.questions;
-  const socket = props.socket;
-  const question = allQuestions?.[currIndex];
-  const [time, setTime] = useState(question?.timeOut);
-
-  const handleNext = useCallback(async () => {
-    const leaderboard = await queryClient.fetchQuery({
-      queryKey: queryKeys.leaderboard(gameCode),
-      queryFn: () => gameSessionsApi.leaderboard(gameCode),
-    });
-    dispatch(setLeaderboard(leaderboard));
-    socket.emit("display-result", gameCode, question?.id, question?.options);
-    const handleDisplayingResult = (data: unknown) => {
-      const payload = data as { presenter?: unknown };
-      dispatch(setResult((payload?.presenter as number[]) ?? []));
-      dispatch(setScreenStatus(ScreenStatus.result));
-    };
-
-    if (socket.once) {
-      socket.once("displaying-result", handleDisplayingResult);
-    } else if (socket.off) {
-      socket.off("displaying-result");
-      socket.on("displaying-result", handleDisplayingResult);
-    } else {
-      socket.on("displaying-result", handleDisplayingResult);
-    }
-  }, [gameCode, dispatch, socket, question?.id, question?.options, queryClient]);
-
-  useEffect(() => {
-    if (time == 0) {
-      handleNext();
-    }
-  }, [time, handleNext]);
+  const { gameCode, quizTitle, socket } = props;
+  const question = useAppSelector((state) => state.game.question);
+  const deadline = useAppSelector((state) => state.game.deadline);
+  const clockOffset = useAppSelector((state) => state.game.clockOffset);
+  const remaining = useServerCountdown(deadline, clockOffset);
 
   if (!question) return null;
 
@@ -69,9 +32,13 @@ export default function QuestionScreen(props: QuestionScreenProps) {
   return (
     <>
       <div className="flex items-center m-auto h-fit w-full md:mx-4 dark:text-white *:bg-white dark:*:bg-dark">
-        <div className="h-full w-[30vw] mx-2 hidden pt-8 md:block rounded-xl">
+        <div className="h-full w-full md:w-1/3 lg:max-w-sm mx-2 hidden pt-8 md:block rounded-xl">
           <div className="flex justify-center">
-            <Countdown key={question?.id ?? currIndex} timer={question?.timeOut ?? 0} setTime={setTime} />
+            <Countdown
+              key={question.id}
+              duration={question.timeOut}
+              remaining={remaining}
+            />
           </div>
           <div className="pl-4 mt-2">
             <div className="text-red-light bg-[#f4d4d4] dark:bg-[#513232] rounded-full px-2 w-fit font-bold">
@@ -81,19 +48,19 @@ export default function QuestionScreen(props: QuestionScreenProps) {
           </div>
           <div className="mt-36 mb-2 pl-4">
             <div className="text-md">Room Code</div>
-            <div className="text-4xl font-black">{props.gameCode}</div>
+            <div className="text-4xl font-black">{gameCode}</div>
           </div>
         </div>
         <div className="h-full w-full md:mx-2 md:rounded-xl flex flex-col justify-center">
           <div className="text-center my-6 md:hidden">
             <div className="text-md">Room Code</div>
-            <div className="text-2xl font-black">{props.gameCode}</div>
+            <div className="text-2xl font-black">{gameCode}</div>
           </div>
           <div className="w-fit mx-auto rounded overflow-hidden">
             {question.mediaType === "image" && question.media && (
               <Image
                 src={question.media}
-                className="h-[25vh] w-auto"
+                className="max-h-[30dvh] w-auto"
                 alt="media Image"
                 height={300}
                 width={300}
@@ -102,19 +69,23 @@ export default function QuestionScreen(props: QuestionScreenProps) {
           </div>
           <div className="pl-4">Question</div>
           <h1 className="pb-6 pl-4 text-2xl font-black capitalize">
-            {question?.title}
+            {question.title}
           </h1>
           <div className="absolute bottom-2 md:bottom-10 right-12 w-fit">
-            <Button className="w-24 h-10 rounded!" size="sm" onClick={handleNext}>
+            <Button
+              className="w-24 h-10 rounded!"
+              size="sm"
+              onClick={() => socket.emit("host-next")}
+            >
               Next
             </Button>
           </div>
-          <div className="flex flex-col md:grid md:grid-cols-2 gap-6 w-full p-8 pl-4 h-fit">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full p-8 pl-4 h-fit">
             {options.length > 0 &&
-              options.map((opt: { title: string }, index: number) => {
+              options.map((opt, index) => {
                 return (
                   <p
-                    key={index}
+                    key={opt.id}
                     className="text-dark dark:text-white bg-light-bg dark:bg-dark-bg  p-4 rounded-xl"
                   >
                     {index + 1}
@@ -132,21 +103,24 @@ export default function QuestionScreen(props: QuestionScreenProps) {
 
 // Lazy-load to keep react-countdown-circle-timer out of main admin bundle.
 const CountdownCircleTimer = dynamic(
-  () => import("react-countdown-circle-timer").then((m) => ({ default: m.CountdownCircleTimer })),
-  { ssr: false }
+  () =>
+    import("react-countdown-circle-timer").then((m) => ({
+      default: m.CountdownCircleTimer,
+    })),
+  { ssr: false },
 );
 
-function Countdown(params: { timer: number; setTime: (t: number) => void }) {
+function Countdown(params: { duration: number; remaining: number }) {
   return (
     <div className="">
       <CountdownCircleTimer
         isPlaying
-        duration={params?.timer}
+        duration={params.duration}
+        initialRemainingTime={Math.min(params.remaining, params.duration)}
         colors={["#a589fc", "#F7B801", "#A30000"]}
         colorsTime={[10, 5, 0]}
         size={150}
         updateInterval={1}
-        onUpdate={(remainingTime: number) => params.setTime(remainingTime)}
       >
         {({ remainingTime }: { remainingTime: number }) => (
           <span className="text-2xl font-bold">{remainingTime}</span>

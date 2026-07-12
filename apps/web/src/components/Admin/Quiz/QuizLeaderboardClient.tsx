@@ -2,12 +2,11 @@
 
 import { DEFAULT_AVATAR } from "@/constants";
 import Skeleton from "@/components/ui/Skeleton";
-import { useLeaderboardByRoomQuery } from "@/lib/modules/game-sessions/hooks";
+import { useResultQuery } from "@/lib/modules/game-sessions/hooks";
 import Image from "next/image";
 
 export default function QuizLeaderboardClient({ roomId }: { roomId: string }) {
-  const { data: leaderboard, isPending, isError } =
-    useLeaderboardByRoomQuery(roomId);
+  const { data: result, isPending, isError } = useResultQuery(roomId);
 
   if (isPending) {
     return (
@@ -25,7 +24,7 @@ export default function QuizLeaderboardClient({ roomId }: { roomId: string }) {
     );
   }
 
-  if (isError) {
+  if (isError || !result) {
     return (
       <p className="text-center text-dark dark:text-white py-8">
         Could not load leaderboard.
@@ -37,37 +36,41 @@ export default function QuizLeaderboardClient({ roomId }: { roomId: string }) {
     <>
       <div className="flex flex-col items-center m-auto w-full px-4 my-8 gap-4 overflow-x-visible">
         <p className="w-full py-2 px-3 text-2xl text-center bg-white text-slate-900 font-semibold rounded max-w-fit capitalize overflow-x-visible">
-          Leaderboard
+          {result.quizTitle} — Leaderboard
+        </p>
+        <p className="text-sm text-dark dark:text-white">
+          Played {new Date(result.endedAt).toLocaleString()} · Room{" "}
+          {result.gameCode}
         </p>
 
         <div className="flex flex-col gap-4 my-6 overflow-x-visible">
-          {leaderboard && leaderboard.length > 0
-            ? leaderboard.map((lead, index) => {
+          {result.entries.length > 0
+            ? result.entries.map((entry) => {
                 return (
                   <div
-                    key={lead.id}
+                    key={entry.id}
                     className="shadow-xl flex justify-between px-4 py-2 flex-row w-[60vw] items-center z-10 bg-white text-black"
                   >
-                    {index == 0 ? (
+                    {entry.rank == 1 ? (
                       <span className="text-3xl overflow-hidden">🥇</span>
-                    ) : index == 1 ? (
+                    ) : entry.rank == 2 ? (
                       <span className="text-3xl overflow-hidden">🥈</span>
-                    ) : index == 2 ? (
+                    ) : entry.rank == 3 ? (
                       <span className="text-3xl overflow-hidden">🥉</span>
                     ) : (
-                      `#${index + 1}`
+                      `#${entry.rank}`
                     )}
                     <div className="flex flex-row items-center gap-x-2 z-20">
                       <Image
-                        src={lead.Player.profilePic || DEFAULT_AVATAR}
+                        src={entry.profilePic || DEFAULT_AVATAR}
                         className="w-12 h-12 rounded-full"
                         width={50}
                         height={50}
                         alt="profile pic"
                       />
-                      <p>{lead.Player.name}</p>
+                      <p>{entry.playerName}</p>
                     </div>
-                    <p>{lead.score}</p>
+                    <p>{entry.score}</p>
                   </div>
                 );
               })

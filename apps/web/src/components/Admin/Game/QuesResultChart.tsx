@@ -5,15 +5,34 @@
  * Keeps @mui/x-charts out of the main admin bundle until the result screen is shown.
  */
 import { BarPlot, ChartContainer } from "@mui/x-charts";
-import { useId } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { RxCross2 } from "react-icons/rx";
 import { TiTick } from "react-icons/ti";
-import type { Option } from "@/types/db";
 
-export default function QuesResultChart(params: { result: number[]; options: Option[] }) {
+const MAX_WIDTH = 550;
+
+export default function QuesResultChart(params: {
+  result: number[];
+  options: { id: string; title: string }[];
+  correctOptionIds: string[];
+}) {
   const uData = params?.result ? params?.result : [0, 0, 0, 0];
   const xLabels = ["Page A", "Page B", "Page C", "Page D"];
   const gradientId = `chart-gradient-${useId()}`;
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [width, setWidth] = useState(MAX_WIDTH);
+
+  // Track the container so the chart never overflows small screens.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width;
+      if (w) setWidth(Math.min(Math.floor(w), MAX_WIDTH));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <>
@@ -25,10 +44,13 @@ export default function QuesResultChart(params: { result: number[]; options: Opt
           </linearGradient>
         </defs>
       </svg>
-      <div className="overflow-hidden flex flex-col items-center ">
+      <div
+        ref={containerRef}
+        className="w-full overflow-hidden flex flex-col items-center"
+      >
         <div className="relative top-[74px] z-10 w-fit">
           <ChartContainer
-            width={550}
+            width={width}
             height={300}
             series={[
               {
@@ -44,10 +66,16 @@ export default function QuesResultChart(params: { result: number[]; options: Opt
           </ChartContainer>
         </div>
 
-        <div className="flex flex-row justify-around w-[450px] text-lg relative z-20 ">
+        <div
+          className="flex flex-row justify-around text-lg relative z-20"
+          style={{ width: Math.min(width, 450) }}
+        >
           {params.result.length > 0 &&
             params.result.map((opt: number, index: number) => {
-              const isCorrect = params.options[index]?.isCorrect === true;
+              const optionId = params.options[index]?.id;
+              const isCorrect =
+                optionId !== undefined &&
+                params.correctOptionIds.includes(optionId);
               return (
                 <div className="flex flex-col" key={index}>
                   <p className="flex flex-row items-center justify-center w-full">

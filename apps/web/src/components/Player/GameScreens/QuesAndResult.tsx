@@ -1,7 +1,8 @@
 "use client";
 import clsx from "clsx";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useAppSelector } from "@/state/hooks";
+import { useServerCountdown } from "@/hooks/useServerCountdown";
 
 interface QuestionOption {
   id: string;
@@ -11,8 +12,8 @@ interface QuestionOption {
 interface QuestionWithOptions {
   title?: string;
   timeOut?: number;
-  media?: string;
-  mediaType?: string;
+  media?: string | null;
+  mediaType?: string | null;
   options?: QuestionOption[];
 }
 
@@ -22,32 +23,26 @@ const QuestionAndResult = (params: {
   gameCode: string;
   screen: string;
   submitAnswer?: (optionId: string) => void;
-  quesTime: number;
   optionId?: string;
+  locked?: boolean;
   status?: string;
   message?: string;
 }) => {
   const options = params?.question?.options ?? [];
-  const [quesTime, setQuesTime] = useState(params?.quesTime);
-  const [percent, setPercent] = useState(100);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (quesTime > 0) {
-        setQuesTime((prev: number) => prev - 1);
-      }
-      if (quesTime >= 0) {
-        const x = Math.floor((quesTime * 100) / (params?.question?.timeOut ?? 1));
-        setPercent(x);
-      }
-    }, 1000);
-
-    return () => {
-      clearInterval(timer);
-    };
-  }, [quesTime, params?.question]);
+  const deadline = useAppSelector((state) => state.game.deadline);
+  const clockOffset = useAppSelector((state) => state.game.clockOffset);
+  const connection = useAppSelector((state) => state.game.connection);
+  // Answers submitted while offline would be rejected anyway — lock the UI.
+  const offline = connection !== "connected";
+  // Display-only countdown against the server deadline; the reveal is pushed
+  // by the server regardless of what this shows.
+  const remaining = useServerCountdown(deadline, clockOffset);
+  const quesTime = Math.ceil(remaining);
+  const timeOut = params?.question?.timeOut ?? 1;
+  const percent = Math.min(100, Math.floor((remaining * 100) / timeOut));
 
   function handleSubmit(id: string) {
+    if (params.locked || offline) return;
     params?.submitAnswer?.(id);
   }
 
@@ -62,11 +57,11 @@ const QuestionAndResult = (params: {
           className="w-full h-2 dark:bg-dprimary bg-lprimary block md:hidden"
         ></div>
       )}
-      <div className="w-full h-[85vh] flex gap-4 md:py-4 md:px-8 *:bg-white dark:*:bg-dark md:*:rounded-xl overflow-y-auto">
+      <div className="w-full h-[85dvh] flex gap-4 md:py-4 md:px-8 *:bg-white dark:*:bg-dark md:*:rounded-xl overflow-y-auto">
         <div className="hidden md:w-1/3 md:flex flex-col justify-between py-6 px-5 h-full">
           <div className="border-12 dark:border-lprimary border-dprimary light: rounded-full w-32 h-32 flex items-center justify-center mx-auto">
             <span className="font-semibold text-3xl dark:text-white">
-              {quesTime}
+              {params.screen === "question" ? quesTime : 0}
             </span>
           </div>
           <div className="flex flex-col">
@@ -103,15 +98,17 @@ const QuestionAndResult = (params: {
             </p>
 
             <div
-              className={clsx("grid grid-cols-1 gap-x-4", params.question?.mediaType === "image" ? "lg:grid-cols-2 my-2" : "my-4")}
+              className={clsx("grid grid-cols-1 sm:grid-cols-2 gap-x-4", params.question?.mediaType === "image" ? "my-2" : "my-4")}
             >
               {options.map((option: QuestionOption, index: number) => (
                 <button
                   key={option.id}
                   type="button"
+                  disabled={offline || (params.locked && option.id !== params.optionId)}
                   className={clsx(
                     "cursor-pointer p-4 rounded-xl text-lg dark:text-white mt-4 text-left w-full",
-                    option.id === params.optionId ? "dark:bg-dprimary bg-lprimary" : "bg-light-bg dark:bg-off-dark"
+                    option.id === params.optionId ? "dark:bg-dprimary bg-lprimary" : "bg-light-bg dark:bg-off-dark",
+                    (offline || (params.locked && option.id !== params.optionId)) && "opacity-50 cursor-default"
                   )}
                   onClick={() => handleSubmit(option.id)}
                   aria-pressed={option.id === params.optionId}
@@ -120,6 +117,12 @@ const QuestionAndResult = (params: {
                 </button>
               ))}
             </div>
+
+            {params.locked && (
+              <p className="dark:text-white text-center font-bold my-2">
+                Answer received — waiting for the results…
+              </p>
+            )}
 
             <p className="dark:text-white mb-1 md:hidden font-bold text-center my-6 text-lg">
               Room code: {params.gameCode}

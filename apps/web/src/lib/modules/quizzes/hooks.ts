@@ -41,6 +41,27 @@ export function useCreateAiQuizMutation() {
   });
 }
 
+export function useUpdateQuizMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      quizId,
+      ...body
+    }: {
+      quizId: string;
+      title?: string;
+      description?: string;
+      isPublic?: boolean;
+    }) => quizzesApi.update(quizId, body),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.quizzes.all });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.quizzes.detail(variables.quizId),
+      });
+    },
+  });
+}
+
 export function useDeleteQuizMutation() {
   const queryClient = useQueryClient();
   return useMutation({

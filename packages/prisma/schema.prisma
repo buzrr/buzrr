@@ -50,12 +50,15 @@ model User {
   emailVerified Boolean       @default(false) @map("email_verified")
   image         String?
   password      String?
+  eloRating     Int           @default(1200) @map("elo_rating")
+  duelsPlayed   Int           @default(0) @map("duels_played")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at")
   GameSessions  GameSession[]
   quizzes       Quiz[]
   accounts      Account[]
   sessions      Session[]
+  hostedResults GameResult[]
 
   @@map("users")
 }
@@ -79,92 +82,106 @@ model Quiz {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   thumbnail    String?
+  /// Public quizzes feed the duel-mode question pool.
+  isPublic     Boolean       @default(false)
   gameSessions GameSession[]
+  gameResults  GameResult[]
   questions    Question[]
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Question {
-  id           String         @id @default(cuid())
-  title        String
-  quizId       String
-  createdAt    DateTime       @default(now())
-  timeOut      Int            @default(15)
-  media        String?
-  mediaType    String?
-  order        Int            @default(1)
-  options      Option[]
-  PlayerAnswer PlayerAnswer[]
-  quiz         Quiz           @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  title     String
+  quizId    String
+  createdAt DateTime @default(now())
+  timeOut   Int      @default(15)
+  media     String?
+  mediaType String?
+  order     Int      @default(1)
+  options   Option[]
+  quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
 }
 
 model Option {
-  id           String         @id @default(cuid())
-  title        String
-  isCorrect    Boolean
-  questionId   String
-  createdAt    DateTime       @default(now())
-  question     Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  PlayerAnswer PlayerAnswer[]
+  id         String   @id @default(cuid())
+  title      String
+  isCorrect  Boolean
+  questionId String
+  createdAt  DateTime @default(now())
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 }
 
 model Player {
-  id              String            @id @default(cuid())
-  name            String
-  gameId          String?
-  createdAt       DateTime          @default(now())
-  profilePic      String?
-  GameLeaderboard GameLeaderboard[]
-  game            GameSession?      @relation(fields: [gameId], references: [id])
-  PlayerAnswer    PlayerAnswer[]
+  id         String       @id @default(cuid())
+  name       String
+  gameId     String?
+  createdAt  DateTime     @default(now())
+  profilePic String?
+  game       GameSession? @relation(fields: [gameId], references: [id])
 }
 
 model GameSession {
-  id              String            @id @default(cuid())
+  id              String     @id @default(cuid())
   quizId          String
   creatorId       String
-  gameCode        String            @unique
-  gameState       GameStates        @default(question)
-  isPlaying       Boolean           @default(false)
-  currentQuestion Int               @default(0)
-  createdAt       DateTime          @default(now())
-  GameLeaderboard GameLeaderboard[]
-  creator         User              @relation(fields: [creatorId], references: [id], onDelete: Cascade)
-  quiz            Quiz              @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  gameCode        String     @unique
+  gameState       GameStates @default(question)
+  isPlaying       Boolean    @default(false)
+  currentQuestion Int        @default(0)
+  createdAt       DateTime   @default(now())
+  creator         User       @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  quiz            Quiz       @relation(fields: [quizId], references: [id], onDelete: Cascade)
   players         Player[]
-  PlayerAnswer    PlayerAnswer[]
 }
 
-model GameLeaderboard {
-  id            String      @id @default(cuid())
-  playerId      String
-  gameSessionId String?
-  score         Int         @default(0)
-  GameSession   GameSession? @relation(fields: [gameSessionId], references: [id], onDelete: SetNull)
-  Player        Player      @relation(fields: [playerId], references: [id], onDelete: Cascade)
-
-  @@unique([playerId, gameSessionId])
-}
-
-model PlayerAnswer {
-  id            String      @id @default(cuid())
-  playerId      String
-  questionId    String
-  optionId      String
-  gameSessionId String
-  timeTaken     Int
-  isCorrect     Boolean
-  score         Int         @default(0)
-  GameSession   GameSession @relation(fields: [gameSessionId], references: [id], onDelete: Cascade)
-  Option        Option      @relation(fields: [optionId], references: [id], onDelete: Cascade)
-  Player        Player      @relation(fields: [playerId], references: [id], onDelete: Cascade)
-  Question      Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
-
-  @@unique([playerId, questionId, gameSessionId])
-}
 
 enum GameStates {
   question
   answer
   leaderboard
+}
+
+enum GameMode {
+  classic
+  duel
+}
+
+/// Immutable record of a finished game. Live state lives in Redis during
+/// play; this (plus its entries) is the only thing that survives a game.
+model GameResult {
+  id            String            @id @default(cuid())
+  gameCode      String
+  mode          GameMode          @default(classic)
+  quizId        String?
+  quizTitle     String
+  hostId        String?
+  playerCount   Int
+  questionCount Int
+  startedAt     DateTime
+  endedAt       DateTime          @default(now())
+  entries       GameResultEntry[]
+  quiz          Quiz?             @relation(fields: [quizId], references: [id], onDelete: SetNull)
+  host          User?             @relation(fields: [hostId], references: [id], onDelete: SetNull)
+
+  @@index([hostId])
+  @@index([quizId])
+}
+
+model GameResultEntry {
+  id           String     @id @default(cuid())
+  gameResultId String
+  /// Snapshot — players are ephemeral rows that don't survive the game.
+  playerName   String
+  profilePic   String?
+  /// Set for logged-in (duel) participants.
+  userId       String?
+  score        Int
+  rank         Int
+  correctCount Int
+  eloBefore    Int?
+  eloAfter     Int?
+  result       GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

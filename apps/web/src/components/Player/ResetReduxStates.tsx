@@ -1,13 +1,13 @@
 "use client";
 import { useEffect } from "react";
 import { useAppDispatch } from "@/state/hooks";
-import { setScreenStatus, ScreenStatus } from "@/state/player/screenSlice";
+import { resetGame } from "@/state/game/gameSlice";
 
 const ResetReduxStates = () => {
   const dispatch = useAppDispatch();
   useEffect(() => {
     if (typeof window !== "undefined") {
-      dispatch(setScreenStatus(ScreenStatus.lobby));
+      dispatch(resetGame());
     }
   }, [dispatch]);
   return <></>;

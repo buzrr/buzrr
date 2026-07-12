@@ -40,9 +40,17 @@ export class GameSessionsController {
     return this.gameSessions.getPlayerPlayContext(playerId);
   }
 
-  @Get("by-code/:gameCode/leaderboard")
-  leaderboardByCode(@Param("gameCode") gameCode: string) {
-    return this.gameSessions.leaderboardByCode(gameCode);
+  @Get("history")
+  history(@CurrentAccountUser() user: AuthUser) {
+    return this.gameSessions.getHistory(user);
+  }
+
+  @Get("results/:resultId")
+  result(
+    @CurrentAccountUser() user: AuthUser,
+    @Param("resultId") resultId: string,
+  ) {
+    return this.gameSessions.getResult(user, resultId);
   }
 
   @Get(":roomId/lobby")
@@ -51,11 +59,6 @@ export class GameSessionsController {
     @Param("roomId") roomId: string,
   ) {
     return this.gameSessions.getAdminLobby(user, roomId);
-  }
-
-  @Get(":roomId/leaderboard")
-  leaderboardByRoom(@Param("roomId") roomId: string) {
-    return this.gameSessions.leaderboardByRoomId(roomId);
   }
 
   @Post()

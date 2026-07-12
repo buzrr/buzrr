@@ -1,12 +1,17 @@
 import { Logger } from "@nestjs/common";
 import {
   OnGatewayConnection,
+  OnGatewayDisconnect,
+  OnGatewayInit,
   WebSocketGateway,
   WebSocketServer,
 } from "@nestjs/websockets";
-import { Server, Socket } from "socket.io";
 import { parseCorsOrigin } from "../../common/utils/parse-cors-origin";
+import { MatchmakingService } from "../duel/matchmaking.service";
+import { GameEngineService } from "../game-engine/game-engine.service";
+import { GameStoreService } from "../game-engine/game-store.service";
 import { RealtimeService } from "./realtime.service";
+import type { TypedServer, TypedSocket } from "./realtime.types";
 
 @WebSocketGateway({
   cors: {
@@ -15,16 +20,27 @@ import { RealtimeService } from "./realtime.service";
     allowedHeaders: ["*"],
   },
 })
-export class RealtimeGateway implements OnGatewayConnection {
+export class RealtimeGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   private readonly logger = new Logger(RealtimeGateway.name);
 
   @WebSocketServer()
-  server: Server;
+  server: TypedServer;
 
-  constructor(private readonly realtimeService: RealtimeService) {}
+  constructor(
+    private readonly realtimeService: RealtimeService,
+    private readonly engine: GameEngineService,
+    private readonly store: GameStoreService,
+    private readonly matchmaking: MatchmakingService,
+  ) {}
 
-  async handleConnection(socket: Socket): Promise<void> {
-    const io = this.server;
+  afterInit(server: TypedServer): void {
+    this.engine.setServer(server);
+    this.matchmaking.setServer(server);
+  }
+
+  async handleConnection(socket: TypedSocket): Promise<void> {
     this.logger.log(`New connection: ${socket.id}`);
 
     try {
@@ -36,41 +52,179 @@ export class RealtimeGateway implements OnGatewayConnection {
         return;
       }
 
+      if (result.userType === "duel") {
+        await this.handleDuelConnection(socket, result.user, result.gameCode);
+        return;
+      }
+
       const { gameCode, gameSessionId, isRoomHost, player, userType } = result;
 
+      socket.data = {
+        gameCode,
+        gameSessionId,
+        isRoomHost,
+        playerId: player?.id ?? null,
+      };
+
       await socket.join(gameCode);
+      await this.engine.ensureLiveSession(gameCode, {
+        sessionId: gameSessionId,
+        quizId: result.quizId,
+        hostId: result.hostId,
+      });
 
       this.logger.log(
         `${userType === "player" ? `Player: ${player?.id}` : `Admin`} SocketId: ${socket.id} joined Game: ${gameCode}`,
       );
 
       if (userType === "player" && player) {
-        io.to(gameCode).emit("player-joined", player);
+        await socket.join(`player:${player.id}`);
+        await this.engine.playerConnected(gameCode, {
+          id: player.id,
+          name: player.name,
+          profilePic: player.profilePic,
+        });
+        this.server.to(gameCode).emit("player-joined", player);
       }
 
-      if (!isRoomHost) return;
+      if (isRoomHost) {
+        await this.engine.hostConnected(gameCode, true);
+        this.registerHostHandlers(socket, gameCode);
+      } else {
+        this.registerPlayerHandlers(socket, gameCode);
+      }
 
-      this.registerHostHandlers(socket, io, gameCode, gameSessionId);
+      socket.on("request-sync", () => {
+        void this.sendSnapshot(socket);
+      });
+
+      // Bring late joiners and reconnecting clients up to date immediately.
+      await this.sendSnapshot(socket);
     } catch (err) {
       this.handleConnectionError(err, socket);
     }
   }
 
-  private registerHostHandlers(
-    socket: Socket,
-    io: Server,
+  /**
+   * Duel connections come in two flavors: queue (no gameCode — the player is
+   * waiting for a match) and game (the Redis-only duel room).
+   */
+  private async handleDuelConnection(
+    socket: TypedSocket,
+    user: {
+      id: string;
+      name: string | null;
+      image: string | null;
+      eloRating: number;
+    },
     gameCode: string,
-    gameSessionId: string,
-  ) {
+  ): Promise<void> {
+    await socket.join(`player:${user.id}`);
+
+    if (!gameCode) {
+      socket.data = {
+        gameCode: "",
+        gameSessionId: "",
+        isRoomHost: false,
+        playerId: null,
+        duelUserId: user.id,
+      };
+      this.logger.log(`Duel queue connection: ${user.id}`);
+
+      const enqueue = async () => {
+        try {
+          await this.matchmaking.enqueue({
+            id: user.id,
+            name: user.name ?? "Player",
+            image: user.image,
+            elo: user.eloRating,
+          });
+        } catch (error) {
+          this.logger.error("Error joining duel queue:", error);
+          socket.emit("duel:error", { message: "Could not join the queue" });
+        }
+      };
+
+      socket.on("duel:queue", () => void enqueue());
+      // Enqueue server-side too: the client emits duel:queue on connect,
+      // which can arrive while validateConnection is still running — before
+      // this handler exists — and socket.io drops events with no listener.
+      await enqueue();
+      socket.on("duel:cancel", () => {
+        void this.matchmaking
+          .dequeue(user.id)
+          .catch((error) =>
+            this.logger.error("Error leaving duel queue:", error),
+          );
+      });
+      return;
+    }
+
+    // Duel game connection — only the two matched players may join.
+    const entry = await this.store.getPlayer(gameCode, user.id);
+    if (!entry) {
+      this.logger.log(
+        `User ${user.id} is not part of duel ${gameCode} — disconnecting`,
+      );
+      socket.disconnect();
+      return;
+    }
+
+    socket.data = {
+      gameCode,
+      gameSessionId: "",
+      isRoomHost: false,
+      playerId: user.id,
+    };
+    await socket.join(gameCode);
+    await this.engine.playerConnected(gameCode, {
+      id: user.id,
+      name: entry.name,
+      profilePic: entry.profilePic,
+    });
+    this.registerPlayerHandlers(socket, gameCode);
+    socket.on("request-sync", () => {
+      void this.sendSnapshot(socket);
+    });
+    await this.sendSnapshot(socket);
+    this.logger.log(`User ${user.id} joined duel ${gameCode}`);
+  }
+
+  async handleDisconnect(socket: TypedSocket): Promise<void> {
+    const data = socket.data;
+    if (data?.duelUserId) {
+      await this.matchmaking
+        .dequeue(data.duelUserId)
+        .catch((err) => this.logger.error("Error dequeuing on disconnect", err));
+      return;
+    }
+    if (!data?.gameCode) return;
+    try {
+      if (data.isRoomHost) {
+        await this.engine.hostConnected(data.gameCode, false);
+        this.logger.log(`Host left game ${data.gameCode}`);
+      } else if (data.playerId) {
+        await this.engine.playerDisconnected(data.gameCode, data.playerId);
+        this.logger.log(
+          `Player ${data.playerId} disconnected from ${data.gameCode}`,
+        );
+      }
+    } catch (err) {
+      this.logger.error("Error handling disconnect:", err);
+    }
+  }
+
+  private registerHostHandlers(socket: TypedSocket, gameCode: string): void {
     socket.on("remove-player", async (p: { id: string }) => {
       try {
         const removed = await this.realtimeService.removePlayer(
           p.id,
-          gameSessionId,
+          socket.data.gameSessionId,
         );
+        await this.engine.removePlayer(gameCode, p.id);
         if (removed) {
           this.logger.log(`Player ${p.id} removed from ${gameCode}`);
-          io.to(gameCode).emit("player-removed", p);
+          this.server.to(gameCode).emit("player-removed", p);
         }
       } catch (error) {
         this.logger.error("Error removing player:", error);
@@ -79,81 +233,93 @@ export class RealtimeGateway implements OnGatewayConnection {
 
     socket.on("start-game", async () => {
       try {
-        await this.realtimeService.startGame(gameCode);
-        this.logger.log(`Game ${gameCode} started`);
-        io.to(gameCode).emit("game-started");
+        await this.engine.startGame(gameCode);
       } catch (error) {
         this.logger.error("Error starting game:", error);
       }
     });
 
-    socket.on("start-timer", () => {
-      io.to(gameCode).emit("timer-starts");
-    });
-
-    socket.on("set-question-index", async (_gc: string, index: number) => {
+    socket.on("host-next", async () => {
       try {
-        await this.realtimeService.setQuestionIndex(gameCode, index);
-        this.logger.log(`Question index ${index} for Game ${gameCode}`);
-        io.to(gameCode).emit("get-question-index", index);
+        await this.engine.hostNext(gameCode);
       } catch (error) {
-        this.logger.error("Error setting question index:", error);
-      }
-    });
-
-    socket.on("change-question", async (_gc: string, index: number) => {
-      try {
-        await this.realtimeService.setQuestionIndex(gameCode, index);
-        this.logger.log(`Question changed to ${index} for Game ${gameCode}`);
-        io.to(gameCode).emit("question-changed", index);
-      } catch (error) {
-        this.logger.error("Error changing question:", error);
-      }
-    });
-
-    socket.on(
-      "display-result",
-      async (_gc: string, quesId: string, options: { id: string }[]) => {
-        try {
-          const data = await this.realtimeService.getResultData(
-            gameCode,
-            quesId,
-            options,
-          );
-          io.to(gameCode).emit("displaying-result", data);
-        } catch (error) {
-          this.logger.error("Error displaying result:", error);
-        }
-      },
-    );
-
-    socket.on("display-leaderboard", () => {
-      io.to(gameCode).emit("displaying-leaderboard");
-    });
-
-    socket.on("final-leaderboard", async () => {
-      try {
-        const leaderboard =
-          await this.realtimeService.getFinalLeaderboard(gameCode);
-        io.to(gameCode).emit("displaying-final-leaderboard", leaderboard);
-      } catch (error) {
-        this.logger.error("Error displaying final leaderboard:", error);
+        this.logger.error("Error advancing game:", error);
       }
     });
 
     socket.on("end-game-session", async () => {
       try {
-        const ended = await this.realtimeService.endGameSession(gameCode);
-        if (ended) {
-          io.to(gameCode).emit("game-session-ended");
-        }
+        await this.engine.endGame(gameCode);
       } catch (error) {
         this.logger.error("Error ending game session:", error);
       }
     });
+
+    // Legacy v1 host events, accepted as pacing aliases until the web client
+    // is fully migrated. The server ignores every client-supplied index/id —
+    // it alone decides what comes next.
+    const legacyNext = () => {
+      void this.engine
+        .hostNext(gameCode)
+        .catch((error) => this.logger.error("Error advancing game:", error));
+    };
+    socket.on("start-timer", () => {
+      // No-op: the server starts timing when it enters the question phase.
+    });
+    socket.on("set-question-index", legacyNext);
+    socket.on("change-question", legacyNext);
+    socket.on("display-result", legacyNext);
+    socket.on("final-leaderboard", legacyNext);
+    socket.on("display-leaderboard", () => {
+      // No-op: leaderboards are pushed by the engine.
+    });
   }
 
-  private handleConnectionError(err: unknown, socket: Socket) {
+  private registerPlayerHandlers(socket: TypedSocket, gameCode: string): void {
+    socket.on("submit-answer", async (payload, ack) => {
+      try {
+        const playerId = socket.data.playerId;
+        if (!playerId) {
+          ack?.({ accepted: false, reason: "Not a player connection" });
+          return;
+        }
+        if (
+          !payload ||
+          typeof payload.qIndex !== "number" ||
+          typeof payload.optionId !== "string"
+        ) {
+          ack?.({ accepted: false, reason: "Malformed payload" });
+          return;
+        }
+        const result = await this.engine.submitAnswer(
+          gameCode,
+          playerId,
+          payload.qIndex,
+          payload.optionId,
+        );
+        ack?.(result);
+      } catch (error) {
+        this.logger.error("Error submitting answer:", error);
+        ack?.({ accepted: false, reason: "Internal error" });
+      }
+    });
+  }
+
+  private async sendSnapshot(socket: TypedSocket): Promise<void> {
+    try {
+      const snapshot = await this.engine.getSnapshot(
+        socket.data.gameCode,
+        socket.data.playerId,
+      );
+      if (snapshot) {
+        socket.emit("state-sync", snapshot);
+      }
+    } catch (error) {
+      this.logger.error("Error sending state snapshot:", error);
+    }
+  }
+
+  private handleConnectionError(err: unknown, socket: TypedSocket) {
     const code =
       err && typeof err === "object" && "code" in err
         ? (err as { code: string }).code

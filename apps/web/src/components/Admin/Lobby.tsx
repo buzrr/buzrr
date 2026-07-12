@@ -5,8 +5,6 @@ import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import { setPlayers } from "@/state/admin/playersSlice";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ScreenStatus, setScreenStatus } from "@/state/admin/screenSlice";
-import { resetTimer } from "@/state/timer/timerSlice";
 import { RxCross2 } from "react-icons/rx";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -28,15 +26,12 @@ const Lobby = (params: {
 }) => {
   const dispatch = useAppDispatch();
   const players = useAppSelector((state) => state.player.players);
-  const socket = useAppSelector((state) => state.socket.socket);
   const [endGame, setEndGame] = useState(false);
   const [load, setLoad] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     if (params?.gameStarted) {
-      dispatch(resetTimer(3));
-      dispatch(setScreenStatus(ScreenStatus.wait));
       router.push(`/admin/game/${params.roomId}`);
     }
 
@@ -45,12 +40,10 @@ const Lobby = (params: {
 
   const handleGameStarted = useCallback(() => {
     setLoad(false);
-    dispatch(resetTimer(3));
-    dispatch(setScreenStatus(ScreenStatus.wait));
     router.push(`/admin/game/${params.roomId}`);
-  }, [dispatch, params.roomId, router]);
+  }, [params.roomId, router]);
 
-  useAdminSocket({
+  const { socket } = useAdminSocket({
     userId: params.userId,
     gameCode: params.gameCode,
     onPlayerRemoved: (player) => {
@@ -113,7 +106,7 @@ const Lobby = (params: {
         Stop Hosting
       </Button>
 
-      <div className="bg-white dark:bg-dark md:rounded-xl md:mx-8 py-10 my-4 h-[81vh] px-6 relative flex flex-col items-center">
+      <div className="bg-white dark:bg-dark md:rounded-xl md:mx-8 py-10 my-4 min-h-[81dvh] px-6 relative flex flex-col items-center">
         <h1 className="font-extrabold text-3xl md:text-4xl italic dark:text-white mb-6 text-center">
           {params?.quizTitle}
         </h1>

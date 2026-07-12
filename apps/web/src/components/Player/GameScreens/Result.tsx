@@ -1,39 +1,39 @@
 import React from "react";
-import { ResultStatus } from "@/state/player/resultSlice";
 import QuestionAndResult from "./QuesAndResult";
+import type { AnswerResultPayload } from "@/types/socket-events";
 
+/**
+ * Reveal-phase outcome, rendered from the server-pushed personal result:
+ * no answer → timeout; otherwise correct/incorrect with the awarded points.
+ */
 const Result = (params: {
-  result: ResultStatus;
-  points?: number;
+  you: AnswerResultPayload | null;
   gameCode: string;
   quizTitle: string;
 }) => {
+  const you = params.you;
+
   return (
     <>
-      {params.result === ResultStatus.timeout ? (
+      {!you || !you.answered ? (
         <QuestionAndResult
           quizTitle={params.quizTitle}
-          quesTime={0}
           gameCode={params.gameCode}
           screen="result"
           status="timesout"
           message="You ran out of time"
         />
-      ) : params.result === ResultStatus.correct ? (
+      ) : you.isCorrect ? (
         <QuestionAndResult
           quizTitle={params.quizTitle}
-          quesTime={0}
           gameCode={params.gameCode}
           screen="result"
           status="correct"
-          message={
-            params.points ? `${params.points}` : "Your answer was correct"
-          }
+          message={you.score ? `+${you.score} points` : "Your answer was correct"}
         />
       ) : (
         <QuestionAndResult
           quizTitle={params.quizTitle}
-          quesTime={0}
           gameCode={params.gameCode}
           screen="result"
           status="incorrect"

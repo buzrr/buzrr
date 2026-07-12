@@ -2,10 +2,10 @@
 import { useEffect } from "react";
 import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import { setPlayers } from "@/state/admin/playersSlice";
-import { ScreenStatus } from "@/state/admin/screenSlice";
 import type { Option } from "@/types/db";
 import type { PlayerPayload } from "@/types/socket-events";
 import { useAdminSocket } from "@/hooks/useAdminSocket";
+import ConnectionBanner from "@/components/ConnectionBanner";
 import WaitScreen from "./WaitScreen";
 import QuestionScreen from "./QuestionScreen";
 import QuesResult from "./QuesResult";
@@ -25,6 +25,10 @@ interface QuizQuestion {
   questions?: QuizQuestionItem[];
 }
 
+/**
+ * Pure phase switch: the server pushes the current phase and this component
+ * renders it. No timers or advancement decisions live on the client anymore.
+ */
 const GameLobby = (params: {
   roomId: string;
   userId: string;
@@ -34,14 +38,13 @@ const GameLobby = (params: {
   currentQues: number;
 }) => {
   const dispatch = useAppDispatch();
-  const socket = useAppSelector((state) => state.socket.socket);
-  const screen = useAppSelector((state) => state.adminScreen.screenStatus);
+  const phase = useAppSelector((state) => state.game.phase);
 
   useEffect(() => {
     dispatch(setPlayers(params.players));
   }, [dispatch, params.players]);
 
-  useAdminSocket({
+  const { socket } = useAdminSocket({
     userId: params.userId,
     gameCode: params.gameCode,
   });
@@ -52,20 +55,24 @@ const GameLobby = (params: {
 
   return (
     <>
-      {screen === ScreenStatus.wait ? (
-        <WaitScreen
-          currentQues={params.currentQues}
+      <ConnectionBanner />
+      {phase === "question" ? (
+        <QuestionScreen
           socket={socket}
           gameCode={params.gameCode}
+          quizTitle={params.quizQuestions?.title}
         />
-      ) : screen === ScreenStatus.question ? (
-        <QuestionScreen {...params} socket={socket} />
-      ) : screen === ScreenStatus.result ? (
-        <QuesResult {...params} socket={socket} />
+      ) : phase === "reveal" ? (
+        <QuesResult socket={socket} />
+      ) : phase === "final" || phase === "ended" ? (
+        <LeaderBoard
+          socket={socket}
+          gameCode={params.gameCode}
+          quizQuestions={params.quizQuestions}
+        />
       ) : (
-        screen === ScreenStatus.leaderboard && (
-          <LeaderBoard {...params} socket={socket} />
-        )
+        // idle / lobby / starting — the pre-question countdown screen
+        <WaitScreen />
       )}
     </>
   );

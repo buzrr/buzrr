@@ -41,6 +41,9 @@ yarn-error.log*
 # Prisma
 packages/prisma/generated/
 
+# Yarn local cache state
+.yarn/install-state.gz
+
 # Misc
 .DS_Store
 *.pem

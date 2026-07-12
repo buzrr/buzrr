@@ -9,58 +9,69 @@ import {
   Result,
   LeaderBoard,
 } from "./GameScreens";
-import { ScreenStatus } from "@/state/player/screenSlice";
+import ConnectionBanner from "@/components/ConnectionBanner";
 import { usePlayerSocket } from "@/hooks/usePlayerSocket";
 
 interface GameSessionWithQuiz extends GameSession {
   quiz: {
     title?: string;
-    questions: { id: string; title?: string; options?: { id: string; title: string }[] }[];
+    questions: {
+      id: string;
+      title?: string;
+      options?: { id: string; title: string }[];
+    }[];
   };
 }
 
-const GamePage = (params: { player: { id: string }; game: GameSessionWithQuiz }) => {
+/**
+ * Pure phase switch driven by server-pushed state. The question payload
+ * arrives over the socket (`question-start` / `state-sync`), so no quiz
+ * pre-fetch is needed for gameplay.
+ */
+const GamePage = (params: {
+  player: { id: string };
+  game: GameSessionWithQuiz;
+}) => {
   const game = params.game;
   const router = useRouter();
 
-  const screen = useAppSelector((state) => state.screen.screenStatus);
-  const result = useAppSelector((state) => state.playerResult.resultStatus);
+  const phase = useAppSelector((state) => state.game.phase);
+  const question = useAppSelector((state) => state.game.question);
+  const you = useAppSelector((state) => state.game.you);
 
-  const { socket, questionIndex, currentQuestion, stats } = usePlayerSocket({
+  const { socket } = usePlayerSocket({
     playerId: params.player.id,
     gameCode: game.gameCode,
-    questions: game.quiz.questions,
     onRemoved: () => router.push("/player"),
   });
 
   return (
     <>
-      {screen === ScreenStatus.lobby ? (
+      <ConnectionBanner />
+      {phase === "idle" || phase === "lobby" ? (
         <WaitGameStart player={params.player} game={params.game} />
-      ) : screen === ScreenStatus.question ? (
-        currentQuestion && socket ? (
+      ) : phase === "question" ? (
+        question && socket ? (
           <Question
-            question={{ ...currentQuestion, options: currentQuestion.options ?? [] }}
-            gameSessionId={params.game.id}
-            playerId={params.player.id}
+            question={question}
             socket={socket}
-            currentQuestion={questionIndex}
             quizTitle={game.quiz.title ?? ""}
-            gameCode={params.game.gameCode}
+            gameCode={game.gameCode}
           />
         ) : (
           <Loader />
         )
-      ) : screen === ScreenStatus.result ? (
+      ) : phase === "reveal" ? (
         <Result
-          result={result}
-          gameCode={params.game.gameCode}
+          you={you}
+          gameCode={game.gameCode}
           quizTitle={game.quiz.title ?? ""}
         />
-      ) : screen === ScreenStatus.wait ? (
-        <Loader />
+      ) : phase === "final" || phase === "ended" ? (
+        <LeaderBoard position={you?.rank ?? null} score={you?.totalScore ?? 0} />
       ) : (
-        <LeaderBoard position={stats.position} score={stats.score} />
+        // "starting" — the pre-question countdown
+        <Loader />
       )}
     </>
   );

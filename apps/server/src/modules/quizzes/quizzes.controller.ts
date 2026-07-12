@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from "@nestjs/common";
@@ -15,6 +16,7 @@ import { RateLimitProfile } from "../../common/decorators/rate-limit-profile.dec
 import { RateLimitGuard } from "../../common/guards/rate-limit.guard";
 import { CreateAiQuizDto } from "./dto/create-ai-quiz.dto";
 import { CreateQuizDto } from "./dto/create-quiz.dto";
+import { UpdateQuizDto } from "./dto/update-quiz.dto";
 import { QuizzesService } from "./quizzes.service";
 
 @Controller("quizzes")
@@ -41,6 +43,15 @@ export class QuizzesController {
   @RateLimitProfile("ai")
   createAi(@CurrentAccountUser() user: AuthUser, @Body() dto: CreateAiQuizDto) {
     return this.quizzes.createWithAi(user, dto);
+  }
+
+  @Patch(":id")
+  update(
+    @CurrentAccountUser() user: AuthUser,
+    @Param("id") id: string,
+    @Body() dto: UpdateQuizDto,
+  ) {
+    return this.quizzes.update(user, id, dto);
   }
 
   @Delete(":id")

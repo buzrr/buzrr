@@ -3,21 +3,22 @@ import { DEFAULT_AVATAR } from "@/constants";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAppSelector } from "@/state/hooks";
+import type { GameSocket } from "@/types/socket-events";
 
 interface LeaderBoardProps {
   gameCode: string;
   quizQuestions?: { id?: string };
-  socket: { emit: (event: string, gameCode: string) => void };
+  socket: GameSocket;
 }
 
 export default function LeaderBoard(props: LeaderBoardProps) {
-  const leaderboard = useAppSelector((state) => state.player.leaderboard);
-  const { gameCode, quizQuestions } = props;
+  const leaderboard = useAppSelector((state) => state.game.leaderboard);
+  const { quizQuestions } = props;
   const socket = props.socket;
   const router = useRouter();
 
   function handleEnd() {
-    socket.emit("end-game-session", gameCode);
+    socket.emit("end-game-session");
     router.push(`/admin/quiz/${quizQuestions?.id}`);
   }
 
@@ -41,7 +42,7 @@ export default function LeaderBoard(props: LeaderBoardProps) {
             ? firstThree.map((lead, index) => {
                 return (
                   <div
-                    key={index}
+                    key={lead.playerId}
                     className={clsx(
                     "flex md:flex-col md:justify-center items-center w-full md:w-[25vw] p-2 md:p-4 my-2 rounded-lg border-2 *:my-1",
                     index === 0 && "md:order-2 order-0 border-yellow-500",
@@ -75,17 +76,14 @@ export default function LeaderBoard(props: LeaderBoardProps) {
                     )}
                     <div className="flex flex-row items-center gap-x-2 ml-3">
                       <Image
-                        src={
-                          lead.Player?.profilePic ||
-                          DEFAULT_AVATAR
-                        }
+                        src={lead.profilePic || DEFAULT_AVATAR}
                         className="w-12 h-12 rounded-full"
                         width={50}
                         height={50}
                         alt="profile pic"
                       />
                       <p className="text-base md:text-xl font-black wrap-break-word md:w-fit w-[40%]">
-                        {lead.Player?.name}
+                        {lead.name}
                       </p>
                     </div>
                     <p className="text-xs md:text-sm text-off-dark dark:text-off-white ml-auto md:ml-0">
@@ -96,27 +94,24 @@ export default function LeaderBoard(props: LeaderBoardProps) {
               })
             : ""}
         </div>
-        <div className="flex flex-col items-center gap-4 my-3 py-3 px-2 w-[95vw] max-h-[35vh] overflow-y-auto rounded-2xl">
+        <div className="flex flex-col items-center gap-4 my-3 py-3 px-2 w-[95vw] max-h-[35dvh] overflow-y-auto rounded-2xl">
           {leaderboardRest.length > 0
-            ? leaderboardRest.map((lead, index) => {
+            ? leaderboardRest.map((lead) => {
                 return (
                   <div
-                    key={index}
+                    key={lead.playerId}
                     className="flex items-center w-full py-2 px-6 bg-white rounded-lg"
                   >
-                    <span className="text-3xl mr-3">{index + 4}</span>
+                    <span className="text-3xl mr-3">{lead.rank}</span>
                     <div className="flex flex-row items-center gap-x-2 z-20">
                       <Image
-                        src={
-                          lead.Player?.profilePic ||
-                          DEFAULT_AVATAR
-                        }
+                        src={lead.profilePic || DEFAULT_AVATAR}
                         className="w-12 h-12 rounded-full"
                         width={50}
                         height={50}
                         alt="profile pic"
                       />
-                      <p>{lead.Player?.name}</p>
+                      <p>{lead.name}</p>
                     </div>
                     <p className="ml-auto">{lead.score}</p>
                   </div>

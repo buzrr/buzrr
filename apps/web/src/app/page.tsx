@@ -25,12 +25,20 @@ export default function Home() {
           <p className="text-sm text-center md:text-start text-dark dark:text-white my-4">
             Press play to join rooms
           </p>
-          <Link
-            href="/player"
-            className="p-2 md:px-16 mt-20 md:mt-4 mx-auto md:mx-0 w-[80%] block md:w-[65%] text-lg font-black text-center bg-lprimary dark:bg-dprimary text-white dark:text-dark rounded-lg"
-          >
-            PLAY
-          </Link>
+          <div className="mt-16 flex flex-col gap-y-6">
+            <Link
+              href="/duel"
+              className="p-2 mt-4 mx-auto md:mx-0 w-[80%] block md:w-[65%] text-lg font-black text-center  bg-lprimary dark:bg-dprimary text-white dark:text-dark rounded-lg"
+            >
+              PLAY 1v1 DUEL
+            </Link>
+            <Link
+              href="/player"
+              className="p-2 md:mt-4 mx-auto md:mx-0 w-[80%] block md:w-[65%] text-lg font-black text-center border-2 border-lprimary dark:border-dprimary text-lprimary dark:text-dprimary rounded-lg"
+            >
+              JOIN A ROOM
+            </Link>
+          </div>
           <Link
             href="/admin"
             className="w-fit text-sm mt-auto self-center text-lprimary dark:text-dprimary font-bold"
