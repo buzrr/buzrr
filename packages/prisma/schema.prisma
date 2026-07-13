@@ -17,13 +17,11 @@ model Account {
   accessToken           String?   @map("access_token")
   scope                 String?
   idToken               String?   @map("id_token")
-  accessTokenExpiresAt  DateTime?
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
   createdAt             DateTime  @default(now()) @map("created_at")
   password              String?
-  refreshTokenExpiresAt DateTime?
-  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at")
-  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
   refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
+  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at")
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([providerId, accountId])
@@ -36,9 +34,7 @@ model Session {
   userId    String   @map("user_id")
   expiresAt DateTime @map("expires")
   createdAt DateTime @default(now()) @map("created_at")
-  ipAddress String?
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
-  userAgent String?
   ipAddress String?  @map("ip_address")
   userAgent String?  @map("user_agent")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
