@@ -30,6 +30,36 @@ const NUMERIC_META = new Set([
 ]);
 const BOOLEAN_META = new Set(["hostConnected"]);
 
+// ARGV: [1]=sessionId (HSETNX guard value), [2]=TTL, [3..]=flattened meta pairs.
+const INIT_META_SCRIPT = `
+local created = redis.call('HSETNX', KEYS[1], 'sessionId', ARGV[1])
+if created == 1 then
+  redis.call('HSET', KEYS[1], unpack(ARGV, 3))
+  redis.call('EXPIRE', KEYS[1], ARGV[2])
+end
+return created
+`;
+
+// Renews the owner TTL only if it's still held by the calling instance.
+const RENEW_OWNER_SCRIPT = `
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  redis.call('PEXPIRE', KEYS[1], ARGV[2])
+  return 1
+end
+return 0
+`;
+
+// Claims the ended-game transition so only one caller persists the result.
+const CLAIM_ENDED_SCRIPT = `
+local phase = redis.call('HGET', KEYS[1], 'phase')
+if phase == 'ended' or phase == false then
+  return 0
+end
+redis.call('HSET', KEYS[1], 'phase', 'ended', 'qDeadline', '0')
+redis.call('EXPIRE', KEYS[1], ARGV[1])
+return 1
+`;
+
 /**
  * Redis access layer for live game sessions. All state that changes during a
  * running game lives here; Postgres only sees the lobby record and (later)
@@ -54,32 +84,55 @@ export class GameStoreService {
   }
 
   async patchMeta(code: string, patch: Partial<GameMeta>): Promise<void> {
-    const flat: Record<string, string> = {};
-    for (const [k, v] of Object.entries(patch)) {
-      if (v === undefined) continue;
-      if (typeof v === "boolean") flat[k] = v ? "1" : "0";
-      else flat[k] = String(v);
+    const flat = this.flattenMeta(patch);
+    if (flat.length === 0) return;
+    const record: Record<string, string> = {};
+    for (let i = 0; i < flat.length; i += 2) {
+      record[flat[i]] = flat[i + 1];
     }
-    if (Object.keys(flat).length === 0) return;
     await this.redis
       .multi()
-      .hset(keys.meta(code), flat)
+      .hset(keys.meta(code), record)
       .expire(keys.meta(code), TTL_SECONDS)
       .exec();
   }
 
   /** Create the meta record if it does not exist yet. Returns true if created. */
   async initMeta(code: string, meta: GameMeta): Promise<boolean> {
-    const created = await this.redis.hsetnx(
+    const flat = this.flattenMeta(meta);
+    const created = await this.redis.eval(
+      INIT_META_SCRIPT,
+      1,
       keys.meta(code),
-      "sessionId",
       meta.sessionId,
+      TTL_SECONDS,
+      ...flat,
     );
-    if (created === 1) {
-      await this.patchMeta(code, meta);
-      return true;
+    return created === 1;
+  }
+
+  /**
+   * Atomically transitions phase to "ended". Returns false if another caller
+   * already claimed it (or the game is gone), so only one claimant persists
+   * the result and cleans up.
+   */
+  async claimEnded(code: string): Promise<boolean> {
+    const claimed = await this.redis.eval(
+      CLAIM_ENDED_SCRIPT,
+      1,
+      keys.meta(code),
+      TTL_SECONDS,
+    );
+    return claimed === 1;
+  }
+
+  private flattenMeta(patch: Partial<GameMeta>): string[] {
+    const flat: string[] = [];
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === undefined) continue;
+      flat.push(k, typeof v === "boolean" ? (v ? "1" : "0") : String(v));
     }
-    return false;
+    return flat;
   }
 
   // -- questions -----------------------------------------------------------
@@ -108,12 +161,12 @@ export class GameStoreService {
     answer: StoredAnswer,
   ): Promise<boolean> {
     const key = keys.answers(code, qIndex);
-    const set = await this.redis.hsetnx(key, playerId, JSON.stringify(answer));
-    if (set === 1) {
-      await this.redis.expire(key, TTL_SECONDS);
-      return true;
-    }
-    return false;
+    const [[, set]] = (await this.redis
+      .multi()
+      .hsetnx(key, playerId, JSON.stringify(answer))
+      .expire(key, TTL_SECONDS)
+      .exec()) as [[Error | null, number]];
+    return set === 1;
   }
 
   async getAnswers(
@@ -225,12 +278,14 @@ export class GameStoreService {
       "NX",
     );
     if (acquired === "OK") return true;
-    const current = await this.redis.get(keys.owner(code));
-    if (current === instanceId) {
-      await this.redis.pexpire(keys.owner(code), 20_000);
-      return true;
-    }
-    return false;
+    const renewed = await this.redis.eval(
+      RENEW_OWNER_SCRIPT,
+      1,
+      keys.owner(code),
+      instanceId,
+      20_000,
+    );
+    return renewed === 1;
   }
 
   // -- cleanup -------------------------------------------------------------------

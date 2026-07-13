@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { toast } from "react-toastify";
 import HostQuizForm from "@/components/Admin/Quiz/HostQuizForm";
 import Switch from "@/components/ui/Switch";
+import { getApiErrorMessage } from "@/lib/api/errors";
 import { useUpdateQuizMutation } from "@/lib/modules/quizzes/hooks";
 import type { QuizDetail } from "@/lib/modules/quizzes/api";
 
@@ -38,7 +40,12 @@ export default function QuizInfoSection(props: { quiz: QuizDetail }) {
               checked={Boolean(props.quiz.isPublic)}
               disabled={updateQuiz.isPending}
               onCheckedChange={(checked) =>
-                updateQuiz.mutate({ quizId: props.quiz.id, isPublic: checked })
+                updateQuiz.mutate(
+                  { quizId: props.quiz.id, isPublic: checked },
+                  {
+                    onError: (err) => toast.error(getApiErrorMessage(err)),
+                  },
+                )
               }
             />
             <span className="text-sm">

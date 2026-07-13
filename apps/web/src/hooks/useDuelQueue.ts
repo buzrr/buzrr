@@ -79,6 +79,8 @@ export function useDuelQueue(options: {
     conn.on("connect_error", () => {
       setStatus("error");
       setError("Could not reach the matchmaking server.");
+      conn.disconnect();
+      socketRef.current = null;
     });
   }, []);
 

@@ -25,6 +25,7 @@ function applyTrustProxy(app: NestExpressApplication): void {
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.enableShutdownHooks();
   applyTrustProxy(app);
   app.useWebSocketAdapter(new RedisIoAdapter(app));
   app.enableCors({

@@ -126,6 +126,7 @@ export class GameSessionsService {
     return this.prisma.db.gameResult.findMany({
       where: { hostId: user.userId },
       orderBy: { endedAt: "desc" },
+      take: 50,
       include: { _count: { select: { entries: true } } },
     });
   }
@@ -139,7 +140,12 @@ export class GameSessionsService {
     if (!result) {
       throw new NotFoundException("Result not found");
     }
-    if (result.hostId && result.hostId !== user.userId) {
+    if (result.hostId) {
+      if (result.hostId !== user.userId) {
+        throw new ForbiddenException("Unauthorized");
+      }
+    } else if (!result.entries.some((e) => e.userId === user.userId)) {
+      // Hostless (duel) results have no host to own them — only participants may view.
       throw new ForbiddenException("Unauthorized");
     }
     return result;

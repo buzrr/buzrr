@@ -45,7 +45,6 @@ const GameLobby = (params: {
   }, [dispatch, params.players]);
 
   const { socket } = useAdminSocket({
-    userId: params.userId,
     gameCode: params.gameCode,
   });
 

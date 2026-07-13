@@ -6,7 +6,6 @@ import type { GameSocket, PlayerPayload } from "@/types/socket-events";
 import { useGameSocket } from "./useGameSocket";
 
 interface UseAdminSocketOptions {
-  userId: string;
   gameCode: string;
   onPlayerRemoved?: (player: PlayerPayload) => void;
   onGameStarted?: () => void;

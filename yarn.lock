@@ -7946,12 +7946,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"nanoid@npm:^5.1.2":
-  version: 5.1.14
-  resolution: "nanoid@npm:5.1.14"
+"nanoid@npm:^3.3.8":
+  version: 3.3.16
+  resolution: "nanoid@npm:3.3.16"
   bin:
-    nanoid: bin/nanoid.js
-  checksum: 10c0/275789f9a334355201352c5ec324f4ce171e0b0a0df6d911ee3c51eb1d1eaf839749bbb637aa47b8696a0918cd8a6ccc901b03d02bd510b057aa13f58018d92d
+    nanoid: bin/nanoid.cjs
+  checksum: 10c0/bbf2dcffe22d2b62d16de2711752070b539c0f644c7916f823ad6521986b2078cbe524f2d6240f58c46e9141ea0c7b87a029e100c0f7f175228cacaf30e41bba
   languageName: node
   linkType: hard
 
@@ -9588,7 +9588,7 @@ __metadata:
     cloudinary: "npm:^2.9.0"
     dotenv: "npm:^17.3.1"
     ioredis: "npm:^5.11.1"
-    nanoid: "npm:^5.1.2"
+    nanoid: "npm:^3.3.8"
     passport: "npm:^0.7.0"
     passport-jwt: "npm:^4.0.1"
     reflect-metadata: "npm:^0.2.2"

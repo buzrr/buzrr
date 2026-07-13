@@ -121,6 +121,7 @@ export class QuizzesService {
         },
         gameResults: {
           orderBy: { endedAt: "desc" },
+          take: 50,
         },
         _count: { select: { questions: true } },
       },

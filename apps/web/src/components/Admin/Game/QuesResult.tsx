@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useState } from "react";
 import { DEFAULT_AVATAR } from "@/constants";
 import { useAppSelector } from "@/state/hooks";
 import Image from "next/image";
@@ -35,6 +36,7 @@ export default function QuesResult(props: QuesResultProps) {
   const players = useAppSelector((state) => state.game.players);
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const qCount = useAppSelector((state) => state.game.qCount);
+  const [advancing, setAdvancing] = useState(false);
 
   const counts = reveal?.counts ?? [];
   const response = counts.reduce((sum, c) => sum + c, 0);
@@ -107,7 +109,14 @@ export default function QuesResult(props: QuesResultProps) {
                   : null}
               </div>
             </div>
-            <Button fullWidth onClick={() => socket.emit("host-next")}>
+            <Button
+              fullWidth
+              disabled={advancing}
+              onClick={() => {
+                setAdvancing(true);
+                socket.emit("host-next");
+              }}
+            >
               {isLastQuestion ? "Final Leaderboard" : "Next Question"}
             </Button>
           </div>

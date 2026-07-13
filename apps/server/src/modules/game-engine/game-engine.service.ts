@@ -255,8 +255,10 @@ export class GameEngineService
     this.clearTimer(gameCode);
     await this.store.clearDeadline(gameCode);
 
-    // Claim the transition first so a crash/retry can't persist twice.
-    await this.store.patchMeta(gameCode, { phase: "ended", qDeadline: 0 });
+    // Atomic claim: only the caller that flips phase -> "ended" persists the
+    // result and cleans up, so concurrent callers can't double-write.
+    const claimed = await this.store.claimEnded(gameCode);
+    if (!claimed) return;
 
     const entries = await this.buildLeaderboard(gameCode);
     const { resultId, eloChanges } = await this.persistResult(

@@ -44,7 +44,6 @@ const Lobby = (params: {
   }, [params.roomId, router]);
 
   const { socket } = useAdminSocket({
-    userId: params.userId,
     gameCode: params.gameCode,
     onPlayerRemoved: (player) => {
       toast.error(`You have removed ${player.name}`);

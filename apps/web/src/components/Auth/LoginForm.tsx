@@ -1,28 +1,37 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { authClient } from "@/lib/auth-client";
 
+/** Only allow same-origin relative paths — never forward an external URL. */
+function sanitizeCallbackURL(value: string | null): string {
+  if (value && value.startsWith("/") && !value.startsWith("//")) {
+    return value;
+  }
+  return "/admin";
+}
+
 const LoginForm = () => {
   const searchParams = useSearchParams();
   const oauthError = searchParams.get("error");
+  const callbackURL = sanitizeCallbackURL(searchParams.get("callbackURL"));
   const autoTriggered = useRef(false);
   const [redirecting, setRedirecting] = useState(false);
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = useCallback(async () => {
     setRedirecting(true);
     try {
       await authClient.signIn.social({
         provider: "google",
-        callbackURL: "/admin",
+        callbackURL,
       });
     } catch {
       setRedirecting(false);
     }
-  };
+  }, [callbackURL]);
 
   useEffect(() => {
     // Skip auto-trigger when returning from a failed/cancelled OAuth attempt,
@@ -30,7 +39,7 @@ const LoginForm = () => {
     if (autoTriggered.current || oauthError) return;
     autoTriggered.current = true;
     void signInWithGoogle();
-  }, [oauthError]);
+  }, [oauthError, signInWithGoogle]);
 
   return (
     <div className="py-4">

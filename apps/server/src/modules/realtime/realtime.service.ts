@@ -196,7 +196,13 @@ export class RealtimeService {
     if (typeof cookieHeader !== "string") return undefined;
     const cookies = cookieHeader
       .split(";")
-      .map((cookie) => cookie.trim().split("="))
+      .map((cookie): [string, string] => {
+        const trimmed = cookie.trim();
+        const eq = trimmed.indexOf("=");
+        return eq === -1
+          ? [trimmed, ""]
+          : [trimmed.slice(0, eq), trimmed.slice(eq + 1)];
+      })
       .reduce<Record<string, string>>((acc, [key, value]) => {
         if (key && value) acc[key] = decodeURIComponent(value);
         return acc;

@@ -15,10 +15,13 @@ import { Question, Result, Loader } from "@/components/Player/GameScreens";
 
 export default function DuelGameClient({ gameCode }: { gameCode: string }) {
   const [token, setToken] = useState<string | null>(null);
+  const [tokenError, setTokenError] = useState(false);
   const { data: profile } = useDuelProfileQuery();
 
   useEffect(() => {
-    void fetchApiAccessToken().then((t) => setToken(t));
+    fetchApiAccessToken()
+      .then((t) => (t ? setToken(t) : setTokenError(true)))
+      .catch(() => setTokenError(true));
   }, []);
 
   const { socket } = useGameSocket({
@@ -30,6 +33,19 @@ export default function DuelGameClient({ gameCode }: { gameCode: string }) {
   const phase = useAppSelector((state) => state.game.phase);
   const question = useAppSelector((state) => state.game.question);
   const you = useAppSelector((state) => state.game.you);
+
+  if (tokenError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[70dvh] gap-4 px-4 text-center">
+        <p className="text-dark dark:text-white">
+          Couldn&apos;t start the duel. Please sign in and try again.
+        </p>
+        <Link href="/duel">
+          <Button>Back to Duel</Button>
+        </Link>
+      </div>
+    );
+  }
 
   if (!token || !socket) return <Loader />;
 

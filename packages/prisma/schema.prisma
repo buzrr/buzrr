@@ -1,7 +1,6 @@
 generator client {
   provider      = "prisma-client-js"
   output        = "./generated/client"
-  // Vercel Node.js runtime (Amazon Linux 2023 / RHEL 9+, OpenSSL 3.0.x); native for local dev. Reduces deploy failures.
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
@@ -11,18 +10,20 @@ datasource db {
 
 model Account {
   id                    String    @id @default(cuid())
-  accountId             String    @map("provider_account_id")
-  providerId            String    @map("provider")
   userId                String    @map("user_id")
-  accessToken           String?   @map("access_token")
+  providerId            String    @map("provider")
+  accountId             String    @map("provider_account_id")
   refreshToken          String?   @map("refresh_token")
+  accessToken           String?   @map("access_token")
+  scope                 String?
   idToken               String?   @map("id_token")
+  accessTokenExpiresAt  DateTime?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  password              String?
+  refreshTokenExpiresAt DateTime?
+  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at")
   accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
   refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
-  scope                 String?
-  password              String?
-  createdAt             DateTime  @default(now()) @map("created_at")
-  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at")
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([providerId, accountId])
@@ -32,12 +33,14 @@ model Account {
 model Session {
   id        String   @id @default(cuid())
   token     String   @unique @map("session_token")
-  expiresAt DateTime @map("expires")
   userId    String   @map("user_id")
-  ipAddress String? @map("ip_address")
-  userAgent String? @map("user_agent")
+  expiresAt DateTime @map("expires")
   createdAt DateTime @default(now()) @map("created_at")
+  ipAddress String?
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  userAgent String?
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("sessions")
@@ -47,18 +50,18 @@ model User {
   id            String        @id @default(cuid())
   name          String?
   email         String        @unique
-  emailVerified Boolean       @default(false) @map("email_verified")
   image         String?
   password      String?
-  eloRating     Int           @default(1200) @map("elo_rating")
-  duelsPlayed   Int           @default(0) @map("duels_played")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at")
+  emailVerified Boolean       @default(false) @map("email_verified")
+  eloRating     Int           @default(1200) @map("elo_rating")
+  duelsPlayed   Int           @default(0) @map("duels_played")
+  hostedResults GameResult[]
   GameSessions  GameSession[]
   quizzes       Quiz[]
   accounts      Account[]
   sessions      Session[]
-  hostedResults GameResult[]
 
   @@map("users")
 }
@@ -68,6 +71,8 @@ model Verification {
   identifier String
   value      String
   expiresAt  DateTime
+  created_at DateTime? @default(now())
+  updated_at DateTime?
   createdAt  DateTime? @default(now())
   updatedAt  DateTime? @updatedAt
 
@@ -84,8 +89,8 @@ model Quiz {
   thumbnail    String?
   /// Public quizzes feed the duel-mode question pool.
   isPublic     Boolean       @default(false)
-  gameSessions GameSession[]
   gameResults  GameResult[]
+  gameSessions GameSession[]
   questions    Question[]
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -135,18 +140,6 @@ model GameSession {
   players         Player[]
 }
 
-
-enum GameStates {
-  question
-  answer
-  leaderboard
-}
-
-enum GameMode {
-  classic
-  duel
-}
-
 /// Immutable record of a finished game. Live state lives in Redis during
 /// play; this (plus its entries) is the only thing that survives a game.
 model GameResult {
@@ -160,9 +153,9 @@ model GameResult {
   questionCount Int
   startedAt     DateTime
   endedAt       DateTime          @default(now())
+  host          User?             @relation(fields: [hostId], references: [id])
+  quiz          Quiz?             @relation(fields: [quizId], references: [id])
   entries       GameResultEntry[]
-  quiz          Quiz?             @relation(fields: [quizId], references: [id], onDelete: SetNull)
-  host          User?             @relation(fields: [hostId], references: [id], onDelete: SetNull)
 
   @@index([hostId])
   @@index([quizId])
@@ -184,4 +177,15 @@ model GameResultEntry {
   result       GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+enum GameStates {
+  question
+  answer
+  leaderboard
+}
+
+enum GameMode {
+  classic
+  duel
 }

@@ -10,6 +10,11 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import type { RateLimitProfile } from "../decorators/rate-limit-profile.decorator";
 
+/**
+ * Uses Upstash's HTTP client, not the ioredis connection the game engine
+ * relies on — this only ever does one-off REST calls, so it doesn't need a
+ * persistent TCP connection (and may point at a different Redis instance).
+ */
 @Injectable()
 export class RateLimitService {
   private readonly logger = new Logger(RateLimitService.name);

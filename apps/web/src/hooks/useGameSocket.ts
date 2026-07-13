@@ -47,7 +47,7 @@ export function useGameSocket({
     if ((userType === "player" || userType === "duel") && !token) return;
 
     const conn: GameSocket = io(
-      `${process.env.NEXT_PUBLIC_SOCKET_URL}/?userType=${userType}&gameCode=${gameCode}`,
+      `${process.env.NEXT_PUBLIC_SOCKET_URL}/?userType=${userType}&gameCode=${encodeURIComponent(gameCode)}`,
       {
         withCredentials: true,
         ...(token ? { auth: { token } } : {}),
@@ -67,6 +67,9 @@ export function useGameSocket({
       dispatch(setConnection("reconnecting"));
     });
     conn.io.on("reconnect_failed", () => {
+      dispatch(setConnection("disconnected"));
+    });
+    conn.on("connect_error", () => {
       dispatch(setConnection("disconnected"));
     });
 
