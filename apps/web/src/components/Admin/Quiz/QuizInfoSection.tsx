@@ -48,8 +48,9 @@ export default function QuizInfoSection(props: { quiz: QuizDetail }) {
                 )
               }
             />
-            <span className="text-sm">
-              Public — questions may appear in 1v1 duels
+            <span className="text-sm max-w-[250px]">
+              Public — questions are submitted for admin review before
+              appearing in 1v1 duels
             </span>
           </div>
           <div className="w-full mt-4">

@@ -101,7 +101,7 @@ export class QuestionsService {
     body: MultipartBody,
     file: Express.Multer.File | undefined,
   ): Promise<void> {
-    await this.assertQuizOwned(quizId, user.userId);
+    const quiz = await this.assertQuizOwned(quizId, user.userId);
 
     const title = body.title;
     const option1 = body.option1;
@@ -153,6 +153,10 @@ export class QuestionsService {
     }
 
     const timeOut = parseInt(time ?? "15", 10) || 15;
+    // Any create/edit re-enters the moderation queue if the quiz is public --
+    // approved content doesn't stay approved across an edit, since the
+    // reviewed text may have changed.
+    const moderationStatus = quiz.isPublic ? "pending" : "draft";
 
     if (quesId) {
       const question = await this.prisma.db.question.findUnique({
@@ -172,6 +176,8 @@ export class QuestionsService {
             timeOut,
             media: fileLink || null,
             mediaType: mediaType || null,
+            moderationStatus,
+            reportCount: 0,
           },
         });
         await tx.option.deleteMany({ where: { questionId: quesId } });
@@ -182,6 +188,7 @@ export class QuestionsService {
             questionId: quesId,
           })),
         });
+        await tx.questionReport.deleteMany({ where: { questionId: quesId } });
       });
     } else {
       await this.prisma.db.$transaction(async (tx) => {
@@ -195,6 +202,7 @@ export class QuestionsService {
             media: fileLink || null,
             mediaType: mediaType || null,
             order: count + 1,
+            moderationStatus,
           },
         });
       });

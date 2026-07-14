@@ -12,6 +12,7 @@ import { fetchApiAccessToken } from "@/lib/api/get-access-token";
 import ConnectionBanner from "@/components/ConnectionBanner";
 import { Button } from "@/components/ui/Button";
 import { Question, Result, Loader } from "@/components/Player/GameScreens";
+import ReportQuestionButton from "./ReportQuestionButton";
 
 export default function DuelGameClient({ gameCode }: { gameCode: string }) {
   const [token, setToken] = useState<string | null>(null);
@@ -55,12 +56,17 @@ export default function DuelGameClient({ gameCode }: { gameCode: string }) {
       <DuelScoreBar myId={profile?.id} />
       {phase === "question" ? (
         question ? (
-          <Question
-            question={question}
-            socket={socket}
-            quizTitle="1v1 Duel"
-            gameCode={gameCode}
-          />
+          <>
+            <div className="fixed top-3 right-3 z-40">
+              <ReportQuestionButton questionId={question.id} />
+            </div>
+            <Question
+              question={question}
+              socket={socket}
+              quizTitle="1v1 Duel"
+              gameCode={gameCode}
+            />
+          </>
         ) : (
           <Loader />
         )

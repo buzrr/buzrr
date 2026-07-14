@@ -206,6 +206,7 @@ export class MatchmakingService implements OnApplicationShutdown {
       SELECT q."id" FROM "Question" q
       JOIN "Quiz" z ON z."id" = q."quizId"
       WHERE z."isPublic" = true
+        AND q."moderationStatus" = 'approved'
       ORDER BY random()
       LIMIT ${DUEL_QUESTION_COUNT}
     `;

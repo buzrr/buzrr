@@ -2754,6 +2754,25 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tanstack/react-virtual@npm:^3.14.6":
+  version: 3.14.6
+  resolution: "@tanstack/react-virtual@npm:3.14.6"
+  dependencies:
+    "@tanstack/virtual-core": "npm:3.17.4"
+  peerDependencies:
+    react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+    react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+  checksum: 10c0/66b2b7e8e6281920ff69450a4e4d57762969ad2c530f21718484af0e561504f568231486778fc402e7862de0c7783b08ab94570b7aa4d62422512b77e6f9f06d
+  languageName: node
+  linkType: hard
+
+"@tanstack/virtual-core@npm:3.17.4":
+  version: 3.17.4
+  resolution: "@tanstack/virtual-core@npm:3.17.4"
+  checksum: 10c0/63682ded2c977abf80893370175ea0af98a5686ffc5ede80b6f90cd7591d7d5bd85a4057d09ecf660f058f956ce4462d32b399b3b6818b649f900551cb692fad
+  languageName: node
+  linkType: hard
+
 "@tokenizer/inflate@npm:^0.4.1":
   version: 0.4.1
   resolution: "@tokenizer/inflate@npm:0.4.1"
@@ -11070,6 +11089,7 @@ __metadata:
     "@tailwindcss/vite": "npm:^4.3.1"
     "@tanstack/react-query": "npm:^5.95.2"
     "@tanstack/react-query-devtools": "npm:^5.95.2"
+    "@tanstack/react-virtual": "npm:^3.14.6"
     "@types/node": "npm:^20"
     "@types/react": "npm:^19"
     "@types/react-dom": "npm:^19"

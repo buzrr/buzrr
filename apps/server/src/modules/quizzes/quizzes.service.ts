@@ -80,16 +80,30 @@ export class QuizzesService {
     quizId: string,
     dto: { title?: string; description?: string; isPublic?: boolean },
   ) {
-    const result = await this.prisma.db.quiz.updateMany({
-      where: { id: quizId, userId: user.userId },
-      data: {
-        ...(dto.title !== undefined ? { title: dto.title } : {}),
-        ...(dto.description !== undefined
-          ? { description: dto.description }
-          : {}),
-        ...(dto.isPublic !== undefined ? { isPublic: dto.isPublic } : {}),
-      },
+    const data = {
+      ...(dto.title !== undefined ? { title: dto.title } : {}),
+      ...(dto.description !== undefined
+        ? { description: dto.description }
+        : {}),
+      ...(dto.isPublic !== undefined ? { isPublic: dto.isPublic } : {}),
+    };
+
+    const result = await this.prisma.db.$transaction(async (tx) => {
+      const updated = await tx.quiz.updateMany({
+        where: { id: quizId, userId: user.userId },
+        data,
+      });
+      // Going public submits never-yet-submitted questions for review;
+      // already-decided ones (pending/approved/unapproved) are left alone.
+      if (updated.count > 0 && dto.isPublic === true) {
+        await tx.question.updateMany({
+          where: { quizId, moderationStatus: "draft" },
+          data: { moderationStatus: "pending" },
+        });
+      }
+      return updated;
     });
+
     if (result.count === 0) {
       throw new NotFoundException("Unauthorized or quiz not found");
     }

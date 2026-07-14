@@ -27,6 +27,7 @@
     "@prisma/client": "^7.6.0",
     "@reduxjs/toolkit": "^2.11.2",
     "@tanstack/react-query": "^5.95.2",
+    "@tanstack/react-virtual": "^3.14.6",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.36.2",
     "axios": "^1.14.0",

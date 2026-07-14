@@ -4,7 +4,9 @@ import { APP_GUARD } from "@nestjs/core";
 import { AuthModule } from "./modules/auth/auth.module";
 import { CommonModule } from "./common/common.module";
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
+import { AdminUsersModule } from "./modules/admin-users/admin-users.module";
 import { GameSessionsModule } from "./modules/game-sessions/game-sessions.module";
+import { ModerationModule } from "./modules/moderation/moderation.module";
 import { PlayersModule } from "./modules/players/players.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { QuestionsModule } from "./modules/questions/questions.module";
@@ -24,6 +26,8 @@ import { RedisModule } from "./redis/redis.module";
     GameSessionsModule,
     QuizzesModule,
     QuestionsModule,
+    ModerationModule,
+    AdminUsersModule,
     DuelModule,
     RealtimeModule,
   ],

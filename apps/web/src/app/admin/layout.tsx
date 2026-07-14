@@ -7,6 +7,7 @@ import ToastViewport from "@/components/ToastViewport";
 import type { Metadata } from "next";
 
 import { auth } from "@/lib/auth";
+import { getUserRole } from "@/lib/get-current-role";
 import { headers } from "next/headers";
 import Link from "next/link";
 
@@ -23,8 +24,9 @@ export default async function RootLayout({
   if (!session?.user) {
     redirect("/auth/login");
   }
+  const role = await getUserRole(session.user.id);
   return (
-    <SessionProvider>
+    <SessionProvider role={role}>
       <div className="flex flex-col w-screen">
         <div className="p-2 px-4 md:px-8 bg-light-bg dark:bg-dark-bg hidden md:block">
           <Link href="/">

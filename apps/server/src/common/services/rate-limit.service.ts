@@ -20,6 +20,7 @@ export class RateLimitService {
   private readonly logger = new Logger(RateLimitService.name);
   private readonly defaultLimit: Ratelimit | null;
   private readonly aiLimit: Ratelimit | null;
+  private readonly reportLimit: Ratelimit | null;
 
   constructor(private readonly config: ConfigService) {
     const url = config.get<string>("UPSTASH_REDIS_REST_URL");
@@ -27,6 +28,7 @@ export class RateLimitService {
     if (!url || !token) {
       this.defaultLimit = null;
       this.aiLimit = null;
+      this.reportLimit = null;
       return;
     }
     const redis = new Redis({ url, token });
@@ -37,6 +39,10 @@ export class RateLimitService {
     this.aiLimit = new Ratelimit({
       redis,
       limiter: Ratelimit.slidingWindow(3, "300s"),
+    });
+    this.reportLimit = new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(10, "600s"),
     });
   }
 
@@ -50,7 +56,11 @@ export class RateLimitService {
   ): Promise<void> {
     if (!this.isEnabled()) return;
     const limiter =
-      profile === "ai" ? this.aiLimit : this.defaultLimit;
+      profile === "ai"
+        ? this.aiLimit
+        : profile === "report"
+          ? this.reportLimit
+          : this.defaultLimit;
     if (!limiter) {
       throw new ServiceUnavailableException(
         "Rate limiting is ON but Upstash is not configured",

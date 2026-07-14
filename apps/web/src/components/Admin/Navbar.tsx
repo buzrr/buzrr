@@ -9,6 +9,7 @@ import { usePathname } from "next/navigation";
 import { useAppSelector, useAppDispatch } from "@/state/hooks";
 import { NavToggle, setNavToggle } from "@/state/admin/navtoggleSlice";
 import { persistor } from "@/state/store";
+import { useCurrentRole } from "@/components/SessionProvider";
 import BasicModal from "../Modal";
 
 const NavLinks = [
@@ -20,9 +21,20 @@ const NavLinks = [
 export default function Navbar() {
   const { data: session } = authClient.useSession();
   const pathname = usePathname();
+  const role = useCurrentRole();
 
   const toggle = useAppSelector((state) => state.navToggle.toggle);
   const dispatch = useAppDispatch();
+
+  const navLinks = [
+    ...NavLinks,
+    ...(role === "admin" || role === "superadmin"
+      ? [{ href: "/admin/moderation", label: "Question Review" }]
+      : []),
+    ...(role === "superadmin"
+      ? [{ href: "/admin/superadmin/admins", label: "Manage Admins" }]
+      : []),
+  ];
 
   return (
     <>
@@ -52,7 +64,7 @@ export default function Navbar() {
         </div>
         <div className="flex flex-col">
           <div className="p-2">
-            {NavLinks.map((link) => (
+            {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}

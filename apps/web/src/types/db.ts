@@ -10,4 +10,6 @@ export type {
   Question,
   Player,
   User,
+  Role,
+  ModerationStatus,
 } from "@buzrr/prisma";

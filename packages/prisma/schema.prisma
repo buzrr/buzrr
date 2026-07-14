@@ -43,22 +43,25 @@ model Session {
 }
 
 model User {
-  id            String        @id @default(cuid())
-  name          String?
-  email         String        @unique
-  image         String?
-  password      String?
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at")
-  emailVerified Boolean       @default(false) @map("email_verified")
-  eloRating     Int           @default(1200) @map("elo_rating")
-  duelsPlayed   Int           @default(0) @map("duels_played")
-  hostedResults GameResult[]
-  GameSessions  GameSession[]
-  quizzes       Quiz[]
-  accounts      Account[]
-  sessions      Session[]
+  id                String           @id @default(cuid())
+  name              String?
+  email             String           @unique
+  image             String?
+  password          String?
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @default(now()) @updatedAt @map("updated_at")
+  emailVerified     Boolean          @default(false) @map("email_verified")
+  eloRating         Int              @default(1200) @map("elo_rating")
+  duelsPlayed       Int              @default(0) @map("duels_played")
+  role              Role             @default(user)
+  hostedResults     GameResult[]
+  GameSessions      GameSession[]
+  quizzes           Quiz[]
+  accounts          Account[]
+  sessions          Session[]
+  reportedQuestions QuestionReport[]
 
+  @@index([role])
   @@map("users")
 }
 
@@ -92,16 +95,23 @@ model Quiz {
 }
 
 model Question {
-  id        String   @id @default(cuid())
-  title     String
-  quizId    String
-  createdAt DateTime @default(now())
-  timeOut   Int      @default(15)
-  media     String?
-  mediaType String?
-  order     Int      @default(1)
-  options   Option[]
-  quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  id               String           @id @default(cuid())
+  title            String
+  quizId           String
+  createdAt        DateTime         @default(now())
+  timeOut          Int              @default(15)
+  media            String?
+  mediaType        String?
+  order            Int              @default(1)
+  /// Per-question moderation gate for the duel pool; the quiz's `isPublic`
+  /// flag alone no longer decides eligibility.
+  moderationStatus ModerationStatus @default(draft)
+  reportCount      Int              @default(0)
+  options          Option[]
+  reports          QuestionReport[]
+  quiz             Quiz             @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([moderationStatus, reportCount])
 }
 
 model Option {
@@ -111,6 +121,19 @@ model Option {
   questionId String
   createdAt  DateTime @default(now())
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+/// A player flagging an approved question as wrong/NSFW. Distinct reporters
+/// are counted toward the auto-unapprove threshold in moderation.service.ts.
+model QuestionReport {
+  id             String   @id @default(cuid())
+  questionId     String
+  reporterUserId String
+  createdAt      DateTime @default(now())
+  question       Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  reporterUser   User     @relation(fields: [reporterUserId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, reporterUserId])
 }
 
 model Player {
@@ -184,4 +207,17 @@ enum GameStates {
 enum GameMode {
   classic
   duel
+}
+
+enum Role {
+  user
+  admin
+  superadmin
+}
+
+enum ModerationStatus {
+  draft
+  pending
+  approved
+  unapproved
 }
