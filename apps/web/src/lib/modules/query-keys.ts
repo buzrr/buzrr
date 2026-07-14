@@ -20,6 +20,7 @@ export const queryKeys = {
     queue: ["moderation", "queue"] as const,
   },
   admins: {
+    lists: ["admins", "list"] as const,
     list: (search: string) => ["admins", "list", search] as const,
   },
 };

@@ -88,6 +88,18 @@ export class QuizzesService {
       ...(dto.isPublic !== undefined ? { isPublic: dto.isPublic } : {}),
     };
 
+    // Nothing to change: verify ownership and return the quiz as-is rather than
+    // running an empty transaction/update.
+    if (Object.keys(data).length === 0) {
+      const existing = await this.prisma.db.quiz.findFirst({
+        where: { id: quizId, userId: user.userId },
+      });
+      if (!existing) {
+        throw new NotFoundException("Unauthorized or quiz not found");
+      }
+      return existing;
+    }
+
     const result = await this.prisma.db.$transaction(async (tx) => {
       const updated = await tx.quiz.updateMany({
         where: { id: quizId, userId: user.userId },

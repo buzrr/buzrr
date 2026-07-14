@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { toast } from "react-toastify";
 import { getApiErrorMessage } from "@/lib/api/errors";
@@ -36,14 +36,17 @@ export default function ModerationQueueClient() {
   const virtualItems = virtualizer.getVirtualItems();
   const lastItem = virtualItems[virtualItems.length - 1];
 
-  if (
-    lastItem &&
-    lastItem.index >= items.length - 1 &&
-    query.hasNextPage &&
-    !query.isFetchingNextPage
-  ) {
-    void query.fetchNextPage();
-  }
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = query;
+  useEffect(() => {
+    if (
+      lastItem &&
+      lastItem.index >= items.length - 1 &&
+      hasNextPage &&
+      !isFetchingNextPage
+    ) {
+      void fetchNextPage();
+    }
+  }, [lastItem, items.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   function handleApprove(id: string) {
     approve.mutate(id, {
@@ -114,7 +117,10 @@ export default function ModerationQueueClient() {
                 item={item}
                 onApprove={() => handleApprove(item.id)}
                 onUnapprove={() => handleUnapprove(item.id)}
-                pending={approve.isPending || unapprove.isPending}
+                pending={
+                  (approve.isPending && approve.variables === item.id) ||
+                  (unapprove.isPending && unapprove.variables === item.id)
+                }
               />
             </div>
           );

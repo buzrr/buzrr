@@ -80,10 +80,14 @@ async function main() {
       data: { isPublic: true },
     });
     // Heals starter-pack rows that drifted (e.g. got reported/unapproved) --
-    // this content is trusted/pre-vetted, so it should always be approved.
+    // this content is trusted/pre-vetted, so it should always be approved with
+    // its report tally cleared.
     await prisma.question.updateMany({
       where: { quizId: existing.id },
-      data: { moderationStatus: "approved" },
+      data: { moderationStatus: "approved", reportCount: 0 },
+    });
+    await prisma.questionReport.deleteMany({
+      where: { question: { quizId: existing.id } },
     });
     console.log(`"${PACK_TITLE}" already seeded (${existing.id}); ensured public.`);
     return;

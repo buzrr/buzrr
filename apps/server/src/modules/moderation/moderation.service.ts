@@ -105,19 +105,19 @@ export class ModerationService {
       throw err;
     }
 
-    // Recomputed from the join table (not incremented) so concurrent reports
-    // can't drift the counter.
-    const reportCount = await this.prisma.db.questionReport.count({
-      where: { questionId },
-    });
-    await this.prisma.db.question.update({
+    // A new distinct reporter got past the unique-constraint guard above, so a
+    // single atomic increment is exactly one bump per distinct report (no
+    // read-modify-write race).
+    const updated = await this.prisma.db.question.update({
       where: { id: questionId },
-      data: {
-        reportCount,
-        ...(reportCount > REPORT_THRESHOLD
-          ? { moderationStatus: "unapproved" as const }
-          : {}),
-      },
+      data: { reportCount: { increment: 1 } },
+      select: { reportCount: true },
     });
+    if (updated.reportCount > REPORT_THRESHOLD) {
+      await this.prisma.db.question.update({
+        where: { id: questionId },
+        data: { moderationStatus: "unapproved" },
+      });
+    }
   }
 }

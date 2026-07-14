@@ -47,14 +47,17 @@ export default function AdminsListClient() {
   const virtualItems = virtualizer.getVirtualItems();
   const lastItem = virtualItems[virtualItems.length - 1];
 
-  if (
-    lastItem &&
-    lastItem.index >= items.length - 1 &&
-    query.hasNextPage &&
-    !query.isFetchingNextPage
-  ) {
-    void query.fetchNextPage();
-  }
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = query;
+  useEffect(() => {
+    if (
+      lastItem &&
+      lastItem.index >= items.length - 1 &&
+      hasNextPage &&
+      !isFetchingNextPage
+    ) {
+      void fetchNextPage();
+    }
+  }, [lastItem, items.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   function handlePromote(userId: string) {
     promote.mutate(userId, {
@@ -119,7 +122,12 @@ export default function AdminsListClient() {
                 >
                   <AdminRow
                     item={item}
-                    pending={promote.isPending || demote.isPending}
+                    pending={
+                      (promote.isPending &&
+                        promote.variables?.userId === item.id) ||
+                      (demote.isPending &&
+                        demote.variables?.userId === item.id)
+                    }
                     onPromote={() => handlePromote(item.id)}
                     onDemote={() => handleDemote(item.id)}
                   />

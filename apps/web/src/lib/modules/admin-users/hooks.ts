@@ -20,7 +20,7 @@ function useSetRoleMutation() {
     mutationFn: ({ userId, role }: { userId: string; role: "admin" | "user" }) =>
       adminUsersApi.setRole(userId, role),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admins", "list"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admins.lists });
     },
   });
 }
