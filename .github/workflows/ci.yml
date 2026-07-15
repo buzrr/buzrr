@@ -8,6 +8,10 @@ on:
   pull_request:
     branches: [main]
 
+# CI only reads the repo; never expose a writable token to build steps.
+permissions:
+  contents: read
+
 # Cancel superseded runs on the same ref to save minutes.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -59,6 +63,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Enable Corepack (Yarn 4)
         run: corepack enable
@@ -71,8 +77,10 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
-      - name: Generate Prisma client
-        run: yarn prisma:generate
+      # Full package build (generate + tsc): apps resolve @buzrr/prisma types
+      # from its dist/, which a fresh checkout doesn't have.
+      - name: Build Prisma package
+        run: yarn workspace @buzrr/prisma build
 
       - name: Sync database schema
         run: yarn prisma db push --url "$DATABASE_URL"
@@ -89,8 +97,16 @@ jobs:
   verify-docker-setup:
     name: Verify Docker dev setup
     runs-on: ubuntu-latest
+    env:
+      # prisma.config.ts requires these at load time — the @buzrr/prisma
+      # postinstall (prisma generate) runs during `yarn install`, before any
+      # .env exists in a fresh checkout.
+      DATABASE_URL: postgresql://buzrr:buzrr@localhost:5432/buzrr
+      DIRECT_URL: postgresql://buzrr:buzrr@localhost:5432/buzrr
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Enable Corepack (Yarn 4)
         run: corepack enable

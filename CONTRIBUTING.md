@@ -49,7 +49,7 @@ yarn dev                 # web :3000, api :3001
 
 We follow [Conventional Commits](https://www.conventionalcommits.org):
 
-```
+```text
 feat: add ranked duel matchmaking
 fix: prevent double-join on reconnect
 refactor: server owns the game loop

@@ -7,7 +7,7 @@ Please **do not** open a public issue for security vulnerabilities.
 Instead, report them privately via
 [GitHub's private vulnerability reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability)
 (the **Security → Report a vulnerability** tab on this repository), or email the
-maintainers directly.
+maintainer directly at <ansarialan31@gmail.com>.
 
 Please include:
 

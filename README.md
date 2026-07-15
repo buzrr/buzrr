@@ -141,7 +141,7 @@ Run from the repo root:
 
 ## 🗂️ Project structure
 
-```
+```text
 buzrr/
 ├── apps/
 │   ├── web/        # Next.js app (+ Better Auth)

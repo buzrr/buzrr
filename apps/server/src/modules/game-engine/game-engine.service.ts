@@ -591,7 +591,8 @@ export class GameEngineService
       await this.store.setDeadline(gameCode, revealUntil);
       this.armTimer(gameCode, DUEL_REVEAL_MS);
     } else {
-      await this.store.clearDeadline(gameCode);
+      // Host-paced: no auto-advance, but stay visible to the abandon sweep.
+      await this.store.parkDeadline(gameCode);
     }
 
     this.emitRoom(gameCode).emit("question-end", {
@@ -624,7 +625,9 @@ export class GameEngineService
     const meta = await this.store.getMeta(gameCode);
     if (!meta || meta.phase !== "reveal") return;
     this.clearTimer(gameCode);
-    await this.store.clearDeadline(gameCode);
+    // Host-paced until endGame; parked so the abandon sweep still sees it
+    // (duels call endGame below, which clears the entry immediately).
+    await this.store.parkDeadline(gameCode);
     await this.store.patchMeta(gameCode, { phase: "final", qDeadline: 0 });
 
     const entries = await this.buildLeaderboard(gameCode);
@@ -679,7 +682,9 @@ export class GameEngineService
   }
 
   private stopSweeperIfIdle(deadlineCount: number): void {
-    if (deadlineCount === 0 && this.sweeper) {
+    // timers.size guards the race where armTimer ran after this sweep's
+    // allDeadlines() read: a locally scheduled game keeps the sweeper alive.
+    if (deadlineCount === 0 && this.timers.size === 0 && this.sweeper) {
       clearInterval(this.sweeper);
       this.sweeper = null;
     }
@@ -759,22 +764,33 @@ export class GameEngineService
     if (deadlines.length === 0) return;
     const now = Date.now();
     // Catch deadlines whose in-process timer was lost (crash, other instance).
+    // Failures are isolated per game so one broken state can't starve the rest.
     for (const { code, atMs } of deadlines) {
-      if (atMs <= now) await this.handleDeadline(code);
+      if (atMs > now) continue;
+      try {
+        await this.handleDeadline(code);
+      } catch (err) {
+        this.logger.error(`Sweep deadline handling failed for ${code}`, err);
+      }
     }
-    // End classic games abandoned by their host mid-game.
+    // End classic games abandoned by their host mid-game. Parked entries keep
+    // host-paced reveal/final games visible here (see parkDeadline).
     for (const { code } of deadlines) {
-      const meta = await this.store.getMeta(code);
-      if (
-        meta &&
-        meta.mode === "classic" &&
-        !meta.hostConnected &&
-        meta.phase !== "lobby" &&
-        meta.phase !== "ended" &&
-        Date.now() - meta.hostLastSeenAt > HOST_ABANDON_MS
-      ) {
-        this.logger.warn(`Ending ${code}: host absent for >5min`);
-        await this.endGame(code);
+      try {
+        const meta = await this.store.getMeta(code);
+        if (
+          meta &&
+          meta.mode === "classic" &&
+          !meta.hostConnected &&
+          meta.phase !== "lobby" &&
+          meta.phase !== "ended" &&
+          Date.now() - meta.hostLastSeenAt > HOST_ABANDON_MS
+        ) {
+          this.logger.warn(`Ending ${code}: host absent for >5min`);
+          await this.endGame(code);
+        }
+      } catch (err) {
+        this.logger.error(`Sweep abandon check failed for ${code}`, err);
       }
     }
   }

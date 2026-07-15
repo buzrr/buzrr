@@ -252,6 +252,20 @@ export class GameStoreService {
     await this.redis.zrem(keys.deadlines(), code);
   }
 
+  /**
+   * Keeps the game visible to the sweeper (host-abandon checks) through
+   * host-paced phases that have no auto-advance deadline. The far-future
+   * score only comes due at the TTL horizon, by which time the meta has
+   * expired and handleDeadline clears the entry.
+   */
+  async parkDeadline(code: string): Promise<void> {
+    await this.redis.zadd(
+      keys.deadlines(),
+      Date.now() + TTL_SECONDS * 1000,
+      code,
+    );
+  }
+
   async allDeadlines(): Promise<{ code: string; atMs: number }[]> {
     const flat = await this.redis.zrange(keys.deadlines(), 0, -1, "WITHSCORES");
     const out: { code: string; atMs: number }[] = [];
