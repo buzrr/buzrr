@@ -1,0 +1,124 @@
+name: CI
+
+# Runs on every push and PR. Vercel is configured to wait for this workflow to
+# succeed before it builds/promotes a deployment (Settings → Git → "Wait for CI").
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref to save minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Lint, typecheck & build
+    runs-on: ubuntu-latest
+
+    # Real databases so the Next.js build (and any schema work) behaves like prod.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: buzrr
+          POSTGRES_PASSWORD: buzrr
+          POSTGRES_DB: buzrr
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U buzrr -d buzrr"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Non-secret, CI-only values. Real credentials live in Vercel/host env.
+      DATABASE_URL: postgresql://buzrr:buzrr@localhost:5432/buzrr
+      DIRECT_URL: postgresql://buzrr:buzrr@localhost:5432/buzrr
+      REDIS_URL: redis://localhost:6379
+      BETTER_AUTH_SECRET: ci-build-secret-not-used-in-production
+      BETTER_AUTH_URL: http://localhost:3000
+      TRUSTED_ORIGINS: http://localhost:3000,http://localhost:3001
+      GOOGLE_CLIENT_ID: ci-dummy-client-id
+      GOOGLE_CLIENT_SECRET: ci-dummy-client-secret
+      NEXT_PUBLIC_SOCKET_URL: http://localhost:3001
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      RATELIMIT: "OFF"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable Corepack (Yarn 4)
+        run: corepack enable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Generate Prisma client
+        run: yarn prisma:generate
+
+      - name: Sync database schema
+        run: yarn prisma db push --url "$DATABASE_URL"
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Type-check
+        run: yarn check-types
+
+      - name: Build
+        run: yarn build
+
+  verify-docker-setup:
+    name: Verify Docker dev setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable Corepack (Yarn 4)
+        run: corepack enable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Start Postgres + Redis via docker compose
+        run: docker compose up -d
+
+      - name: Wait for Postgres health
+        run: |
+          for i in $(seq 1 30); do
+            if [ "$(docker inspect -f '{{.State.Health.Status}}' buzrr-postgres)" = "healthy" ]; then
+              echo "Postgres healthy"; exit 0
+            fi
+            sleep 2
+          done
+          echo "Postgres never became healthy"; docker compose logs postgres; exit 1
+
+      - name: Push schema into the container (matches `yarn setup`)
+        run: yarn prisma db push --url "postgresql://buzrr:buzrr@localhost:5432/buzrr"
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

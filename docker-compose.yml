@@ -1,0 +1,58 @@
+# Local development databases for Buzrr.
+#
+# Brings up PostgreSQL and Redis in containers so you don't need to install or
+# provision either service on your machine. The app itself runs on the host
+# (`yarn dev`) for fast hot-reload.
+#
+# Quick start (from the repo root):
+#
+#     yarn setup      # creates .env files, starts these containers, pushes the schema
+#     yarn dev        # runs web (:3000) + server (:3001) on the host
+#
+# Or manage the containers directly:
+#
+#     docker compose up -d     # start Postgres + Redis in the background
+#     docker compose down      # stop them (data is preserved in named volumes)
+#     docker compose down -v   # stop them and wipe all data
+#
+# Credentials are intentionally simple/local-only — never reuse them in production.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: buzrr-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: buzrr
+      POSTGRES_PASSWORD: buzrr
+      POSTGRES_DB: buzrr
+    ports:
+      - "5432:5432"
+    volumes:
+      - buzrr-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U buzrr -d buzrr"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  redis:
+    image: redis:7-alpine
+    container_name: buzrr-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - buzrr-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 3s
+
+volumes:
+  buzrr-postgres-data:
+  buzrr-redis-data:
