@@ -14,25 +14,28 @@ export const metadata: Metadata = {
 
   title: {
     default:
-      "Buzrr - Open Source Kahoot Alternative for Real-Time Multiplayer Quizzes",
+      "Buzrr - Open Source QuizUp & Kahoot in One: 1v1 Quiz Battles + Live Multiplayer Quizzes",
     template: "%s | Buzrr",
   },
 
   description:
-    "Buzrr is a powerful open source Kahoot alternative for hosting real-time multiplayer quizzes. Run live competitions, classroom quizzes, and interactive events with instant scoring and leaderboards.",
+    "Buzrr is QuizUp and Kahoot together, open source. Go head-to-head in ranked 1v1 quiz battles like QuizUp, or host live multiplayer quiz rooms your friends join with a code like Kahoot — with instant scoring and leaderboards.",
 
   keywords: [
+    "quizup alternative",
+    "open source quizup alternative",
     "kahoot alternative",
     "kahoot competitor",
     "open source kahoot alternative",
+    "1v1 quiz battles",
+    "1v1 quiz platform",
+    "1v1 quiz app",
+    "ranked quiz duels",
     "real-time quiz platform",
     "multiplayer quiz app",
     "online quiz competition",
     "live classroom quiz tool",
     "interactive quiz software",
-    "quiz up alternative",
-    "1v1 quiz platform",
-    "1v1 quiz app",
     "quiz battles",
     "Buzrr",
   ],
@@ -59,15 +62,15 @@ export const metadata: Metadata = {
     url: baseUrl,
     siteName: "Buzrr",
     title:
-      "Buzrr - The Best Open Source Kahoot Alternative for Live Multiplayer Quizzes",
+      "Buzrr - Open Source QuizUp & Kahoot in One: 1v1 Battles + Live Quiz Rooms",
     description:
-      "Host real-time quizzes with instant scoring, live leaderboards, and multiplayer gameplay. Built for classrooms, workshops, and competitive quiz events.",
+      "Ranked 1v1 quiz duels like QuizUp, live hosted multiplayer quiz rooms like Kahoot — one open source app with instant scoring and leaderboards.",
     images: [
       {
         url: `${baseUrl}/opengraph-image.png`,
         width: 1200,
         height: 630,
-        alt: "Buzrr - Open Source Kahoot Alternative",
+        alt: "Buzrr - Open Source QuizUp & Kahoot in One",
       },
     ],
   },
@@ -75,9 +78,9 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title:
-      "Buzrr - Open Source Kahoot Alternative for Real-Time Multiplayer Quizzes",
+      "Buzrr - Open Source QuizUp & Kahoot in One: 1v1 Battles + Live Quiz Rooms",
     description:
-      "Run engaging live quiz competitions with real-time multiplayer gameplay.",
+      "Ranked 1v1 quiz duels like QuizUp, live hosted multiplayer rooms like Kahoot — open source.",
     images: [`${baseUrl}/opengraph-image.png`],
   },
 
@@ -100,7 +103,10 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body
-        className={clsx(sans.className, "bg-light-bg dark:bg-dark-bg h-fit overflow-x-hidden")}
+        className={clsx(
+          sans.className,
+          "bg-light-bg dark:bg-dark-bg h-fit overflow-x-hidden",
+        )}
       >
         <script
           type="application/ld+json"
@@ -112,7 +118,7 @@ export default async function RootLayout({
               applicationCategory: "GameApplication",
               operatingSystem: "Web",
               description:
-                "Buzrr is a powerful open source Kahoot alternative for hosting real-time multiplayer quizzes and hosting 1v1 quiz battles. Run live competitions, classroom quizzes, and interactive events with instant scoring and leaderboards.",
+                "Buzrr is QuizUp and Kahoot together, open source. Go head-to-head in ranked 1v1 quiz battles like QuizUp, or host live multiplayer quiz rooms like Kahoot — with instant scoring and leaderboards.",
               url: baseUrl,
             }),
           }}
@@ -120,7 +126,10 @@ export default async function RootLayout({
         <ReduxProvider>
           <QueryProvider>
             {children}
-            <ReactQueryDevtools initialIsOpen={false} buttonPosition="top-right" />
+            <ReactQueryDevtools
+              initialIsOpen={false}
+              buttonPosition="top-right"
+            />
             <Footer />
           </QueryProvider>
         </ReduxProvider>

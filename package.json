@@ -1,5 +1,6 @@
 {
   "name": "buzrr",
+  "description": "Open-source QuizUp and Kahoot in one app: ranked 1v1 quiz battles and live hosted multiplayer quiz rooms.",
   "private": true,
   "scripts": {
     "build": "turbo run build",
@@ -18,11 +19,15 @@
     "docker:reset": "docker compose down -v && node scripts/setup.mjs",
     "prepare": "husky"
   },
+  "lint-staged": {
+    "*": "prettier --write --ignore-unknown"
+  },
   "devDependencies": {
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "dotenv": "^17.3.1",
     "husky": "^9.1.7",
+    "lint-staged": "^17.0.8",
     "prettier": "^3.5.3",
     "prisma": "^7.4.0",
     "turbo": "^2.9.4",

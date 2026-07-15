@@ -207,7 +207,9 @@ export class GameStoreService {
   }
 
   /** playerId → score, descending. */
-  async leaderboard(code: string): Promise<{ playerId: string; score: number }[]> {
+  async leaderboard(
+    code: string,
+  ): Promise<{ playerId: string; score: number }[]> {
     const flat = await this.redis.zrevrange(keys.lb(code), 0, -1, "WITHSCORES");
     const out: { playerId: string; score: number }[] = [];
     for (let i = 0; i < flat.length; i += 2) {
@@ -257,10 +259,6 @@ export class GameStoreService {
       out.push({ code: flat[i], atMs: Number(flat[i + 1]) });
     }
     return out;
-  }
-
-  async dueDeadlines(nowMs: number): Promise<string[]> {
-    return this.redis.zrangebyscore(keys.deadlines(), 0, nowMs);
   }
 
   // -- ownership ---------------------------------------------------------------

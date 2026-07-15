@@ -67,13 +67,11 @@ export class GameEngineService
   // -- lifecycle -------------------------------------------------------------
 
   async onApplicationBootstrap(): Promise<void> {
+    // recoverTimers re-arms timers for surviving games, which starts the
+    // sweeper via armTimer; with no live games it stays off until one starts.
     await this.recoverTimers().catch((err) =>
       this.logger.error("Timer recovery failed", err),
     );
-    this.sweeper = setInterval(() => {
-      void this.sweep().catch((err) => this.logger.error("Sweep failed", err));
-    }, SWEEP_INTERVAL_MS);
-    this.sweeper.unref();
   }
 
   onApplicationShutdown(): void {
@@ -268,7 +266,11 @@ export class GameEngineService
       opts,
     );
 
-    this.emitRoom(gameCode).emit("game-over", { entries, resultId, eloChanges });
+    this.emitRoom(gameCode).emit("game-over", {
+      entries,
+      resultId,
+      eloChanges,
+    });
     this.emitRoom(gameCode).emit("game-session-ended");
 
     // Classic games have a lobby record to tear down; duels are Redis-only.
@@ -661,7 +663,30 @@ export class GameEngineService
 
   // -- timers / recovery ------------------------------------------------------------
 
+  /**
+   * The sweeper only needs to run while deadlines exist, so it is started
+   * lazily here (every deadline write is paired with an armTimer call) and
+   * stopped by sweep() once the deadline set drains — same pattern as the
+   * matchmaking worker. On Upstash this matters: an unconditional 15s poll
+   * costs ~350K commands/month at zero users.
+   */
+  private ensureSweeper(): void {
+    if (this.sweeper) return;
+    this.sweeper = setInterval(() => {
+      void this.sweep().catch((err) => this.logger.error("Sweep failed", err));
+    }, SWEEP_INTERVAL_MS);
+    this.sweeper.unref();
+  }
+
+  private stopSweeperIfIdle(deadlineCount: number): void {
+    if (deadlineCount === 0 && this.sweeper) {
+      clearInterval(this.sweeper);
+      this.sweeper = null;
+    }
+  }
+
   private armTimer(gameCode: string, delayMs: number): void {
+    this.ensureSweeper();
     this.clearTimer(gameCode);
     const timer = setTimeout(
       () => {
@@ -729,13 +754,16 @@ export class GameEngineService
   }
 
   private async sweep(): Promise<void> {
+    const deadlines = await this.store.allDeadlines();
+    this.stopSweeperIfIdle(deadlines.length);
+    if (deadlines.length === 0) return;
+    const now = Date.now();
     // Catch deadlines whose in-process timer was lost (crash, other instance).
-    const due = await this.store.dueDeadlines(Date.now());
-    for (const code of due) {
-      await this.handleDeadline(code);
+    for (const { code, atMs } of deadlines) {
+      if (atMs <= now) await this.handleDeadline(code);
     }
     // End classic games abandoned by their host mid-game.
-    for (const { code } of await this.store.allDeadlines()) {
+    for (const { code } of deadlines) {
       const meta = await this.store.getMeta(code);
       if (
         meta &&
