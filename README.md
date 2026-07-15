@@ -1,12 +1,12 @@
 <div align="center">
 
-# 🐝 Buzrr
+# ⚡︎ Buzrr
 
 **Open-source QuizUp and Kahoot, together in one app.** Go head-to-head in
 ranked 1v1 quiz battles like QuizUp, host live multiplayer quiz rooms like
 Kahoot, and generate whole quizzes with AI.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org/)
 [![NestJS](https://img.shields.io/badge/NestJS-11-e0234e?logo=nestjs)](https://nestjs.com/)
@@ -178,4 +178,4 @@ issue? See [SECURITY.md](SECURITY.md).
 
 ## 📄 License
 
-[MIT](LICENSE) © Buzrr contributors
+[GPL-3.0](LICENSE) © Buzrr contributors
