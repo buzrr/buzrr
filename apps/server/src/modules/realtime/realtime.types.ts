@@ -111,7 +111,11 @@ export interface ServerToClientEvents {
     name?: string;
     profilePic?: string | null;
   }) => void;
-  "player-removed": (player: { id: string }) => void;
+  "player-removed": (player: {
+    id: string;
+    name?: string;
+    profilePic?: string | null;
+  }) => void;
   "game-started": () => void;
   // -- legacy v1 (dual-emitted until the web client is fully migrated) --
   "timer-starts": () => void;

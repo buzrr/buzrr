@@ -453,6 +453,18 @@ export class GameEngineService
     this.cancelDisconnectGrace(gameCode, playerId);
   }
 
+  /**
+   * Host kicks a player: Redis removal plus the room broadcast, shared by the
+   * socket (`remove-player`) and HTTP (`DELETE .../players/:id`) paths.
+   */
+  async kickPlayer(
+    gameCode: string,
+    player: { id: string; name?: string; profilePic?: string | null },
+  ): Promise<void> {
+    await this.removePlayer(gameCode, player.id);
+    this.emitRoom(gameCode).emit("player-removed", player);
+  }
+
   async hostConnected(gameCode: string, connected: boolean): Promise<void> {
     await this.store.patchMeta(gameCode, {
       hostConnected: connected,

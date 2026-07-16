@@ -66,12 +66,27 @@ export type AdminLobbyPayload = {
   quiz: Quiz & { questions: (Question & { options: Option[] })[] };
 };
 
-export async function getAdminLobby(
-  client: AxiosInstance,
-  roomId: string,
-) {
+export async function getAdminLobby(client: AxiosInstance, roomId: string) {
   const { data } = await client.get<AdminLobbyPayload>(
     `/game-sessions/${encodeURIComponent(roomId)}/lobby`,
+  );
+  return data;
+}
+
+export async function endRoom(client: AxiosInstance, roomId: string) {
+  const { data } = await client.post<{ ended: boolean }>(
+    `/game-sessions/${encodeURIComponent(roomId)}/end`,
+  );
+  return data;
+}
+
+export async function removeRoomPlayer(
+  client: AxiosInstance,
+  roomId: string,
+  playerId: string,
+) {
+  const { data } = await client.delete<{ removed: boolean }>(
+    `/game-sessions/${encodeURIComponent(roomId)}/players/${encodeURIComponent(playerId)}`,
   );
   return data;
 }
@@ -104,10 +119,7 @@ export type PlayerPlayPayload = {
   game: PlayerPlayGame | null;
 };
 
-export async function getPlayerPlay(
-  client: AxiosInstance,
-  playerId: string,
-) {
+export async function getPlayerPlay(client: AxiosInstance, playerId: string) {
   const { data } = await client.get<PlayerPlayPayload>(
     `/game-sessions/player-play/${encodeURIComponent(playerId)}`,
   );
@@ -120,7 +132,11 @@ export const gameSessionsApi = {
   join: (body: Parameters<typeof joinRoom>[1]) =>
     joinRoom(createPlayerAuthedApiClient(), body),
   adminLobby: (roomId: string) => getAdminLobby(getAuthApiClient(), roomId),
+  end: (roomId: string) => endRoom(getAuthApiClient(), roomId),
+  removePlayer: (args: { roomId: string; playerId: string }) =>
+    removeRoomPlayer(getAuthApiClient(), args.roomId, args.playerId),
   history: () => getHistory(getAuthApiClient()),
   result: (resultId: string) => getResult(getAuthApiClient(), resultId),
-  playerPlay: (playerId: string) => getPlayerPlay(getPublicApiClient(), playerId),
+  playerPlay: (playerId: string) =>
+    getPlayerPlay(getPublicApiClient(), playerId),
 };

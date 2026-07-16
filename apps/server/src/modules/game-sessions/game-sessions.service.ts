@@ -14,10 +14,7 @@ import { CreateRoomDto } from "./dto/create-room.dto";
 import { JoinRoomDto } from "./dto/join-room.dto";
 import { SubmitAnswerDto } from "./dto/submit-answer.dto";
 
-const generateGameCode = customAlphabet(
-  "ABCDEFGHJKMNPQRSTUVWXYZ23456789",
-  6,
-);
+const generateGameCode = customAlphabet("ABCDEFGHJKMNPQRSTUVWXYZ23456789", 6);
 
 @Injectable()
 export class GameSessionsService {
@@ -49,7 +46,10 @@ export class GameSessionsService {
     return { roomId: game.id, playerId };
   }
 
-  async createRoom(user: AuthUser, dto: CreateRoomDto): Promise<{ id: string }> {
+  async createRoom(
+    user: AuthUser,
+    dto: CreateRoomDto,
+  ): Promise<{ id: string }> {
     const quiz = await this.prisma.db.quiz.findFirst({
       where: { id: dto.quizId, userId: user.userId },
     });
@@ -149,6 +149,77 @@ export class GameSessionsService {
       throw new ForbiddenException("Unauthorized");
     }
     return result;
+  }
+
+  /**
+   * Host ends the room over HTTP — works even when the host's socket is down.
+   * The engine broadcasts game-over / game-session-ended and tears down Redis
+   * and Postgres; if no live session ever existed (no socket connected since
+   * the room was created), fall back to cleaning up Postgres directly.
+   */
+  async endRoom(user: AuthUser, roomId: string): Promise<{ ended: true }> {
+    const room = await this.prisma.db.gameSession.findUnique({
+      where: { id: roomId },
+    });
+    if (!room) {
+      throw new NotFoundException("Room not found");
+    }
+    if (room.creatorId !== user.userId) {
+      throw new ForbiddenException("Unauthorized");
+    }
+
+    await this.engine.endGame(room.gameCode);
+
+    const remaining = await this.prisma.db.gameSession.findUnique({
+      where: { id: roomId },
+      select: { id: true },
+    });
+    if (remaining) {
+      await this.prisma.db.$transaction([
+        this.prisma.db.player.updateMany({
+          where: { gameId: roomId },
+          data: { gameId: null },
+        }),
+        // deleteMany: idempotent if a concurrent endGame won the claim.
+        this.prisma.db.gameSession.deleteMany({ where: { id: roomId } }),
+      ]);
+    }
+    return { ended: true };
+  }
+
+  /** Host kicks a player over HTTP — works even when the host's socket is down. */
+  async removePlayerFromRoom(
+    user: AuthUser,
+    roomId: string,
+    playerId: string,
+  ): Promise<{ removed: true }> {
+    const room = await this.prisma.db.gameSession.findUnique({
+      where: { id: roomId },
+    });
+    if (!room) {
+      throw new NotFoundException("Room not found");
+    }
+    if (room.creatorId !== user.userId) {
+      throw new ForbiddenException("Unauthorized");
+    }
+
+    const player = await this.prisma.db.player.findUnique({
+      where: { id: playerId },
+    });
+    if (!player || player.gameId !== roomId) {
+      throw new NotFoundException("Player is not in this room");
+    }
+
+    await this.prisma.db.player.update({
+      where: { id: playerId },
+      data: { gameId: null },
+    });
+    await this.engine.kickPlayer(room.gameCode, {
+      id: player.id,
+      name: player.name,
+      profilePic: player.profilePic,
+    });
+    return { removed: true };
   }
 
   async getAdminLobby(user: AuthUser, roomId: string) {

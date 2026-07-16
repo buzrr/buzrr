@@ -21,6 +21,8 @@ export interface UseGameSocketOptions {
   gameCode: string;
   /** Player/account JWT; admins can also authenticate via session cookie. */
   token?: string;
+  /** Defer connecting until credentials are resolved (default true). */
+  ready?: boolean;
   /** Called once per socket instance, to attach role-specific listeners. */
   bind?: (socket: GameSocket) => void;
 }
@@ -35,6 +37,7 @@ export function useGameSocket({
   userType,
   gameCode,
   token,
+  ready = true,
   bind,
 }: UseGameSocketOptions): { socket: GameSocket | null } {
   const dispatch = useAppDispatch();
@@ -44,6 +47,7 @@ export function useGameSocket({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (!ready) return;
     if ((userType === "player" || userType === "duel") && !token) return;
 
     const conn: GameSocket = io(
@@ -63,14 +67,22 @@ export function useGameSocket({
       // for proxies that drop the initial burst.
       conn.emit("request-sync");
     });
-    conn.on("disconnect", () => {
-      dispatch(setConnection("reconnecting"));
+    conn.on("disconnect", (reason) => {
+      // "io server disconnect" means the server refused this socket (auth or
+      // validation failure) — the client will NOT retry on its own, so show a
+      // hard "disconnected" instead of a perpetual "reconnecting".
+      dispatch(
+        setConnection(
+          reason === "io server disconnect" ? "disconnected" : "reconnecting",
+        ),
+      );
     });
     conn.io.on("reconnect_failed", () => {
       dispatch(setConnection("disconnected"));
     });
     conn.on("connect_error", () => {
-      dispatch(setConnection("disconnected"));
+      // The manager keeps retrying with backoff, so this is transient.
+      dispatch(setConnection("reconnecting"));
     });
 
     conn.on("state-sync", (payload) => dispatch(applySync(payload)));
@@ -96,7 +108,7 @@ export function useGameSocket({
       setSocket(null);
       dispatch(resetGame());
     };
-  }, [dispatch, userType, gameCode, token]);
+  }, [dispatch, userType, gameCode, token, ready]);
 
   return { socket };
 }

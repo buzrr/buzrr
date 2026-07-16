@@ -1,9 +1,9 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useAppSelector } from "@/state/hooks";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
+import CountdownRing from "@/components/CountdownRing";
 import { Button } from "@/components/ui/Button";
 import type { GameSocket } from "@/types/socket-events";
 
@@ -34,14 +34,14 @@ export default function QuestionScreen(props: QuestionScreenProps) {
       <div className="flex items-center m-auto h-fit w-full md:mx-4 dark:text-white *:bg-white dark:*:bg-dark">
         <div className="h-full w-full md:w-1/3 lg:max-w-sm mx-2 hidden pt-8 md:block rounded-xl">
           <div className="flex justify-center">
-            <Countdown
+            <CountdownRing
               key={question.id}
               duration={question.timeOut}
               remaining={remaining}
             />
           </div>
           <div className="pl-4 mt-2">
-            <div className="text-red-light bg-[#f4d4d4] dark:bg-[#513232] rounded-full px-2 w-fit font-bold">
+            <div className="text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/40 rounded-full px-2 w-fit font-bold">
               &#9679; Live
             </div>
             <div className="text-2xl font-black">{quizTitle}</div>
@@ -98,34 +98,5 @@ export default function QuestionScreen(props: QuestionScreenProps) {
         </div>
       </div>
     </>
-  );
-}
-
-// Lazy-load to keep react-countdown-circle-timer out of main admin bundle.
-const CountdownCircleTimer = dynamic(
-  () =>
-    import("react-countdown-circle-timer").then((m) => ({
-      default: m.CountdownCircleTimer,
-    })),
-  { ssr: false },
-);
-
-function Countdown(params: { duration: number; remaining: number }) {
-  return (
-    <div className="">
-      <CountdownCircleTimer
-        isPlaying
-        duration={params.duration}
-        initialRemainingTime={Math.min(params.remaining, params.duration)}
-        colors={["#a589fc", "#F7B801", "#A30000"]}
-        colorsTime={[10, 5, 0]}
-        size={150}
-        updateInterval={1}
-      >
-        {({ remainingTime }: { remainingTime: number }) => (
-          <span className="text-2xl font-bold">{remainingTime}</span>
-        )}
-      </CountdownCircleTimer>
-    </div>
   );
 }

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -66,13 +67,28 @@ export class GameSessionsController {
     return this.gameSessions.createRoom(user, dto);
   }
 
+  @Post(":roomId/end")
+  @HttpCode(HttpStatus.OK)
+  endRoom(
+    @CurrentAccountUser() user: AuthUser,
+    @Param("roomId") roomId: string,
+  ) {
+    return this.gameSessions.endRoom(user, roomId);
+  }
+
+  @Delete(":roomId/players/:playerId")
+  removePlayer(
+    @CurrentAccountUser() user: AuthUser,
+    @Param("roomId") roomId: string,
+    @Param("playerId") playerId: string,
+  ) {
+    return this.gameSessions.removePlayerFromRoom(user, roomId, playerId);
+  }
+
   @Public()
   @Post(":id/answers")
   @HttpCode(HttpStatus.NO_CONTENT)
-  submitAnswer(
-    @Param("id") id: string,
-    @Body() dto: SubmitAnswerDto,
-  ) {
+  submitAnswer(@Param("id") id: string, @Body() dto: SubmitAnswerDto) {
     return this.gameSessions.submitAnswer(id, dto);
   }
 }

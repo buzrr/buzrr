@@ -195,7 +195,9 @@ export class RealtimeGateway
     if (data?.duelUserId) {
       await this.matchmaking
         .dequeue(data.duelUserId)
-        .catch((err) => this.logger.error("Error dequeuing on disconnect", err));
+        .catch((err) =>
+          this.logger.error("Error dequeuing on disconnect", err),
+        );
       return;
     }
     if (!data?.gameCode) return;
@@ -221,10 +223,9 @@ export class RealtimeGateway
           p.id,
           socket.data.gameSessionId,
         );
-        await this.engine.removePlayer(gameCode, p.id);
+        await this.engine.kickPlayer(gameCode, p);
         if (removed) {
           this.logger.log(`Player ${p.id} removed from ${gameCode}`);
-          this.server.to(gameCode).emit("player-removed", p);
         }
       } catch (error) {
         this.logger.error("Error removing player:", error);

@@ -1,7 +1,8 @@
 "use client";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppDispatch } from "@/state/hooks";
 import { addPlayer, removePlayer } from "@/state/admin/playersSlice";
+import { fetchApiAccessToken } from "@/lib/api/get-access-token";
 import type { GameSocket, PlayerPayload } from "@/types/socket-events";
 import { useGameSocket } from "./useGameSocket";
 
@@ -22,9 +23,29 @@ export function useAdminSocket({
   const callbacks = useRef({ onPlayerRemoved, onGameStarted, onGameOver });
   callbacks.current = { onPlayerRemoved, onGameStarted, onGameOver };
 
+  // Admin sockets authenticate with a JWT: the session cookie is host-scoped
+  // to the Next.js app and never reaches a cross-origin socket server. If the
+  // token fetch fails we still connect and let the cookie fallback try.
+  const [auth, setAuth] = useState<{ token?: string } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchApiAccessToken()
+      .then((token) => {
+        if (!cancelled) setAuth({ token: token ?? undefined });
+      })
+      .catch(() => {
+        if (!cancelled) setAuth({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return useGameSocket({
     userType: "admin",
     gameCode,
+    token: auth?.token,
+    ready: auth !== null,
     bind: (socket) => {
       socket.on("player-joined", (player) => {
         dispatch(addPlayer(player));

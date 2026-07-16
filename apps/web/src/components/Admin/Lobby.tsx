@@ -2,14 +2,19 @@
 import { DEFAULT_AVATAR } from "@/constants";
 import { useEffect, useState, useCallback } from "react";
 import { useAppDispatch, useAppSelector } from "@/state/hooks";
-import { setPlayers } from "@/state/admin/playersSlice";
+import { removePlayer, setPlayers } from "@/state/admin/playersSlice";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { RxCross2 } from "react-icons/rx";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import ConfirmationModal from "./ConfirmationModal";
+import ConnectionStatusPill from "@/components/ConnectionStatusPill";
 import { useAdminSocket } from "@/hooks/useAdminSocket";
+import {
+  useEndRoomMutation,
+  useRemoveRoomPlayerMutation,
+} from "@/lib/modules/game-sessions/hooks";
 import type { PlayerPayload } from "@/types/socket-events";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
@@ -51,17 +56,33 @@ const Lobby = (params: {
     onGameStarted: handleGameStarted,
   });
 
+  const endRoomMutation = useEndRoomMutation();
+  const removePlayerMutation = useRemoveRoomPlayerMutation();
+
+  // Kick and stop-hosting go over HTTP so they work even while the socket is
+  // down; the server broadcasts the resulting events to everyone connected.
   function handlePlayerRemove(player: PlayerPayload) {
-    if (!socket?.connected) {
-      toast.error("Socket not connected. Please try again.");
-      return;
-    }
-    socket.emit("remove-player", player, params.gameCode);
+    removePlayerMutation.mutate(
+      { roomId: params.roomId, playerId: player.id },
+      {
+        onSuccess: () => {
+          // Connected clients get the player-removed broadcast; update
+          // locally in case ours is down (the reducer is idempotent).
+          dispatch(removePlayer({ id: player.id }));
+          if (!socket?.connected) {
+            toast.error(`You have removed ${player.name}`);
+          }
+        },
+        onError: () => {
+          toast.error("Could not remove player. Please try again.");
+        },
+      },
+    );
   }
 
   function handleGameStart() {
     if (!socket?.connected) {
-      toast.error("Socket not connected. Please try again.");
+      toast.error("Not connected to the game server yet. Please wait.");
       return;
     }
     setLoad(true);
@@ -69,34 +90,20 @@ const Lobby = (params: {
   }
 
   async function handleStopHosting() {
-    if (!socket?.connected) {
-      toast.error("Socket not connected. Please try again.");
+    try {
+      await endRoomMutation.mutateAsync(params.roomId);
+      router.push(`/admin/quiz/${params.quizId}`);
+    } catch {
+      toast.error("Could not end game session. Please try again.");
+    } finally {
       setEndGame(false);
-      return;
     }
-
-    await new Promise<void>((resolve) => {
-      const timeout = window.setTimeout(() => {
-        socket.off("game-session-ended", onEnded);
-        toast.error("Could not end game session. Please try again.");
-        setEndGame(false);
-        resolve();
-      }, 5000);
-
-      function onEnded() {
-        window.clearTimeout(timeout);
-        setEndGame(false);
-        router.push(`/admin/quiz/${params.quizId}`);
-        resolve();
-      }
-
-      socket.once("game-session-ended", onEnded);
-      socket.emit("end-game-session", params.gameCode);
-    });
   }
 
   return (
     <>
+      <ConnectionStatusPill className="absolute left-4 md:left-8 top-4 z-10" />
+
       <Button
         size="sm"
         className="bg-red-light dark:bg-red-dark text-white dark:text-dark hover:bg-red-dark absolute right-4 md:right-8 top-4 z-10"

@@ -3,6 +3,7 @@ import clsx from "clsx";
 import Image from "next/image";
 import { useAppSelector } from "@/state/hooks";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
+import CountdownRing from "@/components/CountdownRing";
 
 interface QuestionOption {
   id: string;
@@ -10,6 +11,7 @@ interface QuestionOption {
 }
 
 interface QuestionWithOptions {
+  id?: string;
   title?: string;
   timeOut?: number;
   media?: string | null;
@@ -37,7 +39,6 @@ const QuestionAndResult = (params: {
   // Display-only countdown against the server deadline; the reveal is pushed
   // by the server regardless of what this shows.
   const remaining = useServerCountdown(deadline, clockOffset);
-  const quesTime = Math.ceil(remaining);
   const timeOut = params?.question?.timeOut ?? 1;
   const percent = Math.min(100, Math.floor((remaining * 100) / timeOut));
 
@@ -59,15 +60,26 @@ const QuestionAndResult = (params: {
       )}
       <div className="w-full h-[85dvh] flex gap-4 md:py-4 md:px-8 *:bg-white dark:*:bg-dark md:*:rounded-xl overflow-y-auto">
         <div className="hidden md:w-1/3 md:flex flex-col justify-between py-6 px-5 h-full">
-          <div className="border-12 dark:border-lprimary border-dprimary light: rounded-full w-32 h-32 flex items-center justify-center mx-auto">
-            <span className="font-semibold text-3xl dark:text-white">
-              {params.screen === "question" ? quesTime : 0}
-            </span>
+          <div className="flex items-center justify-center mx-auto">
+            {params.screen === "question" ? (
+              <CountdownRing
+                key={params.question?.id ?? params.question?.title}
+                duration={timeOut}
+                remaining={remaining}
+                size={128}
+              />
+            ) : (
+              <div className="border-12 dark:border-lprimary border-dprimary rounded-full w-32 h-32 flex items-center justify-center">
+                <span className="font-semibold text-3xl dark:text-white">
+                  0
+                </span>
+              </div>
+            )}
           </div>
           <div className="flex flex-col">
-            <div className="flex items-center gap-1 rounded-xl dark:bg-opacity-30 bg-opacity-30 bg-red-light dark:bg-red-dark w-fit p-1 py-[2px]">
-              <div className="rounded-full w-3 h-3 bg-red-600"></div>
-              <p className="text-xs text-red-light dark:text-red-dark">Live</p>
+            <div className="flex items-center gap-1 rounded-xl bg-green-100 dark:bg-green-900/40 w-fit p-1 py-[2px]">
+              <div className="rounded-full w-3 h-3 bg-green-500"></div>
+              <p className="text-xs text-green-600 dark:text-green-400">Live</p>
             </div>
             <p className="font-extrabold mt-2 mb-4 dark:text-white capitalize text-xl">
               {params.quizTitle}
@@ -98,17 +110,26 @@ const QuestionAndResult = (params: {
             </p>
 
             <div
-              className={clsx("grid grid-cols-1 sm:grid-cols-2 gap-x-4", params.question?.mediaType === "image" ? "my-2" : "my-4")}
+              className={clsx(
+                "grid grid-cols-1 sm:grid-cols-2 gap-x-4",
+                params.question?.mediaType === "image" ? "my-2" : "my-4",
+              )}
             >
               {options.map((option: QuestionOption, index: number) => (
                 <button
                   key={option.id}
                   type="button"
-                  disabled={offline || (params.locked && option.id !== params.optionId)}
+                  disabled={
+                    offline || (params.locked && option.id !== params.optionId)
+                  }
                   className={clsx(
                     "cursor-pointer p-4 rounded-xl text-lg dark:text-white mt-4 text-left w-full",
-                    option.id === params.optionId ? "dark:bg-dprimary bg-lprimary" : "bg-light-bg dark:bg-off-dark",
-                    (offline || (params.locked && option.id !== params.optionId)) && "opacity-50 cursor-default"
+                    option.id === params.optionId
+                      ? "dark:bg-dprimary bg-lprimary"
+                      : "bg-light-bg dark:bg-off-dark",
+                    (offline ||
+                      (params.locked && option.id !== params.optionId)) &&
+                      "opacity-50 cursor-default",
                   )}
                   onClick={() => handleSubmit(option.id)}
                   aria-pressed={option.id === params.optionId}
@@ -147,7 +168,11 @@ const QuestionAndResult = (params: {
               <p
                 className={clsx(
                   "text-xl xl:text-3xl font-medium mt-2",
-                  params.status === "correct" ? "text-[#20A97C]" : params.status === "incorrect" ? "text-red-dark" : "text-[#F2AB53]"
+                  params.status === "correct"
+                    ? "text-[#20A97C]"
+                    : params.status === "incorrect"
+                      ? "text-red-dark"
+                      : "text-[#F2AB53]",
                 )}
               >
                 {params.message}

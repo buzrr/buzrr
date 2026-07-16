@@ -10,6 +10,7 @@ import {
   LeaderBoard,
 } from "./GameScreens";
 import ConnectionBanner from "@/components/ConnectionBanner";
+import ConnectionStatusPill from "@/components/ConnectionStatusPill";
 import { usePlayerSocket } from "@/hooks/usePlayerSocket";
 
 interface GameSessionWithQuiz extends GameSession {
@@ -48,6 +49,7 @@ const GamePage = (params: {
   return (
     <>
       <ConnectionBanner />
+      <ConnectionStatusPill className="fixed left-3 bottom-3 z-40" />
       {phase === "idle" || phase === "lobby" ? (
         <WaitGameStart player={params.player} game={params.game} />
       ) : phase === "question" ? (
@@ -68,7 +70,10 @@ const GamePage = (params: {
           quizTitle={game.quiz.title ?? ""}
         />
       ) : phase === "final" || phase === "ended" ? (
-        <LeaderBoard position={you?.rank ?? null} score={you?.totalScore ?? 0} />
+        <LeaderBoard
+          position={you?.rank ?? null}
+          score={you?.totalScore ?? 0}
+        />
       ) : (
         // "starting" — the pre-question countdown
         <Loader />

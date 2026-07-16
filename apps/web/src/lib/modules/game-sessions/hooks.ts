@@ -16,6 +16,18 @@ export function useJoinRoomMutation() {
   });
 }
 
+export function useEndRoomMutation() {
+  return useMutation({
+    mutationFn: gameSessionsApi.end,
+  });
+}
+
+export function useRemoveRoomPlayerMutation() {
+  return useMutation({
+    mutationFn: gameSessionsApi.removePlayer,
+  });
+}
+
 export function useAdminLobbyQuery(roomId: string, enabled = true) {
   return useQuery({
     queryKey: queryKeys.gameSessions.lobby(roomId),

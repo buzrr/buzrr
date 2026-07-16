@@ -6,6 +6,7 @@ import type { Option } from "@/types/db";
 import type { PlayerPayload } from "@/types/socket-events";
 import { useAdminSocket } from "@/hooks/useAdminSocket";
 import ConnectionBanner from "@/components/ConnectionBanner";
+import ConnectionStatusPill from "@/components/ConnectionStatusPill";
 import WaitScreen from "./WaitScreen";
 import QuestionScreen from "./QuestionScreen";
 import QuesResult from "./QuesResult";
@@ -55,6 +56,7 @@ const GameLobby = (params: {
   return (
     <>
       <ConnectionBanner />
+      <ConnectionStatusPill className="fixed left-3 bottom-3 z-40" />
       {phase === "question" ? (
         <QuestionScreen
           socket={socket}
