@@ -1,5 +1,6 @@
 "use client";
 
+import BackNavButton from "@/components/BackNavButton";
 import SetLocalItem from "@/components/Player/SetLocalItem";
 import ResetReduxStates from "@/components/Player/ResetReduxStates";
 import Skeleton from "@/components/ui/Skeleton";
@@ -29,10 +30,12 @@ function JoinRoomSkeleton() {
 export default function JoinRoomClient({ playerId }: { playerId: string }) {
   const router = useRouter();
   const [sessionAllowed, setSessionAllowed] = useState(false);
-  const { data: player, isPending, isError, error } = usePlayerQuery(
-    playerId,
-    sessionAllowed,
-  );
+  const {
+    data: player,
+    isPending,
+    isError,
+    error,
+  } = usePlayerQuery(playerId, sessionAllowed);
   const { mutate: clearGame, isPending: clearingGame } =
     useClearPlayerGameMutation(playerId);
 
@@ -85,8 +88,11 @@ export default function JoinRoomClient({ playerId }: { playerId: string }) {
           }}
         />
       </div>
-      <div className="w-full h-[81vh] flex gap-4 px-4 *:bg-white dark:*:bg-dark *:rounded-xl">
-        <div className="w-full md:w-fit py-4">
+      <div className="w-full min-h-[81vh] md:h-[81vh] flex flex-col md:flex-row gap-4 px-4 pb-4 md:pb-0 *:bg-white dark:*:bg-dark *:rounded-xl">
+        <div className="w-full md:flex-1 py-4">
+          <div className="px-4 md:px-8 pt-2">
+            <BackNavButton href="/" />
+          </div>
           <JoinRoomForm />
         </div>
         <JoinRoomProfileCard

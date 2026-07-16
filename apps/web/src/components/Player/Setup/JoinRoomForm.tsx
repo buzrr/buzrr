@@ -48,7 +48,7 @@ const JoinRoomForm = () => {
 
   return (
     <form
-      className="flex flex-col justify-center px-2 py-4 m-4 w-[85%] md:w-[55vw]"
+      className="flex flex-col justify-center px-4 py-4 md:m-4 w-full max-w-2xl animate-fade-up"
       onSubmit={onSubmit}
     >
       <h1 className="text-3xl md:text-5xl py-2 font-extrabold dark:text-white">
@@ -65,7 +65,7 @@ const JoinRoomForm = () => {
         type="text"
         {...register("gameCode")}
         placeholder="Enter Code"
-        className="md:w-4/5 uppercase tracking-widest font-mono my-12"
+        className="md:w-4/5 uppercase tracking-widest font-mono my-6 md:my-12"
         autoComplete="off"
         required
         onInput={(e: React.FormEvent<HTMLInputElement>) => {
@@ -73,7 +73,7 @@ const JoinRoomForm = () => {
           input.value = input.value.replace(/\s/g, "").toUpperCase();
         }}
       />
-      <div className="w-full md:w-[40%] mt-10">
+      <div className="w-full md:w-[40%] mt-4 md:mt-10">
         <SubmitButton text="Join" isPending={mutation.isPending} />
       </div>
     </form>

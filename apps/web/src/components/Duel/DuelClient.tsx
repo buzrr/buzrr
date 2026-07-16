@@ -45,10 +45,10 @@ export default function DuelClient() {
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center gap-6 px-4 pb-16">
-        <h1 className="text-3xl md:text-5xl font-black text-dark dark:text-white text-center">
+        <h1 className="text-3xl md:text-5xl font-black text-dark dark:text-white text-center animate-fade-up">
           1v1 Duel
         </h1>
-        <p className="text-sm text-off-dark dark:text-off-white text-center max-w-md">
+        <p className="text-sm text-off-dark dark:text-off-white text-center max-w-md animate-fade-up [animation-delay:100ms]">
           Get matched with a player near your rating and battle through quick
           questions. Faster correct answers score more.
         </p>
@@ -56,7 +56,7 @@ export default function DuelClient() {
         {isPending ? (
           <Skeleton className="h-28 w-full max-w-sm rounded-2xl bg-white dark:bg-card-dark" />
         ) : profile ? (
-          <div className="flex items-center gap-4 bg-white dark:bg-dark rounded-2xl p-5 w-full max-w-sm shadow">
+          <div className="flex items-center gap-4 bg-white dark:bg-dark rounded-2xl p-5 w-full max-w-sm shadow border border-card-light dark:border-off-dark animate-fade-up [animation-delay:150ms]">
             <Image
               src={profile.image || DEFAULT_AVATAR}
               width={56}
@@ -131,7 +131,7 @@ function SearchingCard({
   }, [queuedAt]);
 
   return (
-    <div className="flex flex-col items-center gap-4 bg-white dark:bg-dark rounded-2xl p-6 w-full max-w-sm shadow">
+    <div className="flex flex-col items-center gap-4 bg-white dark:bg-dark rounded-2xl p-6 w-full max-w-sm shadow border border-card-light dark:border-off-dark animate-fade-up">
       <div className="h-12 w-12 rounded-full border-4 border-lprimary dark:border-dprimary border-t-transparent dark:border-t-transparent animate-spin" />
       <p className="font-bold text-dark dark:text-white">
         Searching for an opponent… {queuedAt ? `${elapsed}s` : ""}

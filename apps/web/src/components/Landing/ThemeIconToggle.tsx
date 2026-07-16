@@ -1,11 +1,13 @@
 "use client";
+
 import { useEffect } from "react";
+import { LuMoon, LuSun } from "react-icons/lu";
 import { useAppSelector, useAppDispatch } from "@/state/hooks";
 import { PageTheme, setPageTheme } from "@/state/pageThemeSlice";
-import { Switch } from "@/components/ui/Switch";
 import { withThemeTransition } from "@/utils/themeTransition";
 
-const ThemeToggle = () => {
+/** Compact sun/moon theme switch for the landing navbar. */
+const ThemeIconToggle = () => {
   const theme = useAppSelector((state) => state.pageTheme.theme);
   const dispatch = useAppDispatch();
 
@@ -27,21 +29,15 @@ const ThemeToggle = () => {
   };
 
   return (
-    <div className="flex items-center justify-end gap-3">
-      <div className="flex flex-col leading-tight text-2xs text-left text-dark dark:text-gray">
-        <span>DARK</span>
-        <span>MODE</span>
-      </div>
-      <div className="p-[6px] shadow-[0px_2px_4px_0px_rgba(0,0,0,0.15)] rounded-full bg-white dark:bg-[#27272a]">
-        <Switch
-          checked={theme === PageTheme.dark}
-          aria-label="Toggle dark mode"
-          className="cursor-pointer"
-          onClick={handler}
-        />
-      </div>
-    </div>
+    <button
+      type="button"
+      aria-label="Toggle dark mode"
+      onClick={handler}
+      className="flex items-center justify-center size-9 rounded-full text-dark dark:text-white bg-card-light dark:bg-card-dark hover:bg-cardhover-light dark:hover:bg-cardhover-dark transition-colors"
+    >
+      {theme === PageTheme.dark ? <LuSun size={16} /> : <LuMoon size={16} />}
+    </button>
   );
 };
 
-export default ThemeToggle;
+export default ThemeIconToggle;

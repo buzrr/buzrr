@@ -2,7 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import ThemeToggle from "./ThemeToggle";
+
+// Routes that render their own full footer + theme toggle (landing & co).
+const ROUTES_WITH_OWN_FOOTER = ["/", "/docs", "/roadmap", "/changelog"];
 
 const Links = [
   {
@@ -28,6 +32,9 @@ const Links = [
 ];
 
 const Footer = () => {
+  const pathname = usePathname();
+  if (ROUTES_WITH_OWN_FOOTER.includes(pathname)) return null;
+
   return (
     <div className="flex p-2 md:px-8 justify-start z-50 items-center text-sm text-[#94959c] dark:text-off-white w-fit md:w-full fixed bottom-0 right-3 md:right-0">
       {Links.map((link, index) => (

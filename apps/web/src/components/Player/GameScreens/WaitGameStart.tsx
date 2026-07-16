@@ -16,7 +16,10 @@ interface GameWithQuiz extends GameSession {
   creator?: { name?: string | null; image?: string | null };
 }
 
-const WaitGameStart = (params: { player: PlayerWithProfile; game: GameWithQuiz }) => {
+const WaitGameStart = (params: {
+  player: PlayerWithProfile;
+  game: GameWithQuiz;
+}) => {
   const game = params.game;
 
   return (
@@ -61,7 +64,7 @@ const WaitGameStart = (params: { player: PlayerWithProfile; game: GameWithQuiz }
               </h2>
             </div>
           </div>
-          <div className="md:w-[45vw] w-[99vw] flex flex-col p-2 md:p-4">
+          <div className="md:w-[45vw] w-full flex flex-col p-2 md:p-4">
             <h1 className="text-2xl py-2 font-extrabold dark:text-white md:hidden">
               {game.quiz.title}
             </h1>

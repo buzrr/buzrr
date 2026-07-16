@@ -19,7 +19,9 @@ const JoinRoomProfileCard = (params: {
   profilePic: string | null;
 }) => {
   const [isEditingName, setIsEditingName] = useState(false);
-  const [savedPlayerName, setSavedPlayerName] = useState(params.initialPlayerName);
+  const [savedPlayerName, setSavedPlayerName] = useState(
+    params.initialPlayerName,
+  );
   const mutation = useUpdatePlayerNameMutation();
   const { register, handleSubmit, reset, formState } = useForm<FormValues>({
     resolver: zodResolver(updatePlayerNameSchema),
@@ -51,19 +53,21 @@ const JoinRoomProfileCard = (params: {
   });
 
   return (
-    <div className="w-[40vw] hidden md:flex md:flex-col items-center justify-center gap-4">
+    <div className="w-full md:w-[40vw] flex flex-col items-center justify-center gap-3 md:gap-4 p-6 md:p-4">
       <ClientImage
         props={{
           src: params.profilePic || DEFAULT_AVATAR,
           alt: "player avatar",
           width: 200,
           height: 200,
-          classname: "rounded-full",
+          classname: "rounded-full w-24 h-24 md:w-[200px] md:h-[200px]",
         }}
       />
       {!isEditingName ? (
         <div className="flex items-center gap-3">
-          <p className="text-2xl font-bold dark:text-white">{savedPlayerName}</p>
+          <p className="text-xl md:text-2xl font-bold dark:text-white">
+            {savedPlayerName}
+          </p>
           <button
             type="button"
             className="px-3 py-1 rounded-lg border border-gray dark:text-white font-bold text-sm cursor-pointer"
@@ -88,7 +92,7 @@ const JoinRoomProfileCard = (params: {
               },
             })}
             placeholder="Enter Display Name"
-            className="w-[70%] border-gray dark:bg-dark-bg dark:text-white border focus:border-blue-600 rounded-lg outline-none text-slate-900 px-4 py-3"
+            className="w-full max-w-xs md:w-[70%] md:max-w-none border-gray dark:bg-dark-bg dark:text-white border focus:border-blue-600 rounded-lg outline-none text-slate-900 px-4 py-3"
             required
             autoComplete="off"
             maxLength={30}

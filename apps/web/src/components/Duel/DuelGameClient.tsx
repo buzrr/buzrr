@@ -128,7 +128,10 @@ function DuelScoreBar({ myId }: { myId?: string }) {
               <p className="text-xs font-bold text-dark dark:text-white leading-tight">
                 {p.id === myId ? "You" : p.name}
               </p>
-              <p className="text-sm font-black text-lprimary dark:text-dprimary leading-tight">
+              <p
+                key={p.score}
+                className="text-sm font-black text-lprimary dark:text-dprimary leading-tight animate-pop"
+              >
                 {p.score}
               </p>
             </div>
@@ -156,10 +159,13 @@ function DuelStartingScreen({
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[70dvh] gap-6 px-4">
-      <p className="text-2xl font-black text-dark dark:text-white">
+      <p className="text-2xl font-black text-dark dark:text-white animate-fade-up">
         {opponent ? `You vs ${opponent.name}` : "Get ready!"}
       </p>
-      <p className="text-7xl font-black text-lprimary dark:text-dprimary animate-pulse">
+      <p
+        key={remaining}
+        className="text-7xl font-black text-lprimary dark:text-dprimary animate-pop-in"
+      >
         {remaining > 0 ? remaining : "GO!"}
       </p>
     </div>
@@ -185,11 +191,16 @@ function DuelResultScreen({ myId }: { myId?: string }) {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[80dvh] gap-6 px-4">
-      <p className="text-4xl font-black text-dark dark:text-white">{outcome}</p>
+      <p className="text-3xl sm:text-4xl font-black text-dark dark:text-white text-center animate-pop-in">
+        {outcome}
+      </p>
 
-      <div className="flex items-center gap-8">
+      <div className="flex items-center gap-6 sm:gap-8 animate-fade-up [animation-delay:150ms]">
         {[me, opponent].filter(Boolean).map((entry) => (
-          <div key={entry!.playerId} className="flex flex-col items-center gap-2">
+          <div
+            key={entry!.playerId}
+            className="flex flex-col items-center gap-2"
+          >
             <Image
               src={entry!.profilePic || DEFAULT_AVATAR}
               width={64}
@@ -208,7 +219,7 @@ function DuelResultScreen({ myId }: { myId?: string }) {
       </div>
 
       {myElo && (
-        <div className="bg-white dark:bg-dark rounded-2xl px-6 py-4 shadow text-center">
+        <div className="bg-white dark:bg-dark rounded-2xl px-6 py-4 shadow border border-card-light dark:border-off-dark text-center animate-fade-up [animation-delay:300ms]">
           <p className="text-xs text-off-dark dark:text-off-white mb-1">
             Rating
           </p>

@@ -97,62 +97,72 @@ const QuestionAndResult = (params: {
           </div>
         </div>
         {params.screen === "question" ? (
-          <div className="w-full p-6 flex flex-col min-h-full h-fit ">
-            {params.question?.mediaType === "image" && (
-              <Image
-                src={params.question?.media ?? ""}
-                className="mb-10 mx-auto md:h-[30vh]"
-                alt="media Image"
-                height={320}
-                width={500}
-              />
-            )}
-            <p className="dark:text-white">Question</p>
-            <p className="font-bold text-2xl dark:text-white">
-              {params.question?.title ?? ""}
-            </p>
-
-            <div
-              className={clsx(
-                "grid grid-cols-1 sm:grid-cols-2 gap-x-4",
-                params.question?.mediaType === "image" ? "my-2" : "my-4",
+          <div className="w-full p-4 sm:p-6 flex flex-col min-h-full h-fit">
+            <div className="w-full max-w-3xl mx-auto flex flex-col flex-1">
+              {params.question?.mediaType === "image" && (
+                <Image
+                  src={params.question?.media ?? ""}
+                  className="mb-6 md:mb-10 mx-auto max-h-[30vh] w-auto"
+                  alt="media Image"
+                  height={320}
+                  width={500}
+                />
               )}
-            >
-              {options.map((option: QuestionOption, index: number) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  disabled={offline || params.locked}
-                  className={clsx(
-                    "cursor-pointer p-4 rounded-xl text-lg dark:text-white mt-4 text-left w-full",
-                    option.id === params.optionId
-                      ? "dark:bg-dprimary bg-lprimary"
-                      : "bg-light-bg dark:bg-off-dark",
-                    (offline ||
-                      (params.locked && option.id !== params.optionId)) &&
-                      "opacity-50 cursor-default",
-                  )}
-                  onClick={() => handleSubmit(option.id)}
-                  aria-pressed={option.id === params.optionId}
-                >
-                  {index + 1}. {option.title}
-                </button>
-              ))}
-            </div>
-
-            {params.locked && (
-              <p className="dark:text-white text-center font-bold my-2">
-                Answer received — waiting for the results…
+              <p className="dark:text-white">Question</p>
+              <p className="font-bold text-xl sm:text-2xl dark:text-white animate-fade-up">
+                {params.question?.title ?? ""}
               </p>
-            )}
 
-            <p className="dark:text-white mb-1 md:hidden font-bold text-center my-6 text-lg">
-              Room code: {params.gameCode}
-            </p>
+              <div
+                className={clsx(
+                  "grid grid-cols-1 sm:grid-cols-2 gap-x-4",
+                  params.question?.mediaType === "image" ? "my-2" : "my-4",
+                )}
+              >
+                {options.map((option: QuestionOption, index: number) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    disabled={offline || params.locked}
+                    className={clsx(
+                      "cursor-pointer p-4 rounded-xl text-base sm:text-lg mt-4 text-left w-full transition-all duration-150",
+                      option.id === params.optionId
+                        ? "dark:bg-dprimary bg-lprimary text-white dark:text-dark font-semibold shadow-md animate-pop"
+                        : "bg-light-bg dark:bg-off-dark dark:text-white",
+                      !offline &&
+                        !params.locked &&
+                        "hover:scale-[1.01] hover:shadow active:scale-[0.98]",
+                      (offline ||
+                        (params.locked && option.id !== params.optionId)) &&
+                        "opacity-50 cursor-default",
+                    )}
+                    onClick={() => handleSubmit(option.id)}
+                    aria-pressed={option.id === params.optionId}
+                  >
+                    {index + 1}. {option.title}
+                  </button>
+                ))}
+              </div>
+
+              {params.locked && (
+                <p className="dark:text-white text-center font-bold my-2 animate-fade-up">
+                  Answer received — waiting for the results…
+                </p>
+              )}
+
+              <p className="dark:text-white mb-1 md:hidden font-bold text-center my-6 text-lg">
+                Room code: {params.gameCode}
+              </p>
+            </div>
           </div>
         ) : (
-          <div className="w-full p-6 flex flex-col">
-            <div className="flex flex-col justify-center items-center">
+          <div className="w-full p-6 flex flex-col justify-center min-h-full">
+            <div
+              className={clsx(
+                "flex flex-col justify-center items-center",
+                params.status === "incorrect" && "animate-shake",
+              )}
+            >
               <Image
                 src={`${
                   params.status === "correct"
@@ -164,11 +174,11 @@ const QuestionAndResult = (params: {
                 width={160}
                 height={160}
                 alt="Logo"
-                className="w-1/2 h-1/2 md:w-2/5 md:h-2/5"
+                className="w-1/2 h-1/2 md:w-2/5 md:h-2/5 animate-pop-in"
               />
               <p
                 className={clsx(
-                  "text-xl xl:text-3xl font-medium mt-2",
+                  "text-xl xl:text-3xl font-medium mt-2 animate-fade-up [animation-delay:150ms]",
                   params.status === "correct"
                     ? "text-[#20A97C]"
                     : params.status === "incorrect"

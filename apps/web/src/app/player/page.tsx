@@ -27,8 +27,8 @@ function Player() {
           }}
         />
       </div>
-      <div className="w-full h-[81vh] flex gap-4 px-4 *:bg-white dark:*:bg-dark *:rounded-xl">
-        <div className="mx-auto md:w-[60vw] p-6">
+      <div className="w-full min-h-[81vh] md:h-[81vh] flex gap-4 px-4 pb-4 md:pb-0 *:bg-white dark:*:bg-dark *:rounded-xl">
+        <div className="w-full mx-auto md:w-[60vw] p-4 sm:p-6 animate-fade-up">
           <BackNavButton />
           <CreatePlayerForm data={data} setData={setData} />
         </div>

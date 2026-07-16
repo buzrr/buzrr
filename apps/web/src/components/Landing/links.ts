@@ -1,0 +1,9 @@
+export const GITHUB_LINK = "https://github.com/buzrr/buzrr";
+export const CONTRIBUTING_LINK = `${GITHUB_LINK}/blob/main/CONTRIBUTING.md`;
+export const LICENSE_LINK = `${GITHUB_LINK}/blob/main/LICENSE`;
+export const SELF_HOSTING_LINK = `${GITHUB_LINK}#-quick-start`;
+export const ISSUES_LINK = `${GITHUB_LINK}/issues`;
+export const COMMITS_LINK = `${GITHUB_LINK}/commits/main`;
+export const INSTAGRAM_LINK = "https://www.instagram.com/buzrr.in/";
+export const YOUTUBE_LINK = "https://www.youtube.com/@BuzznoldBuzzenegger";
+export const AUTHOR_LINK = "https://github.com/alanansari";

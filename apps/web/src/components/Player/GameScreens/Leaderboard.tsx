@@ -18,8 +18,10 @@ const Leaderboard = (params: Stats) => {
     <>
       {onPodium && <ConfettiBurst />}
       <div className="flex flex-col items-center justify-center min-h-[80dvh] px-4">
-        <div className="w-full max-w-md bg-white dark:bg-dark rounded-2xl shadow-lg px-6 sm:px-10 py-10 text-center">
-          <p className="text-6xl mb-4">{medalFor(params.position)}</p>
+        <div className="w-full max-w-md bg-white dark:bg-dark rounded-2xl shadow-lg border border-card-light dark:border-off-dark px-6 sm:px-10 py-10 text-center animate-fade-up">
+          <p className="text-6xl mb-4 animate-pop-in [animation-delay:200ms]">
+            {medalFor(params.position)}
+          </p>
           <h1 className="text-3xl font-black text-dark dark:text-white">
             Quiz completed!
           </h1>
