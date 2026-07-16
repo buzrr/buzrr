@@ -314,6 +314,13 @@ export class GameEngineService
       return { accepted: false, reason: "Time is up" };
     }
 
+    // Kicked players are removed from the roster but may still hold a live
+    // socket for a moment — never accept intents from outside the roster.
+    const rosterEntry = await this.store.getPlayer(gameCode, playerId);
+    if (!rosterEntry) {
+      return { accepted: false, reason: "Not in this game" };
+    }
+
     const questions = await this.store.getQuestions(gameCode);
     const question = questions?.[qIndex];
     if (!question) {
@@ -455,7 +462,11 @@ export class GameEngineService
 
   /**
    * Host kicks a player: Redis removal plus the room broadcast, shared by the
-   * socket (`remove-player`) and HTTP (`DELETE .../players/:id`) paths.
+   * socket (`remove-player`) and HTTP (`DELETE .../players/:id`) paths. The
+   * broadcast goes out before the disconnect so the kicked client still hears
+   * it and can clear its local session; the disconnect then guarantees the
+   * kicked player cannot linger in the room (works across instances via the
+   * Redis adapter).
    */
   async kickPlayer(
     gameCode: string,
@@ -463,6 +474,7 @@ export class GameEngineService
   ): Promise<void> {
     await this.removePlayer(gameCode, player.id);
     this.emitRoom(gameCode).emit("player-removed", player);
+    this.io?.in(`player:${player.id}`).disconnectSockets(true);
   }
 
   async hostConnected(gameCode: string, connected: boolean): Promise<void> {

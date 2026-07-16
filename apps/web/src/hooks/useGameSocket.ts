@@ -43,7 +43,9 @@ export function useGameSocket({
   const dispatch = useAppDispatch();
   const [socket, setSocket] = useState<GameSocket | null>(null);
   const bindRef = useRef(bind);
-  bindRef.current = bind;
+  useEffect(() => {
+    bindRef.current = bind;
+  }, [bind]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -77,9 +79,12 @@ export function useGameSocket({
         ),
       );
     });
-    conn.io.on("reconnect_failed", () => {
+    // The Manager (conn.io) is shared across sockets for the same URL, so
+    // this handler must be removed explicitly on cleanup.
+    const onReconnectFailed = () => {
       dispatch(setConnection("disconnected"));
-    });
+    };
+    conn.io.on("reconnect_failed", onReconnectFailed);
     conn.on("connect_error", () => {
       // The manager keeps retrying with backoff, so this is transient.
       dispatch(setConnection("reconnecting"));
@@ -104,6 +109,7 @@ export function useGameSocket({
     setSocket(conn);
 
     return () => {
+      conn.io.off("reconnect_failed", onReconnectFailed);
       conn.disconnect();
       setSocket(null);
       dispatch(resetGame());

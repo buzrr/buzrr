@@ -21,7 +21,9 @@ export function useAdminSocket({
 }: UseAdminSocketOptions): { socket: GameSocket | null } {
   const dispatch = useAppDispatch();
   const callbacks = useRef({ onPlayerRemoved, onGameStarted, onGameOver });
-  callbacks.current = { onPlayerRemoved, onGameStarted, onGameOver };
+  useEffect(() => {
+    callbacks.current = { onPlayerRemoved, onGameStarted, onGameOver };
+  }, [onPlayerRemoved, onGameStarted, onGameOver]);
 
   // Admin sockets authenticate with a JWT: the session cookie is host-scoped
   // to the Next.js app and never reaches a cross-origin socket server. If the

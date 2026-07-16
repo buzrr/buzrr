@@ -206,14 +206,19 @@ export class GameSessionsService {
     const player = await this.prisma.db.player.findUnique({
       where: { id: playerId },
     });
-    if (!player || player.gameId !== roomId) {
+    // A detached player (gameId null) is still kickable so that a retry can
+    // finish the Redis removal + broadcast if a previous attempt failed after
+    // the Postgres update; only a player in a *different* room is rejected.
+    if (!player || (player.gameId !== null && player.gameId !== roomId)) {
       throw new NotFoundException("Player is not in this room");
     }
 
-    await this.prisma.db.player.update({
-      where: { id: playerId },
-      data: { gameId: null },
-    });
+    if (player.gameId === roomId) {
+      await this.prisma.db.player.update({
+        where: { id: playerId },
+        data: { gameId: null },
+      });
+    }
     await this.engine.kickPlayer(room.gameCode, {
       id: player.id,
       name: player.name,

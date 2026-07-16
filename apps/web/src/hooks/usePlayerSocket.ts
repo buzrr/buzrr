@@ -16,7 +16,9 @@ export function usePlayerSocket({
   onRemoved,
 }: UsePlayerSocketOptions): { socket: GameSocket | null } {
   const onRemovedRef = useRef(onRemoved);
-  onRemovedRef.current = onRemoved;
+  useEffect(() => {
+    onRemovedRef.current = onRemoved;
+  }, [onRemoved]);
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {

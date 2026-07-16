@@ -1,7 +1,6 @@
 "use client";
 import Link from "next/link";
 import ConfettiBurst from "@/components/ConfettiBurst";
-import { Button } from "@/components/ui/Button";
 
 interface Stats {
   position: number | null;
@@ -48,13 +47,17 @@ const Leaderboard = (params: Stats) => {
           </div>
 
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
-            <Link href="/player" className="w-full">
-              <Button fullWidth>Join Another Game</Button>
+            <Link
+              href="/player"
+              className="w-full inline-flex items-center justify-center rounded-xl font-bold px-5 py-3 transition-all duration-300 ease-in-out bg-lprimary dark:bg-dprimary text-white dark:text-dark"
+            >
+              Join Another Game
             </Link>
-            <Link href="/" className="w-full">
-              <Button variant="outline" fullWidth>
-                Back to Home
-              </Button>
+            <Link
+              href="/"
+              className="w-full inline-flex items-center justify-center rounded-xl font-bold px-5 py-3 transition-all duration-300 ease-in-out border-2 border-lprimary dark:border-dprimary text-lprimary dark:text-dprimary"
+            >
+              Back to Home
             </Link>
           </div>
         </div>

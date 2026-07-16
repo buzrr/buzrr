@@ -27,7 +27,9 @@ export default function CountdownRing(params: {
       duration={params.duration}
       initialRemainingTime={Math.min(params.remaining, params.duration)}
       colors={["#a589fc", "#F7B801", "#A30000"]}
-      colorsTime={[10, 5, 0]}
+      // Warning threshold scales with short questions so it never exceeds
+      // the duration (which would skip the first color entirely).
+      colorsTime={[params.duration, Math.min(5, params.duration / 2), 0]}
       size={params.size ?? 150}
       updateInterval={1}
     >

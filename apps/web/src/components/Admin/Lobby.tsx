@@ -51,7 +51,7 @@ const Lobby = (params: {
   const { socket } = useAdminSocket({
     gameCode: params.gameCode,
     onPlayerRemoved: (player) => {
-      toast.error(`You have removed ${player.name}`);
+      toast.error(`You have removed ${player.name ?? "the player"}`);
     },
     onGameStarted: handleGameStarted,
   });
@@ -70,7 +70,7 @@ const Lobby = (params: {
           // locally in case ours is down (the reducer is idempotent).
           dispatch(removePlayer({ id: player.id }));
           if (!socket?.connected) {
-            toast.error(`You have removed ${player.name}`);
+            toast.error(`You have removed ${player.name ?? "the player"}`);
           }
         },
         onError: () => {

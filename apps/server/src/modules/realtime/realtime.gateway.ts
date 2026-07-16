@@ -223,9 +223,13 @@ export class RealtimeGateway
           p.id,
           socket.data.gameSessionId,
         );
-        await this.engine.kickPlayer(gameCode, p);
         if (removed) {
+          await this.engine.kickPlayer(gameCode, p);
           this.logger.log(`Player ${p.id} removed from ${gameCode}`);
+        } else {
+          // Already detached in Postgres (e.g. a partially-failed earlier
+          // kick) — still clear any stale Redis roster entry, quietly.
+          await this.engine.removePlayer(gameCode, p.id);
         }
       } catch (error) {
         this.logger.error("Error removing player:", error);

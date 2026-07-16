@@ -40,7 +40,10 @@ const QuestionAndResult = (params: {
   // by the server regardless of what this shows.
   const remaining = useServerCountdown(deadline, clockOffset);
   const timeOut = params?.question?.timeOut ?? 1;
-  const percent = Math.min(100, Math.floor((remaining * 100) / timeOut));
+  const percent = Math.max(
+    0,
+    Math.min(100, Math.floor((remaining * 100) / timeOut)),
+  );
 
   function handleSubmit(id: string) {
     if (params.locked || offline) return;
@@ -119,9 +122,7 @@ const QuestionAndResult = (params: {
                 <button
                   key={option.id}
                   type="button"
-                  disabled={
-                    offline || (params.locked && option.id !== params.optionId)
-                  }
+                  disabled={offline || params.locked}
                   className={clsx(
                     "cursor-pointer p-4 rounded-xl text-lg dark:text-white mt-4 text-left w-full",
                     option.id === params.optionId
