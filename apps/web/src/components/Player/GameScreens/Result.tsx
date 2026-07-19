@@ -20,11 +20,11 @@ const Result = (params: {
   const reveal = useAppSelector((state) => state.game.reveal);
 
   const optionTitle = (id: string | null | undefined) =>
-    question?.options.find((o) => o.id === id)?.title;
+    question?.options?.find((o) => o.id === id)?.title;
 
   const correctAnswer =
     reveal?.correctOptionIds
-      .map((id) => optionTitle(id))
+      ?.map((id) => optionTitle(id))
       .filter(Boolean)
       .join(", ") || undefined;
 

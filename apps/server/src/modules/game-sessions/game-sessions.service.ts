@@ -40,22 +40,29 @@ export class GameSessionsService {
     if (!player) {
       throw new NotFoundException("Player not found");
     }
-    // Re-joining the same room (e.g. after a refresh) must never hit the cap.
-    if (player.gameId !== game.id) {
-      const limit = game.creator.hostSizeLimit;
-      const playerCount = await this.prisma.db.player.count({
-        where: { gameId: game.id },
-      });
-      if (playerCount >= limit) {
-        throw new ForbiddenException(
-          `This room is full — rooms are capped at ${limit} players while Buzrr is in beta on free-tier infrastructure.`,
-        );
-      }
-    }
-    await this.prisma.db.player.update({
-      where: { id: playerId },
-      data: { gameId: game.id },
-    });
+    // Serializable so concurrent joins can't both pass the count and
+    // overshoot the cap.
+    await this.prisma.db.$transaction(
+      async (tx) => {
+        // Re-joining the same room (e.g. after a refresh) must never hit the cap.
+        if (player.gameId !== game.id) {
+          const limit = game.creator.hostSizeLimit;
+          const playerCount = await tx.player.count({
+            where: { gameId: game.id },
+          });
+          if (playerCount >= limit) {
+            throw new ForbiddenException(
+              `This room is full — rooms are capped at ${limit} players while Buzrr is in beta on free-tier infrastructure.`,
+            );
+          }
+        }
+        await tx.player.update({
+          where: { id: playerId },
+          data: { gameId: game.id },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
     return { roomId: game.id, playerId };
   }
 

@@ -63,6 +63,7 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
         {/* Mobile drawer: the quiz info the top bar has no room for
             (description, public toggle, past sessions). */}
         <div
+          aria-hidden="true"
           className={clsx(
             "fixed inset-0 z-10 bg-[#0000006a] md:hidden",
             !sidebarOpen && "hidden",
@@ -71,8 +72,8 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
         ></div>
         <div
           className={clsx(
-            "z-20 p-4 flex bg-white dark:bg-dark flex-col h-dvh fixed w-[80vw] left-0 top-0 md:hidden overflow-y-auto",
-            !sidebarOpen && "hidden",
+            "z-20 p-4 bg-white dark:bg-dark flex-col h-dvh fixed w-[80vw] left-0 top-0 md:hidden overflow-y-auto",
+            sidebarOpen ? "flex" : "hidden",
           )}
         >
           <div className="flex justify-end">

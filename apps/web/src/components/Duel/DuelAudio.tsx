@@ -43,6 +43,9 @@ export default function DuelAudio({
   const outcomeRef = useRef<HTMLAudioElement | null>(null);
   const inBattleRef = useRef(false);
   const outcomePlayedRef = useRef(false);
+  // Guards the gesture-retry in playWhenAllowed: a queued retry must not
+  // restart audio after this component unmounts.
+  const isMountedRef = useRef(true);
 
   const inBattle =
     phase === "lobby" ||
@@ -72,7 +75,10 @@ export default function DuelAudio({
         battleRef.current = audio;
       }
       battleRef.current.muted = muted;
-      playWhenAllowed(battleRef.current, () => inBattleRef.current);
+      playWhenAllowed(
+        battleRef.current,
+        () => isMountedRef.current && inBattleRef.current,
+      );
     } else {
       battleRef.current?.pause();
     }
@@ -88,13 +94,17 @@ export default function DuelAudio({
       const audio = new Audio(`/audio/1v1-${outcome}.mp3`);
       audio.muted = muted;
       outcomeRef.current = audio;
-      playWhenAllowed(audio, () => !inBattleRef.current);
+      playWhenAllowed(
+        audio,
+        () => isMountedRef.current && !inBattleRef.current,
+      );
     }
   }, [phase, outcome, muted]);
 
   // Stop everything when leaving the duel screen.
   useEffect(() => {
     return () => {
+      isMountedRef.current = false;
       battleRef.current?.pause();
       outcomeRef.current?.pause();
     };

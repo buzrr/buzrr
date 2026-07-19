@@ -151,7 +151,7 @@ const Lobby = (params: {
           <span
             className={clsx(
               "p-2 dark:text-white border rounded-xl font-bold bg-light-bg dark:bg-cardhover-dark",
-              maxPlayers && players.length >= maxPlayers
+              players.length >= maxPlayers
                 ? "border-red-light dark:border-red-dark"
                 : "border-lprimary dark:border-dprimary",
             )}
