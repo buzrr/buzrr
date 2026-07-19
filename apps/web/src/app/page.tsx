@@ -6,6 +6,7 @@ import {
   LuGitCommitHorizontal,
   LuGitPullRequest,
   LuGithub,
+  LuHeart,
   LuPlay,
   LuScale,
   LuServer,
@@ -234,6 +235,31 @@ export default async function Home() {
               <LuStar size={16} />
               Star on GitHub
             </a>
+          </div>
+        </section>
+
+        {/* Support CTA */}
+        <section className="pb-16">
+          <div className="flex flex-col sm:flex-row items-center gap-6 rounded-2xl border border-card-light dark:border-off-dark bg-white dark:bg-dark p-6 sm:p-8">
+            <Link
+              href="/support"
+              className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold bg-lprimary dark:bg-dprimary text-white dark:text-dark hover:opacity-90 transition-opacity"
+            >
+              <LuHeart size={16} className="fill-current" />
+              Donate Us
+            </Link>
+            <div className="text-center sm:text-left">
+              <p className="font-bold text-dark dark:text-white">
+                Enjoying Buzrr? Help keep it running.
+              </p>
+              <p className="text-sm text-dark/60 dark:text-gray">
+                Donations cover servers and chai — always optional, never
+                required.
+              </p>
+            </div>
+            <div className="sm:ml-auto hidden sm:flex items-center justify-center size-14 shrink-0 rounded-full bg-card-light dark:bg-card-dark text-lprimary dark:text-dprimary">
+              <LuHeart size={26} className="fill-current" />
+            </div>
           </div>
         </section>
       </main>

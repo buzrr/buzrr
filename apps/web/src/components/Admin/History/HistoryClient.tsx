@@ -1,11 +1,16 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
 import NavbarToggle from "@/components/Admin/NavbarToggle";
+import LeaderboardView from "@/components/Admin/LeaderboardView";
 import Skeleton from "@/components/ui/Skeleton";
 import { useHistoryQuery } from "@/lib/modules/game-sessions/hooks";
 
-function HistoryBody() {
+function HistoryBody({
+  onShowLeaderboard,
+}: {
+  onShowLeaderboard: (resultId: string) => void;
+}) {
   const { data: results, isPending, isError } = useHistoryQuery();
 
   if (isPending) {
@@ -43,10 +48,11 @@ function HistoryBody() {
   return (
     <div className="flex flex-col gap-3">
       {results.map((result) => (
-        <Link
+        <button
+          type="button"
           key={result.id}
-          href={`/admin/quiz/leaderboard/${result.id}`}
-          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white dark:bg-card-dark rounded-xl p-4 hover:bg-card-light dark:hover:bg-cardhover-dark transition-colors"
+          onClick={() => onShowLeaderboard(result.id)}
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-left bg-white dark:bg-card-dark rounded-xl p-4 hover:bg-card-light dark:hover:bg-cardhover-dark transition-colors hover:cursor-pointer"
         >
           <div>
             <p className="font-bold text-dark dark:text-white capitalize">
@@ -72,13 +78,15 @@ function HistoryBody() {
               </span>
             )}
           </div>
-        </Link>
+        </button>
       ))}
     </div>
   );
 }
 
 export default function HistoryClient() {
+  const [leaderboardId, setLeaderboardId] = useState<string | null>(null);
+
   return (
     <div className="w-full p-4 md:p-6">
       <div className="flex items-center gap-2 mb-4">
@@ -89,7 +97,15 @@ export default function HistoryClient() {
           Game History
         </h1>
       </div>
-      <HistoryBody />
+      {leaderboardId ? (
+        <LeaderboardView
+          roomId={leaderboardId}
+          onBack={() => setLeaderboardId(null)}
+          backLabel="Back to history"
+        />
+      ) : (
+        <HistoryBody onShowLeaderboard={setLeaderboardId} />
+      )}
     </div>
   );
 }

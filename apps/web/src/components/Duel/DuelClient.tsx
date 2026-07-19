@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DEFAULT_AVATAR } from "@/constants";
+import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/Button";
 import Skeleton from "@/components/ui/Skeleton";
 import ClientImage from "@/components/ClientImage";
@@ -13,6 +14,7 @@ import { useDuelProfileQuery } from "@/lib/modules/duel/hooks";
 
 export default function DuelClient() {
   const router = useRouter();
+  const { data: session } = authClient.useSession();
   const { data: profile, isPending } = useDuelProfileQuery();
   const { status, error, queuedAt, findMatch, cancel } = useDuelQueue({
     onMatched: (payload) => {
@@ -30,21 +32,32 @@ export default function DuelClient() {
 
   return (
     <div className="flex flex-col min-h-dvh">
-      <div className="p-4 flex items-center justify-between">
-        <Link href="/">
-          <ClientImage
-            props={{
-              src: "/images/logo.svg",
-              darksrc: "/images/logo-dark.svg",
-              alt: "Buzrr Logo",
-              width: 80,
-              height: 80,
-            }}
-          />
-        </Link>
-      </div>
+      <header className="sticky top-0 z-40 bg-light-bg/90 dark:bg-dark-bg/90 backdrop-blur border-b border-card-light dark:border-card-dark">
+        <div className="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8 py-3">
+          <Link href="/" aria-label="Buzrr home">
+            <ClientImage
+              props={{
+                src: "/images/logo.svg",
+                darksrc: "/images/logo-dark.svg",
+                alt: "Buzrr Logo",
+                width: 72,
+                height: 72,
+              }}
+            />
+          </Link>
+          <Link href="/duel/profile" aria-label="Open your profile">
+            <Image
+              src={session?.user?.image || DEFAULT_AVATAR}
+              width={40}
+              height={40}
+              alt="Profile"
+              className="rounded-full h-10 w-10 hover:opacity-90 transition-opacity"
+            />
+          </Link>
+        </div>
+      </header>
 
-      <div className="flex-1 flex flex-col items-center justify-center gap-6 px-4 pb-16">
+      <div className="flex-1 flex flex-col items-center justify-center gap-6 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
         <h1 className="text-3xl md:text-5xl font-black text-dark dark:text-white text-center animate-fade-up">
           1v1 Duel
         </h1>
@@ -56,7 +69,11 @@ export default function DuelClient() {
         {isPending ? (
           <Skeleton className="h-28 w-full max-w-sm rounded-2xl bg-white dark:bg-card-dark" />
         ) : profile ? (
-          <div className="flex items-center gap-4 bg-white dark:bg-dark rounded-2xl p-5 w-full max-w-sm shadow border border-card-light dark:border-off-dark animate-fade-up [animation-delay:150ms]">
+          <Link
+            href="/duel/profile"
+            aria-label="Open your profile"
+            className="flex items-center gap-4 bg-white dark:bg-dark rounded-2xl p-5 w-full max-w-sm shadow border border-card-light dark:border-off-dark animate-fade-up [animation-delay:150ms] hover:border-lprimary/40 dark:hover:border-dprimary/40 transition-colors"
+          >
             <Image
               src={profile.image || DEFAULT_AVATAR}
               width={56}
@@ -81,7 +98,7 @@ export default function DuelClient() {
                 rating
               </p>
             </div>
-          </div>
+          </Link>
         ) : null}
 
         {status === "queued" || status === "connecting" ? (

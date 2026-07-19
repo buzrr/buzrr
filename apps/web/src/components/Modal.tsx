@@ -7,6 +7,8 @@ import style from "@/utils/modalStyle";
 
 export default function BasicModal(props: {
   btnTitle: string;
+  /** Custom trigger-button content (e.g. icon + label); falls back to btnTitle. */
+  btnContent?: React.ReactNode;
   btnStyle?: string;
   children: React.ReactNode;
   isEdit?: boolean;
@@ -23,10 +25,13 @@ export default function BasicModal(props: {
       <button
         onClick={handleOpen}
         className={
-          props.btnStyle || (props.isEdit ? "p-1 text-lprimary mr-1 hover:bg-cardhover-light rounded-md dark:bg-dark-bg" : "text-white font-sm bg-dark-bg dark:bg-dark-bg rounded-lg w-full mx-auto md:ml-5 p-2")
+          props.btnStyle ||
+          (props.isEdit
+            ? "p-1 text-lprimary mr-1 hover:bg-cardhover-light rounded-md dark:bg-dark-bg"
+            : "text-white font-sm bg-dark-bg dark:bg-dark-bg rounded-lg w-full mx-auto md:ml-5 p-2")
         }
       >
-        {props.btnTitle}
+        {props.btnContent ?? props.btnTitle}
       </button>
 
       <Modal

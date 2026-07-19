@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import SessionProvider from "@/components/SessionProvider";
 import { redirect } from "next/navigation";
 import ClientImage from "@/components/ClientImage";
+import SupportNudge from "@/components/SupportNudge";
 import ToastViewport from "@/components/ToastViewport";
 import type { Metadata } from "next";
 
@@ -28,21 +29,24 @@ export default async function RootLayout({
   return (
     <SessionProvider role={role}>
       <div className="flex flex-col w-screen">
-        <div className="p-2 px-4 md:px-8 bg-light-bg dark:bg-dark-bg hidden md:block">
-          <Link href="/">
-            <ClientImage
-              props={{
-                src: "/images/logo.svg",
-                darksrc: "/images/logo-dark.svg",
-                alt: "Buzrr Logo",
-                width: 80,
-                height: 80,
-              }}
-            />
-          </Link>
+        <div className="p-2 bg-light-bg dark:bg-dark-bg hidden md:block">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <Link href="/" className="inline-block">
+              <ClientImage
+                props={{
+                  src: "/images/logo.svg",
+                  darksrc: "/images/logo-dark.svg",
+                  alt: "Buzrr Logo",
+                  width: 80,
+                  height: 80,
+                }}
+              />
+            </Link>
+          </div>
         </div>
         {children}
         <ToastViewport />
+        <SupportNudge />
       </div>
     </SessionProvider>
   );

@@ -11,3 +11,12 @@ export function useDuelProfileQuery(enabled = true) {
     staleTime: 10_000,
   });
 }
+
+export function useRecentDuelsQuery(limit?: number, enabled = true) {
+  return useQuery({
+    queryKey: ["duel", "recent", limit ?? 10] as const,
+    queryFn: () => duelApi.recent(limit),
+    enabled,
+    staleTime: 30_000,
+  });
+}

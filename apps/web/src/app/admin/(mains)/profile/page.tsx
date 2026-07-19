@@ -1,10 +1,10 @@
 import AdminShell from "@/components/Admin/AdminShell";
-import HistoryClient from "@/components/Admin/History/HistoryClient";
+import ProfileClient from "@/components/Admin/Profile/ProfileClient";
 
 export default function Page() {
   return (
     <AdminShell>
-      <HistoryClient />
+      <ProfileClient />
     </AdminShell>
   );
 }

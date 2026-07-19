@@ -58,15 +58,26 @@ export class QuestionsService {
 
     const dragOrder = dragQues.order;
     const dropOrder = dropQues.order;
+    if (dragOrder === dropOrder) {
+      return { status: 200, message: "Success" };
+    }
 
+    // Insert-at-position semantics: the dragged question takes the drop
+    // slot and everything between shifts by one.
+    const quizId = dragQues.quizId;
     await this.prisma.db.$transaction([
+      dragOrder < dropOrder
+        ? this.prisma.db.question.updateMany({
+            where: { quizId, order: { gt: dragOrder, lte: dropOrder } },
+            data: { order: { decrement: 1 } },
+          })
+        : this.prisma.db.question.updateMany({
+            where: { quizId, order: { gte: dropOrder, lt: dragOrder } },
+            data: { order: { increment: 1 } },
+          }),
       this.prisma.db.question.update({
         where: { id: dto.dragQuesId },
         data: { order: dropOrder },
-      }),
-      this.prisma.db.question.update({
-        where: { id: dto.dropQuesId },
-        data: { order: dragOrder },
       }),
     ]);
 

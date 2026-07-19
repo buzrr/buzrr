@@ -1,10 +1,10 @@
 import AdminShell from "@/components/Admin/AdminShell";
-import HistoryClient from "@/components/Admin/History/HistoryClient";
+import DuelHistoryClient from "@/components/Admin/Profile/DuelHistoryClient";
 
 export default function Page() {
   return (
     <AdminShell>
-      <HistoryClient />
+      <DuelHistoryClient />
     </AdminShell>
   );
 }

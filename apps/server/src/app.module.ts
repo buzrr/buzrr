@@ -12,6 +12,7 @@ import { PrismaModule } from "./prisma/prisma.module";
 import { QuestionsModule } from "./modules/questions/questions.module";
 import { DuelModule } from "./modules/duel/duel.module";
 import { QuizzesModule } from "./modules/quizzes/quizzes.module";
+import { UsersModule } from "./modules/users/users.module";
 import { RealtimeModule } from "./modules/realtime/realtime.module";
 import { RedisModule } from "./redis/redis.module";
 
@@ -29,6 +30,7 @@ import { RedisModule } from "./redis/redis.module";
     ModerationModule,
     AdminUsersModule,
     DuelModule,
+    UsersModule,
     RealtimeModule,
   ],
   providers: [

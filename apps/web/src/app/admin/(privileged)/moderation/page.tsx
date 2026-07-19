@@ -1,12 +1,11 @@
+import AdminShell from "@/components/Admin/AdminShell";
 import NavbarToggle from "@/components/Admin/NavbarToggle";
-import Navbar from "@/components/Admin/Navbar";
 import ModerationQueueClient from "@/components/Admin/Moderation/ModerationQueueClient";
 
 export default function Page() {
   return (
-    <div className="flex">
-      <Navbar />
-      <div className="p-6 w-full md:w-[75%]">
+    <AdminShell>
+      <div className="p-6 w-full">
         <div className="flex items-center">
           <span className="md:hidden inline">
             <NavbarToggle />
@@ -17,6 +16,6 @@ export default function Page() {
         </div>
         <ModerationQueueClient />
       </div>
-    </div>
+    </AdminShell>
   );
 }

@@ -119,7 +119,7 @@ const QuestionAndResult = (params: {
                   params.question?.mediaType === "image" ? "my-2" : "my-4",
                 )}
               >
-                {options.map((option: QuestionOption, index: number) => (
+                {options.map((option: QuestionOption) => (
                   <button
                     key={option.id}
                     type="button"
@@ -139,7 +139,7 @@ const QuestionAndResult = (params: {
                     onClick={() => handleSubmit(option.id)}
                     aria-pressed={option.id === params.optionId}
                   >
-                    {index + 1}. {option.title}
+                    {option.title}
                   </button>
                 ))}
               </div>

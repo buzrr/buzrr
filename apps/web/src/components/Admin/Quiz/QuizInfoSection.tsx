@@ -13,14 +13,17 @@ function formatSessionDate(createdAt: string | Date) {
   return d.toLocaleString("en-US", { timeZoneName: "short" });
 }
 
-export default function QuizInfoSection(props: { quiz: QuizDetail }) {
+export default function QuizInfoSection(props: {
+  quiz: QuizDetail;
+  onShowLeaderboard?: (resultId: string) => void;
+}) {
   const pastGames = props.quiz.gameResults ?? [];
   const questionCount = props.quiz._count?.questions ?? 0;
   const updateQuiz = useUpdateQuizMutation();
 
   return (
     <>
-      <div className="w-[40vw] h-[83vh] bg-white dark:bg-dark p-4 hidden md:flex flex-col">
+      <div className="md:w-2/5 lg:w-1/3 shrink-0 h-full bg-white dark:bg-dark rounded-xl p-4 hidden md:flex flex-col min-h-0">
         <div className="flex flex-col w-[90%] mx-auto text-dark dark:text-white">
           <div className="text-sm">
             <span className="p-1 py-2 underline underline-offset-1">
@@ -49,8 +52,8 @@ export default function QuizInfoSection(props: { quiz: QuizDetail }) {
               }
             />
             <span className="text-sm max-w-[250px]">
-              Public — questions are submitted for admin review before
-              appearing in 1v1 duels
+              Public — questions are submitted for admin review before appearing
+              in 1v1 duels
             </span>
           </div>
           <div className="w-full mt-4">
@@ -68,7 +71,7 @@ export default function QuizInfoSection(props: { quiz: QuizDetail }) {
               pastGames.map((result) => {
                 return (
                   <div key={result.id}>
-                    <div className="bg-card-light dark:bg-card-dark p-4 mt-2">
+                    <div className="bg-card-light dark:bg-card-dark rounded-lg p-4 mt-2">
                       <div className="text-xs w-full flex justify-between">
                         <div>{formatSessionDate(result.endedAt)}</div>
                         <div className="text-lprimary dark:text-dprimary font-black">
@@ -82,9 +85,19 @@ export default function QuizInfoSection(props: { quiz: QuizDetail }) {
                         {result.questionCount === 1 ? "" : "s"}
                       </div>
                       <div className="text-xs mt-3 *:bg-[#f87d49] *:text-white *:dark:text-dark *:font-black *:rounded-md *:p-[6px] *:ml-1">
-                        <Link href={`/admin/quiz/leaderboard/${result.id}`}>
-                          See leaderboard
-                        </Link>
+                        {props.onShowLeaderboard ? (
+                          <button
+                            type="button"
+                            className="hover:cursor-pointer"
+                            onClick={() => props.onShowLeaderboard?.(result.id)}
+                          >
+                            See leaderboard
+                          </button>
+                        ) : (
+                          <Link href={`/admin/quiz/leaderboard/${result.id}`}>
+                            See leaderboard
+                          </Link>
+                        )}
                       </div>
                     </div>
                   </div>

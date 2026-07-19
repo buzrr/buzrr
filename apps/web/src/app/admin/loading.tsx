@@ -1,5 +1,10 @@
-import RouteLoader from "@/components/ui/RouteLoader";
+import AdminShell from "@/components/Admin/AdminShell";
+import { ContentLoader } from "@/components/ui/RouteLoader";
 
 export default function Loading() {
-  return <RouteLoader />;
+  return (
+    <AdminShell>
+      <ContentLoader />
+    </AdminShell>
+  );
 }

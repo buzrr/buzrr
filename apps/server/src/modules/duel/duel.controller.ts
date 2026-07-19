@@ -1,4 +1,4 @@
-import { Controller, Get, NotFoundException } from "@nestjs/common";
+import { Controller, Get, NotFoundException, Query } from "@nestjs/common";
 import { CurrentAccountUser } from "../../common/decorators/current-user.decorator";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -26,11 +26,15 @@ export class DuelController {
   }
 
   @Get("recent")
-  async recent(@CurrentAccountUser() user: AuthUser) {
+  async recent(
+    @CurrentAccountUser() user: AuthUser,
+    @Query("limit") limit?: string,
+  ) {
+    const take = Math.min(Math.max(Number(limit) || 10, 1), 50);
     return this.prisma.db.gameResultEntry.findMany({
       where: { userId: user.userId, result: { mode: "duel" } },
       orderBy: { result: { endedAt: "desc" } },
-      take: 10,
+      take,
       include: {
         result: {
           include: { entries: true },

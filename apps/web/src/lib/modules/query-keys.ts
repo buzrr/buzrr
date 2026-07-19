@@ -11,10 +11,12 @@ export const queryKeys = {
   gameSessions: {
     lobby: (roomId: string) => ["gameSessions", "lobby", roomId] as const,
     history: ["gameSessions", "history"] as const,
-    result: (resultId: string) =>
-      ["gameSessions", "result", resultId] as const,
+    result: (resultId: string) => ["gameSessions", "result", resultId] as const,
     playerPlay: (playerId: string) =>
       ["gameSessions", "playerPlay", playerId] as const,
+  },
+  users: {
+    myStats: ["users", "me", "stats"] as const,
   },
   moderation: {
     queue: ["moderation", "queue"] as const,
