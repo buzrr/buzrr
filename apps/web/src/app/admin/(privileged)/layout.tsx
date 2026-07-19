@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import AdminShell from "@/components/Admin/AdminShell";
 import { auth } from "@/lib/auth";
 import { getUserRole } from "@/lib/get-current-role";
 
@@ -17,5 +18,5 @@ export default async function PrivilegedLayout({
   if (role !== "admin" && role !== "superadmin") {
     redirect("/admin");
   }
-  return <>{children}</>;
+  return <AdminShell>{children}</AdminShell>;
 }

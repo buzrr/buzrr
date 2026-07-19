@@ -53,7 +53,10 @@ export default function DuelHistoryList({ limit }: { limit?: number }) {
               <p className="font-bold text-dark dark:text-white capitalize">
                 {entry.result.quizTitle}
               </p>
-              <p className="text-xs text-off-dark dark:text-off-white mt-1">
+              <p
+                className="text-xs text-off-dark dark:text-off-white mt-1"
+                suppressHydrationWarning
+              >
                 {new Date(entry.result.endedAt).toLocaleString()}
               </p>
             </div>

@@ -16,10 +16,9 @@ import {
 } from "react-icons/lu";
 import { useAppSelector, useAppDispatch } from "@/state/hooks";
 import { NavToggle, setNavToggle } from "@/state/admin/navtoggleSlice";
-import { persistor } from "@/state/store";
 import { useCurrentRole } from "@/components/SessionProvider";
 import { LICENSE_LINK } from "@/components/Landing/links";
-import BasicModal from "../Modal";
+import SignOutButton from "./SignOutButton";
 
 const NavLinks = [
   { href: "/admin", label: "Quizzes", icon: LuBookText },
@@ -34,6 +33,12 @@ export default function Navbar() {
 
   const toggle = useAppSelector((state) => state.navToggle.toggle);
   const dispatch = useAppDispatch();
+
+  // Root link matches exactly; others also match their nested routes.
+  const isActive = (href: string) =>
+    href === "/admin"
+      ? pathname === "/admin"
+      : pathname === href || pathname.startsWith(`${href}/`);
 
   const navLinks = [
     ...NavLinks,
@@ -91,7 +96,7 @@ export default function Navbar() {
                 href={link.href}
                 className={clsx(
                   "my-1 py-2 px-4 rounded-lg flex items-center gap-3",
-                  pathname !== link.href
+                  !isActive(link.href)
                     ? "hover:bg-card-light hover:dark:bg-card-dark dark:text-white transition-colors duration-200 ease-in-out"
                     : "bg-lprimary text-white dark:bg-dprimary dark:text-dark dark:font-extrabold",
                 )}
@@ -110,7 +115,7 @@ export default function Navbar() {
             href="/admin/profile"
             className={clsx(
               "flex items-center p-2 px-4 rounded-md",
-              pathname !== "/admin/profile"
+              !isActive("/admin/profile")
                 ? "hover:bg-card-light dark:hover:bg-card-dark transition-colors duration-200 ease-in-out"
                 : "bg-lprimary dark:bg-dprimary",
             )}
@@ -128,7 +133,7 @@ export default function Navbar() {
             <span
               className={clsx(
                 "text-md",
-                pathname !== "/admin/profile"
+                !isActive("/admin/profile")
                   ? "text-dark dark:text-white"
                   : "text-white dark:text-dark dark:font-extrabold",
               )}
@@ -136,8 +141,9 @@ export default function Navbar() {
               {session?.user?.name}
             </span>
           </Link>
-          <BasicModal
+          <SignOutButton
             btnTitle="Logout"
+            confirmText="Are you sure you want to log out?"
             btnContent={
               <span className="flex items-center gap-3">
                 <LuLogOut size={18} className="shrink-0" />
@@ -145,30 +151,7 @@ export default function Navbar() {
               </span>
             }
             btnStyle="my-1 py-2 px-4 rounded-lg flex items-center w-full text-dark dark:text-white hover:bg-card-light hover:dark:bg-card-dark transition-colors duration-200 ease-in-out hover:cursor-pointer"
-          >
-            <div className="text-center">
-              <p className="text-dark dark:text-white">
-                Are you sure you want to log out?
-              </p>
-              <button
-                className="text-sm text-white dark:text-dark dark:font-bold rounded-lg py-2 px-4 my-2 bg-red-light dark:bg-red-dark w-full"
-                onClick={() =>
-                  authClient.signOut({
-                    fetchOptions: {
-                      onSuccess: async () => {
-                        await persistor.purge();
-                        // Hard navigation so the router cache drops the
-                        // logged-in /admin payload along with client state.
-                        window.location.href = "/";
-                      },
-                    },
-                  })
-                }
-              >
-                Logout
-              </button>
-            </div>
-          </BasicModal>
+          />
           <div className="p-2 px-4">
             <div className="text-xs text-off-dark dark:text-off-white mt-2">
               Licensed under{" "}

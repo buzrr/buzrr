@@ -1,10 +1,5 @@
-import AdminShell from "@/components/Admin/AdminShell";
 import HistoryClient from "@/components/Admin/History/HistoryClient";
 
 export default function Page() {
-  return (
-    <AdminShell>
-      <HistoryClient />
-    </AdminShell>
-  );
+  return <HistoryClient />;
 }

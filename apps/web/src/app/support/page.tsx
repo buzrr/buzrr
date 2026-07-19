@@ -86,7 +86,7 @@ export default function SupportPage() {
               rel="noreferrer"
               className="flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-3 rounded-xl text-lg font-black border-2 border-lprimary dark:border-dprimary text-lprimary dark:text-dprimary hover:bg-lprimary/10 dark:hover:bg-dprimary/10 transition-colors"
             >
-              ☕ Buy me a chai
+              ☕ Buy me a chai (India)
             </a>
           </div>
         </section>

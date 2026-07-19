@@ -33,6 +33,7 @@ export class QuestionsService {
     const questions = await this.prisma.db.question.findMany({
       where: { quizId },
       include: { options: true },
+      orderBy: { order: "asc" },
     });
     return { status: 200, questions };
   }

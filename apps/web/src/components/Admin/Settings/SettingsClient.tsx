@@ -8,15 +8,14 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { toast } from "react-toastify";
 import { z } from "zod";
-import BasicModal from "@/components/Modal";
 import GridListToggle from "@/components/Admin/GridListToggle";
 import NavbarToggle from "@/components/Admin/NavbarToggle";
+import SignOutButton from "@/components/Admin/SignOutButton";
 import ThemeToggle from "@/components/ThemeToggle";
 import Button from "@/components/ui/Button";
 import TextInput from "@/components/ui/TextInput";
 import { DEFAULT_AVATAR } from "@/constants";
 import { authClient } from "@/lib/auth-client";
-import { persistor } from "@/state/store";
 
 const accountSchema = z.object({
   name: z
@@ -205,33 +204,11 @@ function DangerZoneCard() {
       className="border border-red-light dark:border-red-dark"
     >
       <div className="w-full sm:w-64">
-        <BasicModal
+        <SignOutButton
           btnTitle="Sign out"
+          confirmText="Are you sure you want to sign out?"
           btnStyle="text-sm text-white dark:text-dark dark:font-bold rounded-lg py-2 px-4 bg-red-light dark:bg-red-dark w-full"
-        >
-          <div className="text-center">
-            <p className="text-dark dark:text-white">
-              Are you sure you want to sign out?
-            </p>
-            <button
-              className="text-sm text-white dark:text-dark dark:font-bold rounded-lg py-2 px-4 my-2 bg-red-light dark:bg-red-dark w-full"
-              onClick={() =>
-                authClient.signOut({
-                  fetchOptions: {
-                    onSuccess: async () => {
-                      await persistor.purge();
-                      // Hard navigation so the router cache drops the
-                      // logged-in /admin payload along with client state.
-                      window.location.href = "/";
-                    },
-                  },
-                })
-              }
-            >
-              Sign out
-            </button>
-          </div>
-        </BasicModal>
+        />
       </div>
     </SettingsCard>
   );
