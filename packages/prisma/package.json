@@ -10,6 +10,7 @@
     "postinstall": "prisma generate",
     "build": "prisma generate && tsc",
     "check-types": "tsc --noEmit",
+    "migrate:deploy": "prisma migrate deploy",
     "seed:duel": "node scripts/seed-duel-starter.mjs"
   },
   "files": [

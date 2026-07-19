@@ -13,8 +13,12 @@ the maintainers.
 
 You'll need **Node ≥ 18** (20 LTS recommended) and **Docker**.
 
+All changes come in as pull requests from forks — direct pushes to this
+repository are not accepted. Start by **forking the repo** on GitHub, then
+clone **your fork**:
+
 ```sh
-git clone https://github.com/buzrr/buzrr.git
+git clone https://github.com/<your-username>/buzrr.git
 cd buzrr
 corepack enable          # enable the pinned Yarn 4
 yarn install
@@ -30,7 +34,7 @@ yarn dev                 # web :3000, api :3001
 
 ## Development workflow
 
-1. **Fork** the repo and create a branch from `main`:
+1. In your fork's clone, create a branch from `main`:
    `git checkout -b feat/short-description`.
 2. Make your change. Keep it focused — one logical change per PR.
 3. Run the checks locally (a `pre-commit` hook runs `yarn lint` + `yarn check-types`
@@ -43,7 +47,8 @@ yarn dev                 # web :3000, api :3001
    yarn format         # apply Prettier
    ```
 
-4. Commit, push, and open a Pull Request against `main`.
+4. Commit, **push the branch to your fork**, and open a Pull Request from it
+   against this repository's `main`.
 
 ## Commit messages
 

@@ -64,6 +64,8 @@ export type AdminLobbyPayload = {
   room: GameSession;
   players: Player[];
   quiz: Quiz & { questions: (Question & { options: Option[] })[] };
+  /** Host's room-size cap (beta / free-tier limit). */
+  maxPlayers: number;
 };
 
 export async function getAdminLobby(client: AxiosInstance, roomId: string) {

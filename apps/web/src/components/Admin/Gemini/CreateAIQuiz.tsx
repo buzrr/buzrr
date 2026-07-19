@@ -11,6 +11,7 @@ import { Box, Modal } from "@mui/material";
 import Image from "next/image";
 import { useState } from "react";
 import style from "@/utils/modalStyle";
+import ModalCloseButton from "@/components/ModalCloseButton";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useAppSelector } from "@/state/hooks";
@@ -62,7 +63,9 @@ export default function CreateAIQuiz() {
       <div
         className={clsx(
           "p-2 border-2 border-[#c2b4fe] dark:border-transparent w-full text-dark dark:text-white rounded flex justify-center items-center bg-linear-to-b from-[#8D6DDD] to-[#AD56D6] cursor-pointer hover:border-transparent hover:from-[#8D6DDD] hover:to-[#AD56D6] transition-all duration-300 ease-in-out",
-          view === "list" ? "md:w-full flex-row gap-x-3 md:gap-x-1 py-4 px-2" : "p-2 flex-col md:w-40 h-[50vh] md:h-44"
+          view === "list"
+            ? "md:w-full flex-row gap-x-3 md:gap-x-1 py-4 px-2"
+            : "p-2 flex-col md:w-40 h-[50vh] md:h-44",
         )}
         onClick={() => setOpen(true)}
       >
@@ -86,7 +89,10 @@ export default function CreateAIQuiz() {
           </div>
         )}
         <div
-          className={clsx(view === "grid" ? "text-xs" : "text-base", "w-full text-white")}
+          className={clsx(
+            view === "grid" ? "text-xs" : "text-base",
+            "w-full text-white",
+          )}
         >
           Let&apos;s get your quiz ready
         </div>
@@ -100,7 +106,11 @@ export default function CreateAIQuiz() {
         aria-labelledby="modal-modal-title"
         aria-describedby="modal-modal-description"
       >
-        <Box sx={style} className="dark:bg-[#27272A] rounded-xl w-4/5 md:w-1/2">
+        <Box
+          sx={style}
+          className="bg-light-bg dark:bg-[#27272A] rounded-xl w-4/5 md:w-1/2 max-w-[600px]"
+        >
+          <ModalCloseButton onClose={() => setOpen(false)} />
           <div className="p-6">
             <p className="text-xl font-bold mb-2 text-dark dark:text-white">
               Hey there! I&apos;m your AI quiz buddy.
@@ -165,7 +175,9 @@ export default function CreateAIQuiz() {
                       autoComplete="off"
                       label="Write number of quiz questions.(max 15)"
                       fieldValue={field.value?.toString() ?? ""}
-                      onTitleChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                      onTitleChange={(v) =>
+                        field.onChange(v === "" ? "" : Number(v))
+                      }
                       error={!!fieldState.error}
                       errorMessage={fieldState.error?.message}
                     />
@@ -184,7 +196,9 @@ export default function CreateAIQuiz() {
                       autoComplete="off"
                       label="Write down default question time (in seconds)"
                       fieldValue={field.value?.toString() ?? ""}
-                      onTitleChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                      onTitleChange={(v) =>
+                        field.onChange(v === "" ? "" : Number(v))
+                      }
                       error={!!fieldState.error}
                       errorMessage={fieldState.error?.message}
                     />

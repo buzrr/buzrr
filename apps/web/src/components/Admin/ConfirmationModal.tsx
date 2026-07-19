@@ -3,17 +3,21 @@ import { useId } from "react";
 import { Box, Modal } from "@mui/material";
 import style from "@/utils/modalStyle";
 import ClientImage from "@/components/ClientImage";
+import ModalCloseButton from "@/components/ModalCloseButton";
 
 export default function ConfirmationModal({
   open,
   setOpen,
   onClick,
   desc,
+  confirmLabel = "Submit",
 }: {
   open: boolean;
   setOpen: (open: boolean) => void;
   onClick: () => void;
   desc?: string;
+  /** Label of the confirming button (e.g. "Logout"); defaults to "Submit". */
+  confirmLabel?: string;
 }) {
   const id = useId();
   const titleId = `${id}-title`;
@@ -28,8 +32,9 @@ export default function ConfirmationModal({
     >
       <Box
         sx={style}
-        className="dark:bg-[#27272A] rounded-xl w-4/5 sm:w-3/5 md:w-2/5"
+        className="bg-light-bg dark:bg-[#27272A] rounded-xl w-4/5 sm:w-3/5 md:w-2/5 max-w-[600px]"
       >
+        <ModalCloseButton onClose={() => setOpen(false)} />
         <div className="p-6 flex flex-col justify-center items-center">
           <ClientImage
             props={{
@@ -42,7 +47,10 @@ export default function ConfirmationModal({
           <p id={titleId} className="text-xl font-bold mb-2 dark:text-white">
             Are you sure?
           </p>
-          <p id={descId} className="text-[#4E4E56] mb-4 dark:text-white text-center">
+          <p
+            id={descId}
+            className="text-[#4E4E56] mb-4 dark:text-white text-center"
+          >
             {desc}
           </p>
           <div className="w-full grid md:grid-cols-2 md:gap-x-4 gap-y-4 md:gap-y-0">
@@ -56,7 +64,7 @@ export default function ConfirmationModal({
               onClick={onClick}
               className="bg-white text-red-light dark:text-red-dark dark:border-red-dark border-2 font-semibold py-2 border-red-light rounded-lg dark:bg-[#27272A] cursor-pointer"
             >
-              Submit
+              {confirmLabel}
             </button>
           </div>
         </div>

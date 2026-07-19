@@ -11,6 +11,7 @@ import { z } from "zod";
 import GridListToggle from "@/components/Admin/GridListToggle";
 import NavbarToggle from "@/components/Admin/NavbarToggle";
 import SignOutButton from "@/components/Admin/SignOutButton";
+import DeleteProfileButton from "@/components/Admin/Settings/DeleteProfileButton";
 import ThemeToggle from "@/components/ThemeToggle";
 import Button from "@/components/ui/Button";
 import TextInput from "@/components/ui/TextInput";
@@ -200,15 +201,20 @@ function DangerZoneCard() {
   return (
     <SettingsCard
       title="Danger zone"
-      description="Sign out of your account on this device."
+      description="Sign out of this device, or permanently delete your profile."
       className="border border-red-light dark:border-red-dark"
     >
-      <div className="w-full sm:w-64">
-        <SignOutButton
-          btnTitle="Sign out"
-          confirmText="Are you sure you want to sign out?"
-          btnStyle="text-sm text-white dark:text-dark dark:font-bold rounded-lg py-2 px-4 bg-red-light dark:bg-red-dark w-full"
-        />
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="w-full sm:w-64">
+          <SignOutButton
+            btnTitle="Sign out"
+            confirmText="Are you sure you want to sign out?"
+            btnStyle="text-sm text-white dark:text-dark dark:font-bold rounded-lg py-2 px-4 bg-red-light dark:bg-red-dark w-full cursor-pointer"
+          />
+        </div>
+        <div className="w-full sm:w-64">
+          <DeleteProfileButton />
+        </div>
       </div>
     </SettingsCard>
   );

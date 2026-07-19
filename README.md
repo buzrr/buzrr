@@ -90,11 +90,12 @@ That's it. Everything else is optional.
 
 ### Optional features
 
-| Feature            | Add to `.env`                                                          | Where to get it                                            |
-| ------------------ | ---------------------------------------------------------------------- | ---------------------------------------------------------- |
-| AI quiz generation | `GEMINI_API_KEY`                                                       | [Google AI Studio](https://aistudio.google.com/app/apikey) |
-| Image uploads      | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | [Cloudinary](https://cloudinary.com)                       |
-| Rate limiting      | `RATELIMIT=ON` + `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`  | [Upstash](https://upstash.com)                             |
+| Feature              | Add to `.env`                                                          | Where to get it                                                                                         |
+| -------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| AI quiz generation   | `GEMINI_API_KEY`                                                       | [Google AI Studio](https://aistudio.google.com/app/apikey)                                              |
+| Image uploads        | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | [Cloudinary](https://cloudinary.com)                                                                    |
+| Landing GitHub stats | `GITHUB_TOKEN` (in `apps/web/.env`)                                    | [GitHub personal access tokens](https://github.com/settings/tokens) — no scopes needed for public repos |
+| Rate limiting        | `RATELIMIT=ON` + `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`  | [Upstash](https://upstash.com)                                                                          |
 
 ## 🔧 Environment variables
 
@@ -110,6 +111,7 @@ the [`.env.example`](.env.example) files for the full, commented list.
 | `NEXT_PUBLIC_SOCKET_URL` / `NEXT_PUBLIC_API_URL` |    ✅    | Where the browser reaches the API.                                  |
 | `GEMINI_API_KEY`                                 |    ➖    | Enables AI quiz generation.                                         |
 | `CLOUDINARY_*`                                   |    ➖    | Enables image uploads.                                              |
+| `GITHUB_TOKEN`                                   |    ➖    | Raises GitHub API rate limits for landing-page repo stats (web).    |
 | `UPSTASH_REDIS_REST_*` + `RATELIMIT`             |    ➖    | Enables rate limiting.                                              |
 
 ## 📜 Scripts
@@ -172,7 +174,9 @@ dev uses `db push` via `yarn setup`).
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read [**CONTRIBUTING.md**](CONTRIBUTING.md) and
+Contributions are welcome! We use the standard fork-based workflow: **fork**
+this repo, branch off `main` in your fork, and open a pull request from there —
+see [**CONTRIBUTING.md**](CONTRIBUTING.md) for the full steps. Please also read
 our [Code of Conduct](CODE_OF_CONDUCT.md) before opening a PR. Found a security
 issue? See [SECURITY.md](SECURITY.md).
 

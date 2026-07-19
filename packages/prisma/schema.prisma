@@ -53,6 +53,8 @@ model User {
   emailVerified     Boolean          @default(false) @map("email_verified")
   eloRating         Int              @default(1200) @map("elo_rating")
   duelsPlayed       Int              @default(0) @map("duels_played")
+  /// Max players this user may have in a hosted room (beta / free-tier cap).
+  hostSizeLimit     Int              @default(50) @map("host_size_limit")
   role              Role             @default(user)
   hostedResults     GameResult[]
   GameSessions      GameSession[]

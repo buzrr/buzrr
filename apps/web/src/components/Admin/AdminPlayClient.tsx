@@ -19,9 +19,7 @@ export default function AdminPlayClient({
     if (isAxiosError(error)) {
       if (error.response?.status === 404) notFound();
       if (error.response?.status === 403) {
-        return (
-          <p className="p-6 text-dark dark:text-white">Unauthorized</p>
-        );
+        return <p className="p-6 text-dark dark:text-white">Unauthorized</p>;
       }
     }
     return (
@@ -47,7 +45,7 @@ export default function AdminPlayClient({
     );
   }
 
-  const { room, players, quiz } = data;
+  const { room, players, quiz, maxPlayers } = data;
   const playersForLobby = players.map((p) => ({
     ...p,
     profilePic: p.profilePic ?? undefined,
@@ -63,6 +61,7 @@ export default function AdminPlayClient({
       players={playersForLobby}
       gameStarted={room.isPlaying}
       currentQues={room.currentQuestion}
+      maxPlayers={maxPlayers}
     />
   );
 }

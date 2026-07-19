@@ -1,6 +1,7 @@
 "use client";
 
-import BasicModal from "@/components/Modal";
+import { useState } from "react";
+import ConfirmationModal from "@/components/Admin/ConfirmationModal";
 import { authClient } from "@/lib/auth-client";
 import { persistor } from "@/state/store";
 
@@ -16,28 +17,34 @@ export default function SignOutButton({
   btnStyle?: string;
   confirmText: string;
 }) {
+  const [open, setOpen] = useState(false);
+
+  function handleSignOut() {
+    authClient.signOut({
+      fetchOptions: {
+        onSuccess: async () => {
+          await persistor.purge();
+          // Hard navigation so the router cache drops the
+          // logged-in /admin payload along with client state.
+          window.location.href = "/";
+        },
+      },
+    });
+  }
+
   return (
-    <BasicModal btnTitle={btnTitle} btnContent={btnContent} btnStyle={btnStyle}>
-      <div className="text-center">
-        <p className="text-dark dark:text-white">{confirmText}</p>
-        <button
-          className="text-sm text-white dark:text-dark dark:font-bold rounded-lg py-2 px-4 my-2 bg-red-light dark:bg-red-dark w-full"
-          onClick={() =>
-            authClient.signOut({
-              fetchOptions: {
-                onSuccess: async () => {
-                  await persistor.purge();
-                  // Hard navigation so the router cache drops the
-                  // logged-in /admin payload along with client state.
-                  window.location.href = "/";
-                },
-              },
-            })
-          }
-        >
-          {btnTitle}
-        </button>
-      </div>
-    </BasicModal>
+    <>
+      <button onClick={() => setOpen(true)} className={btnStyle}>
+        {btnContent ?? btnTitle}
+      </button>
+
+      <ConfirmationModal
+        open={open}
+        setOpen={setOpen}
+        onClick={handleSignOut}
+        desc={confirmText}
+        confirmLabel={btnTitle}
+      />
+    </>
   );
 }

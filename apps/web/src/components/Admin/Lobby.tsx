@@ -1,4 +1,5 @@
 "use client";
+import clsx from "clsx";
 import { DEFAULT_AVATAR } from "@/constants";
 import { useEffect, useState, useCallback } from "react";
 import { useAppDispatch, useAppSelector } from "@/state/hooks";
@@ -28,9 +29,11 @@ const Lobby = (params: {
   gameStarted: boolean;
   quizTitle: string;
   quizId: string;
+  maxPlayers?: number;
 }) => {
   const dispatch = useAppDispatch();
   const players = useAppSelector((state) => state.player.players);
+  const maxPlayers = params.maxPlayers ?? 50;
   const [endGame, setEndGame] = useState(false);
   const [load, setLoad] = useState(false);
   const router = useRouter();
@@ -145,14 +148,26 @@ const Lobby = (params: {
         </button>
 
         <div className="flex flex-wrap justify-center gap-6 mt-6">
-          <span className="p-2 dark:text-white border border-lprimary dark:border-dprimary bg-light-bg dark:bg-cardhover-dark rounded-xl font-bold">
-            Participants: {players.length}
+          <span
+            className={clsx(
+              "p-2 dark:text-white border rounded-xl font-bold bg-light-bg dark:bg-cardhover-dark",
+              maxPlayers && players.length >= maxPlayers
+                ? "border-red-light dark:border-red-dark"
+                : "border-lprimary dark:border-dprimary",
+            )}
+          >
+            Participants: {players.length} / {maxPlayers}
           </span>
 
           <span className="p-2 dark:text-white border border-lprimary dark:border-dprimary bg-light-bg dark:bg-cardhover-dark rounded-xl font-bold">
             Join at: {process.env.NEXT_PUBLIC_APP_URL ?? "buzrr.in"}
           </span>
         </div>
+
+        <p className="mt-3 text-xs text-stone-500 dark:text-stone-400 text-center max-w-md">
+          Rooms are capped at {maxPlayers} players while Buzrr is in beta on
+          free-tier infrastructure.
+        </p>
 
         <div className="h-fit mt-8 mx-auto max-h-[40vh] flex flex-wrap justify-center overflow-y-auto gap-y-4 gap-x-3 w-full">
           {players.length === 0 ? (

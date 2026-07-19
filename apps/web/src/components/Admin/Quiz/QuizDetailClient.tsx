@@ -1,14 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import clsx from "clsx";
+import { RxCross2 } from "react-icons/rx";
 import BasicModal from "@/components/Modal";
 import AddQuesForm from "@/components/Admin/Quiz/AddQuesForm";
 import AllQues from "@/components/Admin/Quiz/AllQues";
-import QuizInfoSection from "@/components/Admin/Quiz/QuizInfoSection";
+import QuizInfoSection, {
+  QuizInfoContent,
+} from "@/components/Admin/Quiz/QuizInfoSection";
 import HideQuestions from "@/components/Admin/Quiz/HideQuestions";
 import HostQuizForm from "@/components/Admin/Quiz/HostQuizForm";
 import LeaderboardView from "@/components/Admin/LeaderboardView";
 import Skeleton from "@/components/ui/Skeleton";
+import { IconButton } from "@/components/ui/IconButton";
 import { useQuizDetailQuery } from "@/lib/modules/quizzes/hooks";
 import { isAxiosError } from "axios";
 import { notFound } from "next/navigation";
@@ -16,6 +21,7 @@ import { notFound } from "next/navigation";
 export default function QuizDetailClient({ quizId }: { quizId: string }) {
   const { data: quiz, isPending, isError, error } = useQuizDetailQuery(quizId);
   const [leaderboardId, setLeaderboardId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (isError) {
     if (isAxiosError(error) && error.response?.status === 404) {
@@ -53,6 +59,40 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
     <div className="w-full max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-2 md:py-4">
       <div className="text-dark dark:text-white w-full flex flex-col md:flex-row gap-3 md:h-[calc(100dvh-12rem)]">
         <QuizInfoSection quiz={quiz} onShowLeaderboard={setLeaderboardId} />
+
+        {/* Mobile drawer: the quiz info the top bar has no room for
+            (description, public toggle, past sessions). */}
+        <div
+          className={clsx(
+            "fixed inset-0 z-10 bg-[#0000006a] md:hidden",
+            !sidebarOpen && "hidden",
+          )}
+          onClick={() => setSidebarOpen(false)}
+        ></div>
+        <div
+          className={clsx(
+            "z-20 p-4 flex bg-white dark:bg-dark flex-col h-dvh fixed w-[80vw] left-0 top-0 md:hidden overflow-y-auto",
+            !sidebarOpen && "hidden",
+          )}
+        >
+          <div className="flex justify-end">
+            <IconButton
+              aria-label="Close quiz info"
+              className="text-dark dark:text-white"
+              onClick={() => setSidebarOpen(false)}
+              icon={<RxCross2 size={22} />}
+            />
+          </div>
+          <QuizInfoContent
+            quiz={quiz}
+            showHostForm={false}
+            onShowLeaderboard={(resultId) => {
+              setLeaderboardId(resultId);
+              setSidebarOpen(false);
+            }}
+          />
+        </div>
+
         <div className="bg-white dark:bg-dark rounded-xl w-full flex-1 flex flex-col min-h-0">
           {leaderboardId ? (
             <div className="flex-1 min-h-0 overflow-y-auto p-4">
@@ -64,7 +104,28 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
             </div>
           ) : (
             <>
-              <div className="p-3 flex items-center justify-start md:hidden">
+              <div className="p-3 flex items-center gap-2 justify-start md:hidden">
+                <IconButton
+                  aria-label="Open quiz info"
+                  className="text-dark dark:text-white"
+                  onClick={() => setSidebarOpen(true)}
+                  icon={
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-6 w-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 6h16M4 12h16m-7 6h7"
+                      />
+                    </svg>
+                  }
+                />
                 <p className="text-dark dark:text-white font-black">
                   {quiz.title}
                 </p>

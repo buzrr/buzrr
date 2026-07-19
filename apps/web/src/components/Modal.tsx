@@ -4,6 +4,7 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Modal from "@mui/material/Modal";
 import style from "@/utils/modalStyle";
+import ModalCloseButton from "@/components/ModalCloseButton";
 
 export default function BasicModal(props: {
   btnTitle: string;
@@ -42,8 +43,9 @@ export default function BasicModal(props: {
       >
         <Box
           sx={style}
-          className="dark:bg-dark-bg bg-light-bg rounded-xl w-4/5 md:w-1/2 p-6 overflow-y-auto max-h-[90vh]"
+          className="dark:bg-dark-bg bg-light-bg rounded-xl w-4/5 md:w-1/2 max-w-[600px] p-6 overflow-y-auto max-h-[90vh]"
         >
+          <ModalCloseButton onClose={handleClose} />
           <Typography
             id={titleId}
             variant="h6"

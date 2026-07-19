@@ -59,7 +59,9 @@ function resolveAuthSecret() {
   for (const rel of ["apps/web/.env", "apps/server/.env"]) {
     const p = join(ROOT, rel);
     if (!existsSync(p)) continue;
-    const m = readFileSync(p, "utf8").match(/^BETTER_AUTH_SECRET\s*=\s*"?([^"\n]+)"?/m);
+    const m = readFileSync(p, "utf8").match(
+      /^BETTER_AUTH_SECRET\s*=\s*"?([^"\n]+)"?/m,
+    );
     if (m && m[1].trim()) return m[1].trim();
   }
   return randomBytes(32).toString("base64");
@@ -121,6 +123,8 @@ NEXT_PUBLIC_API_URL="http://localhost:3001"
 # --- Optional ---
 # AI quiz generation (https://aistudio.google.com/app/apikey)
 GEMINI_API_KEY=""
+# Landing-page GitHub stats (https://github.com/settings/tokens — no scopes needed for public repos)
+GITHUB_TOKEN=""
 # Rate limiting: ON | OFF
 RATELIMIT="OFF"
 UPSTASH_REDIS_REST_URL=""
@@ -145,13 +149,19 @@ function tryRun(cmd) {
 
 step("Checking prerequisites");
 if (!tryRun("docker --version")) {
-  die("Docker is not installed or not on PATH. Install Docker Desktop: https://docs.docker.com/get-docker/");
+  die(
+    "Docker is not installed or not on PATH. Install Docker Desktop: https://docs.docker.com/get-docker/",
+  );
 }
 if (!tryRun("docker compose version")) {
-  die("`docker compose` is unavailable. Update to Docker Compose v2 (bundled with Docker Desktop).");
+  die(
+    "`docker compose` is unavailable. Update to Docker Compose v2 (bundled with Docker Desktop).",
+  );
 }
 if (!tryRun("docker info")) {
-  die("The Docker daemon isn't running. Start Docker Desktop and re-run `yarn setup`.");
+  die(
+    "The Docker daemon isn't running. Start Docker Desktop and re-run `yarn setup`.",
+  );
 }
 ok("Docker is ready");
 
@@ -186,7 +196,12 @@ const REQUIRED_LOCAL_KEYS = {
 const hasKey = (text, key) => {
   const m = text.match(new RegExp(`^\\s*${key}\\s*=\\s*(.*)$`, "m"));
   if (!m) return false;
-  return m[1].trim().replace(/^["']|["']$/g, "").trim() !== "";
+  return (
+    m[1]
+      .trim()
+      .replace(/^["']|["']$/g, "")
+      .trim() !== ""
+  );
 };
 
 let createdAny = false;
@@ -235,7 +250,17 @@ let ready = false;
 while (Date.now() < DEADLINE) {
   const r = spawnSync(
     "docker",
-    ["compose", "exec", "-T", "postgres", "pg_isready", "-U", "buzrr", "-d", "buzrr"],
+    [
+      "compose",
+      "exec",
+      "-T",
+      "postgres",
+      "pg_isready",
+      "-U",
+      "buzrr",
+      "-d",
+      "buzrr",
+    ],
     { cwd: ROOT, stdio: "ignore" },
   );
   if (r.status === 0) {
@@ -244,7 +269,10 @@ while (Date.now() < DEADLINE) {
   }
   execSync(process.platform === "win32" ? "timeout /t 1 >nul" : "sleep 1");
 }
-if (!ready) die("Postgres did not become ready within 60s. Check `docker compose logs postgres`.");
+if (!ready)
+  die(
+    "Postgres did not become ready within 60s. Check `docker compose logs postgres`.",
+  );
 ok("Postgres is accepting connections");
 
 // ---------------------------------------------------------------------------
@@ -263,7 +291,9 @@ try {
   // --url pins the target to the local container, independent of any .env.
   run(`yarn prisma db push --url "${LOCAL_DATABASE_URL}"`, { env: prismaEnv });
 } catch {
-  die("`prisma db push` failed. Ensure dependencies are installed (`yarn install`).");
+  die(
+    "`prisma db push` failed. Ensure dependencies are installed (`yarn install`).",
+  );
 }
 ok("Database is in sync with the Prisma schema");
 
@@ -280,8 +310,12 @@ console.log(
   `  1. Add your Google OAuth credentials to ${c.cyan}apps/web/.env${c.reset}` +
     ` (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).`,
 );
-console.log(`     ${c.dim}Redirect URI: http://localhost:3000/api/auth/callback/google${c.reset}`);
-console.log(`  2. Run ${c.cyan}yarn dev${c.reset} — web on :3000, API on :3001.`);
 console.log(
-  `\n${c.dim}Optional: add GEMINI_API_KEY (AI quiz generation) or CLOUDINARY_* (image uploads) later.${c.reset}\n`,
+  `     ${c.dim}Redirect URI: http://localhost:3000/api/auth/callback/google${c.reset}`,
+);
+console.log(
+  `  2. Run ${c.cyan}yarn dev${c.reset} — web on :3000, API on :3001.`,
+);
+console.log(
+  `\n${c.dim}Optional: add GEMINI_API_KEY (AI), CLOUDINARY_* (uploads), or GITHUB_TOKEN (landing stats) later.${c.reset}\n`,
 );

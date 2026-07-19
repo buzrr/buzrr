@@ -29,6 +29,10 @@ const QuestionAndResult = (params: {
   locked?: boolean;
   status?: string;
   message?: string;
+  /** Shown on a miss (wrong answer / timeout): the correct option title(s). */
+  correctAnswer?: string;
+  /** The player's own pick on a wrong answer; null when they never answered. */
+  yourAnswer?: string | null;
 }) => {
   const options = params?.question?.options ?? [];
   const deadline = useAppSelector((state) => state.game.deadline);
@@ -188,6 +192,26 @@ const QuestionAndResult = (params: {
               >
                 {params.message}
               </p>
+              {params.status !== "correct" &&
+                (params.correctAnswer || params.yourAnswer !== undefined) && (
+                  <div className="mt-6 w-full max-w-md rounded-xl bg-light-bg dark:bg-off-dark p-4 text-left animate-fade-up [animation-delay:300ms]">
+                    <p className="dark:text-white mb-2">
+                      <span className="font-bold text-[#20A97C]">
+                        Correct answer:{" "}
+                      </span>
+                      {params.correctAnswer ?? "—"}
+                    </p>
+                    <p className="dark:text-white">
+                      <span className="font-bold text-red-dark">
+                        Your answer:{" "}
+                      </span>
+                      {params.yourAnswer ??
+                        (params.status === "timesout"
+                          ? "No answer (time limit exceeded)"
+                          : "—")}
+                    </p>
+                  </div>
+                )}
             </div>
           </div>
         )}

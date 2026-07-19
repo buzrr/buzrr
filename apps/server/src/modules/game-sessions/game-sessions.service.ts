@@ -29,6 +29,7 @@ export class GameSessionsService {
   ): Promise<{ roomId: string; playerId: string }> {
     const game = await this.prisma.db.gameSession.findUnique({
       where: { gameCode: dto.gameCode },
+      include: { creator: { select: { hostSizeLimit: true } } },
     });
     if (!game) {
       throw new NotFoundException("Game not found");
@@ -38,6 +39,18 @@ export class GameSessionsService {
     });
     if (!player) {
       throw new NotFoundException("Player not found");
+    }
+    // Re-joining the same room (e.g. after a refresh) must never hit the cap.
+    if (player.gameId !== game.id) {
+      const limit = game.creator.hostSizeLimit;
+      const playerCount = await this.prisma.db.player.count({
+        where: { gameId: game.id },
+      });
+      if (playerCount >= limit) {
+        throw new ForbiddenException(
+          `This room is full — rooms are capped at ${limit} players while Buzrr is in beta on free-tier infrastructure.`,
+        );
+      }
     }
     await this.prisma.db.player.update({
       where: { id: playerId },
@@ -230,6 +243,7 @@ export class GameSessionsService {
   async getAdminLobby(user: AuthUser, roomId: string) {
     const room = await this.prisma.db.gameSession.findUnique({
       where: { id: roomId },
+      include: { creator: { select: { hostSizeLimit: true } } },
     });
     if (!room) {
       throw new NotFoundException("Room not found");
@@ -251,7 +265,8 @@ export class GameSessionsService {
     if (!quiz) {
       throw new NotFoundException("Quiz not found");
     }
-    return { room, players, quiz };
+    const { creator, ...roomData } = room;
+    return { room: roomData, players, quiz, maxPlayers: creator.hostSizeLimit };
   }
 
   async getPlayerPlayContext(playerId: string) {

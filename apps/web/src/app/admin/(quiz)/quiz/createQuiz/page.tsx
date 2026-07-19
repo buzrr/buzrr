@@ -30,7 +30,7 @@ export default function CreateQuiz() {
   const [title, setTitle] = useState("");
   return (
     <>
-      <div className="md:mx-8 my-6 md:max-h-[84vh] h-[84vh]">
+      <div className="w-full max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-2 md:py-4 md:max-h-[84vh] h-[84vh]">
         <div className="flex md:px-8 bg-white dark:bg-dark rounded-lg w-full overflow-y-auto m-auto py-4 h-full">
           <div className="mt-4 w-full md:w-1/2 px-4 sm:px-8 md:px-0 flex flex-col bg-white dark:bg-dark">
             <p

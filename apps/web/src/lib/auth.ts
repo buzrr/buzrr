@@ -29,6 +29,11 @@ function getAuth(): Auth {
     session: {
       cookieCache: { enabled: true, maxAge: 5 * 60 },
     },
+    user: {
+      // Powers the settings danger-zone "Delete profile" flow; related rows
+      // (quizzes, sessions, accounts, …) go with the user via FK cascades.
+      deleteUser: { enabled: true },
+    },
   }) as unknown as Auth;
 
   return _auth!;

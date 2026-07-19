@@ -3,6 +3,7 @@
 import { Box, Modal } from "@mui/material";
 import Image from "next/image";
 import { useState } from "react";
+import ModalCloseButton from "@/components/ModalCloseButton";
 
 const style = {
   position: "absolute" as const,
@@ -48,7 +49,11 @@ export default function ShowMedia(props: { media: string; mediaType: string }) {
         aria-labelledby="modal-modal-title"
         aria-describedby="modal-modal-description"
       >
-        <Box sx={style} className="">
+        <Box sx={style} className="max-w-[600px]">
+          <ModalCloseButton
+            onClose={handleClose}
+            className="text-white hover:bg-white/10"
+          />
           {mediaType === "image" && (
             <Image
               src={props.media}

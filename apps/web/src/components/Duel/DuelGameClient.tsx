@@ -9,10 +9,12 @@ import { useGameSocket } from "@/hooks/useGameSocket";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
 import { useDuelProfileQuery } from "@/lib/modules/duel/hooks";
 import { fetchApiAccessToken } from "@/lib/api/get-access-token";
+import ConfettiBurst from "@/components/ConfettiBurst";
 import ConnectionBanner from "@/components/ConnectionBanner";
 import { Button } from "@/components/ui/Button";
 import { Question, Result, Loader } from "@/components/Player/GameScreens";
 import ReportQuestionButton from "./ReportQuestionButton";
+import DuelAudio, { type DuelOutcome } from "./DuelAudio";
 
 export default function DuelGameClient({ gameCode }: { gameCode: string }) {
   const [token, setToken] = useState<string | null>(null);
@@ -34,6 +36,20 @@ export default function DuelGameClient({ gameCode }: { gameCode: string }) {
   const phase = useAppSelector((state) => state.game.phase);
   const question = useAppSelector((state) => state.game.question);
   const you = useAppSelector((state) => state.game.you);
+  const leaderboard = useAppSelector((state) => state.game.leaderboard);
+
+  const outcome = useMemo<DuelOutcome | null>(() => {
+    const myId = profile?.id;
+    if (!myId) return null;
+    const me = leaderboard.find((e) => e.playerId === myId);
+    const opponent = leaderboard.find((e) => e.playerId !== myId);
+    if (!me || !opponent) return null;
+    return me.score === opponent.score
+      ? "tie"
+      : me.score > opponent.score
+        ? "win"
+        : "defeat";
+  }, [leaderboard, profile?.id]);
 
   if (tokenError) {
     return (
@@ -53,6 +69,7 @@ export default function DuelGameClient({ gameCode }: { gameCode: string }) {
   return (
     <>
       <ConnectionBanner />
+      <DuelAudio outcome={outcome} />
       <DuelScoreBar myId={profile?.id} />
       {phase === "question" ? (
         question ? (
@@ -180,17 +197,19 @@ function DuelResultScreen({ myId }: { myId?: string }) {
   const opponent = leaderboard.find((e) => e.playerId !== myId);
   const myElo = myId ? eloChanges?.[myId] : undefined;
 
+  const won = Boolean(me && opponent && me.score > opponent.score);
   const outcome =
     !me || !opponent
       ? "Duel over"
       : me.score === opponent.score
         ? "It's a tie!"
-        : me.score > opponent.score
+        : won
           ? "You won! 🏆"
           : "You lost";
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[80dvh] gap-6 px-4">
+      {won && <ConfettiBurst />}
       <p className="text-3xl sm:text-4xl font-black text-dark dark:text-white text-center animate-pop-in">
         {outcome}
       </p>
