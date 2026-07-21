@@ -7,6 +7,7 @@ import type { PlayerPayload } from "@/types/socket-events";
 import { useAdminSocket } from "@/hooks/useAdminSocket";
 import ConnectionBanner from "@/components/ConnectionBanner";
 import ConnectionStatusPill from "@/components/ConnectionStatusPill";
+import EndQuizButton from "@/components/Admin/EndQuizButton";
 import WaitScreen from "./WaitScreen";
 import QuestionScreen from "./QuestionScreen";
 import QuesResult from "./QuesResult";
@@ -49,31 +50,31 @@ const GameLobby = (params: {
     gameCode: params.gameCode,
   });
 
-  if (!socket) {
-    return null;
-  }
+  const isEnded = phase === "final" || phase === "ended";
 
   return (
     <>
-      <ConnectionBanner />
-      <ConnectionStatusPill className="fixed left-3 bottom-3 z-40" />
-      {phase === "question" ? (
-        <QuestionScreen
-          socket={socket}
-          gameCode={params.gameCode}
-          quizTitle={params.quizQuestions?.title}
-        />
-      ) : phase === "reveal" ? (
-        <QuesResult socket={socket} />
-      ) : phase === "final" || phase === "ended" ? (
-        <LeaderBoard
-          socket={socket}
-          gameCode={params.gameCode}
-          quizQuestions={params.quizQuestions}
-        />
-      ) : (
-        // idle / lobby / starting — the pre-question countdown screen
-        <WaitScreen />
+      {/* Always available to the host, on every in-game phase. */}
+      <EndQuizButton roomId={params.roomId} alreadyEnded={isEnded} />
+      {socket && (
+        <>
+          <ConnectionBanner />
+          <ConnectionStatusPill className="fixed left-3 bottom-3 z-40" />
+          {phase === "question" ? (
+            <QuestionScreen
+              socket={socket}
+              gameCode={params.gameCode}
+              quizTitle={params.quizQuestions?.title}
+            />
+          ) : phase === "reveal" ? (
+            <QuesResult socket={socket} />
+          ) : isEnded ? (
+            <LeaderBoard />
+          ) : (
+            // idle / lobby / starting — the pre-question countdown screen
+            <WaitScreen />
+          )}
+        </>
       )}
     </>
   );

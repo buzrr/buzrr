@@ -162,3 +162,85 @@ html.theme-anim *::after {
     cursor: default;
   }
 }
+
+/* --- Centered, minimal toast (react-toastify) --- */
+.buzrr-toast-container {
+  width: auto;
+  max-width: 90vw;
+  padding: 0;
+}
+
+.buzrr-toast-container .buzrr-toast {
+  min-height: unset;
+  width: max-content;
+  max-width: 90vw;
+  margin: 0.35rem auto;
+  padding: 0.45rem 0.9rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.buzrr-toast-container .buzrr-toast .Toastify__toast-body {
+  padding: 0;
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.buzrr-toast-container .buzrr-toast .Toastify__toast-icon {
+  width: 1rem;
+  margin-inline-end: 0.45rem;
+}
+
+/* Per-type color schemes — consistent across the app.
+   Dark pill base with a colored border + accent per toast type. */
+.buzrr-toast-container .buzrr-toast {
+  color: #f5f3ff;
+  background: #2c2c2c;
+  border: 1px solid transparent;
+}
+
+.buzrr-toast-container .buzrr-toast.Toastify__toast--success {
+  border-color: #22c55e;
+}
+.buzrr-toast-container
+  .buzrr-toast.Toastify__toast--success
+  .Toastify__toast-icon
+  svg {
+  fill: #22c55e;
+}
+
+.buzrr-toast-container .buzrr-toast.Toastify__toast--error {
+  border-color: #e84b4b;
+}
+.buzrr-toast-container
+  .buzrr-toast.Toastify__toast--error
+  .Toastify__toast-icon
+  svg {
+  fill: #e84b4b;
+}
+
+.buzrr-toast-container .buzrr-toast.Toastify__toast--warning {
+  border-color: #f59e0b;
+}
+.buzrr-toast-container
+  .buzrr-toast.Toastify__toast--warning
+  .Toastify__toast-icon
+  svg {
+  fill: #f59e0b;
+}
+
+.buzrr-toast-container .buzrr-toast.Toastify__toast--info {
+  border-color: #a589fc;
+}
+.buzrr-toast-container
+  .buzrr-toast.Toastify__toast--info
+  .Toastify__toast-icon
+  svg {
+  fill: #a589fc;
+}
+
+.buzrr-toast-container .buzrr-toast.Toastify__toast--default {
+  border-color: #7d49f8;
+}

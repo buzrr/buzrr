@@ -14,6 +14,9 @@ const Result = (params: {
   you: AnswerResultPayload | null;
   gameCode: string;
   quizTitle: string;
+  hideRoomCode?: boolean;
+  hostName?: string | null;
+  hostImage?: string | null;
 }) => {
   const you = params.you;
   const question = useAppSelector((state) => state.game.question);
@@ -34,6 +37,9 @@ const Result = (params: {
         <QuestionAndResult
           quizTitle={params.quizTitle}
           gameCode={params.gameCode}
+          hideRoomCode={params.hideRoomCode}
+          hostName={params.hostName}
+          hostImage={params.hostImage}
           screen="result"
           status="timesout"
           message="Time Limit Exceeded"
@@ -44,6 +50,9 @@ const Result = (params: {
         <QuestionAndResult
           quizTitle={params.quizTitle}
           gameCode={params.gameCode}
+          hideRoomCode={params.hideRoomCode}
+          hostName={params.hostName}
+          hostImage={params.hostImage}
           screen="result"
           status="correct"
           message={
@@ -54,6 +63,9 @@ const Result = (params: {
         <QuestionAndResult
           quizTitle={params.quizTitle}
           gameCode={params.gameCode}
+          hideRoomCode={params.hideRoomCode}
+          hostName={params.hostName}
+          hostImage={params.hostImage}
           screen="result"
           status="incorrect"
           message="Your answer was wrong"

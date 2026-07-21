@@ -116,6 +116,12 @@ export interface ServerToClientEvents {
     name?: string;
     profilePic?: string | null;
   }) => void;
+  /** A player left on their own (distinct from a host kick / player-removed). */
+  "player-left": (player: {
+    id: string;
+    name?: string;
+    profilePic?: string | null;
+  }) => void;
   "game-started": () => void;
   // -- legacy v1 (dual-emitted until the web client is fully migrated) --
   "timer-starts": () => void;
@@ -141,6 +147,8 @@ export interface ClientToServerEvents {
     ack: (result: SubmitAnswerAck) => void,
   ) => void;
   "request-sync": () => void;
+  /** A player voluntarily leaves the room (back / leave-game confirmation). */
+  "leave-room": () => void;
   // -- shared with v1 --
   "remove-player": (player: { id: string }, gameCode?: string) => void;
   "start-game": (gameCode?: string) => void;

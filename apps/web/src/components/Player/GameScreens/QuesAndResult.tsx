@@ -1,6 +1,7 @@
 "use client";
 import clsx from "clsx";
 import Image from "next/image";
+import { DEFAULT_AVATAR } from "@/constants";
 import { useAppSelector } from "@/state/hooks";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
 import CountdownRing from "@/components/CountdownRing";
@@ -33,6 +34,11 @@ const QuestionAndResult = (params: {
   correctAnswer?: string;
   /** The player's own pick on a wrong answer; null when they never answered. */
   yourAnswer?: string | null;
+  /** Hide the "Room code" line (e.g. 1v1 duels, where the code is internal). */
+  hideRoomCode?: boolean;
+  /** Host of the quiz — shown as "Quiz by". Omitted for duels (no host). */
+  hostName?: string | null;
+  hostImage?: string | null;
 }) => {
   const options = params?.question?.options ?? [];
   const deadline = useAppSelector((state) => state.game.deadline);
@@ -65,7 +71,7 @@ const QuestionAndResult = (params: {
           className="w-full h-2 dark:bg-dprimary bg-lprimary block md:hidden"
         ></div>
       )}
-      <div className="w-full h-[85dvh] flex gap-4 md:py-4 md:px-8 *:bg-white dark:*:bg-dark md:*:rounded-xl overflow-y-auto">
+      <div className="w-full max-w-7xl mx-auto h-[85dvh] flex gap-4 md:py-4 px-4 sm:px-6 lg:px-8 *:bg-white dark:*:bg-dark md:*:rounded-xl overflow-y-auto">
         <div className="hidden md:w-1/3 md:flex flex-col justify-between py-6 px-5 h-full">
           <div className="flex items-center justify-center mx-auto">
             {params.screen === "question" ? (
@@ -91,13 +97,26 @@ const QuestionAndResult = (params: {
             <p className="font-extrabold mt-2 mb-4 dark:text-white capitalize text-xl">
               {params.quizTitle}
             </p>
-            <p className="dark:text-white mb-1">Room code: {params.gameCode}</p>
-            <p className="dark:text-white mb-1">Quiz by</p>
-
-            <div className="flex gap-2 items-center">
-              <Image src="/images/SI.svg" width={48} height={48} alt="Logo" />
-              <p className="dark:text-white">SDC-SI</p>
-            </div>
+            {!params.hideRoomCode && (
+              <p className="dark:text-white mb-1">
+                Room code: {params.gameCode}
+              </p>
+            )}
+            {params.hostName && (
+              <>
+                <p className="dark:text-white mb-1">Quiz by</p>
+                <div className="flex gap-2 items-center">
+                  <Image
+                    src={params.hostImage || DEFAULT_AVATAR}
+                    width={48}
+                    height={48}
+                    alt={params.hostName}
+                    className="rounded-full h-12 w-12"
+                  />
+                  <p className="dark:text-white">{params.hostName}</p>
+                </div>
+              </>
+            )}
           </div>
         </div>
         {params.screen === "question" ? (
@@ -154,9 +173,11 @@ const QuestionAndResult = (params: {
                 </p>
               )}
 
-              <p className="dark:text-white mb-1 md:hidden font-bold text-center my-6 text-lg">
-                Room code: {params.gameCode}
-              </p>
+              {!params.hideRoomCode && (
+                <p className="dark:text-white mb-1 md:hidden font-bold text-center my-6 text-lg">
+                  Room code: {params.gameCode}
+                </p>
+              )}
             </div>
           </div>
         ) : (

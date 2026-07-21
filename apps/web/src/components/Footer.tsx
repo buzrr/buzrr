@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LuMail } from "react-icons/lu";
 import ThemeToggle from "./ThemeToggle";
-import { ISSUES_LINK } from "./Landing/links";
 import supportLinks from "@/data/support-links.json";
 
 // Routes that render their own full footer + theme toggle (landing & co).
@@ -20,7 +19,7 @@ const ROUTES_WITH_OWN_FOOTER = [
 const Links = [
   {
     name: "Contact us",
-    link: ISSUES_LINK,
+    link: "mailto:ansarialan31@gmail.com",
     icon: null,
   },
   {

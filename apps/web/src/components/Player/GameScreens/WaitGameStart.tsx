@@ -19,15 +19,19 @@ interface GameWithQuiz extends GameSession {
 const WaitGameStart = (params: {
   player: PlayerWithProfile;
   game: GameWithQuiz;
+  /** Back/leave action — opens the "you'll leave the game" confirmation. */
+  onLeave?: () => void;
 }) => {
   const game = params.game;
 
   return (
     <>
       <div className="px-4 py-2">
-        <div className="w-full h-[81dvh] flex gap-4 *:bg-white dark:*:bg-dark *:rounded-xl">
-          <div className="w-full md:w-full p-4 hidden md:flex md:flex-col">
-            <BackNavButton />
+        <div className="w-full h-[81dvh] flex gap-4 md:justify-center *:bg-white dark:*:bg-dark *:rounded-xl">
+          <div className="w-full md:w-[26vw] md:max-w-sm p-4 hidden md:flex md:flex-col">
+            <div className="self-start">
+              <BackNavButton onBack={params.onLeave} />
+            </div>
             <h1 className="text-5xl py-2 font-extrabold dark:text-white">
               {game.quiz.title}
             </h1>

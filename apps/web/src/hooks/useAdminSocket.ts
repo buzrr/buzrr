@@ -56,6 +56,11 @@ export function useAdminSocket({
         dispatch(removePlayer(player));
         callbacks.current.onPlayerRemoved?.(player);
       });
+      // A voluntary leave: drop them from the roster, but no "you removed this
+      // player" toast — the host didn't kick them.
+      socket.on("player-left", (player) => {
+        dispatch(removePlayer(player));
+      });
       socket.on("game-started", () => {
         callbacks.current.onGameStarted?.();
       });

@@ -15,6 +15,9 @@ const Question = (params: {
   socket: GameSocket;
   quizTitle: string;
   gameCode: string;
+  hideRoomCode?: boolean;
+  hostName?: string | null;
+  hostImage?: string | null;
 }) => {
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const [optionId, setOptionId] = useState("");
@@ -49,6 +52,9 @@ const Question = (params: {
         question={params.question}
         quizTitle={params.quizTitle}
         gameCode={params.gameCode}
+        hideRoomCode={params.hideRoomCode}
+        hostName={params.hostName}
+        hostImage={params.hostImage}
         screen="question"
         submitAnswer={submitAnswer}
         optionId={optionId}

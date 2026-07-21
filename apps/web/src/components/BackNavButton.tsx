@@ -5,8 +5,17 @@ import { useAppSelector } from "@/state/hooks";
 import { PageTheme } from "@/state/pageThemeSlice";
 import { IconButton } from "@/components/ui/IconButton";
 
-/** Navigates to `href` when given, otherwise falls back to history.back(). */
-const BackNavButton = ({ href }: { href?: string }) => {
+/**
+ * Navigates to `href` when given, otherwise falls back to history.back().
+ * `onBack`, when provided, overrides both (e.g. to confirm leaving a game).
+ */
+const BackNavButton = ({
+  href,
+  onBack,
+}: {
+  href?: string;
+  onBack?: () => void;
+}) => {
   const theme = useAppSelector((state) => state.pageTheme.theme);
   const router = useRouter();
 
@@ -14,7 +23,15 @@ const BackNavButton = ({ href }: { href?: string }) => {
     <IconButton
       aria-label="Go back"
       className="cursor-pointer"
-      onClick={() => (href ? router.push(href) : window.history.back())}
+      onClick={() => {
+        if (onBack) {
+          onBack();
+        } else if (href) {
+          router.push(href);
+        } else {
+          window.history.back();
+        }
+      }}
       icon={
         <Image
           src={

@@ -12,6 +12,9 @@ import "react-toastify/dist/ReactToastify.css";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { createPlayerSchema } from "@/lib/modules/forms/schemas";
 import { useCreatePlayerMutation } from "@/lib/modules/players/hooks";
+import { useJoinRoomMutation } from "@/lib/modules/game-sessions/hooks";
+import { clearPlayerLocalSession } from "@/lib/player-session";
+import { isAxiosError } from "axios";
 import { TextInput } from "@/components/ui/TextInput";
 
 type FormValues = z.infer<typeof createPlayerSchema>;
@@ -25,9 +28,15 @@ const CreatePlayerForm = (props: {
     image: string;
   };
   setData: (data: { name: string; image: string }) => void;
+  /**
+   * When set (link/QR join flow), the player is dropped straight into this
+   * room after being created — skipping the manual "enter room code" step.
+   */
+  joinGameCode?: string;
 }) => {
   const router = useRouter();
   const mutation = useCreatePlayerMutation();
+  const joinMutation = useJoinRoomMutation();
   const { control, handleSubmit, reset } = useForm<FormValues>({
     resolver: zodResolver(createPlayerSchema),
     defaultValues: {
@@ -51,6 +60,34 @@ const CreatePlayerForm = (props: {
     });
   };
 
+  // Link/QR flow: after the player exists, join the room the link points at
+  // and go straight to the game — no room-code entry step.
+  const autoJoin = (gameCode: string) => {
+    joinMutation.mutate(
+      { gameCode },
+      {
+        onSuccess: (joinRes) => {
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem("playerId", joinRes.playerId);
+          }
+          router.push(`/player/play/${joinRes.playerId}`);
+        },
+        onError: (err) => {
+          if (isAxiosError(err) && err.response?.status === 401) {
+            clearPlayerLocalSession();
+            toast.error("Your session expired. Please try again.");
+            return;
+          }
+          if (isAxiosError(err) && err.response?.status === 404) {
+            toast.error("This quiz link is invalid or the game has ended.");
+            return;
+          }
+          toast.error(getApiErrorMessage(err));
+        },
+      },
+    );
+  };
+
   const onSubmit = handleSubmit((data) => {
     mutation.mutate(
       {
@@ -62,6 +99,10 @@ const CreatePlayerForm = (props: {
           if (typeof window !== "undefined") {
             window.localStorage.setItem("playerToken", res.accessToken);
           }
+          if (props.joinGameCode) {
+            autoJoin(props.joinGameCode);
+            return;
+          }
           router.push(`/player/joinRoom/${res.playerId}`);
         },
         onError: (err) => {
@@ -72,7 +113,10 @@ const CreatePlayerForm = (props: {
   });
 
   return (
-    <form className="flex flex-col" onSubmit={onSubmit}>
+    <form
+      className="flex flex-col w-full max-w-xl animate-fade-up"
+      onSubmit={onSubmit}
+    >
       <h1 className="text-3xl md:text-5xl py-2 font-extrabold dark:text-white">
         Create a custom profile
       </h1>
@@ -89,7 +133,7 @@ const CreatePlayerForm = (props: {
             id="displayName"
             name={field.name}
             placeholder="Enter Display Name"
-            className="md:w-4/5 my-2"
+            className="w-full my-2"
             required
             autoComplete="off"
             maxLength={30}
@@ -105,8 +149,12 @@ const CreatePlayerForm = (props: {
         )}
       />
 
-      <div className="w-full md:w-[40%] mt-10">
-        <SubmitButton style="game" isPending={mutation.isPending} />
+      <div className="w-full mt-8">
+        <SubmitButton
+          style="game"
+          text={props.joinGameCode ? "Join Game" : undefined}
+          isPending={mutation.isPending || joinMutation.isPending}
+        />
       </div>
     </form>
   );

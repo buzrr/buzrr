@@ -9,16 +9,14 @@ import { useRouter } from "next/navigation";
 import { RxCross2 } from "react-icons/rx";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import ConfirmationModal from "./ConfirmationModal";
 import ConnectionStatusPill from "@/components/ConnectionStatusPill";
 import { useAdminSocket } from "@/hooks/useAdminSocket";
-import {
-  useEndRoomMutation,
-  useRemoveRoomPlayerMutation,
-} from "@/lib/modules/game-sessions/hooks";
+import { useRemoveRoomPlayerMutation } from "@/lib/modules/game-sessions/hooks";
 import type { PlayerPayload } from "@/types/socket-events";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
+import ShareRoom from "@/components/ShareRoom";
+import EndQuizButton from "@/components/Admin/EndQuizButton";
 
 const Lobby = (params: {
   roomId: string;
@@ -34,7 +32,6 @@ const Lobby = (params: {
   const dispatch = useAppDispatch();
   const players = useAppSelector((state) => state.player.players);
   const maxPlayers = params.maxPlayers ?? 50;
-  const [endGame, setEndGame] = useState(false);
   const [load, setLoad] = useState(false);
   const router = useRouter();
 
@@ -59,7 +56,6 @@ const Lobby = (params: {
     onGameStarted: handleGameStarted,
   });
 
-  const endRoomMutation = useEndRoomMutation();
   const removePlayerMutation = useRemoveRoomPlayerMutation();
 
   // Kick and stop-hosting go over HTTP so they work even while the socket is
@@ -90,67 +86,26 @@ const Lobby = (params: {
     }
     setLoad(true);
     socket.emit("start-game", params.gameCode);
-  }
-
-  async function handleStopHosting() {
-    try {
-      await endRoomMutation.mutateAsync(params.roomId);
-      router.push(`/admin/quiz/${params.quizId}`);
-    } catch {
-      toast.error("Could not end game session. Please try again.");
-    } finally {
-      setEndGame(false);
-    }
+    // Move to the game screen right away instead of waiting for the
+    // `game-started` round-trip — it syncs the countdown over the socket on
+    // connect, so the host isn't stranded on the lobby while the server spins
+    // up the game. `onGameStarted` remains a backup navigation.
+    router.push(`/admin/game/${params.roomId}`);
   }
 
   return (
     <>
-      <ConnectionStatusPill className="absolute left-4 md:left-8 top-4 z-10" />
+      <EndQuizButton
+        roomId={params.roomId}
+        redirectTo={`/admin/quiz/${params.quizId}`}
+      />
 
-      <Button
-        size="sm"
-        className="bg-red-light dark:bg-red-dark text-white dark:text-dark hover:bg-red-dark absolute right-4 md:right-8 top-4 z-10"
-        onClick={() => setEndGame(true)}
-      >
-        Stop Hosting
-      </Button>
-
-      <div className="bg-white dark:bg-dark md:rounded-xl md:mx-8 py-10 my-4 min-h-[81dvh] px-6 relative flex flex-col items-center">
-        <h1 className="font-extrabold text-3xl md:text-4xl italic dark:text-white mb-6 text-center">
-          {params?.quizTitle}
-        </h1>
-
-        <button
-          type="button"
-          onClick={() => {
-            navigator.clipboard
-              .writeText(params?.gameCode)
-              .then(() => {
-                toast.success("Room code copied!");
-              })
-              .catch(() => {
-                toast.error("Failed to copy room code");
-              });
-          }}
-          className="cursor-pointer select-none bg-light-bg dark:bg-cardhover-dark border-2 border-lprimary dark:border-dprimary rounded-2xl px-12 py-10 text-center shadow-lg hover:scale-[1.02] transition-all duration-300"
-        >
-          <p className="text-sm tracking-[4px] text-gray-500 dark:text-gray-300 mb-3">
-            ROOM CODE
-          </p>
-
-          <h2 className="text-5xl md:text-5xl font-extrabold tracking-[12px] text-lprimary dark:text-dprimary font-mono drop-shadow-lg">
-            {params?.gameCode}
-          </h2>
-
-          <p className="mt-3 text-sm text-stone-500 dark:text-stone-400">
-            Click to copy & share with players
-          </p>
-        </button>
-
-        <div className="flex flex-wrap justify-center gap-6 mt-6">
+      <div className="bg-white dark:bg-dark md:rounded-xl md:mx-8 py-6 md:py-10 my-4 min-h-[81dvh] px-6 relative flex flex-col items-center overflow-y-auto">
+        <div className="absolute left-4 top-4 z-10 flex flex-col items-start gap-2">
+          <ConnectionStatusPill />
           <span
             className={clsx(
-              "p-2 dark:text-white border rounded-xl font-bold bg-light-bg dark:bg-cardhover-dark",
+              "px-2 py-1 text-xs md:text-sm dark:text-white border rounded-xl font-bold bg-light-bg dark:bg-cardhover-dark",
               players.length >= maxPlayers
                 ? "border-red-light dark:border-red-dark"
                 : "border-lprimary dark:border-dprimary",
@@ -158,13 +113,44 @@ const Lobby = (params: {
           >
             Participants: {players.length} / {maxPlayers}
           </span>
-
-          <span className="p-2 dark:text-white border border-lprimary dark:border-dprimary bg-light-bg dark:bg-cardhover-dark rounded-xl font-bold">
-            Join at: {process.env.NEXT_PUBLIC_APP_URL ?? "buzrr.in"}
-          </span>
         </div>
 
-        <p className="mt-3 text-xs text-stone-500 dark:text-stone-400 text-center max-w-md">
+        <h1 className="font-extrabold text-2xl md:text-4xl italic dark:text-white mb-4 md:mb-6 mt-8 md:mt-0 text-center">
+          {params?.quizTitle}
+        </h1>
+
+        <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-12">
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard
+                .writeText(params?.gameCode)
+                .then(() => {
+                  toast.success("Room code copied!");
+                })
+                .catch(() => {
+                  toast.error("Failed to copy room code");
+                });
+            }}
+            className="cursor-pointer select-none bg-light-bg dark:bg-cardhover-dark border-2 border-lprimary dark:border-dprimary rounded-2xl px-8 py-6 md:px-12 md:py-8 text-center shadow-lg hover:scale-[1.02] transition-all duration-300"
+          >
+            <p className="text-sm tracking-[4px] text-gray-500 dark:text-gray-300 mb-2 md:mb-3">
+              ROOM CODE
+            </p>
+
+            <h2 className="text-4xl md:text-5xl font-extrabold tracking-[12px] text-lprimary dark:text-dprimary font-mono drop-shadow-lg">
+              {params?.gameCode}
+            </h2>
+
+            <p className="mt-2 md:mt-3 text-sm text-stone-500 dark:text-stone-400">
+              Click to copy & share with players
+            </p>
+          </button>
+
+          <ShareRoom gameCode={params.gameCode} variant="full" />
+        </div>
+
+        <p className="mt-4 md:mt-6 text-xs text-stone-500 dark:text-stone-400 text-center max-w-md">
           Rooms are capped at {maxPlayers} players while Buzrr is in beta on
           free-tier infrastructure.
         </p>
@@ -209,13 +195,6 @@ const Lobby = (params: {
           Start Game
         </Button>
       </div>
-
-      <ConfirmationModal
-        open={endGame}
-        setOpen={setEndGame}
-        onClick={handleStopHosting}
-        desc="Do you really want to stop this quiz session? This action cannot be undone."
-      />
     </>
   );
 };

@@ -134,6 +134,8 @@ export interface ServerToClientEvents {
   "player-connection": (payload: PlayerConnectionPayload) => void;
   "player-joined": (player: PlayerPayload) => void;
   "player-removed": (player: PlayerPayload) => void;
+  /** A player left on their own (distinct from a host kick / player-removed). */
+  "player-left": (player: { id: string }) => void;
   "game-started": () => void;
   "game-session-ended": () => void;
 }
@@ -147,6 +149,8 @@ export interface ClientToServerEvents {
     ack: (result: SubmitAnswerAck) => void,
   ) => void;
   "request-sync": () => void;
+  /** A player voluntarily leaves the room (back / leave-game confirmation). */
+  "leave-room": () => void;
   "remove-player": (player: { id: string }, gameCode?: string) => void;
   "start-game": (gameCode?: string) => void;
   "end-game-session": (gameCode?: string) => void;

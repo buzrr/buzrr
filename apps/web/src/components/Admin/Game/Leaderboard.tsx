@@ -1,26 +1,10 @@
 import clsx from "clsx";
 import { DEFAULT_AVATAR } from "@/constants";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useAppSelector } from "@/state/hooks";
-import type { GameSocket } from "@/types/socket-events";
 
-interface LeaderBoardProps {
-  gameCode: string;
-  quizQuestions?: { id?: string };
-  socket: GameSocket;
-}
-
-export default function LeaderBoard(props: LeaderBoardProps) {
+export default function LeaderBoard() {
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
-  const { quizQuestions } = props;
-  const socket = props.socket;
-  const router = useRouter();
-
-  function handleEnd() {
-    socket.emit("end-game-session");
-    router.push(`/admin/quiz/${quizQuestions?.id}`);
-  }
 
   const firstThree = leaderboard.slice(0, 3);
   const leaderboardRest = leaderboard.slice(3);
@@ -29,14 +13,6 @@ export default function LeaderBoard(props: LeaderBoardProps) {
     <>
       <div className="flex flex-col h-full w-full px-4 pt-6 text-dark dark:text-white">
         <p className="text-2xl font-black">Thank you for joining!</p>
-        <div className="absolute top-2 right-10">
-          <button
-            className="px-3 py-2 bg-red-light rounded text-sm text-white font-black"
-            onClick={handleEnd}
-          >
-            End Quiz
-          </button>
-        </div>
         <div className="w-[95vw] my-3 flex flex-col md:flex-row md:justify-between items-center">
           {firstThree.length > 0
             ? firstThree.map((lead, index) => {
@@ -44,11 +20,11 @@ export default function LeaderBoard(props: LeaderBoardProps) {
                   <div
                     key={lead.playerId}
                     className={clsx(
-                    "flex md:flex-col md:justify-center items-center w-full md:w-[25vw] p-2 md:p-4 my-2 rounded-lg border-2 *:my-1",
-                    index === 0 && "md:order-2 order-0 border-yellow-500",
-                    index === 1 && "md:order-1 order-0 border-gray",
-                    index === 2 && "md:order-3 order-0 border-[#ec7070e8]"
-                  )}
+                      "flex md:flex-col md:justify-center items-center w-full md:w-[25vw] p-2 md:p-4 my-2 rounded-lg border-2 *:my-1",
+                      index === 0 && "md:order-2 order-0 border-yellow-500",
+                      index === 1 && "md:order-1 order-0 border-gray",
+                      index === 2 && "md:order-3 order-0 border-[#ec7070e8]",
+                    )}
                   >
                     {index == 0 ? (
                       <span className="text-xl md:text-3xl overflow-hidden text-[#F2AB53]">

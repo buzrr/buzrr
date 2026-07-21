@@ -82,13 +82,19 @@ export default function DuelGameClient({ gameCode }: { gameCode: string }) {
               socket={socket}
               quizTitle="1v1 Duel"
               gameCode={gameCode}
+              hideRoomCode
             />
           </>
         ) : (
           <Loader />
         )
       ) : phase === "reveal" ? (
-        <Result you={you} gameCode={gameCode} quizTitle="1v1 Duel" />
+        <Result
+          you={you}
+          gameCode={gameCode}
+          quizTitle="1v1 Duel"
+          hideRoomCode
+        />
       ) : phase === "final" || phase === "ended" ? (
         <DuelResultScreen myId={profile?.id} />
       ) : (

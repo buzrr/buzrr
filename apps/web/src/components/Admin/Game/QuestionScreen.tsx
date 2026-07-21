@@ -5,6 +5,7 @@ import { useAppSelector } from "@/state/hooks";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
 import CountdownRing from "@/components/CountdownRing";
 import { Button } from "@/components/ui/Button";
+import ShareRoom from "@/components/ShareRoom";
 import type { GameSocket } from "@/types/socket-events";
 
 interface QuestionScreenProps {
@@ -31,7 +32,7 @@ export default function QuestionScreen(props: QuestionScreenProps) {
 
   return (
     <>
-      <div className="flex items-center m-auto h-fit w-full md:mx-4 dark:text-white *:bg-white dark:*:bg-dark">
+      <div className="flex items-center w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-fit dark:text-white *:bg-white dark:*:bg-dark">
         <div className="h-full w-full md:w-1/3 lg:max-w-sm mx-2 hidden pt-8 md:block rounded-xl">
           <div className="flex justify-center">
             <CountdownRing
@@ -46,9 +47,12 @@ export default function QuestionScreen(props: QuestionScreenProps) {
             </div>
             <div className="text-2xl font-black">{quizTitle}</div>
           </div>
-          <div className="mt-36 mb-2 pl-4">
+          <div className="mt-24 mb-2 pl-4">
             <div className="text-md">Room Code</div>
             <div className="text-4xl font-black">{gameCode}</div>
+            <div className="mt-4">
+              <ShareRoom gameCode={gameCode} variant="compact" />
+            </div>
           </div>
         </div>
         <div className="h-full w-full md:mx-2 md:rounded-xl flex flex-col justify-center">
@@ -71,15 +75,6 @@ export default function QuestionScreen(props: QuestionScreenProps) {
           <h1 className="pb-6 pl-4 text-2xl font-black capitalize">
             {question.title}
           </h1>
-          <div className="absolute bottom-2 md:bottom-10 right-12 w-fit">
-            <Button
-              className="w-24 h-10 rounded!"
-              size="sm"
-              onClick={() => socket.emit("host-next")}
-            >
-              Next
-            </Button>
-          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full p-8 pl-4 h-fit">
             {options.length > 0 &&
               options.map((opt, index) => {
@@ -94,6 +89,15 @@ export default function QuestionScreen(props: QuestionScreenProps) {
                   </p>
                 );
               })}
+          </div>
+          <div className="mt-2 mb-6 px-8 flex justify-end">
+            <Button
+              className="w-24 h-10 rounded!"
+              size="sm"
+              onClick={() => socket.emit("host-next")}
+            >
+              Next
+            </Button>
           </div>
         </div>
       </div>

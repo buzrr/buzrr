@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import { useAppSelector } from "@/state/hooks";
 import { useRouter } from "next/navigation";
 import type { GameSession } from "@/types/db";
@@ -11,7 +12,9 @@ import {
 } from "./GameScreens";
 import ConnectionBanner from "@/components/ConnectionBanner";
 import ConnectionStatusPill from "@/components/ConnectionStatusPill";
+import ConfirmationModal from "@/components/Admin/ConfirmationModal";
 import { usePlayerSocket } from "@/hooks/usePlayerSocket";
+import { playersApi } from "@/lib/modules/players/api";
 
 interface GameSessionWithQuiz extends GameSession {
   quiz: {
@@ -22,6 +25,7 @@ interface GameSessionWithQuiz extends GameSession {
       options?: { id: string; title: string }[];
     }[];
   };
+  creator?: { name?: string | null; image?: string | null };
 }
 
 /**
@@ -35,6 +39,7 @@ const GamePage = (params: {
 }) => {
   const game = params.game;
   const router = useRouter();
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
 
   const phase = useAppSelector((state) => state.game.phase);
   const question = useAppSelector((state) => state.game.question);
@@ -46,12 +51,48 @@ const GamePage = (params: {
     onRemoved: () => router.push("/player"),
   });
 
+  // Guard the browser/hardware back button: leaving the game is confirmed via
+  // a modal instead of silently dropping the player on the previous screen.
+  useEffect(() => {
+    window.history.pushState(null, "", window.location.href);
+    const onPopState = () => {
+      window.history.pushState(null, "", window.location.href);
+      setShowLeaveModal(true);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  const confirmLeave = () => {
+    setShowLeaveModal(false);
+    // Tell the server so the host's roster updates immediately; the HTTP
+    // clear-game also detaches the player in Postgres and is the reliable
+    // fallback when the socket is down. Both are fire-and-forget — invalidating
+    // the play query here would flip gameId to null mid-render and race the
+    // navigation. The saved player identity is kept, so the next screen is the
+    // room-code step, not create-profile.
+    if (socket?.connected) socket.emit("leave-room");
+    void playersApi.clearGame(params.player.id).catch(() => {});
+    router.replace(`/player/joinRoom/${params.player.id}`);
+  };
+
   return (
     <>
       <ConnectionBanner />
       <ConnectionStatusPill className="fixed left-3 bottom-3 z-40" />
+      <ConfirmationModal
+        open={showLeaveModal}
+        setOpen={setShowLeaveModal}
+        onClick={confirmLeave}
+        desc="If you leave now you'll be removed from this game. Your name is saved — you can rejoin with the room code."
+        confirmLabel="Leave Game"
+      />
       {phase === "idle" || phase === "lobby" ? (
-        <WaitGameStart player={params.player} game={params.game} />
+        <WaitGameStart
+          player={params.player}
+          game={params.game}
+          onLeave={() => setShowLeaveModal(true)}
+        />
       ) : phase === "question" ? (
         question && socket ? (
           <Question
@@ -59,6 +100,8 @@ const GamePage = (params: {
             socket={socket}
             quizTitle={game.quiz.title ?? ""}
             gameCode={game.gameCode}
+            hostName={game.creator?.name}
+            hostImage={game.creator?.image}
           />
         ) : (
           <Loader />
@@ -68,6 +111,8 @@ const GamePage = (params: {
           you={you}
           gameCode={game.gameCode}
           quizTitle={game.quiz.title ?? ""}
+          hostName={game.creator?.name}
+          hostImage={game.creator?.image}
         />
       ) : phase === "final" || phase === "ended" ? (
         <LeaderBoard

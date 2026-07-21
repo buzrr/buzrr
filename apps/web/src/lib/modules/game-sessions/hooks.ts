@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/modules/query-keys";
 import { gameSessionsApi } from "./api";
 
@@ -11,8 +11,17 @@ export function useCreateGameSessionMutation() {
 }
 
 export function useJoinRoomMutation() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: gameSessionsApi.join,
+    onSuccess: (res) => {
+      // Clear any stale play snapshot (e.g. gameId: null cached after leaving a
+      // previous room) so the play page fetches fresh data instead of reading
+      // the old snapshot and redirecting straight back to the join screen.
+      queryClient.resetQueries({
+        queryKey: queryKeys.gameSessions.playerPlay(res.playerId),
+      });
+    },
   });
 }
 

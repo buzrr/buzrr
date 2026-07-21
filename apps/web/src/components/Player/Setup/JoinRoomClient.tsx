@@ -77,29 +77,33 @@ export default function JoinRoomClient({ playerId }: { playerId: string }) {
     <>
       <SetLocalItem mapKey="playerId" value={playerId} />
       <ResetReduxStates />
-      <div className="p-4 flex justify-between">
-        <ClientImage
-          props={{
-            src: "/images/logo.svg",
-            darksrc: "/images/logo-dark.svg",
-            alt: "Buzrr Logo",
-            width: 80,
-            height: 80,
-          }}
-        />
-      </div>
-      <div className="w-full min-h-[81vh] md:h-[81vh] flex flex-col md:flex-row gap-4 px-4 pb-4 md:pb-0 *:bg-white dark:*:bg-dark *:rounded-xl">
-        <div className="w-full md:flex-1 py-4">
-          <div className="px-4 md:px-8 pt-2">
-            <BackNavButton href="/" />
-          </div>
-          <JoinRoomForm />
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="py-4 flex justify-between">
+          <ClientImage
+            props={{
+              src: "/images/logo.svg",
+              darksrc: "/images/logo-dark.svg",
+              alt: "Buzrr Logo",
+              width: 80,
+              height: 80,
+            }}
+          />
         </div>
-        <JoinRoomProfileCard
-          playerId={playerId}
-          initialPlayerName={player.name}
-          profilePic={player.profilePic}
-        />
+        <div className="w-full min-h-[81vh] md:h-[81vh] flex flex-col md:flex-row gap-4 pb-4 md:pb-0 *:bg-white dark:*:bg-dark *:rounded-xl">
+          <div className="w-full md:flex-1 flex flex-col py-4">
+            <div className="px-4 md:px-8 pt-2">
+              <BackNavButton href="/" />
+            </div>
+            <div className="flex-1 flex items-center justify-center px-4 md:px-8 py-8 md:py-4">
+              <JoinRoomForm />
+            </div>
+          </div>
+          <JoinRoomProfileCard
+            playerId={playerId}
+            initialPlayerName={player.name}
+            profilePic={player.profilePic}
+          />
+        </div>
       </div>
     </>
   );

@@ -36,6 +36,7 @@
     "clsx": "^2.1.1",
     "jose": "^6.2.2",
     "next": "15.2.8",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.7",
     "react-countdown-circle-timer": "^3.2.1",
     "react-dom": "^19.2.7",

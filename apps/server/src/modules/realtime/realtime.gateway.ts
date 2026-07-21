@@ -281,6 +281,27 @@ export class RealtimeGateway
   }
 
   private registerPlayerHandlers(socket: TypedSocket, gameCode: string): void {
+    socket.on("leave-room", async () => {
+      const playerId = socket.data.playerId;
+      if (!playerId) return;
+      try {
+        await this.realtimeService.removePlayer(
+          playerId,
+          socket.data.gameSessionId,
+        );
+        await this.engine.removePlayer(gameCode, playerId);
+        // Notify the host (and everyone else) so their roster updates
+        // immediately — but not the leaving player, whose client is
+        // navigating away and must keep its saved session. `player-left` is
+        // distinct from `player-removed` (a host kick) so the host doesn't get
+        // a "you removed this player" toast for a voluntary leave.
+        socket.to(gameCode).emit("player-left", { id: playerId });
+        this.logger.log(`Player ${playerId} left game ${gameCode}`);
+      } catch (error) {
+        this.logger.error("Error handling player leave:", error);
+      }
+    });
+
     socket.on("submit-answer", async (payload, ack) => {
       try {
         const playerId = socket.data.playerId;
