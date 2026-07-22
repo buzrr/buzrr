@@ -50,12 +50,16 @@ const GameLobby = (params: {
     gameCode: params.gameCode,
   });
 
-  const isEnded = phase === "final" || phase === "ended";
+  // The final leaderboard shows for both phases, but a classic game only
+  // persists its GameResult when endGame runs. At "final" that hasn't happened
+  // yet, so the button must still end (and save); only "ended" is a plain exit.
+  const showLeaderboard = phase === "final" || phase === "ended";
+  const alreadyEnded = phase === "ended";
 
   return (
     <>
       {/* Always available to the host, on every in-game phase. */}
-      <EndQuizButton roomId={params.roomId} alreadyEnded={isEnded} />
+      <EndQuizButton roomId={params.roomId} alreadyEnded={alreadyEnded} />
       {socket && (
         <>
           <ConnectionBanner />
@@ -68,7 +72,7 @@ const GameLobby = (params: {
             />
           ) : phase === "reveal" ? (
             <QuesResult socket={socket} />
-          ) : isEnded ? (
+          ) : showLeaderboard ? (
             <LeaderBoard />
           ) : (
             // idle / lobby / starting — the pre-question countdown screen

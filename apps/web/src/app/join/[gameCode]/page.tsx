@@ -6,5 +6,8 @@ export default async function JoinViaLink({
   params: Promise<{ gameCode: string }>;
 }) {
   const { gameCode } = await params;
-  return <JoinViaLinkClient gameCode={decodeURIComponent(gameCode)} />;
+  // Next already decodes the route segment; decoding again throws on a lone
+  // "%" and other malformed input. Pass it through — the client normalizes it
+  // and an unknown code is handled as an invalid link.
+  return <JoinViaLinkClient gameCode={gameCode} />;
 }

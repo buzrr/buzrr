@@ -62,30 +62,37 @@ const Footer = () => {
   return (
     <div className="fixed bottom-0 right-3 md:right-0 md:left-0 z-50 w-fit md:w-full md:bg-light-bg md:dark:bg-dark-bg">
       <div className="max-w-7xl mx-auto flex items-center justify-start p-2 px-4 sm:px-6 lg:px-8 text-sm text-[#94959c] dark:text-off-white">
-        {Links.map((link, index) => (
-          <Link
-            href={link.link}
-            key={index}
-            {...("internal" in link && link.internal
-              ? {}
-              : { target: "_blank" })}
-          >
-            <div className="hidden md:flex items-center justify-center mr-3">
-              {link.icon ? (
-                <Image
-                  className="w-auto h-auto"
-                  src={link.icon}
-                  alt={link.name}
-                  width={18}
-                  height={18}
-                />
-              ) : (
-                <LuMail size={16} />
-              )}
-              <span className="text-xs px-1 hidden md:inline">{link.name}</span>
-            </div>
-          </Link>
-        ))}
+        {Links.map((link, index) => {
+          // New tab only for real external web links — never for mailto:, in-app
+          // routes, or "#" placeholders.
+          const isExternal =
+            !("internal" in link && link.internal) &&
+            /^https?:\/\//.test(link.link);
+          return (
+            <Link
+              href={link.link}
+              key={index}
+              {...(isExternal ? { target: "_blank", rel: "noreferrer" } : {})}
+            >
+              <div className="hidden md:flex items-center justify-center mr-3">
+                {link.icon ? (
+                  <Image
+                    className="w-auto h-auto"
+                    src={link.icon}
+                    alt={link.name}
+                    width={18}
+                    height={18}
+                  />
+                ) : (
+                  <LuMail size={16} />
+                )}
+                <span className="text-xs px-1 hidden md:inline">
+                  {link.name}
+                </span>
+              </div>
+            </Link>
+          );
+        })}
         <div className="ml-auto">
           <ThemeToggle />
         </div>

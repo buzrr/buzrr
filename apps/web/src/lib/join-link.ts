@@ -6,8 +6,11 @@
  * still resolves when the env var is unset (e.g. local dev / previews).
  */
 export function buildJoinUrl(gameCode: string): string {
-  const base =
+  const rawBase =
     process.env.NEXT_PUBLIC_APP_URL ??
     (typeof window !== "undefined" ? window.location.origin : "");
+  // Drop any trailing slash(es) so a configured base like "https://app.com/"
+  // doesn't produce "https://app.com//join/CODE".
+  const base = rawBase.replace(/\/+$/, "");
   return `${base}/join/${encodeURIComponent(gameCode)}`;
 }

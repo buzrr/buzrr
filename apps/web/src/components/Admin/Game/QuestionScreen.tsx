@@ -56,9 +56,12 @@ export default function QuestionScreen(props: QuestionScreenProps) {
           </div>
         </div>
         <div className="h-full w-full md:mx-2 md:rounded-xl flex flex-col justify-center">
-          <div className="text-center my-6 md:hidden">
+          <div className="my-6 md:hidden flex flex-col items-center">
             <div className="text-md">Room Code</div>
             <div className="text-2xl font-black">{gameCode}</div>
+            <div className="mt-3">
+              <ShareRoom gameCode={gameCode} variant="compact" />
+            </div>
           </div>
           <div className="w-fit mx-auto rounded overflow-hidden">
             {question.mediaType === "image" && question.media && (
