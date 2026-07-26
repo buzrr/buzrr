@@ -74,7 +74,7 @@ export default function QuesResult(props: QuesResultProps) {
       {
         onSuccess: () => {
           dispatch(playerRemoved({ playerId }));
-          toast.error(`You have removed ${name}`);
+          toast.success(`You have removed ${name}`);
         },
         onError: () =>
           toast.error("Could not remove player. Please try again."),
@@ -91,7 +91,7 @@ export default function QuesResult(props: QuesResultProps) {
         onSuccess: () => {
           dispatch(playerRemoved({ playerId }));
           setPlayerToBan(null);
-          toast.error(`You have banned ${name}`);
+          toast.success(`You have banned ${name}`);
         },
         onError: () => toast.error("Could not ban player. Please try again."),
       },

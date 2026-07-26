@@ -50,6 +50,18 @@ end
 return 0
 `;
 
+// Adds a roster entry unless the player is banned from the room, so a
+// connection racing a ban can never end up registered.
+// KEYS: [1]=players hash, [2]=banned set. ARGV: [1]=playerId, [2]=entry, [3]=TTL.
+const REGISTER_PLAYER_SCRIPT = `
+if redis.call('SISMEMBER', KEYS[2], ARGV[1]) == 1 then
+  return 0
+end
+redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
+redis.call('EXPIRE', KEYS[1], ARGV[3])
+return 1
+`;
+
 // Claims the ended-game transition so only one caller persists the result.
 const CLAIM_ENDED_SCRIPT = `
 local phase = redis.call('HGET', KEYS[1], 'phase')
@@ -95,6 +107,10 @@ export class GameStoreService {
       .multi()
       .hset(keys.meta(code), record)
       .expire(keys.meta(code), TTL_SECONDS)
+      // The ban list gets no writes of its own after the ban, so it rides the
+      // meta's renewal — otherwise a room outliving the TTL would quietly
+      // un-ban everyone. EXPIRE on a missing key is a no-op.
+      .expire(keys.banned(code), TTL_SECONDS)
       .exec();
   }
 
@@ -227,6 +243,27 @@ export class GameStoreService {
       .hset(keys.players(code), entry.id, JSON.stringify(entry))
       .expire(keys.players(code), TTL_SECONDS)
       .exec();
+  }
+
+  /**
+   * Roster write that loses to a ban: returns false (and writes nothing) when
+   * the player is banned. Checking and writing in one round trip is what makes
+   * a connection that raced the ban impossible to admit.
+   */
+  async upsertPlayerUnlessBanned(
+    code: string,
+    entry: RosterEntry,
+  ): Promise<boolean> {
+    const registered = await this.redis.eval(
+      REGISTER_PLAYER_SCRIPT,
+      2,
+      keys.players(code),
+      keys.banned(code),
+      entry.id,
+      JSON.stringify(entry),
+      TTL_SECONDS,
+    );
+    return registered === 1;
   }
 
   async getPlayer(code: string, playerId: string): Promise<RosterEntry | null> {

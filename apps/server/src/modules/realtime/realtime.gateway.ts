@@ -86,16 +86,6 @@ export class RealtimeGateway
 
       const { gameCode, gameSessionId, isRoomHost, player, userType } = result;
 
-      // Banned players are refused even if they still hold a valid token and a
-      // Postgres row pointing at this room (e.g. a rejoin racing the kick).
-      if (player && (await this.store.isBanned(gameCode, player.id))) {
-        this.logger.log(
-          `Player ${player.id} is banned from ${gameCode} — disconnecting`,
-        );
-        socket.disconnect();
-        return;
-      }
-
       socket.data = {
         gameCode,
         gameSessionId,
@@ -115,12 +105,24 @@ export class RealtimeGateway
       );
 
       if (userType === "player" && player) {
+        // Join the per-player room *before* registering: a ban landing after
+        // this point reaches this socket via disconnectSockets, and one
+        // landing before it is caught by the roster write below. Banned
+        // players are refused even holding a valid token and a Postgres row
+        // still pointing at this room (e.g. a rejoin racing the kick).
         await socket.join(`player:${player.id}`);
-        await this.engine.playerConnected(gameCode, {
+        const admitted = await this.engine.playerConnected(gameCode, {
           id: player.id,
           name: player.name,
           profilePic: player.profilePic,
         });
+        if (!admitted) {
+          this.logger.log(
+            `Player ${player.id} is banned from ${gameCode} — disconnecting`,
+          );
+          socket.disconnect();
+          return;
+        }
         this.server.to(gameCode).emit("player-joined", player);
       }
 

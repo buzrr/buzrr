@@ -376,12 +376,18 @@ export class GameEngineService
 
   // -- roster / presence -----------------------------------------------------------
 
+  /**
+   * Admits a player to the live roster. Returns false when the room's ban list
+   * rejects them — the registration is atomic with the ban check, so a connect
+   * racing a ban can't slip into the roster behind it. Callers must drop the
+   * connection when this is false.
+   */
   async playerConnected(
     gameCode: string,
     player: { id: string; name: string; profilePic: string | null },
-  ): Promise<void> {
+  ): Promise<boolean> {
     const existing = await this.store.getPlayer(gameCode, player.id);
-    await this.store.upsertPlayer(gameCode, {
+    const admitted = await this.store.upsertPlayerUnlessBanned(gameCode, {
       id: player.id,
       name: player.name,
       profilePic: player.profilePic,
@@ -389,11 +395,13 @@ export class GameEngineService
       lastSeenAt: Date.now(),
       userId: existing?.userId,
     });
+    if (!admitted) return false;
     this.cancelDisconnectGrace(gameCode, player.id);
     this.emitRoom(gameCode).emit("player-connection", {
       playerId: player.id,
       connected: true,
     });
+    return true;
   }
 
   async playerDisconnected(gameCode: string, playerId: string): Promise<void> {
@@ -493,9 +501,10 @@ export class GameEngineService
   }
 
   /**
-   * Host bans a player: the room-scoped ban is recorded first so the kick's
-   * disconnect can't be beaten by a reconnect, then the player is kicked.
-   * The ban is cleared with the rest of the game state when the game ends.
+   * Host bans a player: the room-scoped ban is recorded first, so from this
+   * point on no connection can be admitted (`playerConnected` checks the ban
+   * atomically with the roster write) and the kick's disconnect can't be
+   * beaten by a reconnect. Cleared with the rest of the game state at the end.
    */
   async banPlayer(
     gameCode: string,

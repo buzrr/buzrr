@@ -222,11 +222,12 @@ export class GameSessionsService {
     roomId: string,
     playerId: string,
   ): Promise<{ removed: true }> {
-    const { room, player } = await this.detachPlayerFromRoom(
+    const { room, player } = await this.authorizeRoomPlayer(
       user,
       roomId,
       playerId,
     );
+    await this.detachPlayer(roomId, player);
     await this.engine.kickPlayer(room.gameCode, {
       id: player.id,
       name: player.name,
@@ -245,21 +246,24 @@ export class GameSessionsService {
     roomId: string,
     playerId: string,
   ): Promise<{ banned: true }> {
-    const { room, player } = await this.detachPlayerFromRoom(
+    const { room, player } = await this.authorizeRoomPlayer(
       user,
       roomId,
       playerId,
     );
+    // Record the ban before releasing the room membership: between the two,
+    // `join` would otherwise still see an unbanned player and let them back in.
     await this.engine.banPlayer(room.gameCode, {
       id: player.id,
       name: player.name,
       profilePic: player.profilePic,
     });
+    await this.detachPlayer(roomId, player);
     return { banned: true };
   }
 
-  /** Shared host-authorization + Postgres detach behind kick and ban. */
-  private async detachPlayerFromRoom(
+  /** Shared host-authorization behind kick and ban. */
+  private async authorizeRoomPlayer(
     user: AuthUser,
     roomId: string,
     playerId: string,
@@ -284,13 +288,19 @@ export class GameSessionsService {
       throw new NotFoundException("Player is not in this room");
     }
 
-    if (player.gameId === roomId) {
-      await this.prisma.db.player.update({
-        where: { id: playerId },
-        data: { gameId: null },
-      });
-    }
     return { room, player };
+  }
+
+  /** Drops the room membership. The player row itself is never deleted. */
+  private async detachPlayer(
+    roomId: string,
+    player: { id: string; gameId: string | null },
+  ): Promise<void> {
+    if (player.gameId !== roomId) return;
+    await this.prisma.db.player.update({
+      where: { id: player.id },
+      data: { gameId: null },
+    });
   }
 
   async getAdminLobby(user: AuthUser, roomId: string) {
