@@ -18,6 +18,8 @@ import type {
   TypedSocket,
 } from "./realtime.types";
 
+type DuelInviteAck = (result: DuelInviteAcceptAck) => void;
+
 @WebSocketGateway({
   cors: {
     origin: parseCorsOrigin(process.env.WEB_ORIGIN),
@@ -50,18 +52,12 @@ export class RealtimeGateway
   async handleConnection(socket: TypedSocket): Promise<void> {
     this.logger.log(`New connection: ${socket.id}`);
 
-    // Buffer accepts that land before validation finishes. socket.io silently
-    // drops events with no listener, and validateConnection costs a DB round
-    // trip — without this, a guest who clicks Accept the instant the page
-    // connects would never get an ack and the button would hang forever.
-    const buffered: {
-      code: string;
-      ack: (result: DuelInviteAcceptAck) => void;
-    }[] = [];
-    const bufferAccept = (
-      payload: { code: string },
-      ack: (result: DuelInviteAcceptAck) => void,
-    ) => buffered.push({ code: payload?.code, ack });
+    // socket.io drops events with no listener, and validateConnection below
+    // costs a DB round trip — so buffer accepts that beat it, or a guest who
+    // clicks Accept the instant the page connects never gets an ack.
+    const buffered: DuelInviteAck[] = [];
+    const bufferAccept = (_payload: { code: string }, ack: DuelInviteAck) =>
+      buffered.push(ack);
     socket.on("duel:invite-accept", bufferAccept);
 
     try {
@@ -69,7 +65,7 @@ export class RealtimeGateway
 
       if (!result.valid) {
         this.logger.log(`${result.reason} — Disconnecting: ${socket.id}`);
-        buffered.forEach(({ ack }) => ack({ ok: false, reason: "error" }));
+        buffered.forEach((ack) => ack({ ok: false, reason: "error" }));
         socket.disconnect();
         return;
       }
@@ -86,7 +82,7 @@ export class RealtimeGateway
       }
 
       socket.off("duel:invite-accept", bufferAccept);
-      buffered.forEach(({ ack }) => ack({ ok: false, reason: "error" }));
+      buffered.forEach((ack) => ack({ ok: false, reason: "error" }));
 
       const { gameCode, gameSessionId, isRoomHost, player, userType } = result;
 
@@ -153,22 +149,31 @@ export class RealtimeGateway
     gameCode: string,
     intent: "queue" | "invite",
     earlyAccepts: {
-      buffered: { code: string; ack: (result: DuelInviteAcceptAck) => void }[];
-      bufferAccept: (
-        payload: { code: string },
-        ack: (result: DuelInviteAcceptAck) => void,
-      ) => void;
+      buffered: DuelInviteAck[];
+      bufferAccept: (payload: { code: string }, ack: DuelInviteAck) => void;
     },
   ): Promise<void> {
     await socket.join(`player:${user.id}`);
     socket.off("duel:invite-accept", earlyAccepts.bufferAccept);
 
-    if (intent === "invite" && gameCode) {
-      // No live room exists yet, so skip the roster gate, the engine and the
-      // snapshot. `playerId` stays null and `duelUserId` is left unset so
-      // handleDisconnect is a no-op: the invite deliberately outlives the
-      // socket (reload, StrictMode remount, phone backgrounding), and staleness
-      // is caught by the presence check at accept time instead.
+    if (intent === "invite") {
+      // Must not fall through to the queue branch below, which would silently
+      // drop a codeless invite connection into *ranked* matchmaking.
+      if (!gameCode) {
+        this.logger.log(
+          `Invite connection without a code from ${user.id} — disconnecting`,
+        );
+        earlyAccepts.buffered.forEach((ack) =>
+          ack({ ok: false, reason: "not-found" }),
+        );
+        socket.disconnect();
+        return;
+      }
+
+      // No live room exists yet, so skip the roster gate, engine and snapshot.
+      // `playerId` null and `duelUserId` unset keep handleDisconnect a no-op:
+      // the invite outlives the socket (reload, remount, backgrounding), and
+      // staleness is caught by the presence check at accept time instead.
       socket.data = {
         gameCode,
         gameSessionId: "",
@@ -178,12 +183,11 @@ export class RealtimeGateway
       };
       this.logger.log(`Duel invite connection: ${user.id} on ${gameCode}`);
 
-      const acceptInvite = (
-        payload: { code: string },
-        ack: (result: DuelInviteAcceptAck) => void,
-      ) => {
+      // The handshake code wins over the payload — it's what host presence is
+      // keyed on, so any other code would check a room this socket isn't in.
+      const acceptInvite = (ack: DuelInviteAck) => {
         void this.invites
-          .accept(payload?.code ?? gameCode, {
+          .accept(gameCode, {
             id: user.id,
             name: user.name ?? "Player",
             image: user.image,
@@ -196,17 +200,13 @@ export class RealtimeGateway
           });
       };
 
-      socket.on("duel:invite-accept", acceptInvite);
-      earlyAccepts.buffered.forEach(({ code, ack }) =>
-        acceptInvite({ code: code ?? gameCode }, ack),
-      );
+      socket.on("duel:invite-accept", (_payload, ack) => acceptInvite(ack));
+      earlyAccepts.buffered.forEach(acceptInvite);
       return;
     }
 
     // Queue and game connections never accept invites.
-    earlyAccepts.buffered.forEach(({ ack }) =>
-      ack({ ok: false, reason: "error" }),
-    );
+    earlyAccepts.buffered.forEach((ack) => ack({ ok: false, reason: "error" }));
 
     if (!gameCode) {
       socket.data = {

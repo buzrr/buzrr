@@ -21,8 +21,7 @@ export function buildJoinUrl(gameCode: string): string {
 
 /**
  * Builds the shareable link for a 1v1 friend challenge. Unlike a hosted-quiz
- * join link this requires a signed-in account, so the page behind it gates on
- * the session and rounds the friend back here after login.
+ * join link, the page behind it requires a signed-in account.
  */
 export function buildDuelInviteUrl(code: string): string {
   return `${appOrigin()}/duel/invite/${encodeURIComponent(code)}`;

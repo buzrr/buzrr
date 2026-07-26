@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { LuCheck, LuCopy, LuShare2 } from "react-icons/lu";
 import { toast } from "react-toastify";
@@ -25,8 +25,15 @@ export default function ShareRoom({
   toastMessage?: string;
 }) {
   const [copied, setCopied] = useState(false);
+  // Resolved after mount: reading `navigator` during render would make the SSR
+  // and first client render disagree, which React flags as a hydration error.
+  const [canShare, setCanShare] = useState(false);
   const compact = variant === "compact";
   const qrSize = compact ? 96 : 160;
+
+  useEffect(() => {
+    setCanShare(typeof navigator.share === "function");
+  }, []);
 
   async function handleCopy() {
     try {
@@ -46,9 +53,6 @@ export default function ShareRoom({
       // Cancelling the share sheet rejects — not an error worth surfacing.
     }
   }
-
-  const canShare =
-    typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   return (
     <div

@@ -8,15 +8,11 @@ import type {
   DuelInviteFailure,
   TypedServer,
 } from "../realtime/realtime.types";
-import { generateDuelCode } from "./duel-code";
+import { generateDuelInviteCode } from "./duel-code";
 import { DuelQuestionsService } from "./duel-questions.service";
 
 const INVITE_TTL_SECONDS = 15 * 60;
-/**
- * How long a claimed invite lingers. Keeping it around lets a second racing
- * guest read a truthful "already accepted" instead of a confusing "expired",
- * and gives the release path something to undo.
- */
+/** A claimed invite lingers so a losing racer reads "claimed", not "expired". */
 const CLAIMED_TTL_SECONDS = 60;
 const CREATE_ATTEMPTS = 5;
 
@@ -24,12 +20,11 @@ const inviteKey = (code: string) => `duel:invite:${code}`;
 const hostIndexKey = (userId: string) => `duel:invite:host:${userId}`;
 
 /**
- * Reserve a code, but only if it isn't already taken by a pending invite or a
- * live game — `initMeta` is HSETNX-guarded, so a collision there would silently
- * no-op and run the duel on the colliding game's questions.
- *
  * KEYS: [invite, hostIndex, game meta]  ARGV: [ttl, code, ...field/value pairs]
  * Returns 1 created, 0 code collision (retry), -1 host already has an invite.
+ *
+ * The game-meta check matters because `initMeta` is HSETNX-guarded: a collision
+ * there would silently no-op and run the duel on the old game's questions.
  */
 const CREATE_SCRIPT = `
 if redis.call('EXISTS', KEYS[1]) == 1 or redis.call('EXISTS', KEYS[3]) == 1 then
@@ -44,12 +39,11 @@ return 1
 `;
 
 /**
- * The single serialization point for accepting an invite. A bare HSETNX can't
- * do this: on an *expired* invite it would create the hash, report a win on a
- * dead invite, and leave a resurrected key with no TTL.
- *
  * KEYS: [invite, hostIndex]  ARGV: [guestId, now, claimedTtl, code]
  * Returns {0} gone, {1} already claimed, {3} self-claim, {2, ...hash} claimed.
+ *
+ * The EXISTS guard is load-bearing: a bare HSETNX on an expired invite would
+ * create the hash, report a win on a dead invite, and leave it with no TTL.
  */
 const CLAIM_SCRIPT = `
 if redis.call('EXISTS', KEYS[1]) == 0 then return {0} end
@@ -64,7 +58,7 @@ return h
 `;
 
 /**
- * Undo a claim when startDuel throws, so the guest can retry.
+ * Undoes a claim when startDuel throws, so the guest can retry.
  * KEYS: [invite, hostIndex]  ARGV: [remainingTtl, code]
  */
 const RELEASE_SCRIPT = `
@@ -105,16 +99,17 @@ export interface DuelInviteView {
   expiresAt: number;
   status: "pending" | "claimed";
   isHost: boolean;
+  /** True when the viewer is the guest who claimed this invite. */
+  isClaimer: boolean;
   hostOnline: boolean;
 }
 
 export type CancelOutcome = "cancelled" | "forbidden" | "claimed";
 
 /**
- * Friend-challenge duels. A pending invite is a *pre-game* record: it reserves
- * a code and nothing else. Only when the guest accepts do we build questions
- * and hand the same code to `GameEngineService.startDuel`, which is what lets
- * an invited duel reuse the entire matchmade-duel path unchanged.
+ * Friend-challenge duels. A pending invite is a pre-game record: it reserves a
+ * code and nothing else. The guest's accept hands that same code to
+ * `GameEngineService.startDuel`, so an invited duel reuses the matchmade path.
  */
 @Injectable()
 export class DuelInviteService {
@@ -132,11 +127,7 @@ export class DuelInviteService {
     this.io = io;
   }
 
-  /**
-   * Mints a code for `user`, or returns their existing pending invite. That
-   * idempotency is what makes a double-clicked button or a React StrictMode
-   * double-effect harmless.
-   */
+  /** Mints a code, or returns the host's existing pending invite. */
   async create(user: {
     id: string;
     name: string | null;
@@ -155,7 +146,7 @@ export class DuelInviteService {
     const expiresAt = now + INVITE_TTL_SECONDS * 1000;
 
     for (let attempt = 0; attempt < CREATE_ATTEMPTS; attempt++) {
-      const code = generateDuelCode();
+      const code = generateDuelInviteCode();
       const result = (await this.redis.eval(
         CREATE_SCRIPT,
         3,
@@ -183,7 +174,7 @@ export class DuelInviteService {
         return { code, expiresAt };
       }
       if (result === -1) {
-        // Lost a race with a concurrent create — reuse whatever won.
+        // Lost a race with a concurrent create — reuse whichever won.
         const winner = await this.redis.get(hostIndexKey(user.id));
         const record = winner ? await this.read(winner) : null;
         if (winner && record) {
@@ -210,6 +201,7 @@ export class DuelInviteService {
       expiresAt: Number(record.expiresAt),
       status: record.claimedBy ? "claimed" : "pending",
       isHost: record.hostId === viewerId,
+      isClaimer: Boolean(record.claimedBy) && record.claimedBy === viewerId,
       hostOnline: presence.waitingOn.includes(code),
     };
   }
@@ -228,11 +220,10 @@ export class DuelInviteService {
   }
 
   /**
-   * The guest claims the invite and both players are dropped into a live duel.
+   * The guest claims the invite and both players drop into a live duel.
    *
-   * Ordering matters: presence and question-building both happen *before* the
-   * claim, so a missing host or an empty question pool leaves the invite
-   * reusable instead of burning it.
+   * Presence and question-building run *before* the claim, so a missing host or
+   * an empty question pool leaves the invite reusable instead of burning it.
    */
   async accept(
     code: string,
@@ -246,8 +237,8 @@ export class DuelInviteService {
     if (record.hostId === guest.id) return fail("self");
     if (record.claimedBy) return fail("claimed");
 
-    // Without a live host socket the host never receives `duel:matched`, yet
-    // the duel would start anyway on its countdown and forfeit them 30s later.
+    // Without a live host socket the host misses `duel:matched`, yet the duel
+    // starts anyway on its countdown and forfeits them 30s later.
     const hostPresence = await this.presence(record.hostId);
     if (!hostPresence.waitingOn.includes(code)) return fail("host-offline");
     if (hostPresence.inLiveDuel) return fail("busy");
@@ -276,8 +267,7 @@ export class DuelInviteService {
     if (status === 1) return fail("claimed");
     if (status === 3) return fail("self");
 
-    // Re-read both accounts so names, avatars and ratings are current rather
-    // than whatever was snapshotted when the invite was minted.
+    // Re-read both accounts: the invite snapshot can be 15 minutes stale.
     const users = await this.prisma.db.user.findMany({
       where: { id: { in: [record.hostId, guest.id] } },
       select: { id: true, name: true, image: true, eloRating: true },
@@ -365,13 +355,10 @@ export class DuelInviteService {
   }
 
   /**
-   * Live presence straight off the socket adapter — deliberately not a stored
-   * flag, which would need a disconnect handler that silently rots on an
-   * instance SIGKILL, exactly when the host is most offline.
-   *
-   * `player:{userId}` is also joined by duel *game* sockets and classic-game
-   * player sockets, so the invite code is what proves a socket is open for
-   * *this* invite rather than merely somewhere in the app.
+   * Live presence off the socket adapter rather than a stored flag, which would
+   * need a disconnect handler that rots on an instance SIGKILL — exactly when
+   * the host is most offline. `player:{userId}` also holds game sockets, so
+   * `duelInviteCode` is what proves a socket is open for *this* invite.
    */
   private async presence(
     userId: string,
@@ -388,8 +375,8 @@ export class DuelInviteService {
         ),
       };
     } catch (err) {
-      // Fail closed: a false "absent" costs the guest a retry click, a false
-      // "present" silently forfeits the host.
+      // Fail closed: a false "absent" costs a retry click, a false "present"
+      // silently forfeits the host.
       this.logger.error(`Presence lookup failed for ${userId}`, err);
       return { waitingOn: [], inLiveDuel: false };
     }

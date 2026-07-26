@@ -24,6 +24,8 @@ export type DuelInvite = {
   status: "pending" | "claimed";
   /** True when the viewer created this challenge. */
   isHost: boolean;
+  /** True when the viewer is the guest who claimed this challenge. */
+  isClaimer: boolean;
   /** Whether the host is currently sitting on the waiting page. */
   hostOnline: boolean;
 };

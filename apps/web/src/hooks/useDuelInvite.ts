@@ -27,11 +27,9 @@ const FAILURE_MESSAGES: Record<DuelInviteFailure, string> = {
 };
 
 /**
- * Waiting-room connection for a friend challenge (`intent=invite`). Both the
- * host and the invited guest open this — the connection itself is what marks
- * the host as "present", and it's what guarantees the guest receives
- * `duel:matched` (socket.io does not buffer room emits, so accepting over REST
- * could deliver the match before the guest was listening).
+ * Waiting-room connection for a friend challenge (`intent=invite`). Both roles
+ * open it: it's what marks the host as "present", and what guarantees the guest
+ * is listening before `duel:matched` fires (socket.io won't buffer room emits).
  */
 export function useDuelInvite(options: {
   code: string;
@@ -75,10 +73,21 @@ export function useDuelInvite(options: {
         setStatus("error");
         setError(payload.message);
       });
-      conn.on("connect_error", () => {
+      // socket.io retries on its own, so only give up once it stops — a single
+      // connect_error would otherwise disable Accept for a socket that's about
+      // to come back.
+      const giveUp = () => {
         setStatus("error");
         setError("Could not reach the duel server.");
+      };
+      conn.on("connect_error", () => {
+        if (conn.active) {
+          setStatus("connecting");
+          return;
+        }
+        giveUp();
       });
+      conn.io.on("reconnect_failed", giveUp);
     }
 
     void connect();
@@ -100,9 +109,7 @@ export function useDuelInvite(options: {
     setError(null);
     setStatus("accepting");
 
-    // Belt-and-braces: never leave the button stuck on "Starting…" if the ack
-    // is lost. The server buffers accepts that beat handler registration, so
-    // this should only ever fire on a genuinely dropped connection.
+    // Never strand the button on "Starting…" if the ack is lost.
     let settled = false;
     const timeout = setTimeout(() => {
       if (settled) return;

@@ -27,7 +27,12 @@ export class DuelQuestionsService {
       where: { id: { in: ids.map((r) => r.id) } },
       include: { options: { orderBy: { createdAt: "asc" } } },
     });
-    const questions: LiveQuestion[] = rows
+    // findMany ignores the `IN` order, so restore the raw query's shuffle.
+    const byId = new Map(rows.map((q) => [q.id, q]));
+    const ordered = ids
+      .map((r) => byId.get(r.id))
+      .filter((q): q is (typeof rows)[number] => q !== undefined);
+    const questions: LiveQuestion[] = ordered
       .filter(
         (q) => q.options.length >= 2 && q.options.some((o) => o.isCorrect),
       )

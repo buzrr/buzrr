@@ -111,8 +111,8 @@ export class GameEngineService
    * matchmaker calls this once both players are paired; the first question
    * fires after the start countdown whether or not both have connected yet.
    *
-   * Friend invites pass `rated: false` — those duels play identically but
-   * leave ELO untouched, so two accounts can't farm rating off each other.
+   * Friend invites pass `rated: false`: identical play, but ELO is left alone
+   * so two accounts can't farm rating off each other.
    */
   async startDuel(
     gameCode: string,
@@ -854,8 +854,8 @@ export class GameEngineService
       }
     }
 
-    // `!== false` (rather than a truthiness check) keeps duels that were
-    // already live in Redis before `rated` existed rated across a deploy.
+    // `!== false` rather than truthiness: duels already live in Redis before
+    // `rated` existed stay rated across the deploy.
     const isRatedDuel =
       meta.mode === "duel" &&
       meta.rated !== false &&

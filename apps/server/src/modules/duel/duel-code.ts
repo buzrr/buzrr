@@ -1,16 +1,26 @@
 import { customAlphabet } from "nanoid";
 
 /** Ambiguity-free alphabet — no I/L/O/0/1, so codes survive being read aloud. */
-const nanoid = customAlphabet("ABCDEFGHJKMNPQRSTUVWXYZ23456789", 5);
+const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+
+const nanoid = customAlphabet(ALPHABET, 5);
+const inviteNanoid = customAlphabet(ALPHABET, 13);
 
 /**
- * Duel room codes are `D` + 5 chars, which keeps them visually distinct from
- * the 6-char hosted-room codes and satisfies the socket handshake's
- * `/^[a-zA-Z0-9_-]{4,20}$/` check.
+ * Matchmade duel codes. Short is safe: the code grants nothing on its own,
+ * because the socket gate requires the user to already be in the Redis roster.
  */
 export function generateDuelCode(): string {
   return `D${nanoid()}`;
 }
 
-/** Matches what {@link generateDuelCode} produces — used to validate params. */
-export const DUEL_CODE_PATTERN = /^D[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{5}$/;
+/**
+ * Invite codes are bearer tokens — whoever holds one can claim the duel — so
+ * they get 13 chars ≈ 64 bits to make enumeration infeasible. Only ever shared
+ * as a link or QR, never typed.
+ */
+export function generateDuelInviteCode(): string {
+  return `D${inviteNanoid()}`;
+}
+
+export const DUEL_INVITE_CODE_PATTERN = new RegExp(`^D[${ALPHABET}]{13}$`);

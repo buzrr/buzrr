@@ -12,9 +12,9 @@ import type { DuelInvite } from "@/lib/modules/duel/api";
 import type { DuelMatchedPayload } from "@/types/socket-events";
 
 /**
- * What the challenger sees while waiting. The socket opened here is more than a
- * notification channel — it's the presence signal the server checks before
- * letting a friend accept, so a duel never starts against an absent host.
+ * What the challenger sees while waiting. The socket opened here is also the
+ * presence signal the server checks before letting a friend accept, so a duel
+ * never starts against an absent host.
  */
 export default function DuelInviteHostView({
   invite,
@@ -82,8 +82,8 @@ export default function DuelInviteHostView({
         onClick={() =>
           cancel.mutate(invite.code, {
             onSuccess: () => router.replace("/duel"),
-            // A 409 means a friend accepted first — the duel:matched handler is
-            // already navigating us into the game.
+            // A 409 means a friend accepted first, and duel:matched is already
+            // navigating us into the game.
             onError: () => toast.error("Couldn't cancel the challenge."),
           })
         }

@@ -9,10 +9,12 @@ import {
   Param,
   Post,
   Query,
+  UseGuards,
 } from "@nestjs/common";
 import { CurrentAccountUser } from "../../common/decorators/current-user.decorator";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
 import { RateLimitProfile } from "../../common/decorators/rate-limit-profile.decorator";
+import { RateLimitGuard } from "../../common/guards/rate-limit.guard";
 import { PrismaService } from "../../prisma/prisma.service";
 import { DuelInviteService } from "./duel-invite.service";
 import { InviteCodeParamDto } from "./dto/duel-invite.dto";
@@ -48,6 +50,7 @@ export class DuelController {
    * `WEB_ORIGIN` may be a comma-separated CORS list.
    */
   @Post("invites")
+  @UseGuards(RateLimitGuard)
   @RateLimitProfile("report")
   async createInvite(@CurrentAccountUser() user: AuthUser) {
     const record = await this.prisma.db.user.findUnique({
@@ -66,6 +69,7 @@ export class DuelController {
   }
 
   @Get("invites/:code")
+  @UseGuards(RateLimitGuard)
   async getInvite(
     @Param() params: InviteCodeParamDto,
     @CurrentAccountUser() user: AuthUser,
@@ -78,6 +82,7 @@ export class DuelController {
   }
 
   @Delete("invites/:code")
+  @UseGuards(RateLimitGuard)
   @HttpCode(204)
   async cancelInvite(
     @Param() params: InviteCodeParamDto,

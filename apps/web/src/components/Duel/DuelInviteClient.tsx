@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
@@ -12,16 +12,13 @@ import { useDuelInviteQuery } from "@/lib/modules/duel/hooks";
 import type { DuelMatchedPayload } from "@/types/socket-events";
 
 /**
- * Landing page for a 1v1 friend challenge. The same URL serves both sides: the
- * host sees the share widget and waits, the invited friend sees who challenged
- * them and an Accept button.
+ * Landing page for a 1v1 friend challenge. One URL serves both sides: the host
+ * gets the share widget, the invited friend gets an Accept button.
  */
 export default function DuelInviteClient({ code }: { code: string }) {
   const router = useRouter();
   const { data: invite, isPending, isError } = useDuelInviteQuery(code);
 
-  // Shared by both roles — mirrors DuelClient so the game screen needs no
-  // knowledge of where the duel came from.
   const onMatched = useCallback(
     (payload: DuelMatchedPayload) => {
       try {
@@ -60,15 +57,37 @@ export default function DuelInviteClient({ code }: { code: string }) {
           <Skeleton className="h-64 w-full max-w-sm rounded-2xl bg-white dark:bg-card-dark" />
         ) : isError || !invite ? (
           <InviteGone reason="This challenge link has expired or was cancelled." />
+        ) : invite.status === "claimed" ? (
+          // Before isHost: a host reloading after their friend accepted has
+          // already missed the duel:matched push, and would otherwise sit on
+          // "waiting" while their duel ran without them.
+          invite.isHost || invite.isClaimer ? (
+            <RejoiningDuel code={invite.code} />
+          ) : (
+            <InviteGone reason="Someone else already accepted this challenge." />
+          )
         ) : invite.isHost ? (
           <DuelInviteHostView invite={invite} onMatched={onMatched} />
-        ) : invite.status === "claimed" ? (
-          <InviteGone reason="Someone else already accepted this challenge." />
         ) : (
           <DuelInviteGuestView invite={invite} onMatched={onMatched} />
         )}
       </div>
     </div>
+  );
+}
+
+/** The invite is now a live duel and this viewer is in it — send them in. */
+function RejoiningDuel({ code }: { code: string }) {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace(`/duel/game/${code}`);
+  }, [code, router]);
+
+  return (
+    <p className="font-bold text-dark dark:text-white animate-pulse">
+      Rejoining your duel…
+    </p>
   );
 }
 
