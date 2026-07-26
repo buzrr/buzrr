@@ -37,6 +37,12 @@ export function useRemoveRoomPlayerMutation() {
   });
 }
 
+export function useBanRoomPlayerMutation() {
+  return useMutation({
+    mutationFn: gameSessionsApi.banPlayer,
+  });
+}
+
 export function useAdminLobbyQuery(roomId: string, enabled = true) {
   return useQuery({
     queryKey: queryKeys.gameSessions.lobby(roomId),

@@ -16,6 +16,7 @@ const keys = {
   answers: (c: string, q: number) => `game:${c}:answers:${q}`,
   lb: (c: string) => `game:${c}:lb`,
   players: (c: string) => `game:${c}:players`,
+  banned: (c: string) => `game:${c}:banned`,
   owner: (c: string) => `game:${c}:owner`,
   deadlines: () => `games:deadlines`,
 };
@@ -233,13 +234,46 @@ export class GameStoreService {
     return raw ? (JSON.parse(raw) as RosterEntry) : null;
   }
 
+  /**
+   * Drops the roster entry *and* the score: a removed player must not linger
+   * on the leaderboard as a nameless row (buildLeaderboard resolves names from
+   * the roster). Someone who rejoins later starts from zero.
+   */
   async removePlayer(code: string, playerId: string): Promise<void> {
-    await this.redis.hdel(keys.players(code), playerId);
+    await this.redis
+      .multi()
+      .hdel(keys.players(code), playerId)
+      .zrem(keys.lb(code), playerId)
+      .exec();
   }
 
   async roster(code: string): Promise<RosterEntry[]> {
     const raw = await this.redis.hgetall(keys.players(code));
     return Object.values(raw ?? {}).map((v) => JSON.parse(v) as RosterEntry);
+  }
+
+  // -- bans ------------------------------------------------------------------
+
+  /**
+   * Room-scoped ban list. Lives and dies with the game (deleteGame clears it),
+   * so a ban blocks rejoining *this* room — a later room for the same quiz
+   * starts with a clean slate.
+   */
+  async banPlayer(code: string, playerId: string): Promise<void> {
+    await this.redis
+      .multi()
+      .sadd(keys.banned(code), playerId)
+      .expire(keys.banned(code), TTL_SECONDS)
+      .exec();
+  }
+
+  async isBanned(code: string, playerId: string): Promise<boolean> {
+    const member = await this.redis.sismember(keys.banned(code), playerId);
+    return member === 1;
+  }
+
+  async bannedPlayers(code: string): Promise<string[]> {
+    return this.redis.smembers(keys.banned(code));
   }
 
   // -- deadlines / recovery --------------------------------------------------
@@ -308,6 +342,7 @@ export class GameStoreService {
       keys.questions(code),
       keys.lb(code),
       keys.players(code),
+      keys.banned(code),
       keys.owner(code),
     ];
     for (let i = 0; i < Math.max(qCount, 1); i++) {

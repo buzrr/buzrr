@@ -3,9 +3,19 @@
 import dynamic from "next/dynamic";
 import { useState } from "react";
 import { DEFAULT_AVATAR } from "@/constants";
-import { useAppSelector } from "@/state/hooks";
+import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import Image from "next/image";
+import { LuBan, LuUserMinus } from "react-icons/lu";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import ConfirmationModal from "@/components/Admin/ConfirmationModal";
+import { playerRemoved } from "@/state/game/gameSlice";
+import {
+  useBanRoomPlayerMutation,
+  useRemoveRoomPlayerMutation,
+} from "@/lib/modules/game-sessions/hooks";
 import type { GameSocket } from "@/types/socket-events";
 
 // Lazy-load chart to keep @mui/x-charts out of main bundle until result screen is shown.
@@ -21,15 +31,21 @@ const Barchart = dynamic(
 
 interface QuesResultProps {
   socket: GameSocket;
+  roomId: string;
 }
 
 /**
  * Per-question results. All data (answer counts, running leaderboard,
  * whether this was the last question) is pushed by the server; "Next" is a
  * single pacing intent — the server decides what follows.
+ *
+ * The leaderboard doubles as the host's moderation surface: every row can be
+ * kicked (removed from this round, free to rejoin with the room code) or
+ * banned (removed and blocked from rejoining this room).
  */
 export default function QuesResult(props: QuesResultProps) {
-  const { socket } = props;
+  const { socket, roomId } = props;
+  const dispatch = useAppDispatch();
   const question = useAppSelector((state) => state.game.question);
   const reveal = useAppSelector((state) => state.game.reveal);
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
@@ -37,11 +53,50 @@ export default function QuesResult(props: QuesResultProps) {
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const qCount = useAppSelector((state) => state.game.qCount);
   const [advancing, setAdvancing] = useState(false);
+  const [playerToBan, setPlayerToBan] = useState<{
+    playerId: string;
+    name: string;
+  } | null>(null);
+
+  const removePlayerMutation = useRemoveRoomPlayerMutation();
+  const banPlayerMutation = useBanRoomPlayerMutation();
 
   const counts = reveal?.counts ?? [];
   const response = counts.reduce((sum, c) => sum + c, 0);
   const isLastQuestion = qIndex === qCount - 1;
   const connectedById = new Map(players.map((p) => [p.id, p.connected]));
+
+  // Kick and ban go over HTTP so they work even while the host socket is down;
+  // the server broadcasts player-removed and a fresh leaderboard to the room.
+  function handleKick(playerId: string, name: string) {
+    removePlayerMutation.mutate(
+      { roomId, playerId },
+      {
+        onSuccess: () => {
+          dispatch(playerRemoved({ playerId }));
+          toast.error(`You have removed ${name}`);
+        },
+        onError: () =>
+          toast.error("Could not remove player. Please try again."),
+      },
+    );
+  }
+
+  function handleBan() {
+    if (!playerToBan) return;
+    const { playerId, name } = playerToBan;
+    banPlayerMutation.mutate(
+      { roomId, playerId },
+      {
+        onSuccess: () => {
+          dispatch(playerRemoved({ playerId }));
+          setPlayerToBan(null);
+          toast.error(`You have banned ${name}`);
+        },
+        onError: () => toast.error("Could not ban player. Please try again."),
+      },
+    );
+  }
 
   return (
     <>
@@ -102,13 +157,49 @@ export default function QuesResult(props: QuesResultProps) {
                             </span>
                             <span className="font-bold">{lead.name}</span>
                           </div>
-                          <p>{lead.score}</p>
+                          <div className="flex items-center gap-x-1">
+                            <p>{lead.score}</p>
+                            <IconButton
+                              aria-label={`Remove ${lead.name} from this game`}
+                              title="Kick — can rejoin with the room code"
+                              disabled={removePlayerMutation.isPending}
+                              className="cursor-pointer text-off-dark dark:text-off-white hover:text-red-500 dark:hover:text-red-500 transition"
+                              onClick={() =>
+                                handleKick(lead.playerId, lead.name)
+                              }
+                              icon={<LuUserMinus size={18} />}
+                            />
+                            <IconButton
+                              aria-label={`Ban ${lead.name} from this room`}
+                              title="Ban — blocked from rejoining this room"
+                              className="cursor-pointer text-off-dark dark:text-off-white hover:text-red-500 dark:hover:text-red-500 transition"
+                              onClick={() =>
+                                setPlayerToBan({
+                                  playerId: lead.playerId,
+                                  name: lead.name,
+                                })
+                              }
+                              icon={<LuBan size={18} />}
+                            />
+                          </div>
                         </div>
                       );
                     })
                   : null}
               </div>
             </div>
+
+            <ConfirmationModal
+              open={playerToBan !== null}
+              setOpen={(open) => {
+                if (!open) setPlayerToBan(null);
+              }}
+              onClick={handleBan}
+              desc={`${playerToBan?.name ?? "This player"} will be removed and blocked from rejoining this room. The ban lasts until this room ends.`}
+              confirmLabel="Ban Player"
+              confirming={banPlayerMutation.isPending}
+              confirmingLabel="Banning…"
+            />
             <Button
               fullWidth
               disabled={advancing}

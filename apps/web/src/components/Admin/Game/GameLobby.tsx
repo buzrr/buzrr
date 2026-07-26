@@ -71,7 +71,7 @@ const GameLobby = (params: {
               quizTitle={params.quizQuestions?.title}
             />
           ) : phase === "reveal" ? (
-            <QuesResult socket={socket} />
+            <QuesResult socket={socket} roomId={params.roomId} />
           ) : showLeaderboard ? (
             <LeaderBoard />
           ) : (

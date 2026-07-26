@@ -7,14 +7,19 @@ import { removePlayer, setPlayers } from "@/state/admin/playersSlice";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { RxCross2 } from "react-icons/rx";
+import { LuBan } from "react-icons/lu";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import ConnectionStatusPill from "@/components/ConnectionStatusPill";
 import { useAdminSocket } from "@/hooks/useAdminSocket";
-import { useRemoveRoomPlayerMutation } from "@/lib/modules/game-sessions/hooks";
+import {
+  useBanRoomPlayerMutation,
+  useRemoveRoomPlayerMutation,
+} from "@/lib/modules/game-sessions/hooks";
 import type { PlayerPayload } from "@/types/socket-events";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
+import ConfirmationModal from "@/components/Admin/ConfirmationModal";
 import ShareRoom from "@/components/ShareRoom";
 import { buildJoinUrl } from "@/lib/join-link";
 import EndQuizButton from "@/components/Admin/EndQuizButton";
@@ -52,15 +57,21 @@ const Lobby = (params: {
   const { socket } = useAdminSocket({
     gameCode: params.gameCode,
     onPlayerRemoved: (player) => {
-      toast.error(`You have removed ${player.name ?? "the player"}`);
+      toast.error(
+        player.banned
+          ? `You have banned ${player.name ?? "the player"}`
+          : `You have removed ${player.name ?? "the player"}`,
+      );
     },
     onGameStarted: handleGameStarted,
   });
 
   const removePlayerMutation = useRemoveRoomPlayerMutation();
+  const banPlayerMutation = useBanRoomPlayerMutation();
+  const [playerToBan, setPlayerToBan] = useState<PlayerPayload | null>(null);
 
-  // Kick and stop-hosting go over HTTP so they work even while the socket is
-  // down; the server broadcasts the resulting events to everyone connected.
+  // Kick, ban and stop-hosting go over HTTP so they work even while the socket
+  // is down; the server broadcasts the resulting events to everyone connected.
   function handlePlayerRemove(player: PlayerPayload) {
     removePlayerMutation.mutate(
       { roomId: params.roomId, playerId: player.id },
@@ -75,6 +86,26 @@ const Lobby = (params: {
         },
         onError: () => {
           toast.error("Could not remove player. Please try again.");
+        },
+      },
+    );
+  }
+
+  function handlePlayerBan() {
+    const player = playerToBan;
+    if (!player) return;
+    banPlayerMutation.mutate(
+      { roomId: params.roomId, playerId: player.id },
+      {
+        onSuccess: () => {
+          dispatch(removePlayer({ id: player.id }));
+          setPlayerToBan(null);
+          if (!socket?.connected) {
+            toast.error(`You have banned ${player.name ?? "the player"}`);
+          }
+        },
+        onError: () => {
+          toast.error("Could not ban player. Please try again.");
         },
       },
     );
@@ -176,7 +207,15 @@ const Lobby = (params: {
                 />
                 {player.name}
                 <IconButton
+                  aria-label={`Ban ${player.name} from this room`}
+                  title="Ban from this room"
+                  className="cursor-pointer font-bold text-lg hover:text-red-500 transition"
+                  onClick={() => setPlayerToBan(player)}
+                  icon={<LuBan size={18} />}
+                />
+                <IconButton
                   aria-label={`Remove ${player.name}`}
+                  title="Remove from this room"
                   className="cursor-pointer font-bold text-lg hover:text-red-500 transition"
                   onClick={() => handlePlayerRemove(player)}
                   icon={<RxCross2 size={20} />}
@@ -185,6 +224,18 @@ const Lobby = (params: {
             ))
           )}
         </div>
+
+        <ConfirmationModal
+          open={playerToBan !== null}
+          setOpen={(open) => {
+            if (!open) setPlayerToBan(null);
+          }}
+          onClick={handlePlayerBan}
+          desc={`${playerToBan?.name ?? "This player"} will be removed and blocked from rejoining this room. The ban lasts until this room ends.`}
+          confirmLabel="Ban Player"
+          confirming={banPlayerMutation.isPending}
+          confirmingLabel="Banning…"
+        />
 
         <Button
           className="mt-10 w-64 sm:w-96 absolute bottom-10"

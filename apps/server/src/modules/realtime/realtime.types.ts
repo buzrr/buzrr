@@ -133,6 +133,8 @@ export interface ServerToClientEvents {
     id: string;
     name?: string;
     profilePic?: string | null;
+    /** True when the host banned the player instead of just kicking them. */
+    banned?: boolean;
   }) => void;
   /** A player left on their own (distinct from a host kick / player-removed). */
   "player-left": (player: {

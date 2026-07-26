@@ -142,6 +142,19 @@ const gameSlice = createSlice({
       const p = state.players.find((x) => x.id === action.payload.playerId);
       if (p) p.connected = action.payload.connected;
     },
+    /**
+     * A player was kicked, banned or left. The server re-emits the leaderboard
+     * on its own; this keeps the roster-derived bits (response totals, the
+     * connection dots) right without waiting for the next sync.
+     */
+    playerRemoved: (state, action: PayloadAction<{ playerId: string }>) => {
+      state.players = state.players.filter(
+        (p) => p.id !== action.payload.playerId,
+      );
+      state.leaderboard = state.leaderboard.filter(
+        (entry) => entry.playerId !== action.payload.playerId,
+      );
+    },
     setConnection: (state, action: PayloadAction<ConnectionStatus>) => {
       state.connection = action.payload;
     },
@@ -158,6 +171,7 @@ export const {
   leaderboardReceived,
   gameOver,
   playerConnection,
+  playerRemoved,
   setConnection,
   resetGame,
 } = gameSlice.actions;

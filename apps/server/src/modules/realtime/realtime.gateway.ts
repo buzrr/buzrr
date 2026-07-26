@@ -86,6 +86,16 @@ export class RealtimeGateway
 
       const { gameCode, gameSessionId, isRoomHost, player, userType } = result;
 
+      // Banned players are refused even if they still hold a valid token and a
+      // Postgres row pointing at this room (e.g. a rejoin racing the kick).
+      if (player && (await this.store.isBanned(gameCode, player.id))) {
+        this.logger.log(
+          `Player ${player.id} is banned from ${gameCode} — disconnecting`,
+        );
+        socket.disconnect();
+        return;
+      }
+
       socket.data = {
         gameCode,
         gameSessionId,

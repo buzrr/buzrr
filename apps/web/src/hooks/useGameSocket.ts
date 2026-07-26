@@ -9,6 +9,7 @@ import {
   gameStarted,
   leaderboardReceived,
   playerConnection,
+  playerRemoved,
   questionEnd,
   questionStart,
   resetGame,
@@ -107,6 +108,12 @@ export function useGameSocket({
     );
     conn.on("player-connection", (payload) =>
       dispatch(playerConnection(payload)),
+    );
+    conn.on("player-removed", (player) =>
+      dispatch(playerRemoved({ playerId: player.id })),
+    );
+    conn.on("player-left", (player) =>
+      dispatch(playerRemoved({ playerId: player.id })),
     );
 
     bindRef.current?.(conn);

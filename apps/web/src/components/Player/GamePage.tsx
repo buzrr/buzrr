@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { useAppSelector } from "@/state/hooks";
 import { useRouter } from "next/navigation";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import type { GameSession } from "@/types/db";
 import {
   WaitGameStart,
@@ -48,7 +50,18 @@ const GamePage = (params: {
   const { socket } = usePlayerSocket({
     playerId: params.player.id,
     gameCode: game.gameCode,
-    onRemoved: () => router.push("/player"),
+    // Kicked or banned: the player keeps their profile, so send them back to
+    // the room-code screen (not "create a player") — they can join elsewhere,
+    // or, if only kicked, be let back into this room by the host.
+    onRemoved: ({ banned }) => {
+      toast.error(
+        banned
+          ? "The host banned you from this room."
+          : "The host removed you from this game.",
+      );
+      router.replace(`/player/joinRoom/${params.player.id}`);
+    },
+    onSessionEnded: () => router.push("/player"),
   });
 
   // Guard the browser/hardware back button: leaving the game is confirmed via

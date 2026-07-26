@@ -471,17 +471,63 @@ export class GameEngineService
    * Host kicks a player: Redis removal plus the room broadcast, shared by the
    * socket (`remove-player`) and HTTP (`DELETE .../players/:id`) paths. The
    * broadcast goes out before the disconnect so the kicked client still hears
-   * it and can clear its local session; the disconnect then guarantees the
+   * it and can leave the game screen; the disconnect then guarantees the
    * kicked player cannot linger in the room (works across instances via the
    * Redis adapter).
+   *
+   * `banned` only labels the broadcast — the ban itself is recorded by
+   * `banPlayer` before this runs.
    */
   async kickPlayer(
     gameCode: string,
     player: { id: string; name?: string; profilePic?: string | null },
+    opts?: { banned?: boolean },
   ): Promise<void> {
     await this.removePlayer(gameCode, player.id);
-    this.emitRoom(gameCode).emit("player-removed", player);
+    this.emitRoom(gameCode).emit("player-removed", {
+      ...player,
+      ...(opts?.banned ? { banned: true } : {}),
+    });
     this.io?.in(`player:${player.id}`).disconnectSockets(true);
+    await this.afterRosterShrink(gameCode);
+  }
+
+  /**
+   * Host bans a player: the room-scoped ban is recorded first so the kick's
+   * disconnect can't be beaten by a reconnect, then the player is kicked.
+   * The ban is cleared with the rest of the game state when the game ends.
+   */
+  async banPlayer(
+    gameCode: string,
+    player: { id: string; name?: string; profilePic?: string | null },
+  ): Promise<void> {
+    await this.store.banPlayer(gameCode, player.id);
+    await this.kickPlayer(gameCode, player, { banned: true });
+  }
+
+  async isBanned(gameCode: string, playerId: string): Promise<boolean> {
+    return this.store.isBanned(gameCode, playerId);
+  }
+
+  /**
+   * Keeps the room consistent after a mid-game removal: the reveal may now be
+   * due (the removed player was the last one everyone was waiting on), and any
+   * screen showing a leaderboard needs the row to disappear.
+   */
+  private async afterRosterShrink(gameCode: string): Promise<void> {
+    const meta = await this.store.getMeta(gameCode);
+    if (!meta) return;
+    if (meta.phase === "question") {
+      await this.maybeRevealEarly(gameCode, meta.qIndex);
+      return;
+    }
+    if (meta.phase === "reveal" || meta.phase === "final") {
+      const entries = await this.buildLeaderboard(gameCode);
+      this.emitRoom(gameCode).emit("leaderboard", {
+        entries,
+        isFinal: meta.phase === "final",
+      });
+    }
   }
 
   async hostConnected(gameCode: string, connected: boolean): Promise<void> {

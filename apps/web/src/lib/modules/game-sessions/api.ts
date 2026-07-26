@@ -93,6 +93,17 @@ export async function removeRoomPlayer(
   return data;
 }
 
+export async function banRoomPlayer(
+  client: AxiosInstance,
+  roomId: string,
+  playerId: string,
+) {
+  const { data } = await client.post<{ banned: boolean }>(
+    `/game-sessions/${encodeURIComponent(roomId)}/players/${encodeURIComponent(playerId)}/ban`,
+  );
+  return data;
+}
+
 export async function getHistory(client: AxiosInstance) {
   const { data } = await client.get<
     (GameResult & { _count: { entries: number } })[]
@@ -137,6 +148,8 @@ export const gameSessionsApi = {
   end: (roomId: string) => endRoom(getAuthApiClient(), roomId),
   removePlayer: (args: { roomId: string; playerId: string }) =>
     removeRoomPlayer(getAuthApiClient(), args.roomId, args.playerId),
+  banPlayer: (args: { roomId: string; playerId: string }) =>
+    banRoomPlayer(getAuthApiClient(), args.roomId, args.playerId),
   history: () => getHistory(getAuthApiClient()),
   result: (resultId: string) => getResult(getAuthApiClient(), resultId),
   playerPlay: (playerId: string) =>

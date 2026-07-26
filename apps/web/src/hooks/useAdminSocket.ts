@@ -3,12 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import { useAppDispatch } from "@/state/hooks";
 import { addPlayer, removePlayer } from "@/state/admin/playersSlice";
 import { fetchApiAccessToken } from "@/lib/api/get-access-token";
-import type { GameSocket, PlayerPayload } from "@/types/socket-events";
+import type { GameSocket, PlayerRemovedPayload } from "@/types/socket-events";
 import { useGameSocket } from "./useGameSocket";
 
 interface UseAdminSocketOptions {
   gameCode: string;
-  onPlayerRemoved?: (player: PlayerPayload) => void;
+  onPlayerRemoved?: (player: PlayerRemovedPayload) => void;
   onGameStarted?: () => void;
   onGameOver?: () => void;
 }

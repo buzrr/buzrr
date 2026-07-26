@@ -6,19 +6,26 @@ import { useGameSocket } from "./useGameSocket";
 interface UsePlayerSocketOptions {
   playerId: string;
   gameCode: string;
-  /** Called when this player is removed by the host or the game ends. */
-  onRemoved?: () => void;
+  /**
+   * Called when the host kicks or bans this player. The saved player identity
+   * is deliberately kept, so the client can send them back to the room-code
+   * screen rather than making them create a profile again.
+   */
+  onRemoved?: (info: { banned: boolean }) => void;
+  /** Called when the room itself is gone (host ended the session). */
+  onSessionEnded?: () => void;
 }
 
 export function usePlayerSocket({
   playerId,
   gameCode,
   onRemoved,
+  onSessionEnded,
 }: UsePlayerSocketOptions): { socket: GameSocket | null } {
-  const onRemovedRef = useRef(onRemoved);
+  const callbacks = useRef({ onRemoved, onSessionEnded });
   useEffect(() => {
-    onRemovedRef.current = onRemoved;
-  }, [onRemoved]);
+    callbacks.current = { onRemoved, onSessionEnded };
+  }, [onRemoved, onSessionEnded]);
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,10 +42,11 @@ export function usePlayerSocket({
         window.localStorage.removeItem("playerId");
       };
 
+      // A kick/ban only ends this room's membership — the player keeps their
+      // profile and can enter another room code straight away.
       socket.on("player-removed", (player) => {
         if (player.id === playerId) {
-          clearLocalPlayerSession();
-          onRemovedRef.current?.();
+          callbacks.current.onRemoved?.({ banned: player.banned ?? false });
         }
       });
 
@@ -49,7 +57,7 @@ export function usePlayerSocket({
       });
       socket.on("game-session-ended", () => {
         clearLocalPlayerSession();
-        onRemovedRef.current?.();
+        callbacks.current.onSessionEnded?.();
       });
     },
   });

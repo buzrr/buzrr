@@ -6,6 +6,11 @@ export interface PlayerPayload {
   profilePic?: string | null;
 }
 
+export interface PlayerRemovedPayload extends PlayerPayload {
+  /** True when the host banned the player instead of just kicking them. */
+  banned?: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Contract v2 — the server owns all timing. Clients render countdowns from
 // `deadline`, correcting for clock skew via `serverNow`.
@@ -151,7 +156,7 @@ export interface ServerToClientEvents {
   "state-sync": (payload: StateSyncPayload) => void;
   "player-connection": (payload: PlayerConnectionPayload) => void;
   "player-joined": (player: PlayerPayload) => void;
-  "player-removed": (player: PlayerPayload) => void;
+  "player-removed": (player: PlayerRemovedPayload) => void;
   /** A player left on their own (distinct from a host kick / player-removed). */
   "player-left": (player: { id: string }) => void;
   "game-started": () => void;

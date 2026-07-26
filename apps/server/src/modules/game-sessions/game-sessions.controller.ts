@@ -85,6 +85,16 @@ export class GameSessionsController {
     return this.gameSessions.removePlayerFromRoom(user, roomId, playerId);
   }
 
+  @Post(":roomId/players/:playerId/ban")
+  @HttpCode(HttpStatus.OK)
+  banPlayer(
+    @CurrentAccountUser() user: AuthUser,
+    @Param("roomId") roomId: string,
+    @Param("playerId") playerId: string,
+  ) {
+    return this.gameSessions.banPlayerFromRoom(user, roomId, playerId);
+  }
+
   @Public()
   @Post(":id/answers")
   @HttpCode(HttpStatus.NO_CONTENT)
