@@ -4,18 +4,23 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "react-toastify";
 import { DEFAULT_AVATAR } from "@/constants";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/Button";
 import Skeleton from "@/components/ui/Skeleton";
 import ClientImage from "@/components/ClientImage";
 import { useDuelQueue } from "@/hooks/useDuelQueue";
-import { useDuelProfileQuery } from "@/lib/modules/duel/hooks";
+import {
+  useCreateDuelInviteMutation,
+  useDuelProfileQuery,
+} from "@/lib/modules/duel/hooks";
 
 export default function DuelClient() {
   const router = useRouter();
   const { data: session } = authClient.useSession();
   const { data: profile, isPending } = useDuelProfileQuery();
+  const createInvite = useCreateDuelInviteMutation();
   const { status, error, queuedAt, findMatch, cancel } = useDuelQueue({
     onMatched: (payload) => {
       try {
@@ -121,6 +126,21 @@ export default function DuelClient() {
             )}
             <Button fullWidth size="lg" onClick={() => void findMatch()}>
               Find Match
+            </Button>
+            <Button
+              variant="outline"
+              fullWidth
+              size="lg"
+              disabled={createInvite.isPending}
+              onClick={() =>
+                createInvite.mutate(undefined, {
+                  onSuccess: (res) => router.push(`/duel/invite/${res.code}`),
+                  onError: () =>
+                    toast.error("Couldn't create a challenge link. Try again."),
+                })
+              }
+            >
+              {createInvite.isPending ? "Creating link…" : "Invite a Friend"}
             </Button>
           </div>
         )}

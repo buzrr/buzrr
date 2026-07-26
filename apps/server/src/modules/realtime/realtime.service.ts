@@ -95,6 +95,12 @@ export class RealtimeService {
         user,
         // Empty gameCode = matchmaking-queue connection.
         gameCode: validGameCode ? gameCode : "",
+        // "invite" = waiting room for a friend challenge; the gameCode is a
+        // reserved invite code with no live game behind it yet.
+        intent:
+          normalizeQueryValue(socket.handshake.query.intent) === "invite"
+            ? ("invite" as const)
+            : ("queue" as const),
       };
     }
 
@@ -119,7 +125,10 @@ export class RealtimeService {
       });
 
       if (!player) {
-        return { valid: false as const, reason: `Player ${payload.sub} not found` };
+        return {
+          valid: false as const,
+          reason: `Player ${payload.sub} not found`,
+        };
       }
 
       const inSession = player.gameId !== null && player.gameId === game.id;

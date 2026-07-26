@@ -94,6 +94,7 @@ export class GameEngineService
       hostId: init.hostId,
       mode: "classic",
       phase: "lobby",
+      rated: false,
       qIndex: 0,
       qId: "",
       qStartAt: 0,
@@ -109,6 +110,9 @@ export class GameEngineService
    * Bootstrap a hostless duel entirely in Redis (no GameSession row). The
    * matchmaker calls this once both players are paired; the first question
    * fires after the start countdown whether or not both have connected yet.
+   *
+   * Friend invites pass `rated: false` — those duels play identically but
+   * leave ELO untouched, so two accounts can't farm rating off each other.
    */
   async startDuel(
     gameCode: string,
@@ -119,6 +123,7 @@ export class GameEngineService
       userId: string;
     }[],
     questions: LiveQuestion[],
+    opts?: { rated?: boolean },
   ): Promise<void> {
     const now = Date.now();
     const firstQuestionAt = now + START_COUNTDOWN_MS;
@@ -129,6 +134,7 @@ export class GameEngineService
       hostId: "",
       mode: "duel",
       phase: "starting",
+      rated: opts?.rated ?? true,
       qIndex: 0,
       qId: "",
       qStartAt: 0,
@@ -270,6 +276,7 @@ export class GameEngineService
       entries,
       resultId,
       eloChanges,
+      rated: meta.mode === "duel" && meta.rated !== false,
     });
     this.emitRoom(gameCode).emit("game-session-ended");
 
@@ -847,8 +854,13 @@ export class GameEngineService
       }
     }
 
+    // `!== false` (rather than a truthiness check) keeps duels that were
+    // already live in Redis before `rated` existed rated across a deploy.
     const isRatedDuel =
-      meta.mode === "duel" && entries.length === 2 && !opts?.abandoned;
+      meta.mode === "duel" &&
+      meta.rated !== false &&
+      entries.length === 2 &&
+      !opts?.abandoned;
 
     const data = (
       quizId: string | null,

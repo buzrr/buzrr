@@ -16,6 +16,7 @@ import type { PlayerPayload } from "@/types/socket-events";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import ShareRoom from "@/components/ShareRoom";
+import { buildJoinUrl } from "@/lib/join-link";
 import EndQuizButton from "@/components/Admin/EndQuizButton";
 
 const Lobby = (params: {
@@ -147,7 +148,7 @@ const Lobby = (params: {
             </p>
           </button>
 
-          <ShareRoom gameCode={params.gameCode} variant="full" />
+          <ShareRoom url={buildJoinUrl(params.gameCode)} variant="full" />
         </div>
 
         <p className="mt-4 md:mt-6 text-xs text-stone-500 dark:text-stone-400 text-center max-w-md">

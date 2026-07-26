@@ -1,15 +1,10 @@
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-
-export default async function DuelLayout({
+export default function DuelLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user?.id) redirect("/auth/login?callbackURL=/duel");
-
+  // The session gate lives in the individual pages (see lib/duel-session.ts) so
+  // deep links such as an invite URL survive the login round-trip.
   return (
     <div className="min-h-dvh bg-light-bg dark:bg-dark-bg">{children}</div>
   );

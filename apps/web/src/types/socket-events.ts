@@ -70,6 +70,8 @@ export interface GameOverPayload {
   resultId?: string;
   /** Duels only: rating change per playerId. */
   eloChanges?: Record<string, { before: number; after: number }>;
+  /** True only for rated duels; friend invites are unrated. */
+  rated?: boolean;
 }
 
 export interface DuelMatchedPayload {
@@ -80,6 +82,22 @@ export interface DuelMatchedPayload {
     profilePic: string | null;
     elo: number;
   };
+}
+
+export type DuelInviteFailure =
+  | "not-found"
+  | "claimed"
+  | "self"
+  | "host-offline"
+  | "busy"
+  | "no-questions"
+  | "error";
+
+export interface DuelInviteAcceptAck {
+  ok: boolean;
+  reason?: DuelInviteFailure;
+  /** Present when ok — clients normally navigate on `duel:matched` instead. */
+  gameCode?: string;
 }
 
 export interface PlayerConnectionPayload {
@@ -143,6 +161,14 @@ export interface ServerToClientEvents {
 export interface ClientToServerEvents {
   "duel:queue": () => void;
   "duel:cancel": () => void;
+  /**
+   * The invited friend claims a pending invite. Emitted on the guest's own
+   * already-connected invite socket so `duel:matched` can't race ahead of it.
+   */
+  "duel:invite-accept": (
+    payload: { code: string },
+    ack: (result: DuelInviteAcceptAck) => void,
+  ) => void;
   "host-next": () => void;
   "submit-answer": (
     payload: { qIndex: number; optionId: string },

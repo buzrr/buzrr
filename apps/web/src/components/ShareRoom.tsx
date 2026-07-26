@@ -1,27 +1,29 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { LuCheck, LuCopy } from "react-icons/lu";
+import { LuCheck, LuCopy, LuShare2 } from "react-icons/lu";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import clsx from "clsx";
-import { buildJoinUrl } from "@/lib/join-link";
 import { Button } from "@/components/ui/Button";
 
 /**
- * Host-facing share widget: a scannable QR + copyable link that drops players
- * straight into the game (name → join). Shown in the quiz lobby (`full`) and
- * the live in-game sidebar (`compact`).
+ * Share widget: a scannable QR + copyable link. Used for hosted-quiz join links
+ * (lobby `full`, in-game sidebar `compact`) and for 1v1 friend challenges — it
+ * takes a ready-made URL so it stays agnostic about what it's sharing.
  */
 export default function ShareRoom({
-  gameCode,
+  url,
   variant = "full",
+  caption = "SCAN TO JOIN",
+  toastMessage = "Join link copied!",
 }: {
-  gameCode: string;
+  url: string;
   variant?: "full" | "compact";
+  caption?: string;
+  toastMessage?: string;
 }) {
-  const url = useMemo(() => buildJoinUrl(gameCode), [gameCode]);
   const [copied, setCopied] = useState(false);
   const compact = variant === "compact";
   const qrSize = compact ? 96 : 160;
@@ -30,12 +32,23 @@ export default function ShareRoom({
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
-      toast.success("Join link copied!");
+      toast.success(toastMessage);
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error("Failed to copy link");
     }
   }
+
+  async function handleShare() {
+    try {
+      await navigator.share({ url });
+    } catch {
+      // Cancelling the share sheet rejects — not an error worth surfacing.
+    }
+  }
+
+  const canShare =
+    typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   return (
     <div
@@ -46,7 +59,7 @@ export default function ShareRoom({
     >
       {!compact && (
         <p className="text-sm tracking-[2px] text-gray-500 dark:text-gray-300">
-          SCAN TO JOIN
+          {caption}
         </p>
       )}
 
@@ -61,15 +74,29 @@ export default function ShareRoom({
         </p>
       )}
 
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleCopy}
-        leftIcon={copied ? <LuCheck size={16} /> : <LuCopy size={16} />}
-        aria-label="Copy join link"
-      >
-        {copied ? "Copied" : "Copy link"}
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleCopy}
+          leftIcon={copied ? <LuCheck size={16} /> : <LuCopy size={16} />}
+          aria-label="Copy link"
+        >
+          {copied ? "Copied" : "Copy link"}
+        </Button>
+
+        {canShare && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void handleShare()}
+            leftIcon={<LuShare2 size={16} />}
+            aria-label="Share link"
+          >
+            Share
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

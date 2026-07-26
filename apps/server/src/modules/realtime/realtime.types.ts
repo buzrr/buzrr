@@ -45,6 +45,8 @@ export interface GameOverPayload {
   resultId?: string;
   /** Duels only: rating change per playerId. */
   eloChanges?: Record<string, { before: number; after: number }>;
+  /** True only for rated duels; friend invites are unrated. */
+  rated?: boolean;
 }
 
 export interface DuelMatchedPayload {
@@ -55,6 +57,22 @@ export interface DuelMatchedPayload {
     profilePic: string | null;
     elo: number;
   };
+}
+
+export type DuelInviteFailure =
+  | "not-found"
+  | "claimed"
+  | "self"
+  | "host-offline"
+  | "busy"
+  | "no-questions"
+  | "error";
+
+export interface DuelInviteAcceptAck {
+  ok: boolean;
+  reason?: DuelInviteFailure;
+  /** Present when ok — clients normally navigate on `duel:matched` instead. */
+  gameCode?: string;
 }
 
 export interface PlayerConnectionPayload {
@@ -140,6 +158,14 @@ export interface ClientToServerEvents {
   // -- duel matchmaking --
   "duel:queue": () => void;
   "duel:cancel": () => void;
+  /**
+   * The invited friend claims a pending invite. Emitted on the guest's own
+   * already-connected invite socket so `duel:matched` can't race ahead of it.
+   */
+  "duel:invite-accept": (
+    payload: { code: string },
+    ack: (result: DuelInviteAcceptAck) => void,
+  ) => void;
   // -- contract v2 --
   "host-next": () => void;
   "submit-answer": (
@@ -173,6 +199,11 @@ export interface SocketData {
   playerId: string | null;
   /** Set on duel-queue connections (no gameCode). */
   duelUserId?: string;
+  /**
+   * Set on duel-invite waiting-room connections (`intent=invite`). Doubles as
+   * the presence signal that the host is sitting on the invite page.
+   */
+  duelInviteCode?: string;
 }
 
 export type TypedServer = import("socket.io").Server<

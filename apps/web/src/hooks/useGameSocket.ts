@@ -98,7 +98,11 @@ export function useGameSocket({
     conn.on("leaderboard", (payload) => dispatch(leaderboardReceived(payload)));
     conn.on("game-over", (payload) =>
       dispatch(
-        gameOver({ entries: payload.entries, eloChanges: payload.eloChanges }),
+        gameOver({
+          entries: payload.entries,
+          eloChanges: payload.eloChanges,
+          rated: payload.rated,
+        }),
       ),
     );
     conn.on("player-connection", (payload) =>

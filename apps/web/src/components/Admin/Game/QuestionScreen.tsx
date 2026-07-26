@@ -6,6 +6,7 @@ import { useServerCountdown } from "@/hooks/useServerCountdown";
 import CountdownRing from "@/components/CountdownRing";
 import { Button } from "@/components/ui/Button";
 import ShareRoom from "@/components/ShareRoom";
+import { buildJoinUrl } from "@/lib/join-link";
 import type { GameSocket } from "@/types/socket-events";
 
 interface QuestionScreenProps {
@@ -51,7 +52,7 @@ export default function QuestionScreen(props: QuestionScreenProps) {
             <div className="text-md">Room Code</div>
             <div className="text-4xl font-black">{gameCode}</div>
             <div className="mt-4">
-              <ShareRoom gameCode={gameCode} variant="compact" />
+              <ShareRoom url={buildJoinUrl(gameCode)} variant="compact" />
             </div>
           </div>
         </div>
@@ -60,7 +61,7 @@ export default function QuestionScreen(props: QuestionScreenProps) {
             <div className="text-md">Room Code</div>
             <div className="text-2xl font-black">{gameCode}</div>
             <div className="mt-3">
-              <ShareRoom gameCode={gameCode} variant="compact" />
+              <ShareRoom url={buildJoinUrl(gameCode)} variant="compact" />
             </div>
           </div>
           <div className="w-fit mx-auto rounded overflow-hidden">

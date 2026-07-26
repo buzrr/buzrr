@@ -15,6 +15,8 @@ export interface GameMeta {
   hostId: string;
   mode: GameMode;
   phase: GamePhase;
+  /** Duels only: friend-invite duels are unrated so ratings can't be farmed. */
+  rated: boolean;
   qIndex: number;
   qId: string;
   qStartAt: number;

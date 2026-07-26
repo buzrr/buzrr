@@ -198,6 +198,7 @@ function DuelStartingScreen({
 function DuelResultScreen({ myId }: { myId?: string }) {
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
   const eloChanges = useAppSelector((state) => state.game.eloChanges);
+  const rated = useAppSelector((state) => state.game.rated);
 
   const me = leaderboard.find((e) => e.playerId === myId);
   const opponent = leaderboard.find((e) => e.playerId !== myId);
@@ -243,7 +244,13 @@ function DuelResultScreen({ myId }: { myId?: string }) {
         ))}
       </div>
 
-      {myElo && (
+      {!rated && (
+        <p className="text-sm text-off-dark dark:text-off-white text-center animate-fade-up [animation-delay:300ms]">
+          Friendly duel — rating unaffected
+        </p>
+      )}
+
+      {rated && myElo && (
         <div className="bg-white dark:bg-dark rounded-2xl px-6 py-4 shadow border border-card-light dark:border-off-dark text-center animate-fade-up [animation-delay:300ms]">
           <p className="text-xs text-off-dark dark:text-off-white mb-1">
             Rating

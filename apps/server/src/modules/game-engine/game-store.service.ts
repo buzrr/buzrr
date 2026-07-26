@@ -28,7 +28,7 @@ const NUMERIC_META = new Set([
   "startedAt",
   "hostLastSeenAt",
 ]);
-const BOOLEAN_META = new Set(["hostConnected"]);
+const BOOLEAN_META = new Set(["hostConnected", "rated"]);
 
 // ARGV: [1]=sessionId (HSETNX guard value), [2]=TTL, [3..]=flattened meta pairs.
 const INIT_META_SCRIPT = `

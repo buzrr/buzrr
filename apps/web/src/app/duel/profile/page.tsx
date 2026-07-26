@@ -1,14 +1,11 @@
 import Link from "next/link";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import SessionProvider from "@/components/SessionProvider";
 import ProfileDetails from "@/components/Admin/Profile/ProfileDetails";
-import { auth } from "@/lib/auth";
+import { requireDuelSession } from "@/lib/duel-session";
 import { getUserRole } from "@/lib/get-current-role";
 
 export default async function Page() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user?.id) redirect("/auth/login?callbackURL=/duel/profile");
+  const session = await requireDuelSession("/duel/profile");
   const role = await getUserRole(session.user.id);
 
   return (

@@ -137,7 +137,7 @@ export default async function Home() {
               href="/admin"
               className="mt-4 text-sm text-dark/60 dark:text-gray hover:text-lprimary dark:hover:text-dprimary transition-colors underline underline-offset-4"
             >
-              or create your own quiz →
+              or create and host your own quiz →
             </Link>
 
             <div className="mt-8 flex flex-wrap justify-center xl:justify-start gap-2">

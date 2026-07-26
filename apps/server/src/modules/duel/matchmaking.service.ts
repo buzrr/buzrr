@@ -1,11 +1,16 @@
-import { Inject, Injectable, Logger, OnApplicationShutdown } from "@nestjs/common";
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnApplicationShutdown,
+} from "@nestjs/common";
 import Redis from "ioredis";
-import { customAlphabet } from "nanoid";
 import { REDIS } from "../../redis/redis.constants";
-import { PrismaService } from "../../prisma/prisma.service";
 import { GameEngineService } from "../game-engine/game-engine.service";
 import type { LiveQuestion } from "../game-engine/game-engine.types";
 import type { TypedServer } from "../realtime/realtime.types";
+import { generateDuelCode } from "./duel-code";
+import { DuelQuestionsService } from "./duel-questions.service";
 
 const QUEUE_KEY = "mm:duel:queue"; // zset userId -> elo
 const META_KEY = "mm:duel:meta"; // hash userId -> JSON {name, image, joinedAt}
@@ -13,10 +18,6 @@ const LOCK_KEY = "mm:duel:lock";
 
 const QUEUE_TIMEOUT_MS = 60_000;
 const TICK_MS = 2_000;
-const DUEL_QUESTION_COUNT = 7;
-const MIN_QUESTIONS = 3;
-
-const generateDuelCode = customAlphabet("ABCDEFGHJKMNPQRSTUVWXYZ23456789", 5);
 
 interface QueueEntry {
   userId: string;
@@ -40,7 +41,7 @@ export class MatchmakingService implements OnApplicationShutdown {
 
   constructor(
     @Inject(REDIS) private readonly redis: Redis,
-    private readonly prisma: PrismaService,
+    private readonly questions: DuelQuestionsService,
     private readonly engine: GameEngineService,
   ) {}
 
@@ -115,9 +116,7 @@ export class MatchmakingService implements OnApplicationShutdown {
         this.io?.to(`player:${entry.userId}`).emit("duel:queue-timeout");
       }
     }
-    const waiting = entries.filter(
-      (e) => now - e.joinedAt <= QUEUE_TIMEOUT_MS,
-    );
+    const waiting = entries.filter((e) => now - e.joinedAt <= QUEUE_TIMEOUT_MS);
     if (waiting.length < 2) return;
 
     // Longest-waiting player searches first, with a widening band.
@@ -127,8 +126,7 @@ export class MatchmakingService implements OnApplicationShutdown {
       const band = Math.min(100 + 50 * Math.floor(waitSec / 5), 500);
       const candidate = waiting.find(
         (c) =>
-          c.userId !== seeker.userId &&
-          Math.abs(c.elo - seeker.elo) <= band,
+          c.userId !== seeker.userId && Math.abs(c.elo - seeker.elo) <= band,
       );
       if (!candidate) continue;
       const paired = await this.pair(seeker, candidate);
@@ -162,20 +160,18 @@ export class MatchmakingService implements OnApplicationShutdown {
   private async createDuel(a: QueueEntry, b: QueueEntry): Promise<void> {
     let questions: LiveQuestion[];
     try {
-      questions = await this.buildQuestionSet();
+      questions = await this.questions.build();
     } catch (err) {
       this.logger.error("Failed to build duel question set", err);
       for (const p of [a, b]) {
-        this.io
-          ?.to(`player:${p.userId}`)
-          .emit("duel:error", {
-            message: "No duel questions are available right now.",
-          });
+        this.io?.to(`player:${p.userId}`).emit("duel:error", {
+          message: "No duel questions are available right now.",
+        });
       }
       return;
     }
 
-    const gameCode = `D${generateDuelCode()}`;
+    const gameCode = generateDuelCode();
     await this.engine.startDuel(
       gameCode,
       [a, b].map((p) => ({
@@ -198,42 +194,6 @@ export class MatchmakingService implements OnApplicationShutdown {
     this.logger.log(
       `Matched duel ${gameCode}: ${a.userId} (${a.elo}) vs ${b.userId} (${b.elo})`,
     );
-  }
-
-  /** Random questions drawn from public quizzes, snapshotted into Redis. */
-  private async buildQuestionSet(): Promise<LiveQuestion[]> {
-    const ids = await this.prisma.db.$queryRaw<{ id: string }[]>`
-      SELECT q."id" FROM "Question" q
-      JOIN "Quiz" z ON z."id" = q."quizId"
-      WHERE z."isPublic" = true
-        AND q."moderationStatus" = 'approved'
-      ORDER BY random()
-      LIMIT ${DUEL_QUESTION_COUNT}
-    `;
-    const rows = await this.prisma.db.question.findMany({
-      where: { id: { in: ids.map((r) => r.id) } },
-      include: { options: { orderBy: { createdAt: "asc" } } },
-    });
-    const questions: LiveQuestion[] = rows
-      .filter((q) => q.options.length >= 2 && q.options.some((o) => o.isCorrect))
-      .map((q) => ({
-        id: q.id,
-        title: q.title,
-        media: q.media,
-        mediaType: q.mediaType,
-        timeOut: q.timeOut,
-        options: q.options.map((o) => ({
-          id: o.id,
-          title: o.title,
-          isCorrect: o.isCorrect,
-        })),
-      }));
-    if (questions.length < MIN_QUESTIONS) {
-      throw new Error(
-        `Only ${questions.length} usable public questions (need ${MIN_QUESTIONS})`,
-      );
-    }
-    return questions;
   }
 
   private async loadQueue(): Promise<QueueEntry[]> {

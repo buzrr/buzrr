@@ -39,6 +39,8 @@ export interface GameLiveState {
   gameOver: boolean;
   /** Duels only: rating change per playerId, delivered with game-over. */
   eloChanges: Record<string, { before: number; after: number }> | null;
+  /** True only for rated duels; friend invites play unrated. */
+  rated: boolean;
 }
 
 const initialState: GameLiveState = {
@@ -58,6 +60,7 @@ const initialState: GameLiveState = {
   connection: "connecting",
   gameOver: false,
   eloChanges: null,
+  rated: false,
 };
 
 const gameSlice = createSlice({
@@ -122,6 +125,7 @@ const gameSlice = createSlice({
       action: PayloadAction<{
         entries: LiveLeaderboardEntry[];
         eloChanges?: Record<string, { before: number; after: number }>;
+        rated?: boolean;
       }>,
     ) => {
       state.phase = "ended";
@@ -129,6 +133,7 @@ const gameSlice = createSlice({
       state.isFinalLeaderboard = true;
       state.gameOver = true;
       state.eloChanges = action.payload.eloChanges ?? null;
+      state.rated = action.payload.rated ?? false;
     },
     playerConnection: (
       state,
