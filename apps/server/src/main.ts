@@ -33,7 +33,7 @@ async function bootstrap() {
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
   });
-  app.setGlobalPrefix("api");
+  app.setGlobalPrefix("api", { exclude: ["health"] });
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
