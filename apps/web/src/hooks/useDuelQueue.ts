@@ -85,7 +85,10 @@ export function useDuelQueue(options: {
     conn.on("duel:error", (payload) => {
       setStatus("error");
       setError(payload.message);
-      capture("duel_queue_failed", { reason: payload.message });
+      capture("duel_queue_failed", {
+        reason: payload.message,
+        waited_ms: waitedMs(),
+      });
       conn.disconnect();
       socketRef.current = null;
     });

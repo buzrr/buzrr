@@ -93,21 +93,31 @@ export function loadAnalytics(): Promise<PostHog | null> {
     return Promise.resolve(null);
   }
 
-  clientPromise ??= import("posthog-js").then(({ default: posthog }) => {
-    posthog.init(posthogKey, {
-      api_host: posthogHost,
-      // Pageviews are captured by hand in PostHogProvider so they land only on
-      // in-scope routes; the automatic history listener cannot tell them apart.
-      capture_pageview: false,
-      // Only create person profiles for users we actually identify — anonymous
-      // landing-page traffic stays event-only.
-      person_profiles: "identified_only",
-      // Final scope gate: drops autocapture (and anything else the SDK raises
-      // on its own) while the visitor is on an out-of-scope route.
-      before_send: (event) => (pathTracked ? event : null),
+  clientPromise ??= import("posthog-js")
+    .then(({ default: posthog }) => {
+      posthog.init(posthogKey, {
+        api_host: posthogHost,
+        // Pageviews are captured by hand in PostHogProvider so they land only
+        // on in-scope routes; the automatic history listener cannot tell them
+        // apart.
+        capture_pageview: false,
+        // Only create person profiles for users we actually identify —
+        // anonymous landing-page traffic stays event-only.
+        person_profiles: "identified_only",
+        // Final scope gate: drops autocapture (and anything else the SDK
+        // raises on its own) while the visitor is on an out-of-scope route.
+        before_send: (event) => (pathTracked ? event : null),
+      });
+      return posthog;
+    })
+    .catch(() => {
+      // A chunk that 404s after a redeploy, or a blocked request, must never
+      // break the page. Forget the failure so a later navigation can retry
+      // instead of every caller inheriting one rejected promise, and resolve
+      // to null so callers degrade to a no-op rather than reject unhandled.
+      clientPromise = null;
+      return null;
     });
-    return posthog;
-  });
 
   return clientPromise;
 }
