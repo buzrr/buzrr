@@ -125,6 +125,9 @@ NEXT_PUBLIC_API_URL="http://localhost:3001"
 GEMINI_API_KEY=""
 # Landing-page GitHub stats (https://github.com/settings/tokens — no scopes needed for public repos)
 GITHUB_TOKEN=""
+# PostHog analytics — blank key disables analytics entirely
+NEXT_PUBLIC_POSTHOG_KEY=""
+NEXT_PUBLIC_POSTHOG_HOST="https://eu.i.posthog.com"
 # Rate limiting: ON | OFF
 RATELIMIT="OFF"
 UPSTASH_REDIS_REST_URL=""

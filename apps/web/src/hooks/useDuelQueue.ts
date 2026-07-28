@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { fetchApiAccessToken } from "@/lib/api/get-access-token";
+import { capture } from "@/lib/analytics";
 import type { DuelMatchedPayload, GameSocket } from "@/types/socket-events";
 
 export type DuelQueueStatus =
@@ -24,6 +25,8 @@ export function useDuelQueue(options: {
   const [error, setError] = useState<string | null>(null);
   const [queuedAt, setQueuedAt] = useState<number | null>(null);
   const socketRef = useRef<GameSocket | null>(null);
+  // Mirrors `queuedAt` state so socket callbacks read a fresh value.
+  const queuedAtRef = useRef<number | null>(null);
   const onMatchedRef = useRef(options.onMatched);
   onMatchedRef.current = options.onMatched;
 
@@ -37,6 +40,10 @@ export function useDuelQueue(options: {
   const findMatch = useCallback(async () => {
     setError(null);
     setStatus("connecting");
+    queuedAtRef.current = null;
+
+    const waitedMs = () =>
+      queuedAtRef.current === null ? null : Date.now() - queuedAtRef.current;
 
     const token = await fetchApiAccessToken();
     if (!token) {
@@ -56,29 +63,36 @@ export function useDuelQueue(options: {
       conn.emit("duel:queue");
     });
     conn.on("duel:queued", () => {
+      const now = Date.now();
       setStatus("queued");
-      setQueuedAt(Date.now());
+      setQueuedAt(now);
+      queuedAtRef.current = now;
+      capture("duel_queue_started");
     });
     conn.on("duel:matched", (payload) => {
       setStatus("matched");
+      capture("duel_matched", { waited_ms: waitedMs() });
       conn.disconnect();
       socketRef.current = null;
       onMatchedRef.current(payload);
     });
     conn.on("duel:queue-timeout", () => {
       setStatus("timeout");
+      capture("duel_queue_timeout", { waited_ms: waitedMs() });
       conn.disconnect();
       socketRef.current = null;
     });
     conn.on("duel:error", (payload) => {
       setStatus("error");
       setError(payload.message);
+      capture("duel_queue_failed", { reason: payload.message });
       conn.disconnect();
       socketRef.current = null;
     });
     conn.on("connect_error", () => {
       setStatus("error");
       setError("Could not reach the matchmaking server.");
+      capture("duel_queue_failed", { reason: "connect_error" });
       conn.disconnect();
       socketRef.current = null;
     });
@@ -90,6 +104,7 @@ export function useDuelQueue(options: {
     socketRef.current = null;
     setStatus("idle");
     setQueuedAt(null);
+    queuedAtRef.current = null;
   }, []);
 
   return { status, error, queuedAt, findMatch, cancel };
