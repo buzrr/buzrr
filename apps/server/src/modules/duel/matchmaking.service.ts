@@ -31,6 +31,20 @@ interface QueueEntry {
   joinedAt: number;
 }
 
+/** Rating gap a player will accept, widening the longer they have waited. */
+function eloBand(waitMs: number): number {
+  return Math.min(100 + 50 * Math.floor(waitMs / 5_000), 500);
+}
+
+/**
+ * Either side's band is enough: tick() gives every entry a turn as seeker, so
+ * a long waiter's widened band can reach a rating its own is too narrow for.
+ */
+function eloEligible(a: QueueEntry, b: QueueEntry, now: number): boolean {
+  const gap = Math.abs(a.elo - b.elo);
+  return gap <= Math.max(eloBand(now - a.joinedAt), eloBand(now - b.joinedAt));
+}
+
 /**
  * Redis-backed 1v1 matchmaking. Players are held in a sorted set keyed by
  * ELO; a 2s worker (running only while the queue is non-empty, to spare the
@@ -130,8 +144,7 @@ export class MatchmakingService implements OnApplicationShutdown {
     // Longest-waiting player searches first, with a widening band.
     waiting.sort((a, b) => a.joinedAt - b.joinedAt);
     for (const seeker of waiting) {
-      const waitSec = (now - seeker.joinedAt) / 1000;
-      const band = Math.min(100 + 50 * Math.floor(waitSec / 5), 500);
+      const band = eloBand(now - seeker.joinedAt);
       const candidate = waiting.find(
         (c) =>
           c.userId !== seeker.userId && Math.abs(c.elo - seeker.elo) <= band,
@@ -151,15 +164,21 @@ export class MatchmakingService implements OnApplicationShutdown {
 
   /**
    * Re-reads the queue before committing: a human may have joined since this
-   * tick's snapshot, and pairing two players always beats botting one.
+   * tick's snapshot, and pairing two players always beats botting one. Only a
+   * human this seeker could actually be paired with blocks the fallback —
+   * someone stuck outside the band would otherwise keep both of them waiting
+   * out the full timeout for a match that can never happen.
    */
   private async tryBotMatch(seeker: QueueEntry): Promise<boolean> {
     const now = Date.now();
     const fresh = await this.loadQueue();
-    const others = fresh.filter(
-      (e) => e.userId !== seeker.userId && now - e.joinedAt <= QUEUE_TIMEOUT_MS,
+    const reachable = fresh.filter(
+      (e) =>
+        e.userId !== seeker.userId &&
+        now - e.joinedAt <= QUEUE_TIMEOUT_MS &&
+        eloEligible(seeker, e, now),
     );
-    if (others.length > 0) return false;
+    if (reachable.length > 0) return false;
 
     const lock = await this.redis.set(LOCK_KEY, "1", "PX", 5_000, "NX");
     if (lock !== "OK") return false;

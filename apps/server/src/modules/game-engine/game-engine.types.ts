@@ -23,6 +23,9 @@ export interface GameMeta {
   botId?: string;
   botTier?: BotTier;
   botElo?: number;
+  /** The bot's answer to the open question, so a restart can re-arm it. */
+  botOptionId?: string;
+  botAnswerAt?: number;
   qIndex: number;
   qId: string;
   qStartAt: number;

@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { nanoid } from "nanoid";
 import { computeScore } from "../../common/utils/compute-score";
-import type { BotTier } from "../../common/utils/duel-bot";
+import { BotTier, planBotAnswer } from "../../common/utils/duel-bot";
 import { applyFloor, eloDelta, kFactor } from "../../common/utils/elo";
 import { PrismaService } from "../../prisma/prisma.service";
 import type {
@@ -642,12 +642,20 @@ export class GameEngineService
     }
     const now = Date.now();
     const deadline = now + question.timeOut * 1000 + DEADLINE_GRACE_MS;
+
+    // Planned before the meta write so it rides the same round trip: the
+    // answer has to be durable for recoverTimers to re-arm it after a restart.
+    const plan =
+      meta.botId && meta.botTier ? planBotAnswer(question, meta.botTier) : null;
+    const botAnswerAt = plan ? now + plan.delayMs : 0;
+
     await this.store.patchMeta(gameCode, {
       phase: "question",
       qIndex: index,
       qId: question.id,
       qStartAt: now,
       qDeadline: deadline,
+      ...(plan ? { botOptionId: plan.optionId, botAnswerAt } : {}),
     });
     await this.store.setDeadline(gameCode, deadline);
 
@@ -669,11 +677,11 @@ export class GameEngineService
 
     this.armTimer(gameCode, deadline - now);
 
-    // Scheduling here rather than at duel start keeps the bot's timer on
-    // whichever instance currently owns the game's deadlines.
-    const { botId, botTier } = meta;
-    if (botId && botTier) {
-      this.bots.schedule(gameCode, botTier, question, (optionId) =>
+    // Arming here rather than at duel start keeps the bot's timer on whichever
+    // instance currently owns the game's deadlines.
+    const { botId } = meta;
+    if (botId && plan) {
+      this.bots.arm(gameCode, plan.optionId, botAnswerAt, (optionId) =>
         this.submitAnswer(gameCode, botId, index, optionId),
       );
     }
@@ -867,11 +875,30 @@ export class GameEngineService
         await this.handleDeadline(code);
       } else {
         this.armTimer(code, atMs - now);
+        // handleDeadline re-enters the question (and re-plans) on its own; a
+        // question still mid-flight needs its bot answer put back by hand.
+        await this.recoverBotAnswer(code);
       }
     }
     if (deadlines.length > 0) {
       this.logger.log(`Recovered ${deadlines.length} game timer(s)`);
     }
+  }
+
+  /** Re-arms the answer the bot had already committed to before the restart. */
+  private async recoverBotAnswer(gameCode: string): Promise<void> {
+    const meta = await this.store.getMeta(gameCode);
+    if (!meta || meta.phase !== "question") return;
+    const { botId, botOptionId, botAnswerAt } = meta;
+    if (!botId || !botOptionId || !botAnswerAt) return;
+    // Already answered before we went down? submitAnswer is first-write-wins,
+    // so a duplicate is harmless — but skip the wasted round trip.
+    const answers = await this.store.getAnswers(gameCode, meta.qIndex);
+    if (answers[botId]) return;
+    const qIndex = meta.qIndex;
+    this.bots.arm(gameCode, botOptionId, botAnswerAt, (optionId) =>
+      this.submitAnswer(gameCode, botId, qIndex, optionId),
+    );
   }
 
   private async sweep(): Promise<void> {
