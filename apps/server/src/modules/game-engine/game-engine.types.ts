@@ -1,3 +1,5 @@
+import type { BotTier } from "../../common/utils/duel-bot";
+
 export type GamePhase =
   | "lobby"
   | "starting"
@@ -17,6 +19,10 @@ export interface GameMeta {
   phase: GamePhase;
   /** Duels only: friend-invite duels are unrated so ratings can't be farmed. */
   rated: boolean;
+  /** Set when an empty queue fell back to a bot opponent. */
+  botId?: string;
+  botTier?: BotTier;
+  botElo?: number;
   qIndex: number;
   qId: string;
   qStartAt: number;

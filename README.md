@@ -18,7 +18,7 @@ Kahoot, and generate whole quizzes with AI.
 ## ✨ Features
 
 - 🎮 **Live multiplayer quizzes** (the Kahoot half) — host a room, players join with a code, everyone answers in real time over WebSockets.
-- ⚔️ **Ranked 1v1 duels** (the QuizUp half) — matchmaking with an **ELO** rating system.
+- ⚔️ **Ranked 1v1 duels** (the QuizUp half) — matchmaking with an **ELO** rating system, backed by difficulty-scaled bot opponents when nobody else is queuing.
 - 🤖 **AI quiz generation** — describe a topic and let **Gemini** draft the questions (optional).
 - 🛡️ **Public question moderation** — community questions feed the duel pool behind an approve/report workflow.
 - 🖼️ **Media questions** — image uploads via **Cloudinary** (optional).
@@ -113,6 +113,7 @@ the [`.env.example`](.env.example) files for the full, commented list.
 | `CLOUDINARY_*`                                   |    ➖    | Enables image uploads.                                              |
 | `GITHUB_TOKEN`                                   |    ➖    | Raises GitHub API rate limits for landing-page repo stats (web).    |
 | `UPSTASH_REDIS_REST_*` + `RATELIMIT`             |    ➖    | Enables rate limiting.                                              |
+| `DUEL_BOTS`                                      |    ➖    | Set to `OFF` to disable bot opponents in 1v1 matchmaking.           |
 
 ## 📜 Scripts
 
