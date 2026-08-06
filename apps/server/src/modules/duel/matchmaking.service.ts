@@ -4,7 +4,9 @@ import {
   Logger,
   OnApplicationShutdown,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import Redis from "ioredis";
+import { createBotOpponent } from "../../common/utils/duel-bot";
 import { REDIS } from "../../redis/redis.constants";
 import { GameEngineService } from "../game-engine/game-engine.service";
 import type { LiveQuestion } from "../game-engine/game-engine.types";
@@ -18,6 +20,8 @@ const LOCK_KEY = "mm:duel:lock";
 
 const QUEUE_TIMEOUT_MS = 60_000;
 const TICK_MS = 2_000;
+/** Wait this long with nobody else in the queue and you get a bot. */
+const BOT_MATCH_MS = 15_000;
 
 interface QueueEntry {
   userId: string;
@@ -27,11 +31,28 @@ interface QueueEntry {
   joinedAt: number;
 }
 
+/** Rating gap a player will accept, widening the longer they have waited. */
+function eloBand(waitMs: number): number {
+  return Math.min(100 + 50 * Math.floor(waitMs / 5_000), 500);
+}
+
+/**
+ * Either side's band is enough: tick() gives every entry a turn as seeker, so
+ * a long waiter's widened band can reach a rating its own is too narrow for.
+ */
+function eloEligible(a: QueueEntry, b: QueueEntry, now: number): boolean {
+  const gap = Math.abs(a.elo - b.elo);
+  return gap <= Math.max(eloBand(now - a.joinedAt), eloBand(now - b.joinedAt));
+}
+
 /**
  * Redis-backed 1v1 matchmaking. Players are held in a sorted set keyed by
  * ELO; a 2s worker (running only while the queue is non-empty, to spare the
  * Upstash command budget) pairs the longest-waiting player with anyone whose
  * rating falls inside a band that widens the longer they wait.
+ *
+ * A player left alone in the queue for BOT_MATCH_MS is matched with a bot
+ * instead of waiting out the full timeout. Set DUEL_BOTS=OFF to disable.
  */
 @Injectable()
 export class MatchmakingService implements OnApplicationShutdown {
@@ -43,6 +64,7 @@ export class MatchmakingService implements OnApplicationShutdown {
     @Inject(REDIS) private readonly redis: Redis,
     private readonly questions: DuelQuestionsService,
     private readonly engine: GameEngineService,
+    private readonly config: ConfigService,
   ) {}
 
   setServer(io: TypedServer): void {
@@ -117,13 +139,12 @@ export class MatchmakingService implements OnApplicationShutdown {
       }
     }
     const waiting = entries.filter((e) => now - e.joinedAt <= QUEUE_TIMEOUT_MS);
-    if (waiting.length < 2) return;
+    if (waiting.length === 0) return;
 
     // Longest-waiting player searches first, with a widening band.
     waiting.sort((a, b) => a.joinedAt - b.joinedAt);
     for (const seeker of waiting) {
-      const waitSec = (now - seeker.joinedAt) / 1000;
-      const band = Math.min(100 + 50 * Math.floor(waitSec / 5), 500);
+      const band = eloBand(now - seeker.joinedAt);
       const candidate = waiting.find(
         (c) =>
           c.userId !== seeker.userId && Math.abs(c.elo - seeker.elo) <= band,
@@ -131,6 +152,44 @@ export class MatchmakingService implements OnApplicationShutdown {
       if (!candidate) continue;
       const paired = await this.pair(seeker, candidate);
       if (paired) return; // one match per tick keeps things simple
+    }
+
+    // Nobody could be paired with a human — fall back to a bot.
+    if (this.config.get<string>("DUEL_BOTS") === "OFF") return;
+    for (const seeker of waiting) {
+      if (now - seeker.joinedAt < BOT_MATCH_MS) continue;
+      if (await this.tryBotMatch(seeker)) return;
+    }
+  }
+
+  /**
+   * Re-reads the queue before committing: a human may have joined since this
+   * tick's snapshot, and pairing two players always beats botting one. Only a
+   * human this seeker could actually be paired with blocks the fallback —
+   * someone stuck outside the band would otherwise keep both of them waiting
+   * out the full timeout for a match that can never happen.
+   */
+  private async tryBotMatch(seeker: QueueEntry): Promise<boolean> {
+    const now = Date.now();
+    const fresh = await this.loadQueue();
+    const reachable = fresh.filter(
+      (e) =>
+        e.userId !== seeker.userId &&
+        now - e.joinedAt <= QUEUE_TIMEOUT_MS &&
+        eloEligible(seeker, e, now),
+    );
+    if (reachable.length > 0) return false;
+
+    const lock = await this.redis.set(LOCK_KEY, "1", "PX", 5_000, "NX");
+    if (lock !== "OK") return false;
+    try {
+      const removed = await this.redis.zrem(QUEUE_KEY, seeker.userId);
+      if (removed !== 1) return false; // another instance already took them
+      await this.redis.hdel(META_KEY, seeker.userId);
+      await this.createBotDuel(seeker);
+      return true;
+    } finally {
+      await this.redis.del(LOCK_KEY);
     }
   }
 
@@ -193,6 +252,59 @@ export class MatchmakingService implements OnApplicationShutdown {
     });
     this.logger.log(
       `Matched duel ${gameCode}: ${a.userId} (${a.elo}) vs ${b.userId} (${b.elo})`,
+    );
+  }
+
+  /**
+   * Same rated duel as a human match — the bot is just a roster entry the
+   * engine answers for. The `duel:matched` payload is deliberately identical
+   * in shape to a human one, so the client can't tell them apart.
+   */
+  private async createBotDuel(human: QueueEntry): Promise<void> {
+    let questions: LiveQuestion[];
+    try {
+      questions = await this.questions.build();
+    } catch (err) {
+      this.logger.error("Failed to build duel question set", err);
+      this.io?.to(`player:${human.userId}`).emit("duel:error", {
+        message: "No duel questions are available right now.",
+      });
+      return;
+    }
+
+    const bot = createBotOpponent(human.elo);
+    const gameCode = generateDuelCode();
+    await this.engine.startDuel(
+      gameCode,
+      [
+        {
+          id: human.userId,
+          name: human.name,
+          profilePic: human.image,
+          userId: human.userId,
+        },
+        {
+          id: bot.id,
+          name: bot.name,
+          profilePic: bot.profilePic,
+          connected: true,
+        },
+      ],
+      questions,
+      { bot: { id: bot.id, tier: bot.tier, elo: bot.elo } },
+    );
+
+    this.io?.to(`player:${human.userId}`).emit("duel:matched", {
+      gameCode,
+      opponent: {
+        id: bot.id,
+        name: bot.name,
+        profilePic: bot.profilePic,
+        elo: bot.elo,
+      },
+    });
+    this.logger.log(
+      `Matched duel ${gameCode}: ${human.userId} (${human.elo}) vs ${bot.tier} bot (${bot.elo})`,
     );
   }
 

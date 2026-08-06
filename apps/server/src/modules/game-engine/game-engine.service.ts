@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { nanoid } from "nanoid";
 import { computeScore } from "../../common/utils/compute-score";
+import { BotTier, planBotAnswer } from "../../common/utils/duel-bot";
 import { applyFloor, eloDelta, kFactor } from "../../common/utils/elo";
 import { PrismaService } from "../../prisma/prisma.service";
 import type {
@@ -14,6 +15,7 @@ import type {
   SubmitAnswerAck,
   TypedServer,
 } from "../realtime/realtime.types";
+import { DuelBotService } from "./duel-bot.service";
 import {
   GameMeta,
   LeaderboardEntry,
@@ -58,6 +60,7 @@ export class GameEngineService
   constructor(
     private readonly store: GameStoreService,
     private readonly prisma: PrismaService,
+    private readonly bots: DuelBotService,
   ) {}
 
   setServer(io: TypedServer): void {
@@ -113,6 +116,11 @@ export class GameEngineService
    *
    * Friend invites pass `rated: false`: identical play, but ELO is left alone
    * so two accounts can't farm rating off each other.
+   *
+   * `opts.bot` marks one of the players as server-driven. That entry joins the
+   * roster already connected — it has no socket to connect with, and without
+   * it maybeRevealEarly() would close every question the moment the human
+   * answered, before the bot's timer could fire.
    */
   async startDuel(
     gameCode: string,
@@ -120,10 +128,14 @@ export class GameEngineService
       id: string;
       name: string;
       profilePic: string | null;
-      userId: string;
+      userId?: string;
+      connected?: boolean;
     }[],
     questions: LiveQuestion[],
-    opts?: { rated?: boolean },
+    opts?: {
+      rated?: boolean;
+      bot?: { id: string; tier: BotTier; elo: number };
+    },
   ): Promise<void> {
     const now = Date.now();
     const firstQuestionAt = now + START_COUNTDOWN_MS;
@@ -135,6 +147,9 @@ export class GameEngineService
       mode: "duel",
       phase: "starting",
       rated: opts?.rated ?? true,
+      botId: opts?.bot?.id,
+      botTier: opts?.bot?.tier,
+      botElo: opts?.bot?.elo,
       qIndex: 0,
       qId: "",
       qStartAt: 0,
@@ -150,7 +165,7 @@ export class GameEngineService
         id: p.id,
         name: p.name,
         profilePic: p.profilePic,
-        connected: false,
+        connected: p.connected ?? false,
         lastSeenAt: now,
         userId: p.userId,
       });
@@ -237,7 +252,7 @@ export class GameEngineService
         break;
       case "reveal":
         if (meta.qIndex + 1 < meta.qCount) {
-          await this.enterQuestion(gameCode, meta.qIndex + 1);
+          await this.enterQuestion(gameCode, meta.qIndex + 1, meta);
         } else {
           await this.enterFinal(gameCode);
         }
@@ -257,6 +272,7 @@ export class GameEngineService
     const meta = await this.store.getMeta(gameCode);
     if (!meta || meta.phase === "ended") return;
     this.clearTimer(gameCode);
+    this.bots.cancel(gameCode);
     await this.store.clearDeadline(gameCode);
 
     // Atomic claim: only the caller that flips phase -> "ended" persists the
@@ -613,7 +629,11 @@ export class GameEngineService
 
   // -- transitions -------------------------------------------------------------------
 
-  private async enterQuestion(gameCode: string, index: number): Promise<void> {
+  private async enterQuestion(
+    gameCode: string,
+    index: number,
+    meta: GameMeta,
+  ): Promise<void> {
     const questions = await this.store.getQuestions(gameCode);
     const question = questions?.[index];
     if (!question) {
@@ -622,12 +642,20 @@ export class GameEngineService
     }
     const now = Date.now();
     const deadline = now + question.timeOut * 1000 + DEADLINE_GRACE_MS;
+
+    // Planned before the meta write so it rides the same round trip: the
+    // answer has to be durable for recoverTimers to re-arm it after a restart.
+    const plan =
+      meta.botId && meta.botTier ? planBotAnswer(question, meta.botTier) : null;
+    const botAnswerAt = plan ? now + plan.delayMs : 0;
+
     await this.store.patchMeta(gameCode, {
       phase: "question",
       qIndex: index,
       qId: question.id,
       qStartAt: now,
       qDeadline: deadline,
+      ...(plan ? { botOptionId: plan.optionId, botAnswerAt } : {}),
     });
     await this.store.setDeadline(gameCode, deadline);
 
@@ -648,12 +676,22 @@ export class GameEngineService
     this.emitRoom(gameCode).emit("timer-starts");
 
     this.armTimer(gameCode, deadline - now);
+
+    // Arming here rather than at duel start keeps the bot's timer on whichever
+    // instance currently owns the game's deadlines.
+    const { botId } = meta;
+    if (botId && plan) {
+      this.bots.arm(gameCode, plan.optionId, botAnswerAt, (optionId) =>
+        this.submitAnswer(gameCode, botId, index, optionId),
+      );
+    }
   }
 
   private async enterReveal(gameCode: string): Promise<void> {
     const meta = await this.store.getMeta(gameCode);
     if (!meta || meta.phase !== "question") return;
     this.clearTimer(gameCode);
+    this.bots.cancel(gameCode);
 
     const questions = await this.store.getQuestions(gameCode);
     const question = questions?.[meta.qIndex];
@@ -808,7 +846,7 @@ export class GameEngineService
     }
     switch (meta.phase) {
       case "starting":
-        await this.enterQuestion(gameCode, 0);
+        await this.enterQuestion(gameCode, 0, meta);
         break;
       case "question":
         if (Date.now() >= meta.qDeadline) {
@@ -818,7 +856,7 @@ export class GameEngineService
       case "reveal":
         // Only hostless (duel) reveals carry a deadline.
         if (meta.qIndex + 1 < meta.qCount) {
-          await this.enterQuestion(gameCode, meta.qIndex + 1);
+          await this.enterQuestion(gameCode, meta.qIndex + 1, meta);
         } else {
           await this.enterFinal(gameCode);
         }
@@ -837,11 +875,30 @@ export class GameEngineService
         await this.handleDeadline(code);
       } else {
         this.armTimer(code, atMs - now);
+        // handleDeadline re-enters the question (and re-plans) on its own; a
+        // question still mid-flight needs its bot answer put back by hand.
+        await this.recoverBotAnswer(code);
       }
     }
     if (deadlines.length > 0) {
       this.logger.log(`Recovered ${deadlines.length} game timer(s)`);
     }
+  }
+
+  /** Re-arms the answer the bot had already committed to before the restart. */
+  private async recoverBotAnswer(gameCode: string): Promise<void> {
+    const meta = await this.store.getMeta(gameCode);
+    if (!meta || meta.phase !== "question") return;
+    const { botId, botOptionId, botAnswerAt } = meta;
+    if (!botId || !botOptionId || !botAnswerAt) return;
+    // Already answered before we went down? submitAnswer is first-write-wins,
+    // so a duplicate is harmless — but skip the wasted round trip.
+    const answers = await this.store.getAnswers(gameCode, meta.qIndex);
+    if (answers[botId]) return;
+    const qIndex = meta.qIndex;
+    this.bots.arm(gameCode, botOptionId, botAnswerAt, (optionId) =>
+      this.submitAnswer(gameCode, botId, qIndex, optionId),
+    );
   }
 
   private async sweep(): Promise<void> {
@@ -916,6 +973,7 @@ export class GameEngineService
       meta.rated !== false &&
       entries.length === 2 &&
       !opts?.abandoned;
+    const isBotDuel = isRatedDuel && Boolean(meta.botId);
 
     const data = (
       quizId: string | null,
@@ -945,6 +1003,68 @@ export class GameEngineService
     });
 
     try {
+      // Bot duels are rated too, but only one side has a User row to update;
+      // the bot's rating comes from meta.
+      if (isBotDuel) {
+        const human = entries.find((e) => e.playerId !== meta.botId);
+        const bot = entries.find((e) => e.playerId === meta.botId);
+        if (human && bot) {
+          return await this.prisma.db.$transaction(async (tx) => {
+            const userId =
+              rosterById.get(human.playerId)?.userId ?? human.playerId;
+            const user = await tx.user.findUnique({
+              where: { id: userId },
+              select: { eloRating: true, duelsPlayed: true },
+            });
+            if (!user) {
+              const result = await tx.gameResult.create({
+                data: data(null, null),
+                select: { id: true },
+              });
+              return { resultId: result.id };
+            }
+
+            let scoreH: 1 | 0.5 | 0;
+            if (opts?.forfeitLoserId) {
+              scoreH = opts.forfeitLoserId === userId ? 0 : 1;
+            } else if (human.score === bot.score) {
+              scoreH = 0.5;
+            } else {
+              scoreH = human.score > bot.score ? 1 : 0;
+            }
+
+            const delta = eloDelta(
+              user.eloRating,
+              meta.botElo ?? user.eloRating,
+              scoreH,
+              kFactor(user.duelsPlayed),
+            );
+            const eloChanges: Record<
+              string,
+              { before: number; after: number }
+            > = {
+              [human.playerId]: {
+                before: user.eloRating,
+                after: applyFloor(user.eloRating + delta),
+              },
+            };
+
+            await tx.user.update({
+              where: { id: userId },
+              data: {
+                eloRating: eloChanges[human.playerId].after,
+                duelsPlayed: { increment: 1 },
+              },
+            });
+            const result = await tx.gameResult.create({
+              data: data(null, null, eloChanges),
+              select: { id: true },
+            });
+            return { resultId: result.id, eloChanges };
+          });
+        }
+      }
+
       if (isRatedDuel) {
         return await this.prisma.db.$transaction(async (tx) => {
           const [a, b] = entries;

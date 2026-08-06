@@ -28,6 +28,8 @@ const NUMERIC_META = new Set([
   "qCount",
   "startedAt",
   "hostLastSeenAt",
+  "botElo",
+  "botAnswerAt",
 ]);
 const BOOLEAN_META = new Set(["hostConnected", "rated"]);
 
