@@ -28,8 +28,11 @@ vector.
 
 ## Consequences
 
-- Nobody waits more than ~15s for _a_ game; ladder integrity is preserved by
-  the rated/unrated split.
+- **When bot fallback is available**, nobody waits more than ~15s for _a_
+  game. That bound depends on it: with `DUEL_BOTS=OFF` — or when a bot match
+  is declined because a pairable human is still queued — the seeker waits out
+  the full 60s `QUEUE_TIMEOUT_MS` and gets `duel:queue-timeout` instead.
+  Ladder integrity is preserved by the rated/unrated split.
 - The `rated` check is `!== false` on purpose (pre-field Redis games stay
   rated across the deploy that introduced it) — keep that semantics.
 - Bot behavior parameters (`BOT_PROFILES`, delay bounds) directly shape

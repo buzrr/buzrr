@@ -1,8 +1,8 @@
 # Current project context
 
 Snapshot of where Buzrr stands. **Last verified against the code:
-2026-08-14** (HEAD `fa002bc`, "feat: 1v1 bots (#39)"). Update this file when
-the picture changes; keep it about the present, not a changelog.
+2026-08-14**, through PR #39. Update this file when the picture changes; keep
+it about the present, not a changelog.
 
 ## Where the project is
 
@@ -21,11 +21,11 @@ stats/history, health endpoint, Vercel Analytics.
 - **Moderation & roles** (PR #18), **beta room cap** `hostSizeLimit` (#25),
   **kick/ban** (#35), **friend invites** (#34), **health check** (#37),
   **duel bots** (#39 — current HEAD).
-- **Legacy contract retired** (2026-08-14, uncommitted at time of writing):
-  the v1 socket dual-emits/aliases, the `POST /:id/answers` fallback route and
-  the vestigial `GameSession.gameState`/`currentQuestion` columns are gone.
-  The socket contract now has exactly one version. See the ADR-002 amendment;
-  needs `migrate:deploy` for `20260814000001`.
+- **Legacy contract retired**: the v1 socket dual-emits/aliases, the
+  `POST /:id/answers` fallback route and the vestigial
+  `GameSession.gameState`/`currentQuestion` columns are gone. The socket
+  contract now has exactly one version. See the ADR-002 amendment; migration
+  `20260814000001` must be applied with `migrate:deploy` in production.
 
 ## In transition / incomplete (verified in code)
 

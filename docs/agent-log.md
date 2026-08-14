@@ -14,7 +14,7 @@ points to.
 
 Format:
 
-```
+```text
 - YYYY-MM-DD (PR#/commit) — summary. Docs touched: file, file / ADR-NNN.
 ```
 

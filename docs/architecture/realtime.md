@@ -21,7 +21,7 @@ matchmaking, and invite services in `afterInit` (`setServer(...)`).
 
 ## Phase machine
 
-```
+```text
 lobby → starting → question ⇄ reveal → final → ended
         (3.2s)     (timeOut    (duel: 4s auto;
                    +300ms       classic: host-paced)

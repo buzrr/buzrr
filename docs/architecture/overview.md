@@ -39,7 +39,7 @@ Two deployable apps, one shared DB package:
 Both classic rooms and 1v1 duels run on the same phase machine in
 `apps/server/src/modules/game-engine/game-engine.service.ts`:
 
-```
+```text
 lobby → starting → question ⇄ reveal → final → ended
 ```
 
@@ -69,7 +69,7 @@ row and all Redis keys are deleted.
 
 ## Key directories
 
-```
+```text
 apps/server/src/
   main.ts                 # bootstrap: /api prefix, CORS, RedisIoAdapter, filters
   app.module.ts           # module wiring + global JwtAuthGuard

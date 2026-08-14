@@ -7,10 +7,15 @@ Two stores with a hard division of labor:
 - **Redis (ioredis)** — everything that changes during a live game, plus
   matchmaking queues, invites, locks, and Socket.IO adapter pub/sub.
 
-**Rule: nothing that mutates during play is written to Postgres.** The engine
-comment in `game-store.service.ts` states it: "All state that changes during a
-running game lives here; Postgres only sees the lobby record and (later) final
-results."
+**Rule: live phase state stays in Redis — no per-answer or mid-game writes to
+Postgres.** The engine comment in `game-store.service.ts` states it: "All state
+that changes during a running game lives here; Postgres only sees the lobby
+record and (later) final results."
+
+The one exemption is **`GameSession.isPlaying`**, flipped to `true` once in
+`startGame`. It is a lobby flag, not play state: join checks and the
+player-play context read it to tell a waiting room from one already in
+progress. Phase, question index and scores never appear in Postgres.
 
 ## Prisma package (`packages/prisma`)
 

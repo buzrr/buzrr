@@ -89,15 +89,22 @@ Lifecycle (all transitions are Lua scripts — keep them atomic):
   old game's questions. Retries 5 codes; a host race returns the winner's
   code.
 - `accept` (guest, via socket `duel:invite-accept` with ack) — order matters:
-  1. guest busy-check, 2. record read, 3. **host presence check** (a live
-     socket in `player:{hostId}` whose `socket.data.duelInviteCode` matches —
-     presence is derived from the socket adapter, never a stored flag, so a
-     SIGKILL'd instance can't leave a stale "online"), 4. build questions,
-  2. `CLAIM_SCRIPT` (HSETNX `claimedBy`; claimed invites linger 60s so a
-     losing racer reads "claimed" not "expired"), 6. re-read both users from
-     Postgres (invite snapshot can be 15min stale), 7. `startDuel(code, ...,
-{rated:false})`, 8. `duel:matched` to both `player:{id}` rooms.
-     If `startDuel` throws, `RELEASE_SCRIPT` un-claims so the guest can retry.
+
+  1. guest busy-check
+  2. record read
+  3. **host presence check** — a live socket in `player:{hostId}` whose
+     `socket.data.duelInviteCode` matches. Presence is derived from the socket
+     adapter, never a stored flag, so a SIGKILL'd instance can't leave a stale
+     "online".
+  4. build questions
+  5. `CLAIM_SCRIPT` (HSETNX `claimedBy`; claimed invites linger 60s so a losing
+     racer reads "claimed" not "expired")
+  6. re-read both users from Postgres (invite snapshot can be 15min stale)
+  7. `startDuel(code, ..., { rated: false })`
+  8. `duel:matched` to both `player:{id}` rooms
+
+  If `startDuel` throws, `RELEASE_SCRIPT` un-claims so the guest can retry.
+
 - `cancel` — host-only, refused once claimed.
 - Both parties sit on an `intent=invite` socket (`useDuelInvite.ts`); that
   connection **is** the host-presence signal and is what guarantees the guest
