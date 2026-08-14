@@ -1,18 +1,16 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import type { PlayerPayload, LeaderboardEntry } from "@/types/socket-events";
+import type { PlayerPayload } from "@/types/socket-events";
 
+/**
+ * Host-screen roster. Live gameplay state (phase, question, leaderboard) is
+ * server-owned and lives in `gameSlice` — never mirror it here.
+ */
 interface PlayersState {
   players: PlayerPayload[];
-  quesResult: number[];
-  currentIndex: number;
-  leaderboard: LeaderboardEntry[];
 }
 
 const initialState: PlayersState = {
   players: [],
-  quesResult: [],
-  currentIndex: 0,
-  leaderboard: [],
 };
 
 const playerSlice = createSlice({
@@ -33,25 +31,9 @@ const playerSlice = createSlice({
     setPlayers: (state, action: PayloadAction<PlayerPayload[]>) => {
       state.players = action.payload;
     },
-    setResult: (state, action: PayloadAction<number[]>) => {
-      state.quesResult = action.payload;
-    },
-    setCurrIndex: (state, action: PayloadAction<number>) => {
-      state.currentIndex = action.payload;
-    },
-    setLeaderboard: (state, action: PayloadAction<LeaderboardEntry[]>) => {
-      state.leaderboard = action.payload;
-    },
   },
 });
 
-export const {
-  addPlayer,
-  removePlayer,
-  setPlayers,
-  setResult,
-  setCurrIndex,
-  setLeaderboard,
-} = playerSlice.actions;
+export const { addPlayer, removePlayer, setPlayers } = playerSlice.actions;
 
 export default playerSlice.reducer;

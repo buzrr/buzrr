@@ -27,27 +27,14 @@ Kahoot, and generate whole quizzes with AI.
 
 ## 🏗️ Architecture
 
-Buzrr is a [Turborepo](https://turbo.build/repo) monorepo with two apps and a shared Prisma package.
+Buzrr is a [Turborepo](https://turbo.build/repo) monorepo: a Next.js frontend
+(`apps/web`, which also hosts auth), a NestJS server (`apps/server`) that owns
+every game rule over Socket.IO, and a shared Prisma package. Live game state
+lives in Redis; Postgres keeps the lobby record and the final result.
 
-```mermaid
-flowchart LR
-    B([Browser]) -- HTTP/SSR --> W["apps/web<br/>Next.js + Better Auth"]
-    B -- WebSocket / REST --> S["apps/server<br/>NestJS + Socket.IO"]
-    W --> PG[("PostgreSQL")]
-    S --> PG
-    S -- live game state --> R[("Redis")]
-    W -. shared schema .-> P["@buzrr/prisma"]
-    S -. shared schema .-> P
-```
-
-| Package                                          | Description                                                                                     |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| [`apps/web`](apps/web)                           | Next.js 15 app (React 19, MUI, Redux Toolkit, TanStack Query). Hosts the Better Auth endpoints. |
-| [`apps/server`](apps/server)                     | NestJS 11 API + Socket.IO gateway. Owns the realtime game loop.                                 |
-| [`@buzrr/prisma`](packages/prisma)               | Prisma schema, migrations and the shared generated client.                                      |
-| `@repo/eslint-config`, `@repo/typescript-config` | Shared lint/tsconfig presets.                                                                   |
-
-**Tech stack:** TypeScript · Next.js · NestJS · Socket.IO · Prisma · PostgreSQL · Redis · Better Auth · Gemini · Cloudinary · Turborepo · Yarn 4.
+📐 **[Read ARCHITECTURE.md](ARCHITECTURE.md)** for the full picture — the
+server-authoritative game loop, how timer ownership survives crashes and
+multiple instances, and the Redis/Postgres split.
 
 ## 🚀 Quick start
 

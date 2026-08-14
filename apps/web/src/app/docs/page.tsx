@@ -12,7 +12,7 @@ export default function DocsPage() {
   return (
     <ComingSoon
       title="Docs"
-      description="Full documentation is on the way. Until then, the README covers features, architecture and a local quick start."
+      description="Full documentation is on the way. Until then, the README covers features and a local quick start, and ARCHITECTURE.md explains how Buzrr works under the hood."
       ctaLabel="Read the README"
       ctaHref={`${GITHUB_LINK}#readme`}
     />

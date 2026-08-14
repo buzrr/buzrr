@@ -60,7 +60,6 @@ export default function AdminPlayClient({
       gameCode={room.gameCode}
       players={playersForLobby}
       gameStarted={room.isPlaying}
-      currentQues={room.currentQuestion}
       maxPlayers={maxPlayers}
     />
   );

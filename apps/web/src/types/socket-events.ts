@@ -1,5 +1,3 @@
-import type { Player } from "./db";
-
 export interface PlayerPayload {
   id: string;
   name?: string;
@@ -12,7 +10,7 @@ export interface PlayerRemovedPayload extends PlayerPayload {
 }
 
 // ---------------------------------------------------------------------------
-// Contract v2 — the server owns all timing. Clients render countdowns from
+// Socket contract — the server owns all timing. Clients render countdowns from
 // `deadline`, correcting for clock skew via `serverNow`.
 // ---------------------------------------------------------------------------
 
@@ -133,14 +131,6 @@ export interface StateSyncPayload {
 export interface SubmitAnswerAck {
   accepted: boolean;
   reason?: string;
-}
-
-/** Legacy leaderboard row shape kept for the post-game admin leaderboard page. */
-export interface LeaderboardEntry {
-  playerId: string;
-  position?: number;
-  score: number;
-  Player?: Pick<Player, "name" | "profilePic">;
 }
 
 export interface ServerToClientEvents {

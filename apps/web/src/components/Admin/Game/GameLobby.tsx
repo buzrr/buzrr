@@ -37,7 +37,6 @@ const GameLobby = (params: {
   gameCode: string;
   players: PlayerPayload[];
   quizQuestions: QuizQuestion;
-  currentQues: number;
 }) => {
   const dispatch = useAppDispatch();
   const phase = useAppSelector((state) => state.game.phase);

@@ -147,18 +147,20 @@ model Player {
   game       GameSession? @relation(fields: [gameId], references: [id])
 }
 
+/// Lobby record for a classic room. Live gameplay state (phase, question
+/// index, scores) lives in Redis and is owned by the game engine — the only
+/// gameplay flag kept here is `isPlaying`, which join checks read to tell a
+/// waiting lobby from a room already in progress.
 model GameSession {
-  id              String     @id @default(cuid())
-  quizId          String
-  creatorId       String
-  gameCode        String     @unique
-  gameState       GameStates @default(question)
-  isPlaying       Boolean    @default(false)
-  currentQuestion Int        @default(0)
-  createdAt       DateTime   @default(now())
-  creator         User       @relation(fields: [creatorId], references: [id], onDelete: Cascade)
-  quiz            Quiz       @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  players         Player[]
+  id        String   @id @default(cuid())
+  quizId    String
+  creatorId String
+  gameCode  String   @unique
+  isPlaying Boolean  @default(false)
+  createdAt DateTime @default(now())
+  creator   User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  players   Player[]
 }
 
 /// Immutable record of a finished game. Live state lives in Redis during
@@ -198,12 +200,6 @@ model GameResultEntry {
   result       GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-}
-
-enum GameStates {
-  question
-  answer
-  leaderboard
 }
 
 enum GameMode {

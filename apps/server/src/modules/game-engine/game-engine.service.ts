@@ -228,7 +228,9 @@ export class GameEngineService
     await this.store.setDeadline(gameCode, firstQuestionAt);
     await this.store.ensureOwner(gameCode, this.instanceId);
 
-    // Legacy compat: joining checks / player-play context still read this row.
+    // The one gameplay flag Postgres still carries: join checks and the
+    // player-play context read it to tell a waiting lobby from a live room.
+    // Phase, question index and scores stay in Redis.
     await this.prisma.db.gameSession.update({
       where: { gameCode },
       data: { isPlaying: true },
@@ -372,22 +374,6 @@ export class GameEngineService
 
     await this.maybeRevealEarly(gameCode, qIndex);
     return { accepted: true };
-  }
-
-  /**
-   * Legacy-HTTP entry point: answers against whatever question is currently
-   * active. Time is still measured server-side.
-   */
-  async submitAnswerCurrent(
-    gameCode: string,
-    playerId: string,
-    optionId: string,
-  ): Promise<SubmitAnswerAck> {
-    const meta = await this.store.getMeta(gameCode);
-    if (!meta || meta.phase !== "question") {
-      return { accepted: false, reason: "No question is active" };
-    }
-    return this.submitAnswer(gameCode, playerId, meta.qIndex, optionId);
   }
 
   // -- roster / presence -----------------------------------------------------------
@@ -667,13 +653,6 @@ export class GameEngineService
       deadline,
       serverNow: now,
     });
-    // Legacy dual-emit for not-yet-migrated clients.
-    if (index === 0) {
-      this.emitRoom(gameCode).emit("get-question-index", 0);
-    } else {
-      this.emitRoom(gameCode).emit("question-changed", index);
-    }
-    this.emitRoom(gameCode).emit("timer-starts");
 
     this.armTimer(gameCode, deadline - now);
 
@@ -724,14 +703,6 @@ export class GameEngineService
       counts,
       correctOptionIds,
     });
-    // Legacy dual-emit.
-    this.emitRoom(gameCode).emit("displaying-result", {
-      presenter: counts,
-      player: Object.entries(answers).map(([playerId, a]) => ({
-        playerId,
-        isCorrect: a.isCorrect,
-      })),
-    });
 
     // Running leaderboard so the host screen needs no REST round-trip.
     const entries = await this.buildLeaderboard(gameCode);
@@ -756,16 +727,6 @@ export class GameEngineService
 
     const entries = await this.buildLeaderboard(gameCode);
     this.emitRoom(gameCode).emit("leaderboard", { entries, isFinal: true });
-    // Legacy dual-emit, shaped like the old Prisma include result.
-    this.emitRoom(gameCode).emit(
-      "displaying-final-leaderboard",
-      entries.map((e) => ({
-        playerId: e.playerId,
-        score: e.score,
-        position: e.rank,
-        Player: { id: e.playerId, name: e.name, profilePic: e.profilePic },
-      })),
-    );
 
     if (meta.mode === "duel") {
       await this.endGame(gameCode);

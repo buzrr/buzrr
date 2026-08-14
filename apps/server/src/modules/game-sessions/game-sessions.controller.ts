@@ -21,7 +21,6 @@ import { Public } from "../../common/decorators/public.decorator";
 import { RateLimitGuard } from "../../common/guards/rate-limit.guard";
 import { CreateRoomDto } from "./dto/create-room.dto";
 import { JoinRoomDto } from "./dto/join-room.dto";
-import { SubmitAnswerDto } from "./dto/submit-answer.dto";
 import { GameSessionsService } from "./game-sessions.service";
 
 @Controller("game-sessions")
@@ -93,12 +92,5 @@ export class GameSessionsController {
     @Param("playerId") playerId: string,
   ) {
     return this.gameSessions.banPlayerFromRoom(user, roomId, playerId);
-  }
-
-  @Public()
-  @Post(":id/answers")
-  @HttpCode(HttpStatus.NO_CONTENT)
-  submitAnswer(@Param("id") id: string, @Body() dto: SubmitAnswerDto) {
-    return this.gameSessions.submitAnswer(id, dto);
   }
 }

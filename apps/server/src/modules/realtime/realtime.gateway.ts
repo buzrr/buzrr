@@ -358,25 +358,6 @@ export class RealtimeGateway
         this.logger.error("Error ending game session:", error);
       }
     });
-
-    // Legacy v1 host events, accepted as pacing aliases until the web client
-    // is fully migrated. The server ignores every client-supplied index/id —
-    // it alone decides what comes next.
-    const legacyNext = () => {
-      void this.engine
-        .hostNext(gameCode)
-        .catch((error) => this.logger.error("Error advancing game:", error));
-    };
-    socket.on("start-timer", () => {
-      // No-op: the server starts timing when it enters the question phase.
-    });
-    socket.on("set-question-index", legacyNext);
-    socket.on("change-question", legacyNext);
-    socket.on("display-result", legacyNext);
-    socket.on("final-leaderboard", legacyNext);
-    socket.on("display-leaderboard", () => {
-      // No-op: leaderboards are pushed by the engine.
-    });
   }
 
   private registerPlayerHandlers(socket: TypedSocket, gameCode: string): void {
