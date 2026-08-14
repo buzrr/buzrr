@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
@@ -12,7 +11,6 @@ import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
 import { CreateRoomDto } from "./dto/create-room.dto";
 import { JoinRoomDto } from "./dto/join-room.dto";
-import { SubmitAnswerDto } from "./dto/submit-answer.dto";
 
 const generateGameCode = customAlphabet("ABCDEFGHJKMNPQRSTUVWXYZ23456789", 6);
 
@@ -106,44 +104,6 @@ export class GameSessionsService {
     throw new InternalServerErrorException(
       "Could not allocate a unique room code. Please try again.",
     );
-  }
-
-  /**
-   * Legacy fallback route. Scoring and timing are owned by the game engine —
-   * `dto.timeTaken` is deliberately ignored; the server measures time from
-   * the moment it opened the question. Prefer the `submit-answer` socket
-   * event. This route is removed once all clients are migrated.
-   */
-  async submitAnswer(
-    gameSessionId: string,
-    dto: SubmitAnswerDto,
-  ): Promise<void> {
-    const session = await this.prisma.db.gameSession.findUnique({
-      where: { id: gameSessionId },
-      select: { id: true, gameCode: true },
-    });
-    if (!session) {
-      throw new NotFoundException("Game session not found");
-    }
-
-    const player = await this.prisma.db.player.findUnique({
-      where: { id: dto.playerId },
-    });
-    if (!player) {
-      throw new NotFoundException("Player not found");
-    }
-    if (player.gameId !== session.id) {
-      throw new ForbiddenException("Player is not in this game session");
-    }
-
-    const result = await this.engine.submitAnswerCurrent(
-      session.gameCode,
-      dto.playerId,
-      dto.optionId,
-    );
-    if (!result.accepted) {
-      throw new BadRequestException(result.reason ?? "Answer rejected");
-    }
   }
 
   /** Finished games hosted by this user, newest first. */

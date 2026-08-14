@@ -5,8 +5,8 @@ import type {
 } from "../game-engine/game-engine.types";
 
 // ---------------------------------------------------------------------------
-// Contract v2 payloads. The server owns all timing: clients render countdowns
-// from `deadline`, correcting for clock skew via `serverNow`.
+// Socket contract payloads. The server owns all timing: clients render
+// countdowns from `deadline`, correcting for clock skew via `serverNow`.
 // ---------------------------------------------------------------------------
 
 export interface QuestionStartPayload {
@@ -110,7 +110,7 @@ export interface SubmitAnswerAck {
 }
 
 export interface ServerToClientEvents {
-  // -- contract v2 --
+  // -- gameplay --
   "question-start": (payload: QuestionStartPayload) => void;
   "question-end": (payload: QuestionEndPayload) => void;
   "answer-result": (payload: AnswerResultPayload) => void;
@@ -123,7 +123,7 @@ export interface ServerToClientEvents {
   "duel:queued": (payload: { elo: number }) => void;
   "duel:queue-timeout": () => void;
   "duel:error": (payload: { message: string }) => void;
-  // -- shared with v1 --
+  // -- roster & lifecycle --
   "player-joined": (player: {
     id: string;
     name?: string;
@@ -143,16 +143,7 @@ export interface ServerToClientEvents {
     profilePic?: string | null;
   }) => void;
   "game-started": () => void;
-  // -- legacy v1 (dual-emitted until the web client is fully migrated) --
-  "timer-starts": () => void;
-  "get-question-index": (index: number) => void;
-  "question-changed": (index: number) => void;
-  "displaying-result": (data: {
-    presenter: number[];
-    player: { playerId: string; isCorrect: boolean }[];
-  }) => void;
-  "displaying-leaderboard": () => void;
-  "displaying-final-leaderboard": (entries: unknown[]) => void;
+  /** Terminal signal for players: the room is gone, stop rendering it. */
   "game-session-ended": () => void;
 }
 
@@ -168,7 +159,7 @@ export interface ClientToServerEvents {
     payload: { code: string },
     ack: (result: DuelInviteAcceptAck) => void,
   ) => void;
-  // -- contract v2 --
+  // -- gameplay --
   "host-next": () => void;
   "submit-answer": (
     payload: { qIndex: number; optionId: string },
@@ -177,21 +168,10 @@ export interface ClientToServerEvents {
   "request-sync": () => void;
   /** A player voluntarily leaves the room (back / leave-game confirmation). */
   "leave-room": () => void;
-  // -- shared with v1 --
+  // -- host intents (the server decides what each one means) --
   "remove-player": (player: { id: string }, gameCode?: string) => void;
   "start-game": (gameCode?: string) => void;
   "end-game-session": (gameCode?: string) => void;
-  // -- legacy v1 (accepted as aliases until the web client is fully migrated) --
-  "start-timer": (gameCode?: string) => void;
-  "set-question-index": (gameCode: string, index: number) => void;
-  "change-question": (gameCode: string, index: number) => void;
-  "display-result": (
-    gameCode: string,
-    quesId: string,
-    options: { id: string }[],
-  ) => void;
-  "display-leaderboard": () => void;
-  "final-leaderboard": (gameCode?: string) => void;
 }
 
 export interface SocketData {

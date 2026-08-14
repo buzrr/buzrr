@@ -8,12 +8,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import SubmitButton from "@/components/SubmitButton";
 import { useAppDispatch } from "@/state/hooks";
-import {
-  setCurrIndex,
-  setLeaderboard,
-  setPlayers,
-  setResult,
-} from "@/state/admin/playersSlice";
+import { setPlayers } from "@/state/admin/playersSlice";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { hostQuizSchema } from "@/lib/modules/forms/schemas";
 import { useCreateGameSessionMutation } from "@/lib/modules/game-sessions/hooks";
@@ -39,9 +34,6 @@ export default function HostQuizForm(props: {
 
   function resetGameState() {
     dispatch(setPlayers([]));
-    dispatch(setLeaderboard([]));
-    dispatch(setResult([]));
-    dispatch(setCurrIndex(0));
   }
 
   const onSubmit = handleSubmit((data) => {

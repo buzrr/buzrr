@@ -1,6 +1,5 @@
 /**
- * Kahoot-style score decay. Same math as the legacy HTTP scoring path,
- * but in milliseconds and with server-measured time.
+ * Kahoot-style score decay, in milliseconds and over server-measured time.
  * 1000 at t=0 decaying to 100 at the time limit; 0 for wrong answers.
  */
 export function computeScore(

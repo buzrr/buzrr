@@ -19,9 +19,7 @@ export default function AdminGameLobbyClient({
     if (isAxiosError(error)) {
       if (error.response?.status === 404) notFound();
       if (error.response?.status === 403) {
-        return (
-          <p className="p-6 text-dark dark:text-white">Unauthorized</p>
-        );
+        return <p className="p-6 text-dark dark:text-white">Unauthorized</p>;
       }
     }
     return (
@@ -61,7 +59,6 @@ export default function AdminGameLobbyClient({
         gameCode={room.gameCode}
         players={playersForLobby}
         quizQuestions={quiz}
-        currentQues={room.currentQuestion}
       />
     </div>
   );

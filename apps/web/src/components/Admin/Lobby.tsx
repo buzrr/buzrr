@@ -29,7 +29,6 @@ const Lobby = (params: {
   userId: string;
   gameCode: string;
   players: PlayerPayload[];
-  currentQues: number;
   gameStarted: boolean;
   quizTitle: string;
   quizId: string;
