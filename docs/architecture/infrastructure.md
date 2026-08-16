@@ -47,7 +47,7 @@ Templates are the truth: root `.env.example`, `apps/web/.env.example`,
 | `GEMINI_API_KEY`                                 | server            | ➖           | Enables `POST /api/quizzes/ai`.                                                                                          |
 | `CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET`       | server            | ➖           | Enables media on questions.                                                                                              |
 | `RATELIMIT` (+`UPSTASH_REDIS_REST_URL/TOKEN`)    | server            | ➖           | `ON` activates per-IP limits via Upstash REST. `ON` without creds ⇒ guarded routes 503.                                  |
-| `DUEL_BOTS`                                      | server            | ➖           | `OFF` disables the 15s bot fallback in matchmaking.                                                                      |
+| `DUEL_BOTS`                                      | server            | ➖           | `OFF` disables the 12s bot fallback in matchmaking.                                                                      |
 | `GITHUB_TOKEN`                                   | web (SSR)         | ➖           | Higher rate limits for landing-page repo stats.                                                                          |
 
 ### Adding an env var (checklist — five places, easy to miss)

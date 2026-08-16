@@ -31,9 +31,12 @@ const Question = (params: {
    * this the UI would stay locked on an answer the server may never have got.
    */
   const unacked = useRef<string | null>(null);
+  /** The question the UI is on, for discarding acks from a previous one. */
+  const liveQuestionId = useRef(params.question.id);
 
   // A new question means a fresh answer state.
   useEffect(() => {
+    liveQuestionId.current = params.question.id;
     setOptionId("");
     setSubmitted(false);
     unacked.current = null;
@@ -41,6 +44,7 @@ const Question = (params: {
 
   const send = useCallback(
     (optId: string, opts?: { silent?: boolean }) => {
+      const sentFor = liveQuestionId.current;
       unacked.current = optId;
       setOptionId(optId);
       setSubmitted(true);
@@ -48,6 +52,11 @@ const Question = (params: {
         "submit-answer",
         { qIndex, optionId: optId },
         (result) => {
+          // An ack that arrives after the question moved on describes a
+          // question this screen has left. Acting on it would clobber the new
+          // question's state — unlocking an answer already sent for it, or
+          // dropping its pending pick — so ignore it entirely.
+          if (sentFor !== liveQuestionId.current) return;
           if (result.accepted) {
             unacked.current = null;
             return;

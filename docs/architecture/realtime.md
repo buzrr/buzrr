@@ -63,8 +63,8 @@ instanceId)` — a `SET NX PX 20000` owner lock with renew-if-held Lua — so
 
 Grace timers (lobby disconnect 60s, duel forfeit 30s) are **in-memory only**
 (`disconnectTimers`) — they do not survive a restart. The sweeper is the
-backstop for both: the abandon check for classic, `resolvePausedDuel` for
-duels (below).
+backstop for the two that matter: the abandon check for classic, and
+`sweepDuelForfeits` for duel forfeits (below). Lobby removal has none.
 
 ### Paused duels
 
@@ -74,17 +74,31 @@ A duel with **no connected human** is frozen instead of played out
 itself to the end during the 30s forfeit grace, and a player who reconnects in
 time returns to a game that already moved on.
 
-- Pause: timers and the bot answer are cancelled, `pausedAt` goes into meta and
-  the deadline is **parked** so the game stays visible to the sweeper.
+- Pause: `pausedAt` is **claimed** with a Lua compare-and-set
+  (`store.claimPause`) before presence is re-checked, then timers and the bot
+  answer are cancelled and the deadline is **parked** so the game stays visible
+  to the sweeper. Claim-then-recheck is what makes a reconnect racing the
+  disconnect safe: whichever order the two commit in, exactly one side resumes.
 - Resume (`resumeDuel`, from `playerConnected`): every stored timestamp
   (`qDeadline`, `qStartAt`, `botAnswerAt`) is shifted forward by the paused
   span, so the returning player keeps the time they had left and their score
-  decays from the same point. No broadcast — a paused duel has no other
-  connected player, and the gateway's snapshot follows immediately.
+  decays from the same point. Clearing `pausedAt` is itself a claim
+  (`store.claimResume`, one Lua step with the shift) — only the winner re-arms,
+  so two racing resumes can't move the deadlines twice. No broadcast — a paused
+  duel has no other connected player, and the gateway's snapshot follows
+  immediately.
 - `handleDeadline` and `recoverBotAnswer` both no-op while `pausedAt` is set.
-- Still gone after `DUEL_FORFEIT_MS`: the in-memory timer resolves it
-  (`resolveDuelForfeit`), or, if that instance is gone, the sweeper does
-  (`resolvePausedDuel` — lone human forfeits, both gone = abandoned).
+
+### Forfeit backstop
+
+`DUEL_FORFEIT_MS` is enforced by an in-memory timer (`disconnectTimers` →
+`resolveDuelForfeit`), which dies with its instance. `sweepDuelForfeits` re-derives
+it from Redis each sweep: any rostered non-bot player who is `connected: false`
+with `lastSeenAt` older than the grace is resolved through the same
+`resolveDuelForfeit` (opponent still there = forfeit, both gone = abandoned).
+This covers paused duels **and** duels still being played by a connected
+opponent — the latter has no pause to key off, so without it a restart let the
+quitter finish on score instead of forfeiting.
 
 ## Answer path (anti-cheat properties)
 

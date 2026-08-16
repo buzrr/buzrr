@@ -489,27 +489,31 @@ export class GameEngineService
   }
 
   /**
-   * Ends a duel that stayed frozen past the forfeit grace — the backstop for
-   * the in-memory grace timer, which does not survive a restart (or the
-   * instance that armed it going away). A lone human left disconnected loses;
-   * with both sides gone the match is abandoned, exactly as
-   * `resolveDuelForfeit` decides it.
+   * Backstop for the forfeit grace, which is an in-memory timer and therefore
+   * dies with the instance that armed it. `lastSeenAt` is written to the
+   * roster on every disconnect, so any instance can re-derive an overdue
+   * forfeit from Redis alone.
+   *
+   * This covers the paused case *and* the one that is easy to miss: a duel
+   * whose opponent stayed connected is never paused, so before this it relied
+   * entirely on that in-memory timer — a restart meant the quitter simply
+   * played out the match on score instead of forfeiting.
    */
-  private async resolvePausedDuel(
+  private async sweepDuelForfeits(
     gameCode: string,
     meta: GameMeta,
   ): Promise<void> {
     const roster = await this.store.roster(gameCode);
-    const humans = roster.filter((p) => p.id !== meta.botId);
-    if (humans.length === 0 || humans.some((p) => p.connected)) return;
-    this.logger.log(`Duel ${gameCode}: paused past the grace period`);
-    if (humans.length === 1) {
-      await this.endGame(gameCode, {
-        forfeitLoserId: humans[0].userId ?? humans[0].id,
-      });
-    } else {
-      await this.endGame(gameCode, { abandoned: true });
-    }
+    const now = Date.now();
+    const overdue = roster.find(
+      (p) =>
+        p.id !== meta.botId &&
+        !p.connected &&
+        now - p.lastSeenAt > DUEL_FORFEIT_MS,
+    );
+    if (!overdue) return;
+    this.logger.log(`Duel ${gameCode}: ${overdue.id} gone past the grace`);
+    await this.resolveDuelForfeit(gameCode, overdue.id);
   }
 
   /**
@@ -535,11 +539,21 @@ export class GameEngineService
   private async pauseDuel(gameCode: string, meta: GameMeta): Promise<void> {
     if (meta.pausedAt) return;
     if (!["starting", "question", "reveal"].includes(meta.phase)) return;
+    // Claim the pause *before* re-checking presence. The two orderings of a
+    // reconnect racing this are then both covered: one that committed its
+    // roster write earlier is seen by the check below, and one that commits
+    // later is guaranteed to read `pausedAt` and resume. Claiming also means
+    // only one caller ever tears the timers down.
+    if (!(await this.store.claimPause(gameCode, Date.now()))) return;
     this.clearTimer(gameCode);
     this.bots.cancel(gameCode);
-    await this.store.patchMeta(gameCode, { pausedAt: Date.now() });
     await this.store.parkDeadline(gameCode);
     this.logger.log(`Duel ${gameCode} paused: no player connected`);
+
+    if (await this.hasConnectedHuman(gameCode, meta)) {
+      const fresh = await this.store.getMeta(gameCode);
+      if (fresh) await this.resumeDuel(gameCode, fresh);
+    }
   }
 
   /**
@@ -556,13 +570,16 @@ export class GameEngineService
     if (!meta.pausedAt) return;
     const now = Date.now();
     const pausedFor = Math.max(0, now - meta.pausedAt);
-    const patch: Partial<GameMeta> = { pausedAt: 0 };
+    const patch: Partial<GameMeta> = {};
     if (meta.qDeadline > 0) patch.qDeadline = meta.qDeadline + pausedFor;
     if (meta.phase === "question") {
       patch.qStartAt = meta.qStartAt + pausedFor;
       if (meta.botAnswerAt) patch.botAnswerAt = meta.botAnswerAt + pausedFor;
     }
-    await this.store.patchMeta(gameCode, patch);
+    // Clearing `pausedAt` is the claim: whoever wins it is the only caller
+    // that applies the shift and re-arms, so a reconnect racing the sweeper
+    // (or another instance) can't move the deadlines twice.
+    if (!(await this.store.claimResume(gameCode, patch))) return;
 
     if (patch.qDeadline) {
       await this.store.setDeadline(gameCode, patch.qDeadline);
@@ -1011,12 +1028,8 @@ export class GameEngineService
         ) {
           this.logger.warn(`Ending ${code}: host absent for >5min`);
           await this.endGame(code);
-        } else if (
-          meta.mode === "duel" &&
-          meta.pausedAt &&
-          Date.now() - meta.pausedAt > DUEL_FORFEIT_MS
-        ) {
-          await this.resolvePausedDuel(code, meta);
+        } else if (meta.mode === "duel") {
+          await this.sweepDuelForfeits(code, meta);
         }
       } catch (err) {
         this.logger.error(`Sweep abandon check failed for ${code}`, err);

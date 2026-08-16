@@ -65,6 +65,37 @@ redis.call('EXPIRE', KEYS[1], ARGV[3])
 return 1
 `;
 
+// Claims the paused state, so two callers racing the same disconnect can't
+// both pause (only the claimant tears timers down). EXISTS guards against
+// re-creating the meta hash of a game that has already been deleted.
+// KEYS: [1]=meta hash. ARGV: [1]=pausedAt, [2]=TTL.
+const CLAIM_PAUSE_SCRIPT = `
+if redis.call('EXISTS', KEYS[1]) == 0 then
+  return 0
+end
+local paused = redis.call('HGET', KEYS[1], 'pausedAt')
+if paused ~= false and paused ~= '0' then
+  return 0
+end
+redis.call('HSET', KEYS[1], 'pausedAt', ARGV[1])
+redis.call('EXPIRE', KEYS[1], ARGV[2])
+return 1
+`;
+
+// Clears the pause and applies the shifted timestamps in one step, but only
+// while the game is still paused: two racing resumes (a reconnect and the
+// sweeper, or two instances) must not shift the deadlines twice.
+// KEYS: [1]=meta hash. ARGV: [1]=TTL, [2..]=flattened meta pairs.
+const CLAIM_RESUME_SCRIPT = `
+local paused = redis.call('HGET', KEYS[1], 'pausedAt')
+if paused == false or paused == '0' then
+  return 0
+end
+redis.call('HSET', KEYS[1], 'pausedAt', '0', unpack(ARGV, 2))
+redis.call('EXPIRE', KEYS[1], ARGV[1])
+return 1
+`;
+
 // Claims the ended-game transition so only one caller persists the result.
 const CLAIM_ENDED_SCRIPT = `
 local phase = redis.call('HGET', KEYS[1], 'phase')
@@ -142,6 +173,44 @@ export class GameStoreService {
       1,
       keys.meta(code),
       TTL_SECONDS,
+    );
+    return claimed === 1;
+  }
+
+  /**
+   * Claims the paused state for a duel. Returns false if the game is already
+   * paused (or gone), so only one caller stops the timers — the check and the
+   * write are one round trip, which is what makes it safe against a reconnect
+   * racing the disconnect that triggered it.
+   *
+   * Pause/resume skip `patchMeta`, so they don't renew the ban set's TTL —
+   * deliberate: they are duel-only paths and duels have no ban list.
+   */
+  async claimPause(code: string, atMs: number): Promise<boolean> {
+    const claimed = await this.redis.eval(
+      CLAIM_PAUSE_SCRIPT,
+      1,
+      keys.meta(code),
+      String(atMs),
+      TTL_SECONDS,
+    );
+    return claimed === 1;
+  }
+
+  /**
+   * Clears `pausedAt` and applies `patch` (the shifted timestamps) in the same
+   * round trip, only while the game is still paused. Returns false when
+   * another caller already resumed it, so the deadlines can never be shifted
+   * twice by a reconnect racing the sweeper.
+   */
+  async claimResume(code: string, patch: Partial<GameMeta>): Promise<boolean> {
+    const flat = this.flattenMeta({ ...patch, pausedAt: undefined });
+    const claimed = await this.redis.eval(
+      CLAIM_RESUME_SCRIPT,
+      1,
+      keys.meta(code),
+      TTL_SECONDS,
+      ...flat,
     );
     return claimed === 1;
   }

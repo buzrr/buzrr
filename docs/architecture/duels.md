@@ -47,7 +47,7 @@ userId→{name,image,joinedAt}), `mm:duel:lock`.
   `zrem` count check, with rollback if only one was removed — safe across
   instances.
 - Queue timeout 60s → `duel:queue-timeout`.
-- **Bot fallback**: a player alone ≥15s (`BOT_MATCH_MS`) gets a bot — unless
+- **Bot fallback**: a player alone ≥12s (`BOT_MATCH_MS`) gets a bot — unless
   `DUEL_BOTS=OFF`. `tryBotMatch` re-reads the queue first and only bots the
   player if no _reachable_ human exists (someone outside the band doesn't
   block it). Matched payloads for bot duels are shape-identical to human ones
