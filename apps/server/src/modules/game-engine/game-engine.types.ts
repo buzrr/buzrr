@@ -26,6 +26,12 @@ export interface GameMeta {
   /** The bot's answer to the open question, so a restart can re-arm it. */
   botOptionId?: string;
   botAnswerAt?: number;
+  /**
+   * Duels only: when the match was frozen because no human was connected. 0
+   * (or absent) means running; resumeDuel shifts every timestamp below by the
+   * span it was held for.
+   */
+  pausedAt?: number;
   qIndex: number;
   qId: string;
   qStartAt: number;

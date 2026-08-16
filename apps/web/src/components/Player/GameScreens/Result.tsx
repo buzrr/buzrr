@@ -31,9 +31,24 @@ const Result = (params: {
       .filter(Boolean)
       .join(", ") || undefined;
 
+  // Until the personal result lands, "didn't answer" is unknown rather than
+  // true — rendering the timeout verdict in that gap flashes a wrong outcome
+  // at a player who did answer. The server sends it just ahead of the reveal
+  // broadcast, so this placeholder is normally never seen.
+  if (!you) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[85dvh] gap-4">
+        <div className="h-14 w-14 rounded-full border-4 border-light-bg dark:border-off-dark border-t-lprimary dark:border-t-dprimary animate-spin" />
+        <p className="text-off-dark dark:text-off-white">
+          Checking your answer…
+        </p>
+      </div>
+    );
+  }
+
   return (
     <>
-      {!you || !you.answered ? (
+      {!you.answered ? (
         <QuestionAndResult
           quizTitle={params.quizTitle}
           gameCode={params.gameCode}

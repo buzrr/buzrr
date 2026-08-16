@@ -62,8 +62,43 @@ instanceId)` — a `SET NX PX 20000` owner lock with renew-if-held Lua — so
   commands/month at zero users). Don't make them unconditional.
 
 Grace timers (lobby disconnect 60s, duel forfeit 30s) are **in-memory only**
-(`disconnectTimers`) — they do not survive a restart. Accepted trade-off; the
-sweeper's abandon check is the classic-mode backstop.
+(`disconnectTimers`) — they do not survive a restart. The sweeper is the
+backstop for the two that matter: the abandon check for classic, and
+`sweepDuelForfeits` for duel forfeits (below). Lobby removal has none.
+
+### Paused duels
+
+A duel with **no connected human** is frozen instead of played out
+(`pauseDuel`, triggered from `playerDisconnected`; bots are permanently
+`connected` and never count — `hasConnectedHuman`). Otherwise a bot duel runs
+itself to the end during the 30s forfeit grace, and a player who reconnects in
+time returns to a game that already moved on.
+
+- Pause: `pausedAt` is **claimed** with a Lua compare-and-set
+  (`store.claimPause`) before presence is re-checked, then timers and the bot
+  answer are cancelled and the deadline is **parked** so the game stays visible
+  to the sweeper. Claim-then-recheck is what makes a reconnect racing the
+  disconnect safe: whichever order the two commit in, exactly one side resumes.
+- Resume (`resumeDuel`, from `playerConnected`): every stored timestamp
+  (`qDeadline`, `qStartAt`, `botAnswerAt`) is shifted forward by the paused
+  span, so the returning player keeps the time they had left and their score
+  decays from the same point. Clearing `pausedAt` is itself a claim
+  (`store.claimResume`, one Lua step with the shift) — only the winner re-arms,
+  so two racing resumes can't move the deadlines twice. No broadcast — a paused
+  duel has no other connected player, and the gateway's snapshot follows
+  immediately.
+- `handleDeadline` and `recoverBotAnswer` both no-op while `pausedAt` is set.
+
+### Forfeit backstop
+
+`DUEL_FORFEIT_MS` is enforced by an in-memory timer (`disconnectTimers` →
+`resolveDuelForfeit`), which dies with its instance. `sweepDuelForfeits` re-derives
+it from Redis each sweep: any rostered non-bot player who is `connected: false`
+with `lastSeenAt` older than the grace is resolved through the same
+`resolveDuelForfeit` (opponent still there = forfeit, both gone = abandoned).
+This covers paused duels **and** duels still being played by a connected
+opponent — the latter has no pause to key off, so without it a restart let the
+quitter finish on score instead of forfeiting.
 
 ## Answer path (anti-cheat properties)
 
@@ -87,9 +122,20 @@ reveal.
 
 - The server pushes `state-sync` (full snapshot from `getSnapshot`) on every
   connect; clients also may emit `request-sync`. Reconnects therefore need
-  **zero client bookkeeping** — the whole screen re-renders from the snapshot
-  (`apps/web/src/hooks/useGameSocket.ts` → `applySync` in
+  **almost no client bookkeeping** — the whole screen re-renders from the
+  snapshot (`apps/web/src/hooks/useGameSocket.ts` → `applySync` in
   `apps/web/src/state/game/gameSlice.ts`).
+- The one exception is an **answer in flight when the socket dropped**: its ack
+  never fires (socket.io discards pending acks on close) and the buffered emit
+  is dropped server-side if it lands before the gateway registers handlers. So
+  `Question.tsx` treats the snapshot's `you.answered` as the authority —
+  re-sending the pick if the server never got it and the question is still
+  open, unlocking the options if not. Anything less leaves a player locked on
+  an answer that was never recorded, then shown "timed out".
+- `enterReveal` emits each player's `answer-result` **before** the room's
+  `question-end`. The other order flashes the timeout state: clients switch to
+  the reveal screen with no personal result yet, and "no answer" is the only
+  thing that screen can render.
 - All countdowns render from server-issued `deadline` + `serverNow`; the
   client stores `clockOffset = serverNow - Date.now()` and never advances
   phases itself (`useServerCountdown.ts`).
