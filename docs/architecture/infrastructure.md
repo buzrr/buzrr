@@ -17,7 +17,7 @@
 - **Classic room**: sign in as host in one browser, open `/player` (or the
   join link the lobby shows) in an incognito window — guests need no account.
 - **Rated duel**: one signed-in account is enough — queue on `/duel` and a
-  bot matches you after ~15s (`DUEL_BOTS` defaults on). Human-vs-human or
+  bot matches you after ~12s (`DUEL_BOTS` defaults on). Human-vs-human or
   friend invites need **two Google accounts in two browser profiles**.
 - **Empty duel pool** ("No duel questions are available"): build then seed —
   `yarn workspace @buzrr/prisma build && yarn workspace @buzrr/prisma seed:duel`.

@@ -21,6 +21,7 @@ import {
   LeaderboardEntry,
   LiveQuestion,
   RosterEntry,
+  StoredAnswer,
   toPublicQuestion,
 } from "./game-engine.types";
 import { GameStoreService } from "./game-store.service";
@@ -403,6 +404,14 @@ export class GameEngineService
       playerId: player.id,
       connected: true,
     });
+
+    // A duel frozen while this player was away picks up where it stopped.
+    // Awaited before the caller sends its snapshot, so the reconnecting client
+    // renders the resumed deadline rather than the frozen one.
+    const meta = await this.store.getMeta(gameCode);
+    if (meta?.mode === "duel" && meta.pausedAt) {
+      await this.resumeDuel(gameCode, meta);
+    }
     return true;
   }
 
@@ -432,6 +441,13 @@ export class GameEngineService
       }, DUEL_FORFEIT_MS);
       timer.unref();
       this.disconnectTimers.set(graceKey, timer);
+
+      // Nobody left to play it: freeze rather than let the match run on
+      // without them (see pauseDuel) until the forfeit grace decides it.
+      if (!(await this.hasConnectedHuman(gameCode, meta))) {
+        await this.pauseDuel(gameCode, meta);
+        return;
+      }
     } else {
       // In the lobby a dropped player is removed after a grace period;
       // mid-game they keep their score and may rejoin.
@@ -470,6 +486,93 @@ export class GameEngineService
       this.logger.log(`Duel ${gameCode}: both players gone — abandoned`);
       await this.endGame(gameCode, { abandoned: true });
     }
+  }
+
+  /**
+   * Ends a duel that stayed frozen past the forfeit grace — the backstop for
+   * the in-memory grace timer, which does not survive a restart (or the
+   * instance that armed it going away). A lone human left disconnected loses;
+   * with both sides gone the match is abandoned, exactly as
+   * `resolveDuelForfeit` decides it.
+   */
+  private async resolvePausedDuel(
+    gameCode: string,
+    meta: GameMeta,
+  ): Promise<void> {
+    const roster = await this.store.roster(gameCode);
+    const humans = roster.filter((p) => p.id !== meta.botId);
+    if (humans.length === 0 || humans.some((p) => p.connected)) return;
+    this.logger.log(`Duel ${gameCode}: paused past the grace period`);
+    if (humans.length === 1) {
+      await this.endGame(gameCode, {
+        forfeitLoserId: humans[0].userId ?? humans[0].id,
+      });
+    } else {
+      await this.endGame(gameCode, { abandoned: true });
+    }
+  }
+
+  /**
+   * Bots sit in the roster permanently "connected" (they have no socket), so
+   * they never count as someone the match is still being played for.
+   */
+  private async hasConnectedHuman(
+    gameCode: string,
+    meta: GameMeta,
+  ): Promise<boolean> {
+    const roster = await this.store.roster(gameCode);
+    return roster.some((p) => p.connected && p.id !== meta.botId);
+  }
+
+  /**
+   * Freezes a duel nobody is connected to. Without this a bot duel plays
+   * itself out during the 30s forfeit grace — the bot answers, the question
+   * closes early, and a player who reconnects in time comes back to a match
+   * that moved on (or ended) without them. Timers stop and the deadline is
+   * parked so the game stays visible to the sweeper, which decides it if the
+   * player never returns.
+   */
+  private async pauseDuel(gameCode: string, meta: GameMeta): Promise<void> {
+    if (meta.pausedAt) return;
+    if (!["starting", "question", "reveal"].includes(meta.phase)) return;
+    this.clearTimer(gameCode);
+    this.bots.cancel(gameCode);
+    await this.store.patchMeta(gameCode, { pausedAt: Date.now() });
+    await this.store.parkDeadline(gameCode);
+    this.logger.log(`Duel ${gameCode} paused: no player connected`);
+  }
+
+  /**
+   * Restarts a paused duel, shifting every stored timestamp by the frozen
+   * span: the returning player keeps the time they had left on the open
+   * question, their score still decays from the same starting point, and the
+   * bot's planned answer keeps its position inside the question.
+   *
+   * No broadcast is needed — a paused duel has no other connected player, and
+   * the reconnecting one is sent a fresh snapshot by the gateway right after
+   * `playerConnected` (which awaits this) returns.
+   */
+  private async resumeDuel(gameCode: string, meta: GameMeta): Promise<void> {
+    if (!meta.pausedAt) return;
+    const now = Date.now();
+    const pausedFor = Math.max(0, now - meta.pausedAt);
+    const patch: Partial<GameMeta> = { pausedAt: 0 };
+    if (meta.qDeadline > 0) patch.qDeadline = meta.qDeadline + pausedFor;
+    if (meta.phase === "question") {
+      patch.qStartAt = meta.qStartAt + pausedFor;
+      if (meta.botAnswerAt) patch.botAnswerAt = meta.botAnswerAt + pausedFor;
+    }
+    await this.store.patchMeta(gameCode, patch);
+
+    if (patch.qDeadline) {
+      await this.store.setDeadline(gameCode, patch.qDeadline);
+      await this.store.ensureOwner(gameCode, this.instanceId);
+      this.armTimer(gameCode, patch.qDeadline - now);
+    }
+    // Re-arms the bot from the (now shifted) plan in meta, unless it already
+    // answered before the pause.
+    await this.recoverBotAnswer(gameCode);
+    this.logger.log(`Duel ${gameCode} resumed after ${pausedFor}ms paused`);
   }
 
   async removePlayer(gameCode: string, playerId: string): Promise<void> {
@@ -675,7 +778,10 @@ export class GameEngineService
     const questions = await this.store.getQuestions(gameCode);
     const question = questions?.[meta.qIndex];
     if (!question) return;
-    const answers = await this.store.getAnswers(gameCode, meta.qIndex);
+    const [answers, roster] = await Promise.all([
+      this.store.getAnswers(gameCode, meta.qIndex),
+      this.store.roster(gameCode),
+    ]);
 
     const counts = question.options.map(
       (o) => Object.values(answers).filter((a) => a.optionId === o.id).length,
@@ -698,6 +804,25 @@ export class GameEngineService
       await this.store.parkDeadline(gameCode);
     }
 
+    // Personal outcomes to per-player rooms (cross-instance via redis-adapter),
+    // sent *before* the room broadcast that flips clients into the reveal:
+    // arriving after it, a player's own verdict lands on a screen already
+    // rendering "no answer", which reads as a flash of the timeout state.
+    // Built concurrently (and off the answers already read above) so putting
+    // them first costs the room one round trip, not one per player.
+    const results = await Promise.all(
+      roster.map(
+        async (player) =>
+          [
+            player.id,
+            await this.buildAnswerResult(gameCode, meta, player.id, answers),
+          ] as const,
+      ),
+    );
+    for (const [playerId, result] of results) {
+      this.io?.to(`player:${playerId}`).emit("answer-result", result);
+    }
+
     this.emitRoom(gameCode).emit("question-end", {
       index: meta.qIndex,
       counts,
@@ -707,13 +832,6 @@ export class GameEngineService
     // Running leaderboard so the host screen needs no REST round-trip.
     const entries = await this.buildLeaderboard(gameCode);
     this.emitRoom(gameCode).emit("leaderboard", { entries, isFinal: false });
-
-    // Personal outcomes to per-player rooms (cross-instance via redis-adapter).
-    const roster = await this.store.roster(gameCode);
-    for (const player of roster) {
-      const result = await this.buildAnswerResult(gameCode, meta, player.id);
-      this.io?.to(`player:${player.id}`).emit("answer-result", result);
-    }
   }
 
   private async enterFinal(gameCode: string): Promise<void> {
@@ -805,6 +923,8 @@ export class GameEngineService
       await this.store.clearDeadline(gameCode);
       return;
     }
+    // A paused duel advances for nobody; resumeDuel re-arms what is due.
+    if (meta.pausedAt) return;
     switch (meta.phase) {
       case "starting":
         await this.enterQuestion(gameCode, 0, meta);
@@ -849,7 +969,7 @@ export class GameEngineService
   /** Re-arms the answer the bot had already committed to before the restart. */
   private async recoverBotAnswer(gameCode: string): Promise<void> {
     const meta = await this.store.getMeta(gameCode);
-    if (!meta || meta.phase !== "question") return;
+    if (!meta || meta.phase !== "question" || meta.pausedAt) return;
     const { botId, botOptionId, botAnswerAt } = meta;
     if (!botId || !botOptionId || !botAnswerAt) return;
     // Already answered before we went down? submitAnswer is first-write-wins,
@@ -877,21 +997,26 @@ export class GameEngineService
         this.logger.error(`Sweep deadline handling failed for ${code}`, err);
       }
     }
-    // End classic games abandoned by their host mid-game. Parked entries keep
-    // host-paced reveal/final games visible here (see parkDeadline).
+    // End games nobody is coming back to. Parked entries keep both host-paced
+    // classic phases and paused duels visible here (see parkDeadline).
     for (const { code } of deadlines) {
       try {
         const meta = await this.store.getMeta(code);
+        if (!meta || meta.phase === "ended") continue;
         if (
-          meta &&
           meta.mode === "classic" &&
           !meta.hostConnected &&
           meta.phase !== "lobby" &&
-          meta.phase !== "ended" &&
           Date.now() - meta.hostLastSeenAt > HOST_ABANDON_MS
         ) {
           this.logger.warn(`Ending ${code}: host absent for >5min`);
           await this.endGame(code);
+        } else if (
+          meta.mode === "duel" &&
+          meta.pausedAt &&
+          Date.now() - meta.pausedAt > DUEL_FORFEIT_MS
+        ) {
+          await this.resolvePausedDuel(code, meta);
         }
       } catch (err) {
         this.logger.error(`Sweep abandon check failed for ${code}`, err);
@@ -1159,8 +1284,11 @@ export class GameEngineService
     gameCode: string,
     meta: GameMeta,
     playerId: string,
+    /** Pre-read answers for this question, when the caller already has them. */
+    prefetched?: Record<string, StoredAnswer>,
   ): Promise<AnswerResultPayload> {
-    const answers = await this.store.getAnswers(gameCode, meta.qIndex);
+    const answers =
+      prefetched ?? (await this.store.getAnswers(gameCode, meta.qIndex));
     const answer = answers[playerId];
     const [totalScore, rank] = await Promise.all([
       this.store.totalScore(gameCode, playerId),

@@ -21,7 +21,7 @@ const LOCK_KEY = "mm:duel:lock";
 const QUEUE_TIMEOUT_MS = 60_000;
 const TICK_MS = 2_000;
 /** Wait this long with nobody else in the queue and you get a bot. */
-const BOT_MATCH_MS = 15_000;
+const BOT_MATCH_MS = 12_000;
 
 interface QueueEntry {
   userId: string;

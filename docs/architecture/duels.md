@@ -12,7 +12,9 @@ Duels run on the shared engine — read [realtime.md](realtime.md) first.
   in the Redis roster_ (`realtime.gateway.ts` duel branch), not by a DB row.
 - **Requires a signed-in account** (`validateConnection`: JWT or Better Auth
   session cookie; guests can't duel).
-- **Hostless auto-pacing** (4s reveals) and a 30s disconnect forfeit.
+- **Hostless auto-pacing** (4s reveals) and a 30s disconnect forfeit. The
+  match freezes while nobody human is connected and resumes where it stopped —
+  see [realtime.md § Paused duels](realtime.md#paused-duels).
 - **Rated vs unrated**: matchmade duels are rated; friend invites pass
   `rated: false` so two accounts can't farm ELO (`duel-invite.service.ts` →
   `startDuel(..., { rated: false })`).
@@ -68,7 +70,8 @@ userId→{name,image,joinedAt}), `mm:duel:lock`.
   `DuelBotService` just holds the one-per-game timer and submits through the
   normal validated `submitAnswer` path. Bot duels are **rated** (ELO applied
   to the human only), and `resolveDuelForfeit` / forfeit rules apply
-  normally.
+  normally — the human dropping pauses the match rather than letting the bot
+  play it out (realtime.md § Paused duels).
 
 ## Friend invites (`duel-invite.service.ts`)
 

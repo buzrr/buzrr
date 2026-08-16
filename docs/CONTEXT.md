@@ -44,9 +44,9 @@ stats/history, health endpoint, Vercel Analytics.
 2. **Redis is a single point of failure** for all realtime + matchmaking;
    the server won't boot without it. No degraded mode.
 3. **In-memory grace timers** (lobby removal 60s, duel forfeit 30s) die with
-   their instance; classic mode has the sweeper backstop, duels rely on
-   deadlines eventually finishing the game. Rare edge: an instance crash can
-   delay/skip a forfeit.
+   their instance. Both modes now have a sweeper backstop (host-abandon for
+   classic, `resolvePausedDuel` for duels), so a crash delays a forfeit by up
+   to a sweep tick rather than skipping it; lobby removal still has none.
 4. **CORS defaults open**: unset `WEB_ORIGIN` reflects any origin; prod must
    set it (documented in `.env.example`).
 5. **Player row growth**: guest identities are never deleted (by design,

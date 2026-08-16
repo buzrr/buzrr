@@ -121,7 +121,7 @@ const QuestionAndResult = (params: {
         </div>
         {params.screen === "question" ? (
           <div className="w-full p-4 sm:p-6 flex flex-col min-h-full h-fit">
-            <div className="w-full max-w-3xl mx-auto flex flex-col flex-1">
+            <div className="w-full max-w-3xl mx-auto flex flex-col flex-1 justify-center">
               {params.question?.mediaType === "image" && (
                 <Image
                   src={params.question?.media ?? ""}

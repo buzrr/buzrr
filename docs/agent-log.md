@@ -20,6 +20,12 @@ Format:
 
 ## Entries
 
+- 2026-08-16 — Duels now **pause** while no human is connected (`pausedAt` in
+  game meta, parked deadline, `pauseDuel`/`resumeDuel`) instead of letting a
+  bot play the match out during the forfeit grace, and the sweeper gained a
+  `resolvePausedDuel` backstop for the in-memory 30s timer. `enterReveal` also
+  emits personal `answer-result`s before the room's `question-end`. Docs
+  touched: realtime.md, duels.md, CONTEXT.md.
 - 2026-08-14 — Retired the legacy v1 compatibility layer: engine dual-emits,
   gateway v1 host-intent aliases, `POST /game-sessions/:id/answers` (+ DTO,
   `submitAnswerCurrent`), and the vestigial `GameSession.gameState` /
