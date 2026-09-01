@@ -99,7 +99,7 @@ apps/web/src/
 
 ## Buzrr-AI (`apps/ai`)
 
-A fourth, **optional** deployable unit: Python 3.12 + FastAPI on :3002 plus an
+A third, **optional** deployable unit: Python 3.12 + FastAPI on :3002 plus an
 arq worker. Users upload documents into a Knowledge Space; the service indexes
 them (pgvector) and generates cited quiz questions from them. It shares Buzrr's
 Postgres (its own `ai` schema), Redis (`ai:*` keys) and JWT secret, and writes

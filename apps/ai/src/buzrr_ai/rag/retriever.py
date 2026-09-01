@@ -121,15 +121,18 @@ async def _ann_search(
         )
     )
 
-    for fragment in section_filter:
+    for position, fragment in enumerate(section_filter):
         cleaned = fragment.strip()
         if not cleaned:
             continue
         # Match the fragment anywhere in the heading path. `array_to_string`
         # keeps this a single ILIKE rather than an unnest+exists per fragment.
+        # The parameter is named by position: deriving it from the text can
+        # collide ("Unit 4" / "Unit-4"), which silently drops one filter.
+        name = f"frag_{position}"
         stmt = stmt.where(
-            text("array_to_string(chunks.heading_path, ' > ') ILIKE :frag_" + _slug(cleaned))
-        ).params(**{"frag_" + _slug(cleaned): f"%{cleaned}%"})
+            text(f"array_to_string(chunks.heading_path, ' > ') ILIKE :{name}")
+        ).params(**{name: f"%{cleaned}%"})
 
     stmt = stmt.order_by(distance).limit(limit)
 
@@ -152,7 +155,3 @@ async def _ann_search(
             )
         )
     return out
-
-
-def _slug(value: str) -> str:
-    return "".join(ch if ch.isalnum() else "_" for ch in value)[:24] or "f"

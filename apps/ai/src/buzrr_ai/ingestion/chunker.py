@@ -167,20 +167,42 @@ def _overlap_tail(lines: list[str], overlap_tokens: int) -> list[str]:
 
 def _split_oversized(text: str, target_tokens: int) -> list[str]:
     """Sentence-boundary split for a paragraph larger than the whole budget."""
-    sentences = _split_sentences(text)
     pieces: list[str] = []
     buffer: list[str] = []
     tokens = 0
-    for sentence in sentences:
-        cost = estimate_tokens(sentence)
-        if buffer and tokens + cost > target_tokens:
-            pieces.append(" ".join(buffer))
-            buffer, tokens = [], 0
-        buffer.append(sentence)
-        tokens += cost
+    for sentence in _split_sentences(text):
+        # A "sentence" can itself exceed the budget — converted PDFs and OCR
+        # output produce long runs with no sentence punctuation at all, and this
+        # function is the guard that keeps a chunk under the embedding cap.
+        for part in _hard_split(sentence, target_tokens):
+            cost = estimate_tokens(part)
+            if buffer and tokens + cost > target_tokens:
+                pieces.append(" ".join(buffer))
+                buffer, tokens = [], 0
+            buffer.append(part)
+            tokens += cost
     if buffer:
         pieces.append(" ".join(buffer))
     return pieces or [text]
+
+
+def _hard_split(sentence: str, target_tokens: int) -> list[str]:
+    """Last-resort word-count split for a sentence with no usable boundary."""
+    if estimate_tokens(sentence) <= target_tokens:
+        return [sentence]
+    out: list[str] = []
+    buffer: list[str] = []
+    tokens = 0
+    for word in sentence.split(" "):
+        cost = estimate_tokens(word)
+        if buffer and tokens + cost > target_tokens:
+            out.append(" ".join(buffer))
+            buffer, tokens = [], 0
+        buffer.append(word)
+        tokens += cost
+    if buffer:
+        out.append(" ".join(buffer))
+    return out
 
 
 def _split_sentences(text: str) -> list[str]:

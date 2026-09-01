@@ -170,19 +170,40 @@ async def db(engine: AsyncEngine, clean_tables: None) -> AsyncIterator[AsyncSess
 
 
 class StubPipeline:
+    """Counts queued commands so `execute()` returns one reply per command.
+
+    The number of commands per pipeline is the rate limiter's business, not this
+    stub's — returning a fixed-length list would break the moment it changes.
+    """
+
+    def __init__(self) -> None:
+        self.queued = 0
+
     async def __aenter__(self) -> "StubPipeline":
         return self
 
     async def __aexit__(self, *_: object) -> None:
         return None
 
-    def zremrangebyscore(self, *_: object, **__: object) -> None: ...
-    def zcard(self, *_: object, **__: object) -> None: ...
-    def zadd(self, *_: object, **__: object) -> None: ...
-    def expire(self, *_: object, **__: object) -> None: ...
+    def _queue(self) -> None:
+        self.queued += 1
+
+    def zremrangebyscore(self, *_: object, **__: object) -> None:
+        self._queue()
+
+    def zcard(self, *_: object, **__: object) -> None:
+        self._queue()
+
+    def zadd(self, *_: object, **__: object) -> None:
+        self._queue()
+
+    def expire(self, *_: object, **__: object) -> None:
+        self._queue()
 
     async def execute(self) -> list[int]:
-        return [0, 0, 0, 0]  # never rate-limited in tests
+        replies = [0] * self.queued  # zcard is always 0: never rate-limited in tests
+        self.queued = 0
+        return replies
 
 
 class StubQueue:

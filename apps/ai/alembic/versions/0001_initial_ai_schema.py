@@ -21,6 +21,11 @@ EMBEDDING_DIM = 768
 
 
 def upgrade() -> None:
+    # `vector` is an untrusted extension: creating it needs superuser. A
+    # schema-scoped migration role cannot, so the extension must be provisioned
+    # separately (managed Postgres usually offers it as a one-click/DBA step) —
+    # this statement then no-ops for the non-superuser role, because Postgres
+    # short-circuits IF NOT EXISTS before the privilege check.
     op.execute("CREATE EXTENSION IF NOT EXISTS vector")
     op.execute(f'CREATE SCHEMA IF NOT EXISTS "{SCHEMA}"')
 

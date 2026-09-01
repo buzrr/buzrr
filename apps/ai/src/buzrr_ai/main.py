@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from buzrr_ai import health
 from buzrr_ai.api import documents, generation, spaces
 from buzrr_ai.config import get_settings
-from buzrr_ai.deps import close_queue
+from buzrr_ai.deps import close_queue, open_queue
 from buzrr_ai.errors import register_exception_handlers
 from buzrr_ai.logging import configure_logging
 
@@ -30,6 +30,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         embedding_model=settings.ai_embedding_model,
         generation_model=settings.ai_generation_model,
     )
+    try:
+        # Open the queue once here rather than on the first request, so no two
+        # concurrent requests can race to create competing pools.
+        await open_queue()
+    except Exception as exc:  # noqa: BLE001
+        # Not fatal: /health reports Redis down and the guarded lazy path retries.
+        log.warning("queue_open_failed", error=str(exc))
     yield
     await close_queue()
     log.info("stopped")

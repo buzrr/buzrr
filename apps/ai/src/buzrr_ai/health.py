@@ -5,7 +5,9 @@ Shape matches the Nest server's `GET /health` exactly
 semantics — so one uptime check template covers both services.
 """
 
+import asyncio
 import time
+from collections.abc import Coroutine
 
 import structlog
 from arq.connections import ArqRedis
@@ -42,14 +44,20 @@ async def _check_redis() -> str:
         return "down"
 
 
+async def _within_timeout(check: Coroutine[object, object, str], name: str) -> str:
+    """A dependency that does not answer in time is down, not a 500."""
+    try:
+        return await asyncio.wait_for(check, _TIMEOUT_SECONDS)
+    except TimeoutError:
+        log.warning("health_check_timeout", check=name, timeout=_TIMEOUT_SECONDS)
+        return "down"
+
+
 @router.get("/health", include_in_schema=False)
 async def health(response: Response) -> dict[str, object]:
-    import asyncio
-
     database, redis = await asyncio.gather(
-        asyncio.wait_for(_check_database(), _TIMEOUT_SECONDS),
-        asyncio.wait_for(_check_redis(), _TIMEOUT_SECONDS),
-        return_exceptions=False,
+        _within_timeout(_check_database(), "database"),
+        _within_timeout(_check_redis(), "redis"),
     )
 
     healthy = database == "up" and redis == "up"

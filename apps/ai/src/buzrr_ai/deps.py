@@ -1,5 +1,6 @@
 """Shared FastAPI dependencies."""
 
+import asyncio
 from functools import lru_cache
 from typing import Annotated
 
@@ -37,20 +38,33 @@ EmbeddingsDep = Annotated[EmbeddingProvider, Depends(get_embeddings)]
 LLMDep = Annotated[LLMProvider, Depends(get_llm)]
 
 _pool: ArqRedis | None = None
+_pool_lock = asyncio.Lock()
 
 
 async def open_queue() -> ArqRedis:
+    """The one arq pool for this process.
+
+    Opened during startup (`main.lifespan`). The lock guards the remaining lazy
+    path: two concurrent requests on a cold process would otherwise each create
+    a pool, and the discarded one keeps its Redis connections open forever —
+    against the Redis the game engine shares.
+    """
     global _pool
     if _pool is None:
-        _pool = await create_pool(redis_settings(get_settings()), default_queue_name=ARQ_QUEUE)
+        async with _pool_lock:
+            if _pool is None:
+                _pool = await create_pool(
+                    redis_settings(get_settings()), default_queue_name=ARQ_QUEUE
+                )
     return _pool
 
 
 async def close_queue() -> None:
     global _pool
-    if _pool is not None:
-        await _pool.close()
-        _pool = None
+    async with _pool_lock:
+        if _pool is not None:
+            await _pool.close()
+            _pool = None
 
 
 async def get_queue() -> ArqRedis:

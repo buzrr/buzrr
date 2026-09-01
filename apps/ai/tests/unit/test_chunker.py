@@ -75,6 +75,15 @@ def test_oversized_single_paragraph_is_split() -> None:
     assert all(c.token_count <= 400 * 1.2 for c in chunks)
 
 
+def test_oversized_paragraph_without_sentence_punctuation_is_still_split() -> None:
+    # Converted PDFs and OCR output produce long runs with no `.!?;` at all.
+    # Sentence splitting cannot help there, so the cap must still hold.
+    giant = Block("entropy " * 2000, 1)
+    chunks = chunk_blocks([Block("Section", 1, 1), giant], target_tokens=200, max_tokens=400)
+    assert len(chunks) > 1
+    assert all(c.token_count <= 400 * 1.2 for c in chunks)
+
+
 def test_empty_input_yields_no_chunks() -> None:
     assert chunk_blocks([]) == []
 

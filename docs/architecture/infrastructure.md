@@ -116,7 +116,7 @@ repo** — treat the Next CLI as canonical for local work and don't break
 
 ## CI (`.github/workflows/ci.yml`)
 
-One workflow, two jobs, on every push/PR to `main`:
+One workflow, three jobs, on every push/PR to `main`:
 
 1. **build** — real Postgres+Redis service containers; corepack + Yarn 4
    immutable install; `yarn workspace @buzrr/prisma build`; `prisma db push`;

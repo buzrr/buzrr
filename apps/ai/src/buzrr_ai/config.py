@@ -68,10 +68,19 @@ class Settings(BaseSettings):
 
     @field_validator("ai_embedding_dimensions")
     @classmethod
-    def _dims_within_hnsw_limit(cls, v: int) -> int:
-        # pgvector's HNSW index refuses anything above 2000 dimensions.
-        if not 0 < v <= 2000:
-            raise ValueError("ai_embedding_dimensions must be in (0, 2000] for an HNSW index")
+    def _matches_column_width(cls, v: int) -> int:
+        # `chunks.embedding` is `Vector(EMBEDDING_DIM)` and the migration creates
+        # that fixed width, so any other value here boots fine and then fails on
+        # every chunk insert inside the worker. Fail at boot instead.
+        # Imported locally: `db.models` pulls SQLAlchemy, which this module
+        # (loaded by everything, including Alembic's env) has no other need for.
+        from buzrr_ai.db.models import EMBEDDING_DIM
+
+        if v != EMBEDDING_DIM:
+            raise ValueError(
+                f"ai_embedding_dimensions must be {EMBEDDING_DIM} to match the "
+                "chunks.embedding column width; changing it needs a migration"
+            )
         return v
 
     @field_validator("ai_chunk_max_tokens")

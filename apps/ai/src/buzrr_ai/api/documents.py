@@ -65,9 +65,10 @@ async def upload_documents(
         window_seconds=3600,
     )
 
-    max_bytes = settings.ai_max_upload_mb * 1024 * 1024
-    created: list[Document] = []
-
+    # Validate the whole batch first. Rejecting file 3 mid-loop would leave
+    # files 1 and 2 persisted and enqueued while the client sees only a 400 —
+    # orphan documents in the space that the user never knowingly uploaded.
+    names_and_extensions: list[tuple[str, str]] = []
     for upload in files:
         filename = (upload.filename or "untitled").strip()
         extension = Path(filename).suffix.lower()
@@ -76,7 +77,12 @@ async def upload_documents(
                 f"{filename}: unsupported file type. "
                 f"Allowed: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
             )
+        names_and_extensions.append((filename, extension))
 
+    max_bytes = settings.ai_max_upload_mb * 1024 * 1024
+    created: list[Document] = []
+
+    for upload, (filename, extension) in zip(files, names_and_extensions, strict=True):
         # Write to a staging name first — the document id isn't known until the
         # row exists, and the row shouldn't exist until the bytes are safely down.
         staging = storage.temp_path(settings.ai_tmp_dir, uuid.uuid4(), ".part")
