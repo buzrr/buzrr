@@ -20,6 +20,7 @@ Format:
 
 ## Entries
 
+- 2026-08-18 (7440e2d) — Added **`apps/ai`** (Buzrr-AI): a FastAPI + arq service for Knowledge Spaces, document ingestion and cited RAG quiz generation, on a new Alembic-owned `ai` Postgres schema (pgvector) and an `ai:*` Redis prefix, reaching real quizzes only via `POST /api/quizzes/import` on Nest. Docs touched: ai.md (new), ADR-009 (new), overview.md, data.md, auth.md, backend.md, frontend.md, infrastructure.md, invariants.md (#30–#35), ARCHITECTURE.md, AGENTS.md, CONTEXT.md.
 - 2026-08-16 (28aa264 + follow-up) — Duels now **pause** while no human is
   connected (`pausedAt` in game meta, parked deadline, `pauseDuel`/`resumeDuel`,
   both transitions claimed via Lua compare-and-set) instead of letting a bot

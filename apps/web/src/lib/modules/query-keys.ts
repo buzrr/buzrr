@@ -18,6 +18,14 @@ export const queryKeys = {
   users: {
     myStats: ["users", "me", "stats"] as const,
   },
+  ai: {
+    spaces: ["ai", "spaces"] as const,
+    space: (spaceId: string) => ["ai", "spaces", spaceId] as const,
+    spaceStatus: (spaceId: string) =>
+      ["ai", "spaces", spaceId, "status"] as const,
+    runs: (spaceId: string) => ["ai", "spaces", spaceId, "runs"] as const,
+    run: (runId: string) => ["ai", "runs", runId] as const,
+  },
   moderation: {
     queue: ["moderation", "queue"] as const,
   },

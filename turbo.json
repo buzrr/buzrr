@@ -14,18 +14,17 @@
     "UPSTASH_REDIS_REST_URL",
     "UPSTASH_REDIS_REST_TOKEN",
     "RATELIMIT",
-    "NODE_ENV"
+    "NODE_ENV",
+    "AI_DATABASE_URL",
+    "AI_WEB_ORIGIN",
+    "AI_PORT",
+    "NEXT_PUBLIC_AI_API_URL"
   ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [
-        ".next/**",
-        "!.next/cache/**",
-        "dist/**",
-        "generated/**"
-      ]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "generated/**"]
     },
     "lint": {
       "dependsOn": ["^lint"]

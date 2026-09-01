@@ -21,6 +21,12 @@ stats/history, health endpoint, Vercel Analytics.
 - **Moderation & roles** (PR #18), **beta room cap** `hostSizeLimit` (#25),
   **kick/ban** (#35), **friend invites** (#34), **health check** (#37),
   **duel bots** (#39 — current HEAD).
+- **Buzrr-AI (`apps/ai`)** — new Python 3.12 + FastAPI service with an arq
+  worker: Knowledge Spaces, PDF/DOCX/TXT/MD ingestion, pgvector retrieval and
+  cited quiz-question generation, exported into real quizzes via the new
+  `POST /api/quizzes/import`. Optional (hidden when `NEXT_PUBLIC_AI_API_URL` is
+  unset). Local/CI Postgres moved to `pgvector/pgvector:pg16`. See ADR-009 and
+  `docs/architecture/ai.md`.
 - **Legacy contract retired**: the v1 socket dual-emits/aliases, the
   `POST /:id/answers` fallback route and the vestigial
   `GameSession.gameState`/`currentQuestion` columns are gone. The socket
@@ -36,13 +42,16 @@ stats/history, health endpoint, Vercel Analytics.
 
 ## Known debt & risks (grounded, ranked by blast radius)
 
-1. **Zero automated tests.** CI = lint + typecheck + build
-   (`.github/workflows/ci.yml`). The most intricate logic (engine phase
-   machine, Lua-scripted races, ELO transactions) is exactly the kind that
-   regresses silently. Any test infra would be new — there's no
-   runner configured at all.
+1. **Zero automated tests in the Node apps.** CI runs lint + typecheck + build
+   for `apps/web` and `apps/server` (`.github/workflows/ci.yml`). The most
+   intricate logic (engine phase machine, Lua-scripted races, ELO transactions)
+   is exactly the kind that regresses silently, and there is still no runner
+   configured for either app. `apps/ai` does have a pytest suite (75 tests, its
+   own CI job) — a template if that gap ever gets closed, not a fix for it.
 2. **Redis is a single point of failure** for all realtime + matchmaking;
-   the server won't boot without it. No degraded mode.
+   the server won't boot without it. No degraded mode. It now also carries
+   Buzrr-AI's ingestion queue, so an outage degrades two subsystems (AI
+   ingestion is async and retryable, so it degrades more gracefully).
 3. **In-memory grace timers** (lobby removal 60s, duel forfeit 30s) die with
    their instance. Duel forfeits are re-derived from the roster's `lastSeenAt`
    by the sweeper (`sweepDuelForfeits`) and classic has the host-abandon sweep,
@@ -53,8 +62,10 @@ stats/history, health endpoint, Vercel Analytics.
 5. **Player row growth**: guest identities are never deleted (by design,
    ADR-005) and there is no cleanup job.
 6. **Gemini parsing is format-fragile**: `parseQuestions` expects an exact
-   text layout from `gemini-2.5-flash`; model drift breaks AI quiz creation
-   (fails safe with 400/502).
+   text layout from `gemini-3.5-flash`; model drift breaks AI quiz creation
+   (fails safe with 400/502). `apps/ai` uses structured output instead and does
+   not have this problem — `POST /api/quizzes/ai` has **not** been migrated onto
+   it, so the fragile path is still live.
 7. **7-day stateless JWTs**: sign-out/demotion doesn't invalidate minted
    tokens; role checks re-read the DB (mitigates authz), identity itself
    remains valid until expiry.

@@ -1,0 +1,17 @@
+{
+  "name": "ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Turborepo shim for the Python Buzrr-AI service. The real project is pyproject.toml.",
+  "scripts": {
+    "setup": "python3 -m venv .venv && .venv/bin/python -m pip install -q --upgrade pip && .venv/bin/python -m pip install -q -e \".[dev]\"",
+    "dev": "node scripts/run.mjs uvicorn buzrr_ai.main:app --reload --port 3002",
+    "worker": "node scripts/run.mjs arq buzrr_ai.worker.WorkerSettings",
+    "build": "node -e \"console.log('ai: nothing to build — this service ships as a Docker image (apps/ai/Dockerfile).')\"",
+    "check-types": "node scripts/run.mjs mypy src",
+    "lint": "node scripts/run.mjs ruff check src alembic tests",
+    "format": "node scripts/run.mjs ruff format src alembic tests",
+    "test": "node scripts/run.mjs pytest",
+    "migrate:deploy": "node scripts/run.mjs alembic upgrade head"
+  }
+}

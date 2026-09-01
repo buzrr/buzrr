@@ -47,3 +47,11 @@ packages/prisma/generated/
 # Misc
 .DS_Store
 *.pem
+
+# Python (apps/ai)
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

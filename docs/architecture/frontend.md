@@ -7,18 +7,19 @@ setup exists (see [infrastructure.md](infrastructure.md#vinext)).
 
 ## Route map (`src/app/`)
 
-| Route group                                                                     | Audience                  | Gate                                                         |
-| ------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------ |
-| `/` landing, `/changelog`, `/roadmap`, `/docs`, `/support`                      | public                    | —                                                            |
-| `/auth/login`                                                                   | public                    | —                                                            |
-| `/admin/(mains)` — quiz list, history, profile, settings                        | host (account)            | session in `admin/layout.tsx` (+ role via `SessionProvider`) |
-| `/admin/(quiz)/quiz/*` — quiz detail/create, post-game leaderboard              | host                      | same                                                         |
-| `/admin/(gameplay)/play/[roomId]` (lobby) & `/game/[roomId]` (live host screen) | host                      | session per page                                             |
-| `/admin/(privileged)/moderation`                                                | admin+superadmin          | role re-check in `(privileged)/layout.tsx`                   |
-| `/admin/(privileged)/superadmin/admins`                                         | superadmin                | nested layout re-check                                       |
-| `/player`, `/player/joinRoom/[playerId]`, `/player/play/[playerId]`             | anonymous guests          | none (player identity in localStorage)                       |
-| `/join/[gameCode]`                                                              | guests via shared link/QR | none                                                         |
-| `/duel`, `/duel/game/[gameCode]`, `/duel/invite/[code]`, `/duel/profile`        | account                   | per-page `requireDuelSession`                                |
+| Route group                                                                     | Audience                  | Gate                                                          |
+| ------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------- |
+| `/` landing, `/changelog`, `/roadmap`, `/docs`, `/support`                      | public                    | —                                                             |
+| `/auth/login`                                                                   | public                    | —                                                             |
+| `/admin/(mains)` — quiz list, history, profile, settings                        | host (account)            | session in `admin/layout.tsx` (+ role via `SessionProvider`)  |
+| `/admin/(quiz)/quiz/*` — quiz detail/create, post-game leaderboard              | host                      | same                                                          |
+| `/admin/(gameplay)/play/[roomId]` (lobby) & `/game/[roomId]` (live host screen) | host                      | session per page                                              |
+| `/admin/(mains)/ai`, `/admin/ai/[spaceId]` — AI Knowledge Spaces                | host (account)            | same; nav entry hidden unless `NEXT_PUBLIC_AI_API_URL` is set |
+| `/admin/(privileged)/moderation`                                                | admin+superadmin          | role re-check in `(privileged)/layout.tsx`                    |
+| `/admin/(privileged)/superadmin/admins`                                         | superadmin                | nested layout re-check                                        |
+| `/player`, `/player/joinRoom/[playerId]`, `/player/play/[playerId]`             | anonymous guests          | none (player identity in localStorage)                        |
+| `/join/[gameCode]`                                                              | guests via shared link/QR | none                                                          |
+| `/duel`, `/duel/game/[gameCode]`, `/duel/invite/[code]`, `/duel/profile`        | account                   | per-page `requireDuelSession`                                 |
 
 Server components handle session/role gating and param unwrapping; nearly all
 real UI is in `"use client"` components under `src/components/` (`Admin/`,
@@ -60,6 +61,10 @@ Guest identity is _localStorage_, not Redux: `playerId` + `playerToken`
 
 ## API access layer (`src/lib/api/`)
 
+- `ai-client.ts` — `getAiApiClient()` for the Buzrr-AI service
+  (`NEXT_PUBLIC_AI_API_URL` + `/api/ai`). Different origin, **same** token — it
+  reuses `fetchApiAccessToken` because that service verifies the identical JWT.
+  `isAiConfigured()` gates the sidebar entry. See [ai.md](ai.md).
 - `client.ts` — axios instances against `NEXT_PUBLIC_API_URL` (or
   `NEXT_PUBLIC_SOCKET_URL`) + `/api`:
   `getAuthApiClient()` (account JWT interceptor), `createPlayerAuthedApiClient()`
@@ -120,7 +125,9 @@ disconnect`), emits `request-sync` on connect as a safety net, and exposes a
   (`bg-light-bg dark:bg-dark-bg`, `text-dark dark:text-white`) — new UI must
   too.
 - **Shared primitives** in `src/components/ui/` (`Button` with variants,
-  `TextInput`, `IconButton`, `Switch`, `Skeleton`, `RouteLoader`) and shared
+  `TextInput`, `IconButton`, `Switch`, `Skeleton`, `RouteLoader`, plus `Card`
+  /`CardHeader`/`EmptyState`, `Badge` and `Progress` — the first three were
+  promoted out of the local `SettingsCard`/`StatusPill` patterns) and shared
   chrome components (`Modal`, `ConfirmationModal`, `ClientImage` — which
   takes `src` + `darksrc` for theme-aware images like the logo). MUI appears
   only in spots (notably `@mui/x-charts` for the host result chart).

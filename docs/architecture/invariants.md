@@ -129,3 +129,30 @@ the docs, and write an ADR.
 29. **[explicit] DB changes ship as schema + committed migration**
     (CONTRIBUTING.md); local dev may `db push`, production runs
     `migrate deploy`.
+
+## Service boundaries (Buzrr-AI)
+
+30. **[explicit] Alembic owns `ai`; Prisma owns `public`. Neither crosses.**
+    `apps/ai/alembic/env.py` enforces its half with `include_object`; Prisma
+    reports `schema "public"` on every push/migrate. There are deliberately no
+    foreign keys from `ai.*` into `public.users` — `user_id` is a plain text
+    column holding the JWT `sub`. Adding one would couple the two migration
+    tools and break both. Consequence to remember: deleting a user does **not**
+    cascade into the `ai` schema. (ADR-009, [ai.md](ai.md))
+31. **[explicit] The AI service never writes to `public`.** Generated questions
+    become a real quiz only through `POST /api/quizzes/import` on the Nest
+    server, so ownership checks, question `order` and the `moderationStatus`
+    default stay in one place (ADR-007). Don't let `apps/ai` reach into quizzes.
+32. **[explicit] Buzrr-AI is a third JWT _verifier_, not a third identity.**
+    Same `BETTER_AUTH_SECRET`, same claims, and `typ: "player"` is rejected
+    (see #12). Never mint a token there, and never add a separate credential.
+33. **[implied] `ai:` is the AI service's Redis prefix.** Job queue and rate
+    limits live under it; nothing there may touch `game:*`, `games:deadlines`,
+    `mm:duel:*` or `duel:invite:*`, and nothing in the engine may touch `ai:*`.
+34. **[explicit] Source documents are processing inputs, not assets.** They
+    live on ephemeral disk, are deleted on successful ingestion, are kept on
+    failure only so retry can re-parse them, and are reaped by an hourly sweep.
+    They must never be uploaded to Cloudinary or given a public URL.
+35. **[explicit] Every `ai` query is tenant-scoped.** Repository functions take
+    `user_id`; missing and not-yours both return 404 (`"Unauthorized or ..."`),
+    matching the Nest services so ownership never leaks via a 403/404 split.

@@ -1,0 +1,64 @@
+# Render Blueprint for Buzrr-AI (apps/ai).
+#
+# Deploy: Render dashboard → "New +" → "Blueprint" → point at this repo.
+# Field names verified against https://render.com/docs/blueprint-spec and
+# https://render.com/docs/cronjobs.
+#
+# Two services, one image (apps/ai/Dockerfile):
+#   buzrr-ai         Web Service — FastAPI, serves /api/ai/* + /health.
+#   buzrr-ai-ingest  Cron Job    — `arq --burst` on a schedule, not a 24/7
+#                                  Background Worker. Render's Background
+#                                  Worker has no free instance type; Cron Jobs
+#                                  bill per minute actually running instead
+#                                  ($1/mo minimum). See docs/architecture/ai.md.
+#
+# Secrets below use `sync: false` — Render creates a placeholder for each and
+# prompts you to fill in the real value in the dashboard. Nothing secret is
+# committed here. Fill AI_DATABASE_URL / REDIS_URL / BETTER_AUTH_SECRET
+# identically on both services — a mismatch on BETTER_AUTH_SECRET 401s every
+# request; a mismatch on the other two just points the worker at the wrong
+# queue/schema.
+
+services:
+  - type: web
+    name: buzrr-ai
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerContext: apps/ai
+    dockerfilePath: apps/ai/Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: AI_DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: BETTER_AUTH_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: AI_WEB_ORIGIN
+        sync: false
+      - key: AI_PORT
+        value: "3002"
+
+  - type: cron
+    name: buzrr-ai-ingest
+    runtime: docker
+    plan: starter
+    region: oregon
+    schedule: "*/2 * * * *"
+    dockerContext: apps/ai
+    dockerfilePath: apps/ai/Dockerfile
+    dockerCommand: arq buzrr_ai.worker.WorkerSettings --burst
+    envVars:
+      - key: AI_DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: BETTER_AUTH_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: AI_WEB_ORIGIN
+        sync: false

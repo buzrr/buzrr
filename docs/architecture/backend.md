@@ -24,7 +24,7 @@ Global modules: `ConfigModule`, `RedisModule` (3 ioredis clients),
 | `health`        | `GET /health` (no prefix) — pings Postgres + Redis with 2s timeouts; 503 if either is down                                                                                                                                                                       | Prisma, REDIS            |
 | `players`       | `POST /players` (mint guest + player JWT), `PATCH /players/name`, `GET /players/:id`, `PATCH /players/:id/clear-game` — all `@Public()` + rate-limited                                                                                                           | own JwtModule            |
 | `game-sessions` | `POST /game-sessions` (create room), `POST /join`, `GET /player-play/:playerId` (public), `GET /history`, `GET /results/:resultId`, `GET /:roomId/lobby`, `POST /:roomId/end`, `DELETE /:roomId/players/:playerId` (kick), `POST /:roomId/players/:playerId/ban` | GameEngine               |
-| `quizzes`       | CRUD `/quizzes`, `POST /quizzes/ai` (Gemini; `ai` rate profile)                                                                                                                                                                                                  | Gemini via ConfigService |
+| `quizzes`       | CRUD `/quizzes`, `POST /quizzes/ai` (Gemini; `ai` rate profile), `POST /quizzes/import` (batch import from Buzrr-AI)                                                                                                                                             | Gemini via ConfigService |
 | `questions`     | `PATCH /questions/reorder`, `DELETE /questions/:id`, `POST /questions/:id/report`; plus `QuizQuestionsController`: `GET/POST /quizzes/:quizId/questions` (multipart upsert w/ Cloudinary)                                                                        | Cloudinary, Moderation   |
 | `moderation`    | `GET /moderation/questions`, `PATCH .../:id/approve`, `PATCH .../:id/unapprove` — `@Roles("admin","superadmin")`                                                                                                                                                 | —                        |
 | `admin-users`   | `GET /superadmin/users`, `PATCH /superadmin/users/:id/role` — `@Roles("superadmin")`                                                                                                                                                                             | —                        |
@@ -51,7 +51,7 @@ thrown as Nest `HttpException`s from services.
   **Any edit resets `moderationStatus` (public → `pending`), zeroes
   `reportCount`, and deletes existing reports** — approval never survives a
   content change.
-- `POST /quizzes/ai` (`createWithAi`): prompt → `gemini-2.5-flash` → strict
+- `POST /quizzes/ai` (`createWithAi`): prompt → `gemini-3.5-flash` → strict
   text format parsed by `parseQuestions` (4 options, first is correct, then
   shuffled). Timeouts → 503, other API failures → 502, under-generation → 400. Whole quiz insert is one transaction. Requires `GEMINI_API_KEY`.
 

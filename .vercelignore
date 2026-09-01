@@ -2,3 +2,6 @@
 .next/cache
 .turbo
 **/*.tsbuildinfo
+
+# The Python AI service is deployed as a container, not on Vercel.
+apps/ai

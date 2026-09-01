@@ -31,10 +31,11 @@ flowchart LR
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
 | [`apps/web`](apps/web)                           | Next.js 15 app (React 19, MUI, Redux Toolkit, TanStack Query). Hosts the Better Auth endpoints. |
 | [`apps/server`](apps/server)                     | NestJS 11 API + Socket.IO gateway. Owns the realtime game loop.                                 |
+| [`apps/ai`](apps/ai)                             | Python 3.12 + FastAPI + arq. Knowledge Spaces, document RAG, question generation. Optional.     |
 | [`@buzrr/prisma`](packages/prisma)               | Prisma schema, migrations and the shared generated client.                                      |
 | `@repo/eslint-config`, `@repo/typescript-config` | Shared lint/tsconfig presets.                                                                   |
 
-**Tech stack:** TypeScript · Next.js · NestJS · Socket.IO · Prisma · PostgreSQL · Redis · Better Auth · Gemini · Cloudinary · Turborepo · Yarn 4.
+**Tech stack:** TypeScript · Next.js · NestJS · Socket.IO · Prisma · PostgreSQL · Redis · Better Auth · Gemini · Cloudinary · Turborepo · Yarn 4 · Python · FastAPI · pgvector.
 
 The web app owns authentication and almost nothing else: every domain read and
 write goes through the Nest server, which is the only process that touches
@@ -135,6 +136,7 @@ This file is the orientation layer. The full reference lives in
 | Login, JWTs, socket auth, roles, guards                  | [auth.md](docs/architecture/auth.md)                     |
 | Env vars, deployment, CI, Docker, external services      | [infrastructure.md](docs/architecture/infrastructure.md) |
 | Rules you must not break                                 | [invariants.md](docs/architecture/invariants.md)         |
+| Knowledge Spaces, ingestion, RAG, the Python service     | [ai.md](docs/architecture/ai.md)                         |
 | Why it's built this way                                  | [`docs/adr/`](docs/adr/)                                 |
 
 Working on this codebase with an AI agent? [AGENTS.md](AGENTS.md) is the entry

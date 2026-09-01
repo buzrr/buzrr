@@ -11,6 +11,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
 import { CreateAiQuizDto } from "./dto/create-ai-quiz.dto";
+import { ImportQuizDto } from "./dto/import-quiz.dto";
 import { CreateQuizDto } from "./dto/create-quiz.dto";
 
 interface ParsedQuestion {
@@ -64,7 +65,10 @@ export class QuizzesService {
     private readonly config: ConfigService,
   ) {}
 
-  async create(user: AuthUser, dto: CreateQuizDto): Promise<{ quizId: string }> {
+  async create(
+    user: AuthUser,
+    dto: CreateQuizDto,
+  ): Promise<{ quizId: string }> {
     const quiz = await this.prisma.db.quiz.create({
       data: {
         title: dto.title,
@@ -158,6 +162,58 @@ export class QuizzesService {
     return quiz;
   }
 
+  /**
+   * Create a quiz from an externally generated question set (Buzrr-AI).
+   *
+   * Kept on this side of the boundary deliberately: the AI service never writes
+   * to `public`, so quiz ownership, question `order` and the `moderationStatus`
+   * default all stay in one place. New questions land as `draft` — making the
+   * quiz public later moves them to `pending` via `update()`, exactly like
+   * hand-authored ones (ADR-007).
+   *
+   * Note: `AddQuesForm` / `upsertFromMultipart` still assume exactly 4 options,
+   * so a 2-option True/False question imports and *plays* correctly but cannot
+   * yet be edited in the question editor.
+   */
+  async importQuestions(
+    user: AuthUser,
+    dto: ImportQuizDto,
+  ): Promise<{ quizId: string; questionCount: number }> {
+    for (const [index, question] of dto.questions.entries()) {
+      const correct = question.options.filter((o) => o.isCorrect).length;
+      if (correct !== 1) {
+        throw new BadRequestException(
+          `Question ${index + 1} must have exactly one correct option`,
+        );
+      }
+    }
+
+    const quiz = await this.prisma.db.$transaction(async (tx) => {
+      return tx.quiz.create({
+        data: {
+          title: dto.title,
+          description: dto.description ?? null,
+          userId: user.userId,
+          questions: {
+            create: dto.questions.map((question, index) => ({
+              title: question.title,
+              timeOut: question.timeOut ?? 15,
+              order: index + 1,
+              options: {
+                create: question.options.map((option) => ({
+                  title: option.title,
+                  isCorrect: option.isCorrect,
+                })),
+              },
+            })),
+          },
+        },
+      });
+    });
+
+    return { quizId: quiz.id, questionCount: dto.questions.length };
+  }
+
   async createWithAi(
     user: AuthUser,
     dto: CreateAiQuizDto,
@@ -168,7 +224,7 @@ export class QuizzesService {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
     const prompt = `Create a multiple choice question for the following description: ${dto.description}.
         The question should have 4 options and the correct answer should be the first option.
