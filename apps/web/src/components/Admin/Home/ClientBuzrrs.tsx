@@ -41,15 +41,19 @@ export default function ClientBuzrrs({ quizzes }: { quizzes: Quiz[] }) {
     <>
       <div
         className={clsx(
-          "flex gap-3 w-full mt-4 md:max-h-[60vh] overflow-y-auto",
-          view === "list" ? "flex-col" : "flex-row flex-wrap"
+          "w-full mt-4 md:max-h-[60vh] overflow-y-auto gap-3",
+          view === "list"
+            ? "flex flex-col"
+            : "grid grid-cols-2 md:flex md:flex-wrap",
         )}
       >
         <Link
           href="/admin/quiz/createQuiz"
           className={clsx(
             "border border-[#c2b4fe] dark:border-transparent w-full bg-card-light hover:bg-cardhover-light dark:bg-card-dark hover:dark:bg-cardhover-dark transition-all duration-300 ease-in-out text-dark dark:text-white rounded flex justify-center items-center",
-            view === "list" ? "md:w-full flex-row gap-x-3 md:gap-x-1 py-4 px-2" : "p-2 flex-col md:w-40 h-[50vh] md:h-44"
+            view === "list"
+              ? "md:w-full flex-row gap-x-3 md:gap-x-1 py-4 px-2"
+              : "p-2 flex-col h-40 md:w-40 md:h-44",
           )}
         >
           <div className="h-full w-full flex gap-x-4 justify-center items-center">
@@ -74,7 +78,10 @@ export default function ClientBuzrrs({ quizzes }: { quizzes: Quiz[] }) {
             <div className="text-xs font-bold w-full">Create a new quiz</div>
           )}
           <div
-            className={clsx(view === "grid" ? "text-xs" : "text-base", "w-full")}
+            className={clsx(
+              view === "grid" ? "text-xs" : "text-base",
+              "w-full",
+            )}
           >
             Build from the ground up
           </div>
@@ -83,7 +90,9 @@ export default function ClientBuzrrs({ quizzes }: { quizzes: Quiz[] }) {
           href="#"
           className={clsx(
             "border border-[#c2b4fe] dark:border-transparent w-full bg-card-light hover:bg-cardhover-light dark:bg-card-dark hover:dark:bg-cardhover-dark transition-all duration-300 ease-in-out text-dark dark:text-white rounded flex justify-center items-center",
-            view === "list" ? "md:w-full flex-row gap-x-3 md:gap-x-1 py-4 px-2" : "p-2 flex-col md:w-40 h-[50vh] md:h-44"
+            view === "list"
+              ? "md:w-full flex-row gap-x-3 md:gap-x-1 py-4 px-2"
+              : "p-2 flex-col h-40 md:w-40 md:h-44",
           )}
         >
           <div className="h-full w-full flex gap-x-4 justify-center items-center">
@@ -109,7 +118,10 @@ export default function ClientBuzrrs({ quizzes }: { quizzes: Quiz[] }) {
             </div>
           )}
           <div
-            className={clsx(view === "grid" ? "text-xs" : "text-base", "w-full")}
+            className={clsx(
+              view === "grid" ? "text-xs" : "text-base",
+              "w-full",
+            )}
           >
             Coming soon...
           </div>
@@ -124,18 +136,22 @@ export default function ClientBuzrrs({ quizzes }: { quizzes: Quiz[] }) {
               setClicked(true);
               setPoints({ x: e.pageX, y: e.pageY });
               setQuizId(quiz.id);
-
             }}
             className={clsx(
               "border border-[#c2b4fe] dark:border-transparent w-full bg-card-light hover:bg-cardhover-light dark:bg-card-dark hover:dark:bg-cardhover-dark transition-all duration-300 ease-in-out text-dark dark:text-white rounded flex items-center",
-              view === "list" ? "md:w-full flex-row gap-x-3 md:gap-x-1 py-4 px-2" : "p-2 flex-col md:w-40 h-[50vh] md:h-44"
+              view === "list"
+                ? "md:w-full flex-row gap-x-3 md:gap-x-1 py-4 px-2"
+                : "p-2 flex-col h-40 md:w-40 md:h-44",
             )}
           >
             <h2 className="text-md font-bold dark:text-white w-full">
               {quiz.title}
             </h2>
             <p
-              className={clsx(view === "grid" ? "text-xs" : "text-base", "w-full text-off-dark dark:text-off-white")}
+              className={clsx(
+                view === "grid" ? "text-xs" : "text-base",
+                "w-full text-off-dark dark:text-off-white",
+              )}
             >
               {quiz.description}
             </p>

@@ -9,6 +9,12 @@
   waits for Postgres, `prisma db push`, `prisma generate`.
 - `yarn dev` — turborepo runs `next dev` (:3000) + `nest start --watch`
   (:3001). Only manual step: Google OAuth creds in `apps/web/.env`.
+- **Buzrr-AI is opt-in and separate**: `yarn workspace ai setup` (creates
+  `apps/ai/.venv`), then `yarn workspace ai dev` (:3002) and
+  `yarn workspace ai worker`. Or `docker compose --profile ai up -d` to skip the
+  host Python toolchain. `yarn setup`/`yarn dev` are unchanged for everyone else.
+- Local Postgres is **`pgvector/pgvector:pg16`** (was `postgres:16-alpine`) so
+  the `vector` extension exists. Same credentials and volume.
 - Resets: `yarn docker:reset` (wipe volumes + re-setup). DB browsing:
   `yarn db:studio`.
 
@@ -32,23 +38,28 @@
 Templates are the truth: root `.env.example`, `apps/web/.env.example`,
 `apps/server/.env.example`. Summary:
 
-| Var                                              | Used by           | Required     | Notes                                                                                                                    |
-| ------------------------------------------------ | ----------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| `DATABASE_URL` / `DIRECT_URL`                    | both + prisma CLI | ✅           | pg driver adapter; root `.env` feeds the Prisma CLI (`prisma.config.ts` reads `DIRECT_URL`).                             |
-| `BETTER_AUTH_SECRET`                             | both              | ✅           | **Must match across web and server** — the whole trust chain ([auth.md](auth.md)).                                       |
-| `BETTER_AUTH_URL`, `TRUSTED_ORIGINS`             | web               | ✅           | Better Auth base + allowed origins.                                                                                      |
-| `GOOGLE_CLIENT_ID/SECRET`                        | web               | ✅           | Only login method; auth throws without them at first use.                                                                |
-| `REDIS_URL`                                      | server            | ✅           | Server **refuses to boot** without it (`redis.module.ts`). Upstash `rediss://` supported (keepAlive tuned for it).       |
-| `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_SOCKET_URL` | web (browser)     | ✅           | Nest origin, no `/api` suffix (`lib/api/client.ts` appends it).                                                          |
-| `NEXT_PUBLIC_APP_URL`                            | web               | ➖           | Public origin for join/invite links & QR (`lib/join-link.ts`); falls back to `window.location.origin`.                   |
-| `WEB_ORIGIN`                                     | server            | prod ✅      | CORS allow-list (comma-separated). **Unset ⇒ reflect all origins** (`parse-cors-origin.ts`) — fine locally, not in prod. |
-| `PORT` / `API_PORT`                              | server            | ➖           | `API_PORT` wins; default 3001.                                                                                           |
-| `TRUST_PROXY`                                    | server            | behind proxy | Express `trust proxy` for honest `request.ip` (rate limiting).                                                           |
-| `GEMINI_API_KEY`                                 | server            | ➖           | Enables `POST /api/quizzes/ai`.                                                                                          |
-| `CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET`       | server            | ➖           | Enables media on questions.                                                                                              |
-| `RATELIMIT` (+`UPSTASH_REDIS_REST_URL/TOKEN`)    | server            | ➖           | `ON` activates per-IP limits via Upstash REST. `ON` without creds ⇒ guarded routes 503.                                  |
-| `DUEL_BOTS`                                      | server            | ➖           | `OFF` disables the 12s bot fallback in matchmaking.                                                                      |
-| `GITHUB_TOKEN`                                   | web (SSR)         | ➖           | Higher rate limits for landing-page repo stats.                                                                          |
+| Var                                                 | Used by           | Required     | Notes                                                                                                                    |
+| --------------------------------------------------- | ----------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL` / `DIRECT_URL`                       | both + prisma CLI | ✅           | pg driver adapter; root `.env` feeds the Prisma CLI (`prisma.config.ts` reads `DIRECT_URL`).                             |
+| `BETTER_AUTH_SECRET`                                | both              | ✅           | **Must match across web and server** — the whole trust chain ([auth.md](auth.md)).                                       |
+| `BETTER_AUTH_URL`, `TRUSTED_ORIGINS`                | web               | ✅           | Better Auth base + allowed origins.                                                                                      |
+| `GOOGLE_CLIENT_ID/SECRET`                           | web               | ✅           | Only login method; auth throws without them at first use.                                                                |
+| `REDIS_URL`                                         | server            | ✅           | Server **refuses to boot** without it (`redis.module.ts`). Upstash `rediss://` supported (keepAlive tuned for it).       |
+| `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_SOCKET_URL`    | web (browser)     | ✅           | Nest origin, no `/api` suffix (`lib/api/client.ts` appends it).                                                          |
+| `NEXT_PUBLIC_APP_URL`                               | web               | ➖           | Public origin for join/invite links & QR (`lib/join-link.ts`); falls back to `window.location.origin`.                   |
+| `WEB_ORIGIN`                                        | server            | prod ✅      | CORS allow-list (comma-separated). **Unset ⇒ reflect all origins** (`parse-cors-origin.ts`) — fine locally, not in prod. |
+| `PORT` / `API_PORT`                                 | server            | ➖           | `API_PORT` wins; default 3001.                                                                                           |
+| `TRUST_PROXY`                                       | server            | behind proxy | Express `trust proxy` for honest `request.ip` (rate limiting).                                                           |
+| `GEMINI_API_KEY`                                    | server            | ➖           | Enables `POST /api/quizzes/ai`.                                                                                          |
+| `CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET`          | server            | ➖           | Enables media on questions.                                                                                              |
+| `RATELIMIT` (+`UPSTASH_REDIS_REST_URL/TOKEN`)       | server            | ➖           | `ON` activates per-IP limits via Upstash REST. `ON` without creds ⇒ guarded routes 503.                                  |
+| `DUEL_BOTS`                                         | server            | ➖           | `OFF` disables the 12s bot fallback in matchmaking.                                                                      |
+| `GITHUB_TOKEN`                                      | web (SSR)         | ➖           | Higher rate limits for landing-page repo stats.                                                                          |
+| `NEXT_PUBLIC_AI_API_URL`                            | web (browser)     | ➖           | Buzrr-AI origin, no `/api` suffix. **Unset ⇒ the AI Spaces section is hidden entirely.**                                 |
+| `AI_DATABASE_URL`                                   | ai                | ✅           | Same Postgres; owns the `ai` schema only. Prod should use a schema-scoped role.                                          |
+| `AI_WEB_ORIGIN`                                     | ai                | ✅           | CORS allow-list. **Unset fails closed** (deliberately unlike `WEB_ORIGIN`).                                              |
+| `BETTER_AUTH_SECRET`, `REDIS_URL`, `GEMINI_API_KEY` | ai                | ✅           | Shared with the other apps. `GEMINI_API_KEY` is **required** here, unlike on the server.                                 |
+| `AI_PORT`, `AI_TMP_DIR`, `AI_MAX_UPLOAD_MB`, …      | ai                | ➖           | Full list with defaults: `apps/ai/.env.example`.                                                                         |
 
 ### Adding an env var (checklist — five places, easy to miss)
 
@@ -73,6 +84,12 @@ Templates are the truth: root `.env.example`, `apps/web/.env.example`,
   it holds Socket.IO connections, in-process timers, and lazy background
   workers. Prisma `binaryTargets` includes `rhel-openssl-3.0.x` for such
   hosts. Health probe: `GET /health` (200/503 with per-dependency status).
+- **Buzrr-AI → the same kind of container host**, two processes from one image
+  (`apps/ai/Dockerfile`, the repo's first): `uvicorn` and
+  `arq buzrr_ai.worker.WorkerSettings`. Health probe `GET /health`, same shape as
+  the Nest one. Migrations are a release step — `alembic upgrade head`, never at
+  boot, mirroring `prisma migrate deploy`. **The managed Postgres must support
+  the `pgvector` extension.**
 - **Managed Redis (Upstash-compatible)**: `redis.module.ts` and matchmaking/
   sweeper laziness are explicitly tuned for Upstash's per-command pricing and
   idle-connection behavior.
@@ -109,17 +126,24 @@ One workflow, two jobs, on every push/PR to `main`:
 2. **verify-docker-setup** — proves the contributor onboarding path:
    `docker compose up`, wait for health, `db push`, teardown.
 
-Notes: read-only token, concurrency-cancel superseded runs, **no tests exist
-anywhere** — "CI green" means lint+types+build only. Husky pre-commit runs
+3. **python-ai** — pgvector + Redis service containers; setup-python 3.12;
+   `ruff check`, `ruff format --check`, `mypy`, `alembic upgrade head` (proving
+   migrations apply from scratch), then `pytest`. **This is the only job in the
+   repo that runs tests.**
+
+Notes: read-only token, concurrency-cancel superseded runs. For `apps/web` and
+`apps/server`, "CI green" still means lint+types+build only — no tests exist
+there. Husky pre-commit runs
 lint-staged + lint + typecheck locally.
 
 ## External services (integration points)
 
-| Service                     | Where integrated                                             | Failure mode                                                            |
-| --------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| Google OAuth                | web Better Auth (`lib/auth.ts`)                              | login unusable without creds (throws at first auth call)                |
-| Gemini (`gemini-2.5-flash`) | `quizzes.service.ts#createWithAi`                            | 400 if key missing; 502/503 mapped from API errors                      |
-| Cloudinary                  | `common/services/cloudinary.service.ts` ← question upsert    | uploads fail; rest of app unaffected                                    |
-| Upstash REST (rate limit)   | `common/services/rate-limit.service.ts`                      | disabled unless `RATELIMIT=ON`; upstream errors → 503 on guarded routes |
-| GitHub REST                 | `apps/web/src/lib/github-stats.ts` (landing stats, 1h cache) | nulls → UI hides numbers                                                |
-| Vercel Analytics            | web root layout                                              | no-op outside Vercel                                                    |
+| Service                                      | Where integrated                                             | Failure mode                                                            |
+| -------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| Google OAuth                                 | web Better Auth (`lib/auth.ts`)                              | login unusable without creds (throws at first auth call)                |
+| Gemini (`gemini-3.5-flash`)                  | `quizzes.service.ts#createWithAi`                            | 400 if key missing; 502/503 mapped from API errors                      |
+| Gemini (generation + `gemini-embedding-001`) | `apps/ai` (`providers/gemini.py`)                            | retried with backoff, then mapped to the same 502/503 envelope          |
+| Cloudinary                                   | `common/services/cloudinary.service.ts` ← question upsert    | uploads fail; rest of app unaffected                                    |
+| Upstash REST (rate limit)                    | `common/services/rate-limit.service.ts`                      | disabled unless `RATELIMIT=ON`; upstream errors → 503 on guarded routes |
+| GitHub REST                                  | `apps/web/src/lib/github-stats.ts` (landing stats, 1h cache) | nulls → UI hides numbers                                                |
+| Vercel Analytics                             | web root layout                                              | no-op outside Vercel                                                    |

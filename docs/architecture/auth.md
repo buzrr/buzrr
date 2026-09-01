@@ -29,6 +29,11 @@ need cross-app thinking.
    strategy `apps/server/src/modules/auth/jwt.strategy.ts`. It never talks to
    Google and has no login of its own. **Web and server `BETTER_AUTH_SECRET`
    must be identical or every API call 401s.**
+4. **`apps/ai` verifies the very same JWT** (`apps/ai/src/buzrr_ai/auth.py`,
+   PyJWT, HS256, same secret) and rejects `typ: "player"` outright — Knowledge
+   Spaces are account-scoped. It is a third _verifier_, not a third identity:
+   no new secret, no new login, nothing added to the trust chain. All three
+   `BETTER_AUTH_SECRET` values must match ([ai.md](ai.md), ADR-009).
 
 `JwtStrategy.validate` splits on the `typ` claim: `typ === "player"` →
 `{ playerId }`, else `{ userId, email }`. Player JWTs are minted by the server
@@ -96,6 +101,10 @@ state on `io server disconnect` (`useGameSocket.ts`).
   bootstrapped in migration `20260714000001` by email.
 
 ## Rate limiting (adjacent concern)
+
+`apps/ai` rate-limits **per user** instead (embedding/generation cost is
+attributable to an account, and a shared NAT shouldn't let one person exhaust
+everyone's budget) using the shared Redis under `ai:rl:*`.
 
 `RateLimitGuard` + `RateLimitService` (`common/`): Upstash **REST** client
 (separate from the game's ioredis; may point at a different instance), only

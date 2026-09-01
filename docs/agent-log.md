@@ -20,6 +20,16 @@ Format:
 
 ## Entries
 
+- 2026-08-18 — Added **`apps/ai`** (Buzrr-AI): Python 3.12 + FastAPI + arq
+  worker for Knowledge Spaces, document ingestion (PDF/DOCX/TXT/MD) and cited
+  RAG quiz generation. New Postgres schema `ai` (Alembic-owned, pgvector,
+  HNSW) alongside Prisma's `public`; `ai:*` Redis prefix; verifies the existing
+  shared HS256 JWT and rejects `typ: "player"`. Generated questions reach real
+  quizzes only via the new `POST /api/quizzes/import` on Nest. Local/CI Postgres
+  moved to `pgvector/pgvector:pg16`; first Dockerfile and first test suite in
+  the repo. Docs touched: ai.md (new), ADR-009 (new), overview.md, data.md,
+  auth.md, backend.md, frontend.md, infrastructure.md, invariants.md (#30–#35),
+  ARCHITECTURE.md, AGENTS.md, CONTEXT.md.
 - 2026-08-16 (28aa264 + follow-up) — Duels now **pause** while no human is
   connected (`pausedAt` in game meta, parked deadline, `pauseDuel`/`resumeDuel`,
   both transitions claimed via Lua compare-and-set) instead of letting a bot

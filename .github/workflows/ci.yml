@@ -25,7 +25,7 @@ jobs:
     # Real databases so the Next.js build (and any schema work) behaves like prod.
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: buzrr
           POSTGRES_PASSWORD: buzrr
@@ -60,6 +60,7 @@ jobs:
       NEXT_PUBLIC_SOCKET_URL: http://localhost:3001
       NEXT_PUBLIC_API_URL: http://localhost:3001
       RATELIMIT: "OFF"
+      NEXT_PUBLIC_AI_API_URL: http://localhost:3002
 
     steps:
       - uses: actions/checkout@v4
@@ -138,3 +139,81 @@ jobs:
       - name: Tear down
         if: always()
         run: docker compose down -v
+
+  python-ai:
+    name: Buzrr-AI (lint, types, tests)
+    runs-on: ubuntu-latest
+
+    # pgvector, not plain postgres: the AI schema has a vector column and an HNSW
+    # index, and the integration tests exercise both.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: buzrr
+          POSTGRES_PASSWORD: buzrr
+          POSTGRES_DB: buzrr
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U buzrr -d buzrr"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      AI_DATABASE_URL: postgresql://buzrr:buzrr@localhost:5432/buzrr
+      # Test setup drops and recreates the `ai` schema. This service container is
+      # disposable, so it can be the target directly; locally the suite defaults
+      # to a separate `<database>_test` instead of eating your dev data.
+      AI_TEST_DATABASE_URL: postgresql://buzrr:buzrr@localhost:5432/buzrr
+      REDIS_URL: redis://localhost:6379
+      BETTER_AUTH_SECRET: ci-build-secret-not-used-in-production
+      # Never used: both providers are faked in tests.
+      GEMINI_API_KEY: ci-dummy-key
+      AI_WEB_ORIGIN: http://localhost:3000
+      AI_TMP_DIR: /tmp/buzrr-ai-ci
+
+    defaults:
+      run:
+        working-directory: apps/ai
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: apps/ai/pyproject.toml
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Lint
+        run: python -m ruff check src alembic tests
+
+      - name: Format check
+        run: python -m ruff format --check src alembic tests
+
+      - name: Type-check
+        run: python -m mypy src
+
+      - name: Verify migrations apply from scratch
+        run: python -m alembic upgrade head
+
+      - name: Test
+        run: python -m pytest -q

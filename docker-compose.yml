@@ -19,7 +19,7 @@
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: buzrr-postgres
     restart: unless-stopped
     environment:
@@ -52,6 +52,44 @@ services:
       timeout: 5s
       retries: 10
       start_period: 3s
+
+  # The AI service is behind a profile so `docker compose up -d` (and `yarn
+  # setup`) stay exactly as they were for contributors who aren't touching it.
+  #   docker compose --profile ai up -d
+  ai:
+    profiles: ["ai"]
+    build:
+      context: ./apps/ai
+    container_name: buzrr-ai
+    restart: unless-stopped
+    env_file: apps/ai/.env
+    environment:
+      AI_DATABASE_URL: postgresql://buzrr:buzrr@postgres:5432/buzrr
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "3002:3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  ai-worker:
+    profiles: ["ai"]
+    build:
+      context: ./apps/ai
+    container_name: buzrr-ai-worker
+    restart: unless-stopped
+    command: ["arq", "buzrr_ai.worker.WorkerSettings"]
+    env_file: apps/ai/.env
+    environment:
+      AI_DATABASE_URL: postgresql://buzrr:buzrr@postgres:5432/buzrr
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   buzrr-postgres-data:

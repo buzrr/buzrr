@@ -3,9 +3,14 @@
 Two stores with a hard division of labor:
 
 - **PostgreSQL (via Prisma)** — durable domain data: identities, quizzes,
-  lobby records, immutable results, moderation state.
+  lobby records, immutable results, moderation state. All in the **`public`**
+  schema.
 - **Redis (ioredis)** — everything that changes during a live game, plus
   matchmaking queues, invites, locks, and Socket.IO adapter pub/sub.
+
+A **third owner** shares both stores without overlapping either: `apps/ai` owns
+the Postgres `ai` schema (Alembic-migrated, pgvector) and the `ai:*` Redis
+prefix. See [ai.md](ai.md) and [ADR-009](../adr/009-buzrr-ai-rag-service.md).
 
 **Rule: live phase state stays in Redis — no per-answer or mid-game writes to
 Postgres.** The engine comment in `game-store.service.ts` states it: "All state
@@ -54,6 +59,23 @@ There is **no `migrate dev` script anywhere** — migrations are hand-authored:
    `packages/prisma/scripts/seed-duel-starter.mjs` (needs the package built
    first: `yarn workspace @buzrr/prisma build`).
 
+## The `ai` schema (owned by `apps/ai`, not Prisma)
+
+`knowledge_spaces`, `documents`, `chunks` (with a `vector(768)` column and an
+HNSW index), `generation_runs`, `generated_questions`, `question_citations`.
+Migrated by **Alembic** from `apps/ai/alembic/`, never by Prisma.
+
+**Alembic never touches `public`; Prisma never touches `ai`** (invariant #30).
+`alembic/env.py` enforces its half with `include_object`, and Prisma reports
+`schema "public"` on every `db push`/`migrate`. There are deliberately **no
+foreign keys from `ai.*` into `public.users`** — `user_id` is a plain `text`
+column holding the JWT `sub`, which is what lets the two tools stay independent.
+The practical consequence: deleting a Buzrr user does **not** cascade into the
+`ai` schema.
+
+Local Postgres runs `pgvector/pgvector:pg16` (not `postgres:16-alpine`) so the
+`vector` extension is available. Full detail: [ai.md](ai.md).
+
 ## Postgres models (semantics, not a schema dump)
 
 Read `schema.prisma` for fields; what matters is the _meaning_:
@@ -79,19 +101,21 @@ backfill; also documents the seeded system user and initial superadmin).
 All game access goes through `GameStoreService` — **do not** issue raw game
 keys elsewhere. TTL for `game:*` is 6h, renewed on every write.
 
-| Key                                                | Type                 | Written by                                     | Purpose                                                                                                                                                                                                               |
-| -------------------------------------------------- | -------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `game:{code}:meta`                                 | hash                 | store (`initMeta` HSETNX-guarded, `patchMeta`) | `GameMeta`: phase, mode, qIndex/qId/deadlines, hostConnected, `rated`, bot fields (`botId/tier/elo/optionId/answerAt`). Strings on the wire — numeric/boolean fields must be listed in `NUMERIC_META`/`BOOLEAN_META`. |
-| `game:{code}:questions`                            | string (JSON)        | store                                          | Full question snapshot **including `isCorrect`** — server-only; strip via `toPublicQuestion` before emitting.                                                                                                         |
-| `game:{code}:answers:{qIndex}`                     | hash                 | store (`HSETNX` first-write-wins)              | playerId → `StoredAnswer` JSON.                                                                                                                                                                                       |
-| `game:{code}:lb`                                   | zset                 | store (`ZINCRBY`)                              | Live leaderboard, score-descending.                                                                                                                                                                                   |
-| `game:{code}:players`                              | hash                 | store                                          | Roster: playerId → `RosterEntry` JSON (`connected`, `lastSeenAt`, optional `userId` for duels).                                                                                                                       |
-| `game:{code}:banned`                               | set                  | store                                          | Room-scoped ban list; checked atomically with roster writes (`REGISTER_PLAYER_SCRIPT`). Dies with the room.                                                                                                           |
-| `game:{code}:owner`                                | string               | store (`SET NX PX 20000` + renew Lua)          | Timer-ownership lock: one instance drives a game's transitions.                                                                                                                                                       |
-| `games:deadlines`                                  | zset                 | store                                          | Global schedule: code → next transition ms (or far-future "parked" entries so host-paced games stay visible to the sweeper). Drives timer recovery + sweeper.                                                         |
-| `mm:duel:queue` / `mm:duel:meta` / `mm:duel:lock`  | zset / hash / string | `matchmaking.service.ts`                       | ELO queue, member metadata, pairing lock.                                                                                                                                                                             |
-| `duel:invite:{code}` / `duel:invite:host:{userId}` | hash / string        | `duel-invite.service.ts` (Lua scripts)         | Friend-challenge reservation (15min TTL; claimed lingers 60s) + one-pending-invite-per-host index.                                                                                                                    |
-| socket.io adapter channels                         | pub/sub              | `@socket.io/redis-adapter`                     | Cross-instance room broadcasts.                                                                                                                                                                                       |
+| Key                                                | Type                 | Written by                                           | Purpose                                                                                                                                                                                                               |
+| -------------------------------------------------- | -------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `game:{code}:meta`                                 | hash                 | store (`initMeta` HSETNX-guarded, `patchMeta`)       | `GameMeta`: phase, mode, qIndex/qId/deadlines, hostConnected, `rated`, bot fields (`botId/tier/elo/optionId/answerAt`). Strings on the wire — numeric/boolean fields must be listed in `NUMERIC_META`/`BOOLEAN_META`. |
+| `game:{code}:questions`                            | string (JSON)        | store                                                | Full question snapshot **including `isCorrect`** — server-only; strip via `toPublicQuestion` before emitting.                                                                                                         |
+| `game:{code}:answers:{qIndex}`                     | hash                 | store (`HSETNX` first-write-wins)                    | playerId → `StoredAnswer` JSON.                                                                                                                                                                                       |
+| `game:{code}:lb`                                   | zset                 | store (`ZINCRBY`)                                    | Live leaderboard, score-descending.                                                                                                                                                                                   |
+| `game:{code}:players`                              | hash                 | store                                                | Roster: playerId → `RosterEntry` JSON (`connected`, `lastSeenAt`, optional `userId` for duels).                                                                                                                       |
+| `game:{code}:banned`                               | set                  | store                                                | Room-scoped ban list; checked atomically with roster writes (`REGISTER_PLAYER_SCRIPT`). Dies with the room.                                                                                                           |
+| `game:{code}:owner`                                | string               | store (`SET NX PX 20000` + renew Lua)                | Timer-ownership lock: one instance drives a game's transitions.                                                                                                                                                       |
+| `games:deadlines`                                  | zset                 | store                                                | Global schedule: code → next transition ms (or far-future "parked" entries so host-paced games stay visible to the sweeper). Drives timer recovery + sweeper.                                                         |
+| `mm:duel:queue` / `mm:duel:meta` / `mm:duel:lock`  | zset / hash / string | `matchmaking.service.ts`                             | ELO queue, member metadata, pairing lock.                                                                                                                                                                             |
+| `duel:invite:{code}` / `duel:invite:host:{userId}` | hash / string        | `duel-invite.service.ts` (Lua scripts)               | Friend-challenge reservation (15min TTL; claimed lingers 60s) + one-pending-invite-per-host index.                                                                                                                    |
+| `ai:arq:queue*`                                    | arq internals        | Buzrr-AI ingestion job queue (`apps/ai`)             |
+| `ai:rl:{action}:{userId}`                          | zset                 | Buzrr-AI per-user rate limits (uploads, generations) |
+| socket.io adapter channels                         | pub/sub              | `@socket.io/redis-adapter`                           | Cross-instance room broadcasts.                                                                                                                                                                                       |
 
 Three ioredis clients exist (`apps/server/src/redis/redis.module.ts`):
 `REDIS` (commands), `REDIS_PUB`/`REDIS_SUB` (adapter). All from `REDIS_URL`;

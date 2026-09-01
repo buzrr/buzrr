@@ -28,12 +28,15 @@ Turborepo + Yarn 4 workspaces:
 | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | `apps/web`                                             | Next.js 15 frontend (React 19, App Router). Also hosts **Better Auth** (`/api/auth/*`) — the only web-owned API routes. |
 | `apps/server`                                          | NestJS 11 — REST API (`/api/*`) + Socket.IO gateway + the server-authoritative game engine.                             |
+| `apps/ai`                                              | **Buzrr-AI** — Python 3.12 + FastAPI + arq worker. Knowledge Spaces, document ingestion, RAG quiz generation. Optional. |
 | `packages/prisma`                                      | `@buzrr/prisma`: Prisma schema, migrations, generated client, shared by both apps.                                      |
 | `packages/eslint-config`, `packages/typescript-config` | Shared lint/tsconfig presets.                                                                                           |
 | `scripts/setup.mjs`                                    | One-command local bootstrap (Docker Postgres+Redis, .env files, schema push).                                           |
 | `docs/`                                                | Architecture docs, ADRs, current-state context (see below).                                                             |
 
-Local dev: `yarn setup` then `yarn dev` (web :3000, api :3001). Details:
+Local dev: `yarn setup` then `yarn dev` (web :3000, api :3001). The AI service
+is opt-in — `yarn workspace ai setup` then `yarn workspace ai dev` (:3002); with
+`NEXT_PUBLIC_AI_API_URL` unset it is invisible to the rest of the app. Details:
 [docs/architecture/infrastructure.md](docs/architecture/infrastructure.md).
 
 ## Read this before touching anything
@@ -55,6 +58,7 @@ Local dev: `yarn setup` then `yarn dev` (web :3000, api :3001). Details:
 | Login, JWTs, socket auth, roles, guards                                         | [docs/architecture/auth.md](docs/architecture/auth.md)                                                 |
 | REST endpoints, Nest modules, validation, rate limiting, moderation             | [docs/architecture/backend.md](docs/architecture/backend.md)                                           |
 | React pages, components, Redux/React-Query state, socket hooks                  | [docs/architecture/frontend.md](docs/architecture/frontend.md)                                         |
+| Knowledge Spaces, document ingestion, embeddings, RAG, the Python service       | [docs/architecture/ai.md](docs/architecture/ai.md)                                                     |
 | Env vars, deployment, CI, Docker, external services (Gemini/Cloudinary/Upstash) | [docs/architecture/infrastructure.md](docs/architecture/infrastructure.md)                             |
 | "Why is it built this way?"                                                     | [docs/adr/](docs/adr/)                                                                                 |
 

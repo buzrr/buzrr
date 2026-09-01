@@ -97,6 +97,18 @@ apps/web/src/
   components/             # Admin/, Player/, Duel/, Landing/, ui/
 ```
 
+## Buzrr-AI (`apps/ai`)
+
+A fourth, **optional** deployable unit: Python 3.12 + FastAPI on :3002 plus an
+arq worker. Users upload documents into a Knowledge Space; the service indexes
+them (pgvector) and generates cited quiz questions from them. It shares Buzrr's
+Postgres (its own `ai` schema), Redis (`ai:*` keys) and JWT secret, and writes
+nothing to `public` — generated questions become a real quiz only through
+`POST /api/quizzes/import` on the Nest server.
+
+Unset `NEXT_PUBLIC_AI_API_URL` and it disappears from the UI entirely.
+Detail: [ai.md](ai.md) · rationale: [ADR-009](../adr/009-buzrr-ai-rag-service.md).
+
 ## What is deliberately NOT here
 
 - **No message queue / event bus** — cross-instance coordination is Redis

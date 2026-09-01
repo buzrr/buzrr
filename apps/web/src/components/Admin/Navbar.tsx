@@ -12,12 +12,14 @@ import {
   LuLogOut,
   LuSettings,
   LuShieldCheck,
+  LuSparkles,
   LuUserCog,
 } from "react-icons/lu";
 import { useAppSelector, useAppDispatch } from "@/state/hooks";
 import { NavToggle, setNavToggle } from "@/state/admin/navtoggleSlice";
 import { useCurrentRole } from "@/components/SessionProvider";
 import { LICENSE_LINK } from "@/components/Landing/links";
+import { isAiConfigured } from "@/lib/api/ai-client";
 import SignOutButton from "./SignOutButton";
 
 const NavLinks = [
@@ -42,6 +44,11 @@ export default function Navbar() {
 
   const navLinks = [
     ...NavLinks,
+    // Hidden when NEXT_PUBLIC_AI_API_URL is unset, so a contributor running only
+    // web + server doesn't get a nav item that 500s on click.
+    ...(isAiConfigured()
+      ? [{ href: "/admin/ai", label: "AI Spaces", icon: LuSparkles }]
+      : []),
     ...(role === "admin" || role === "superadmin"
       ? [
           {

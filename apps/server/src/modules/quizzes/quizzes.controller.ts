@@ -16,6 +16,7 @@ import { RateLimitProfile } from "../../common/decorators/rate-limit-profile.dec
 import { RateLimitGuard } from "../../common/guards/rate-limit.guard";
 import { CreateAiQuizDto } from "./dto/create-ai-quiz.dto";
 import { CreateQuizDto } from "./dto/create-quiz.dto";
+import { ImportQuizDto } from "./dto/import-quiz.dto";
 import { UpdateQuizDto } from "./dto/update-quiz.dto";
 import { QuizzesService } from "./quizzes.service";
 
@@ -43,6 +44,12 @@ export class QuizzesController {
   @RateLimitProfile("ai")
   createAi(@CurrentAccountUser() user: AuthUser, @Body() dto: CreateAiQuizDto) {
     return this.quizzes.createWithAi(user, dto);
+  }
+
+  @Post("import")
+  @UseGuards(RateLimitGuard)
+  importQuiz(@CurrentAccountUser() user: AuthUser, @Body() dto: ImportQuizDto) {
+    return this.quizzes.importQuestions(user, dto);
   }
 
   @Patch(":id")

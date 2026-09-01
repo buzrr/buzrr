@@ -3875,6 +3875,12 @@ __metadata:
   languageName: node
   linkType: hard
 
+"ai@workspace:apps/ai":
+  version: 0.0.0-use.local
+  resolution: "ai@workspace:apps/ai"
+  languageName: unknown
+  linkType: soft
+
 "ajv-formats@npm:3.0.1":
   version: 3.0.1
   resolution: "ajv-formats@npm:3.0.1"
@@ -11339,7 +11345,6 @@ __metadata:
     "@emotion/react": "npm:^11.14.0"
     "@emotion/styled": "npm:^11.14.1"
     "@eslint/eslintrc": "npm:^3"
-    "@google/generative-ai": "npm:^0.24.1"
     "@hello-pangea/dnd": "npm:^18.0.1"
     "@hookform/resolvers": "npm:^5.2.2"
     "@mui/material": "npm:^7.3.8"

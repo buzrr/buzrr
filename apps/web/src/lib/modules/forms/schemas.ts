@@ -48,3 +48,13 @@ export const addQuestionSchema = z.object({
   choose_option: optionLetter,
   time: z.coerce.number().min(1).optional(),
 });
+
+export const createSpaceSchema = z.object({
+  name: z.string().min(1, "Give your space a name").max(200),
+  description: z.string().max(2000).optional(),
+});
+
+export const generateQuestionsSchema = z.object({
+  prompt: z.string().min(3, "Describe what you want generated").max(2000),
+  count: z.coerce.number().int().min(1).max(30),
+});

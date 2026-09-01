@@ -56,7 +56,7 @@ const LOCAL_REDIS_URL = "redis://localhost:6379";
 /** Reuse an existing BETTER_AUTH_SECRET if one of the env files already has one
  *  (web + server must share it), otherwise mint a new one. */
 function resolveAuthSecret() {
-  for (const rel of ["apps/web/.env", "apps/server/.env"]) {
+  for (const rel of ["apps/web/.env", "apps/server/.env", "apps/ai/.env"]) {
     const p = join(ROOT, rel);
     if (!existsSync(p)) continue;
     const m = readFileSync(p, "utf8").match(
@@ -119,6 +119,10 @@ DIRECT_URL="${LOCAL_DATABASE_URL}"
 # Where the browser reaches the NestJS API (no /api suffix)
 NEXT_PUBLIC_SOCKET_URL="http://localhost:3001"
 NEXT_PUBLIC_API_URL="http://localhost:3001"
+
+# Buzrr-AI service origin (no /api suffix). Unset = the AI Spaces section is
+# hidden from the sidebar, so web + server run fine without it.
+NEXT_PUBLIC_AI_API_URL="http://localhost:3002"
 
 # --- Optional ---
 # AI quiz generation (https://aistudio.google.com/app/apikey)

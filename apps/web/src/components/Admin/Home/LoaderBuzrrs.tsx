@@ -10,7 +10,7 @@ const CardSkeleton = (): React.ReactNode => {
     <div
       className={clsx(
         "border border-[#c2b4fe] dark:border-transparent w-full bg-card-light dark:bg-card-dark text-dark dark:text-white rounded",
-        view === "list" ? "md:w-full py-4 px-2" : "p-2 md:w-40 h-[50vh] md:h-44"
+        view === "list" ? "md:w-full py-4 px-2" : "p-2 h-40 md:w-40 md:h-44",
       )}
     >
       {view === "grid" ? (
@@ -34,7 +34,12 @@ const LoaderBuzrrs = ({ cardCount }: { cardCount: number }) => {
   }
   return (
     <div
-      className={clsx("flex gap-x-3", view === "list" && "flex-col gap-y-3")}
+      className={clsx(
+        "w-full mt-4 gap-3",
+        view === "list"
+          ? "flex flex-col"
+          : "grid grid-cols-2 md:flex md:flex-wrap",
+      )}
     >
       {cards}
     </div>
