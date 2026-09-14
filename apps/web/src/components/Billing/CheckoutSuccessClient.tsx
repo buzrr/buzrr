@@ -46,7 +46,7 @@ export default function CheckoutSuccessClient() {
     return () => timers.forEach(clearTimeout);
   }, [isPro, runSync]);
 
-  if (isPro) {
+  if (isPro && data) {
     return (
       <div className="max-w-lg mx-auto text-center animate-pop-in">
         <LuCircleCheck
