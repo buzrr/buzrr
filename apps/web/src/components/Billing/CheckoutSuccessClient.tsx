@@ -13,6 +13,12 @@ import {
 
 const POLL_MS = 2_000;
 const WAIT_MS = 60_000;
+/**
+ * When to ask the API to pull this account's subscription straight from Dodo.
+ * Covers a slow webhook — and local dev, where no webhook reaches the machine.
+ * Three calls stay well inside the sync route's rate limit.
+ */
+const AUTO_SYNC_AT_MS = [4_000, 15_000, 35_000];
 
 export default function CheckoutSuccessClient() {
   const [timedOut, setTimedOut] = useState(false);
@@ -27,7 +33,18 @@ export default function CheckoutSuccessClient() {
     return () => clearTimeout(timer);
   }, []);
 
-  const isPro = data?.billingEnabled && data.plan === "pro";
+  const isPro = Boolean(data?.billingEnabled && data.plan === "pro");
+
+  // The API still grants only what Dodo reports; this just doesn't wait for
+  // a webhook that may never arrive.
+  const runSync = sync.mutate;
+  useEffect(() => {
+    if (isPro) return;
+    const timers = AUTO_SYNC_AT_MS.map((delay) =>
+      setTimeout(() => runSync(undefined), delay),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [isPro, runSync]);
 
   if (isPro) {
     return (

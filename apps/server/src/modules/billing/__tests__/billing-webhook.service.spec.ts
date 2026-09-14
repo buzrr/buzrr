@@ -25,8 +25,8 @@ import {
   billingConfig,
   createUser,
   deleteUsers,
-  isDatabaseReachable,
   prismaService,
+  requireDatabase,
   signedHeaders,
 } from "./helpers";
 
@@ -55,7 +55,7 @@ describe("BillingWebhookService (Postgres, Dodo API mocked)", () => {
   let dbUp = false;
 
   beforeAll(async () => {
-    dbUp = await isDatabaseReachable();
+    dbUp = await requireDatabase();
   });
 
   afterEach(() => {

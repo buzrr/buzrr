@@ -96,7 +96,7 @@ export class EntitlementsService {
   }
 
   async getEntitlements(userId: string): Promise<Entitlements> {
-    const [plan, user, quizCount, subscription] = await Promise.all([
+    const [plan, user, quizCount, subscriptions] = await Promise.all([
       this.resolvePlan(userId),
       this.prisma.db.user.findUnique({
         where: { id: userId },
@@ -107,14 +107,24 @@ export class EntitlementsService {
         },
       }),
       this.prisma.db.quiz.count({ where: { userId } }),
-      this.prisma.db.subscription.findFirst({
+      this.prisma.db.subscription.findMany({
         where: { userId },
         orderBy: { updatedAt: "desc" },
+        take: 20,
       }),
     ]);
     if (!user) {
       throw new NotFoundException("User not found");
     }
+    // Show the subscription that matters: one granting Pro, else the latest
+    // that got past checkout, else whatever exists. An abandoned `pending`
+    // checkout must never mask a live subscription.
+    const now = new Date();
+    const subscription =
+      subscriptions.find((sub) => isProSubscription(sub, now)) ??
+      subscriptions.find((sub) => sub.status !== "pending") ??
+      subscriptions[0] ??
+      null;
 
     const limits = PLAN_LIMITS[plan];
     let aiTokensUsed: number;
@@ -177,10 +187,17 @@ export class EntitlementsService {
    * can't both see 9 quizzes and land on 11.
    */
   async assertQuizCapacity(tx: Db, userId: string): Promise<void> {
+    // Lock before anything else. A missing row (e.g. a still-valid JWT for a
+    // deleted account) becomes a 404 here instead of a foreign-key failure on
+    // the quiz insert — on every plan, including unlimited ones.
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "users" WHERE "id" = ${userId} FOR UPDATE`;
+    if (locked.length === 0) {
+      throw new NotFoundException("User not found");
+    }
     const plan = await this.resolvePlan(userId, tx);
     const max = PLAN_LIMITS[plan].maxQuizzes;
     if (max === null) return;
-    await tx.$queryRaw`SELECT "id" FROM "users" WHERE "id" = ${userId} FOR UPDATE`;
     const count = await tx.quiz.count({ where: { userId } });
     if (count >= max) {
       throw planLimitError(

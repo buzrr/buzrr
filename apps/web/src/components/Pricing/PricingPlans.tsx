@@ -55,7 +55,8 @@ export default function PricingPlans({
   const amount = pricing?.amount ?? FALLBACK_PRICING[region].amount;
   const priceLoading = !resolved || pricingQuery.isPending;
 
-  const { data: entitlements } = useEntitlementsQuery({ enabled: signedIn });
+  const { data: entitlements, isPending: entitlementsPending } =
+    useEntitlementsQuery({ enabled: signedIn });
   const plan = entitlements?.plan;
   const billingOff = entitlements ? !entitlements.billingEnabled : false;
 
@@ -69,6 +70,10 @@ export default function PricingPlans({
           Get Buzrr Pro
         </Link>
       );
+    }
+    // Until the plan loads, don't offer an upgrade a Pro user doesn't need.
+    if (entitlementsPending) {
+      return <span className={ctaDisabled}>Loading…</span>;
     }
     if (billingOff) {
       return (

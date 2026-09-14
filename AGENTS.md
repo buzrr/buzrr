@@ -121,7 +121,9 @@ keep `docs/CONTEXT.md` about the present, not history.
 
 - Conventional Commits (`feat:`, `fix:`, `refactor:`…) — see CONTRIBUTING.md.
 - Husky pre-commit runs `lint-staged` + `yarn lint` + `yarn check-types`.
-- CI = lint, typecheck, build (no test suite exists — don't claim tests pass).
+- CI = lint, typecheck, `yarn workspace server test` (vitest billing specs
+  against Postgres), build; `apps/ai` has its own pytest job. The web app and
+  the game engine have no tests — don't claim those pass.
 - DB changes go through `packages/prisma/schema.prisma` **plus** a migration in
   `packages/prisma/migrations/` for anything headed to production (local dev
   uses `db push`).

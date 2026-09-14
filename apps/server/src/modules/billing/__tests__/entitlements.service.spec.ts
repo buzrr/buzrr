@@ -1,4 +1,4 @@
-import { ForbiddenException } from "@nestjs/common";
+import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@buzrr/prisma";
 import type { SubscriptionStatus } from "@buzrr/prisma";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -12,8 +12,8 @@ import {
   createSubscription,
   createUser,
   deleteUsers,
-  isDatabaseReachable,
   prismaService,
+  requireDatabase,
 } from "./helpers";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -99,7 +99,7 @@ describe("EntitlementsService (Postgres)", () => {
   }
 
   beforeAll(async () => {
-    dbUp = await isDatabaseReachable();
+    dbUp = await requireDatabase();
   });
 
   afterAll(async () => {
@@ -166,6 +166,26 @@ describe("EntitlementsService (Postgres)", () => {
       prisma.$transaction((tx) => service.assertQuizCapacity(tx, userId)),
       "quizzes",
     );
+  });
+
+  it("returns 404, not an FK error, for a token whose user no longer exists", async (ctx) => {
+    if (!dbUp) ctx.skip();
+    await expect(
+      prisma.$transaction((tx) =>
+        service.assertQuizCapacity(tx, "user-that-does-not-exist"),
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("reports the live subscription, not a newer abandoned checkout", async (ctx) => {
+    if (!dbUp) ctx.skip();
+    const userId = await user();
+    await createSubscription(userId, { status: "active" });
+    await createSubscription(userId, { status: "pending" });
+
+    const entitlements = await service.getEntitlements(userId);
+    expect(entitlements.plan).toBe("pro");
+    expect(entitlements.subscription?.status).toBe("active");
   });
 
   it("lets Pro users create past 10 quizzes", async (ctx) => {

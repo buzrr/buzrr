@@ -42,13 +42,26 @@ export function signedHeaders(
   };
 }
 
-export async function isDatabaseReachable(): Promise<boolean> {
+async function isDatabaseReachable(): Promise<boolean> {
   try {
     await prisma.$queryRaw`SELECT 1`;
     return true;
   } catch {
     return false;
   }
+}
+
+/**
+ * The billing specs need Postgres. An unreachable database fails the suite so
+ * CI can never go green by skipping; set `BILLING_TESTS_ALLOW_NO_DB=1` to skip
+ * the database tests locally instead.
+ */
+export async function requireDatabase(): Promise<boolean> {
+  if (await isDatabaseReachable()) return true;
+  if (process.env.BILLING_TESTS_ALLOW_NO_DB === "1") return false;
+  throw new Error(
+    "Postgres is unreachable (check DATABASE_URL). Set BILLING_TESTS_ALLOW_NO_DB=1 to skip the database-backed billing tests locally.",
+  );
 }
 
 export async function createUser(): Promise<string> {
