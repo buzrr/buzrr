@@ -27,6 +27,7 @@ export function useCreateQuizMutation() {
     mutationFn: quizzesApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.quizzes.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.billing.me });
     },
   });
 }
@@ -37,6 +38,11 @@ export function useCreateAiQuizMutation() {
     mutationFn: quizzesApi.createAi,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.quizzes.all });
+    },
+    // A generation spends an AI token on success and refunds it on failure;
+    // either way the usage numbers changed.
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.billing.me });
     },
   });
 }
@@ -68,6 +74,8 @@ export function useDeleteQuizMutation() {
     mutationFn: quizzesApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.quizzes.all });
+      // Frees a slot under the Free plan's quiz cap.
+      queryClient.invalidateQueries({ queryKey: queryKeys.billing.me });
     },
   });
 }

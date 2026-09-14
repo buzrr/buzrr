@@ -45,7 +45,7 @@ export default function AdminPlayClient({
     );
   }
 
-  const { room, players, quiz, maxPlayers } = data;
+  const { room, players, quiz, maxPlayers, plan } = data;
   const playersForLobby = players.map((p) => ({
     ...p,
     profilePic: p.profilePic ?? undefined,
@@ -61,6 +61,7 @@ export default function AdminPlayClient({
       players={playersForLobby}
       gameStarted={room.isPlaying}
       maxPlayers={maxPlayers}
+      plan={plan}
     />
   );
 }

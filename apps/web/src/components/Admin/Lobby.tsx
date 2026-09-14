@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import { removePlayer, setPlayers } from "@/state/admin/playersSlice";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { RxCross2 } from "react-icons/rx";
 import { LuBan } from "react-icons/lu";
@@ -33,6 +34,7 @@ const Lobby = (params: {
   quizTitle: string;
   quizId: string;
   maxPlayers?: number;
+  plan?: "free" | "pro";
 }) => {
   const dispatch = useAppDispatch();
   const players = useAppSelector((state) => state.player.players);
@@ -182,8 +184,19 @@ const Lobby = (params: {
         </div>
 
         <p className="mt-4 md:mt-6 text-xs text-stone-500 dark:text-stone-400 text-center max-w-md">
-          Rooms are capped at {maxPlayers} players while Buzrr is in beta on
-          free-tier infrastructure.
+          This room can hold up to {maxPlayers} players.
+          {params.plan === "free" && (
+            <>
+              {" "}
+              <Link
+                href="/pricing"
+                className="font-bold text-lprimary dark:text-dprimary underline underline-offset-2"
+              >
+                Upgrade to Pro
+              </Link>{" "}
+              for rooms of up to 250.
+            </>
+          )}
         </p>
 
         <div className="h-fit mt-8 mx-auto max-h-[40vh] flex flex-wrap justify-center overflow-y-auto gap-y-4 gap-x-3 w-full">

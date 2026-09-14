@@ -38,28 +38,35 @@
 Templates are the truth: root `.env.example`, `apps/web/.env.example`,
 `apps/server/.env.example`. Summary:
 
-| Var                                                 | Used by           | Required     | Notes                                                                                                                    |
-| --------------------------------------------------- | ----------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| `DATABASE_URL` / `DIRECT_URL`                       | both + prisma CLI | ✅           | pg driver adapter; root `.env` feeds the Prisma CLI (`prisma.config.ts` reads `DIRECT_URL`).                             |
-| `BETTER_AUTH_SECRET`                                | both              | ✅           | **Must match across web and server** — the whole trust chain ([auth.md](auth.md)).                                       |
-| `BETTER_AUTH_URL`, `TRUSTED_ORIGINS`                | web               | ✅           | Better Auth base + allowed origins.                                                                                      |
-| `GOOGLE_CLIENT_ID/SECRET`                           | web               | ✅           | Only login method; auth throws without them at first use.                                                                |
-| `REDIS_URL`                                         | server            | ✅           | Server **refuses to boot** without it (`redis.module.ts`). Upstash `rediss://` supported (keepAlive tuned for it).       |
-| `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_SOCKET_URL`    | web (browser)     | ✅           | Nest origin, no `/api` suffix (`lib/api/client.ts` appends it).                                                          |
-| `NEXT_PUBLIC_APP_URL`                               | web               | ➖           | Public origin for join/invite links & QR (`lib/join-link.ts`); falls back to `window.location.origin`.                   |
-| `WEB_ORIGIN`                                        | server            | prod ✅      | CORS allow-list (comma-separated). **Unset ⇒ reflect all origins** (`parse-cors-origin.ts`) — fine locally, not in prod. |
-| `PORT` / `API_PORT`                                 | server            | ➖           | `API_PORT` wins; default 3001.                                                                                           |
-| `TRUST_PROXY`                                       | server            | behind proxy | Express `trust proxy` for honest `request.ip` (rate limiting).                                                           |
-| `GEMINI_API_KEY`                                    | server            | ➖           | Enables `POST /api/quizzes/ai`.                                                                                          |
-| `CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET`          | server            | ➖           | Enables media on questions.                                                                                              |
-| `RATELIMIT` (+`UPSTASH_REDIS_REST_URL/TOKEN`)       | server            | ➖           | `ON` activates per-IP limits via Upstash REST. `ON` without creds ⇒ guarded routes 503.                                  |
-| `DUEL_BOTS`                                         | server            | ➖           | `OFF` disables the 12s bot fallback in matchmaking.                                                                      |
-| `GITHUB_TOKEN`                                      | web (SSR)         | ➖           | Higher rate limits for landing-page repo stats.                                                                          |
-| `NEXT_PUBLIC_AI_API_URL`                            | web (browser)     | ➖           | Buzrr-AI origin, no `/api` suffix. **Unset ⇒ the AI Spaces section is hidden entirely.**                                 |
-| `AI_DATABASE_URL`                                   | ai                | ✅           | Same Postgres; owns the `ai` schema only. Prod should use a schema-scoped role.                                          |
-| `AI_WEB_ORIGIN`                                     | ai                | ✅           | CORS allow-list. **Unset fails closed** (deliberately unlike `WEB_ORIGIN`).                                              |
-| `BETTER_AUTH_SECRET`, `REDIS_URL`, `GEMINI_API_KEY` | ai                | ✅           | Shared with the other apps. `GEMINI_API_KEY` is **required** here, unlike on the server.                                 |
-| `AI_PORT`, `AI_TMP_DIR`, `AI_MAX_UPLOAD_MB`, …      | ai                | ➖           | Full list with defaults: `apps/ai/.env.example`.                                                                         |
+| Var                                                                         | Used by                    | Required     | Notes                                                                                                                                        |
+| --------------------------------------------------------------------------- | -------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL` / `DIRECT_URL`                                               | both + prisma CLI          | ✅           | pg driver adapter; root `.env` feeds the Prisma CLI (`prisma.config.ts` reads `DIRECT_URL`).                                                 |
+| `BETTER_AUTH_SECRET`                                                        | both                       | ✅           | **Must match across web and server** — the whole trust chain ([auth.md](auth.md)).                                                           |
+| `BETTER_AUTH_URL`, `TRUSTED_ORIGINS`                                        | web                        | ✅           | Better Auth base + allowed origins.                                                                                                          |
+| `GOOGLE_CLIENT_ID/SECRET`                                                   | web                        | ✅           | Only login method; auth throws without them at first use.                                                                                    |
+| `REDIS_URL`                                                                 | server                     | ✅           | Server **refuses to boot** without it (`redis.module.ts`). Upstash `rediss://` supported (keepAlive tuned for it).                           |
+| `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_SOCKET_URL`                            | web (browser)              | ✅           | Nest origin, no `/api` suffix (`lib/api/client.ts` appends it).                                                                              |
+| `NEXT_PUBLIC_APP_URL`                                                       | web                        | ➖           | Public origin for join/invite links & QR (`lib/join-link.ts`); falls back to `window.location.origin`.                                       |
+| `WEB_ORIGIN`                                                                | server                     | prod ✅      | CORS allow-list (comma-separated). **Unset ⇒ reflect all origins** (`parse-cors-origin.ts`) — fine locally, not in prod.                     |
+| `PORT` / `API_PORT`                                                         | server                     | ➖           | `API_PORT` wins; default 3001.                                                                                                               |
+| `TRUST_PROXY`                                                               | server                     | behind proxy | Express `trust proxy` for honest `request.ip` (rate limiting).                                                                               |
+| `GEMINI_API_KEY`                                                            | server                     | ➖           | Enables `POST /api/quizzes/ai`.                                                                                                              |
+| `CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET`                                  | server                     | ➖           | Enables media on questions.                                                                                                                  |
+| `RATELIMIT` (+`UPSTASH_REDIS_REST_URL/TOKEN`)                               | server                     | ➖           | `ON` activates per-IP limits via Upstash REST. `ON` without creds ⇒ guarded routes 503.                                                      |
+| `DUEL_BOTS`                                                                 | server                     | ➖           | `OFF` disables the 12s bot fallback in matchmaking.                                                                                          |
+| `BILLING`                                                                   | server                     | ➖           | `ON` enables Buzrr Pro. Unset ⇒ no billing and everyone gets Pro limits; `ON` without the Dodo vars ⇒ server refuses to boot.                |
+| `DODO_PAYMENTS_API_KEY`, `DODO_PRO_PRODUCT_ID`, `DODO_PAYMENTS_ENVIRONMENT` | server                     | billing      | Dodo API key, the Pro product (`pdt_…`), and `test_mode`\|`live_mode` (anything else ⇒ test).                                                |
+| `DODO_PAYMENTS_WEBHOOK_KEY`                                                 | server + web (server-side) | billing      | Webhook signing secret. **Must match on both** — each verifies the signature. Never `NEXT_PUBLIC_`.                                          |
+| `APP_URL`                                                                   | server                     | billing      | Public web origin for checkout `return_url`/`cancel_url` and the portal return URL.                                                          |
+| `DODO_PROMO_DISCOUNT_CODE`                                                  | server                     | ➖           | Dodo discount code auto-applied to checkouts and shown on `/pricing`; validated live against Dodo (dates, redemptions, product restriction). |
+| `API_INTERNAL_URL`                                                          | web (server)               | ➖           | Private Nest origin for the webhook forwarder; falls back to `NEXT_PUBLIC_API_URL`.                                                          |
+| `GITHUB_TOKEN`                                                              | web (SSR)                  | ➖           | Higher rate limits for landing-page repo stats.                                                                                              |
+| `NEXT_PUBLIC_AI_API_URL`                                                    | web (browser)              | ➖           | Buzrr-AI origin, no `/api` suffix. **Unset ⇒ the AI Spaces section is hidden entirely.**                                                     |
+| `AI_DATABASE_URL`                                                           | ai                         | ✅           | Same Postgres; owns the `ai` schema only. Prod should use a schema-scoped role.                                                              |
+| `AI_WEB_ORIGIN`                                                             | ai                         | ✅           | CORS allow-list. **Unset fails closed** (deliberately unlike `WEB_ORIGIN`).                                                                  |
+| `BETTER_AUTH_SECRET`, `REDIS_URL`, `GEMINI_API_KEY`                         | ai                         | ✅           | Shared with the other apps. `GEMINI_API_KEY` is **required** here, unlike on the server.                                                     |
+| `AI_PORT`, `AI_TMP_DIR`, `AI_MAX_UPLOAD_MB`, …                              | ai                         | ➖           | Full list with defaults: `apps/ai/.env.example`.                                                                                             |
+| `AI_BUZRR_API_URL`                                                          | ai                         | ✅           | Nest origin (no `/api`); each generation reserves an AI plan token there. Unreachable ⇒ generation fails closed (503).                       |
 
 ### Adding an env var (checklist — five places, easy to miss)
 
@@ -93,6 +100,16 @@ Templates are the truth: root `.env.example`, `apps/web/.env.example`,
 - **Managed Redis (Upstash-compatible)**: `redis.module.ts` and matchmaking/
   sweeper laziness are explicitly tuned for Upstash's per-command pricing and
   idle-connection behavior.
+- **Buzrr Pro billing (optional).** To turn it on:
+  - Set `BILLING=ON` plus the Dodo vars on the server, and
+    `DODO_PAYMENTS_WEBHOOK_KEY` on the web app.
+  - Register `https://<web>/api/webhooks/dodo` in the Dodo dashboard,
+    subscribed to the events listed in ADR-010.
+  - Create the Pro product with an INR localized price of ₹399 (39900 paise;
+    `by_country` + `IN`, or `by_currency`). Turn Adaptive Currency off if
+    everyone outside India should be charged in USD.
+  - Set `AI_BUZRR_API_URL` on `apps/ai`.
+  - Apply migration `20260914000001` with `migrate:deploy`.
 - **Production DB migrations**: `yarn workspace @buzrr/prisma migrate:deploy`
   (`prisma migrate deploy`); local dev uses `db push` instead. Never
   `db push` against prod.
@@ -122,28 +139,29 @@ One workflow, three jobs, on every push/PR to `main`:
    immutable install; `yarn workspace @buzrr/prisma build`; `prisma db push`;
    `yarn lint` (web only — root script filters `--filter=web`);
    `yarn check-types` (root tsc -b for server+prisma, then web tsc);
-   `yarn build` (everything, via turbo).
+   `yarn workspace server test` (vitest billing specs against the Postgres
+   service); `yarn build` (everything, via turbo).
 2. **verify-docker-setup** — proves the contributor onboarding path:
    `docker compose up`, wait for health, `db push`, teardown.
 
 3. **python-ai** — pgvector + Redis service containers; setup-python 3.12;
    `ruff check`, `ruff format --check`, `mypy`, `alembic upgrade head` (proving
-   migrations apply from scratch), then `pytest`. **This is the only job in the
-   repo that runs tests.**
+   migrations apply from scratch), then `pytest`.
 
-Notes: read-only token, concurrency-cancel superseded runs. For `apps/web` and
-`apps/server`, "CI green" still means lint+types+build only — no tests exist
-there. Husky pre-commit runs
+Notes: read-only token, concurrency-cancel superseded runs. For `apps/web`,
+"CI green" still means lint+types+build only; `apps/server` runs only the
+billing specs (`src/modules/billing/__tests__`) — the game engine is untested. Husky pre-commit runs
 lint-staged + lint + typecheck locally.
 
 ## External services (integration points)
 
-| Service                                      | Where integrated                                             | Failure mode                                                            |
-| -------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| Google OAuth                                 | web Better Auth (`lib/auth.ts`)                              | login unusable without creds (throws at first auth call)                |
-| Gemini (`gemini-3.5-flash`)                  | `quizzes.service.ts#createWithAi`                            | 400 if key missing; 502/503 mapped from API errors                      |
-| Gemini (generation + `gemini-embedding-001`) | `apps/ai` (`providers/gemini.py`)                            | retried with backoff, then mapped to the same 502/503 envelope          |
-| Cloudinary                                   | `common/services/cloudinary.service.ts` ← question upsert    | uploads fail; rest of app unaffected                                    |
-| Upstash REST (rate limit)                    | `common/services/rate-limit.service.ts`                      | disabled unless `RATELIMIT=ON`; upstream errors → 503 on guarded routes |
-| GitHub REST                                  | `apps/web/src/lib/github-stats.ts` (landing stats, 1h cache) | nulls → UI hides numbers                                                |
-| Vercel Analytics                             | web root layout                                              | no-op outside Vercel                                                    |
+| Service                                      | Where integrated                                                                                                                  | Failure mode                                                                                                      |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Google OAuth                                 | web Better Auth (`lib/auth.ts`)                                                                                                   | login unusable without creds (throws at first auth call)                                                          |
+| Gemini (`gemini-3.5-flash`)                  | `quizzes.service.ts#createWithAi`                                                                                                 | 400 if key missing; 502/503 mapped from API errors                                                                |
+| Gemini (generation + `gemini-embedding-001`) | `apps/ai` (`providers/gemini.py`)                                                                                                 | retried with backoff, then mapped to the same 502/503 envelope                                                    |
+| Cloudinary                                   | `common/services/cloudinary.service.ts` ← question upsert                                                                         | uploads fail; rest of app unaffected                                                                              |
+| Upstash REST (rate limit)                    | `common/services/rate-limit.service.ts`                                                                                           | disabled unless `RATELIMIT=ON`; upstream errors → 503 on guarded routes                                           |
+| GitHub REST                                  | `apps/web/src/lib/github-stats.ts` (landing stats, 1h cache)                                                                      | nulls → UI hides numbers                                                                                          |
+| Vercel Analytics                             | web root layout                                                                                                                   | no-op outside Vercel                                                                                              |
+| Dodo Payments                                | `apps/server/src/modules/billing` (checkout, portal, `subscriptions.retrieve`); webhooks via `apps/web/src/app/api/webhooks/dodo` | only with `BILLING=ON`; outage ⇒ webhooks 503 and get redelivered, checkout/portal 502; existing plans unaffected |

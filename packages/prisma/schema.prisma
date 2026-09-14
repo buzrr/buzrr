@@ -53,15 +53,27 @@ model User {
   emailVerified     Boolean          @default(false) @map("email_verified")
   eloRating         Int              @default(1200) @map("elo_rating")
   duelsPlayed       Int              @default(0) @map("duels_played")
-  /// Max players this user may have in a hosted room (beta / free-tier cap).
+  /// Manual per-user room-size override. The effective cap is
+  /// max(plan cap, hostSizeLimit) — see billing/entitlements.service.ts.
   hostSizeLimit     Int              @default(50) @map("host_size_limit")
   role              Role             @default(user)
+  /// Dodo Payments customer, set by the first verified billing webhook.
+  dodoCustomerId    String?          @unique @map("dodo_customer_id")
+  /// Lifetime Free-plan AI generations spent (never refills).
+  freeAiTokensUsed  Int              @default(0) @map("free_ai_tokens_used")
+  /// Pro AI generations spent in the rolling 7-day window starting at
+  /// `proAiWindowStart`; the window resets lazily on the next reservation.
+  proAiTokensUsed   Int              @default(0) @map("pro_ai_tokens_used")
+  proAiWindowStart  DateTime?        @map("pro_ai_window_start")
   hostedResults     GameResult[]
   GameSessions      GameSession[]
   quizzes           Quiz[]
   accounts          Account[]
   sessions          Session[]
   reportedQuestions QuestionReport[]
+  subscriptions     Subscription[]
+  payments          Payment[]
+  aiTokenReservations AiTokenReservation[]
 
   @@index([role])
   @@map("users")
@@ -200,6 +212,106 @@ model GameResultEntry {
   result       GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+/// Mirror of a Dodo Payments subscription. Written only by verified webhooks or
+/// server-side Dodo fetches (billing-webhook.service.ts) — never by client
+/// input. Plan entitlements are derived from these rows on every check.
+model Subscription {
+  id                 String             @id @default(cuid())
+  userId             String?            @map("user_id")
+  dodoSubscriptionId String             @unique @map("dodo_subscription_id")
+  dodoCustomerId     String             @map("dodo_customer_id")
+  productId          String             @map("product_id")
+  status             SubscriptionStatus
+  currency           String
+  recurringAmount    Int                @map("recurring_amount")
+  currentPeriodStart DateTime?          @map("current_period_start")
+  currentPeriodEnd   DateTime?          @map("current_period_end")
+  cancelAtPeriodEnd  Boolean            @default(false) @map("cancel_at_period_end")
+  cancelledAt        DateTime?          @map("cancelled_at")
+  lastSyncedAt       DateTime           @default(now()) @map("last_synced_at")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @default(now()) @updatedAt @map("updated_at")
+  user               User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([dodoCustomerId])
+  @@map("subscriptions")
+}
+
+/// Idempotency ledger for Dodo webhooks, keyed by the `webhook-id` header.
+/// The claim is inserted in the same transaction as the event's effects.
+model BillingEvent {
+  webhookId  String   @id @map("webhook_id")
+  type       String
+  objectId   String?  @map("object_id")
+  receivedAt DateTime @default(now()) @map("received_at")
+
+  @@map("billing_events")
+}
+
+/// Audit trail of Dodo payments seen via webhooks.
+model Payment {
+  id                 String   @id @default(cuid())
+  dodoPaymentId      String   @unique @map("dodo_payment_id")
+  userId             String?  @map("user_id")
+  dodoSubscriptionId String?  @map("dodo_subscription_id")
+  status             String
+  amount             Int
+  currency           String
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at")
+  user               User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("payments")
+}
+
+/// One AI generation's token spend. Refundable once (via its hashed release
+/// token) if the generation fails; otherwise it simply stays consumed.
+model AiTokenReservation {
+  id               String                   @id @default(cuid())
+  userId           String                   @map("user_id")
+  source           AiTokenSource
+  bucket           AiTokenBucket
+  /// The Pro window the token came from — a refund never lands in a newer one.
+  windowStart      DateTime?                @map("window_start")
+  status           AiTokenReservationStatus @default(consumed)
+  releaseTokenHash String                   @map("release_token_hash")
+  createdAt        DateTime                 @default(now()) @map("created_at")
+  user             User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("ai_token_reservations")
+}
+
+/// Mirrors Dodo's `SubscriptionStatus`. Only `active` (and a still-paid-for
+/// cancel-at-period-end `cancelled`) grants Pro — see isProSubscription().
+enum SubscriptionStatus {
+  pending
+  active
+  on_hold
+  paused
+  past_due
+  cancelled
+  failed
+  expired
+}
+
+enum AiTokenSource {
+  quiz_ai
+  rag
+}
+
+enum AiTokenBucket {
+  free
+  pro
+}
+
+enum AiTokenReservationStatus {
+  consumed
+  refunded
 }
 
 enum GameMode {

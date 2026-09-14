@@ -52,6 +52,28 @@ class TooManyRequests(AppError):
         super().__init__(status_code=429, detail=message)
 
 
+class PlanLimitReached(AppError):
+    """403 — the account's AI generation allowance is spent.
+
+    Carries Nest's `PLAN_LIMIT` fields (`code`, `limit`, `max`, `resetsAt`) through
+    unchanged so the web client shows the same upgrade prompt for both services.
+    """
+
+    def __init__(self, message: str, extra: dict[str, Any]) -> None:
+        super().__init__(status_code=403, detail=message)
+        self.extra = extra
+
+
+class BillingUnavailable(AppError):
+    """503 — the Nest billing ledger couldn't be reached, so generation fails closed."""
+
+    def __init__(
+        self,
+        message: str = "Couldn't check your AI generation allowance. Please try again shortly.",
+    ) -> None:
+        super().__init__(status_code=503, detail=message)
+
+
 class UpstreamError(AppError):
     """502 — the model provider failed."""
 
@@ -92,7 +114,8 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(HTTPException)
     async def _http(_: Request, exc: HTTPException) -> JSONResponse:
         detail = exc.detail if isinstance(exc.detail, str | list) else str(exc.detail)
-        return _envelope(exc.status_code, detail)
+        extra = exc.extra if isinstance(exc, PlanLimitReached) else {}
+        return _envelope(exc.status_code, detail, **extra)
 
     @app.exception_handler(RequestValidationError)
     async def _validation(_: Request, exc: RequestValidationError) -> JSONResponse:

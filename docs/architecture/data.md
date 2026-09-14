@@ -80,21 +80,49 @@ Local Postgres runs `pgvector/pgvector:pg16` (not `postgres:16-alpine`) so the
 
 Read `schema.prisma` for fields; what matters is the _meaning_:
 
-| Model                                | Role                                                                                                                                                                                                                                                                                                                         | Notes agents get wrong                                                                                                           |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `User`                               | Signed-in account (Google via Better Auth). Carries `eloRating` (default 1200), `duelsPlayed`, `hostSizeLimit` (room cap, default 50), `role` (`user\|admin\|superadmin`).                                                                                                                                                   | Role is read fresh from DB on every privileged check — never cached in tokens.                                                   |
-| `Account`, `Session`, `Verification` | Better Auth tables (`@@map`ped to `accounts`/`sessions`/`verification`). Written by the **web** app's Better Auth adapter; the server only _reads_ `Session` for socket cookie auth.                                                                                                                                         | Don't hand-write these; Better Auth owns their shape.                                                                            |
-| `Player`                             | **Ephemeral guest identity** for classic mode. Created anonymously (`POST /api/players`), joined to a room by setting `gameId`, detached (never deleted) when the game ends or they're kicked.                                                                                                                               | Player rows accumulate forever by design (identity survives across rooms). A ban does _not_ live here — it's Redis, room-scoped. |
-| `Quiz` / `Question` / `Option`       | Host-authored content. `Question.order` is a 1-based dense sequence maintained by reorder/delete transactions (`questions.service.ts`). `Quiz.isPublic` + `Question.moderationStatus` gate the duel pool.                                                                                                                    | Editing a question resets it to `pending` (if public) and wipes its reports — approval does not survive edits.                   |
-| `QuestionReport`                     | One row per distinct reporter (`@@unique([questionId, reporterUserId])`); >5 distinct reports auto-unapprove.                                                                                                                                                                                                                | Reports are deleted on approve/unapprove/edit.                                                                                   |
-| `GameSession`                        | Classic **lobby record only**: `gameCode` (unique, 6-char), `quizId`, `creatorId`, `isPlaying`. Deleted when the game ends.                                                                                                                                                                                                  | `isPlaying` is the only gameplay flag here — phase and question index live in Redis. Duels have **no** GameSession.              |
-| `GameResult` / `GameResultEntry`     | The only durable trace of a finished game (schema comment: "Immutable record of a finished game"). Entries snapshot `playerName`/`profilePic` because Player rows are ephemeral; `userId` set for signed-in participants; `eloBefore/After` for rated duels. Nullable `quizId`/`hostId` survive later deletion of quiz/host. | Never mutate results; append-only. Read paths: host history, duel history, profile stats.                                        |
+| Model                                | Role                                                                                                                                                                                                                                                                                                                                                  | Notes agents get wrong                                                                                                                     |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `User`                               | Signed-in account (Google via Better Auth). Carries `eloRating` (default 1200), `duelsPlayed`, `hostSizeLimit` (manual room-cap override, default 50 — effective cap is `max(plan cap, hostSizeLimit)`), `role` (`user\|admin\|superadmin`), `dodoCustomerId`, and the AI token counters (`freeAiTokensUsed`, `proAiTokensUsed`, `proAiWindowStart`). | Role and plan are read fresh from DB on every check — never cached in tokens.                                                              |
+| `Account`, `Session`, `Verification` | Better Auth tables (`@@map`ped to `accounts`/`sessions`/`verification`). Written by the **web** app's Better Auth adapter; the server only _reads_ `Session` for socket cookie auth.                                                                                                                                                                  | Don't hand-write these; Better Auth owns their shape.                                                                                      |
+| `Player`                             | **Ephemeral guest identity** for classic mode. Created anonymously (`POST /api/players`), joined to a room by setting `gameId`, detached (never deleted) when the game ends or they're kicked.                                                                                                                                                        | Player rows accumulate forever by design (identity survives across rooms). A ban does _not_ live here — it's Redis, room-scoped.           |
+| `Quiz` / `Question` / `Option`       | Host-authored content. `Question.order` is a 1-based dense sequence maintained by reorder/delete transactions (`questions.service.ts`). `Quiz.isPublic` + `Question.moderationStatus` gate the duel pool.                                                                                                                                             | Editing a question resets it to `pending` (if public) and wipes its reports — approval does not survive edits.                             |
+| `QuestionReport`                     | One row per distinct reporter (`@@unique([questionId, reporterUserId])`); >5 distinct reports auto-unapprove.                                                                                                                                                                                                                                         | Reports are deleted on approve/unapprove/edit.                                                                                             |
+| `GameSession`                        | Classic **lobby record only**: `gameCode` (unique, 6-char), `quizId`, `creatorId`, `isPlaying`. Deleted when the game ends.                                                                                                                                                                                                                           | `isPlaying` is the only gameplay flag here — phase and question index live in Redis. Duels have **no** GameSession.                        |
+| `GameResult` / `GameResultEntry`     | The only durable trace of a finished game (schema comment: "Immutable record of a finished game"). Entries snapshot `playerName`/`profilePic` because Player rows are ephemeral; `userId` set for signed-in participants; `eloBefore/After` for rated duels. Nullable `quizId`/`hostId` survive later deletion of quiz/host.                          | Never mutate results; append-only. Read paths: host history, duel history, profile stats.                                                  |
+| `Subscription`                       | Mirror of a Dodo subscription: status, period dates, `cancelAtPeriodEnd`, customer, product. Plans are derived from these rows on every check.                                                                                                                                                                                                        | Written only by `SubscriptionSyncService` from Dodo-fetched state. `userId` is `SET NULL` on account deletion so billing history survives. |
+| `BillingEvent`                       | Webhook idempotency ledger keyed by Dodo's `webhook-id`.                                                                                                                                                                                                                                                                                              | The claim commits in the same transaction as the event's effects — never insert it on its own.                                             |
+| `Payment`                            | Audit trail of `payment.succeeded` / `payment.failed`.                                                                                                                                                                                                                                                                                                | Informational only; access never depends on it.                                                                                            |
+| `AiTokenReservation`                 | One AI generation's token spend (`bucket` free/pro, `windowStart`), refundable once via a hashed release token.                                                                                                                                                                                                                                       | The counters live on `User`; this row only makes refunds exact and idempotent.                                                             |
 
 Migrations live in `packages/prisma/migrations/` and are the change history:
 notable ones are `20260712000003_drop_unused_tables` (dropped `PlayerAnswer` +
 `GameLeaderboard` when live state moved to Redis) and
 `20260714000001_add_roles_and_question_moderation` (roles + moderation
 backfill; also documents the seeded system user and initial superadmin).
+`20260914000001_add_billing_and_entitlements` adds Buzrr Pro billing
+([ADR-010](../adr/010-billing-and-entitlements.md)).
+
+## Billing data (Buzrr Pro)
+
+- **A plan is never stored.** `EntitlementsService.resolvePlan` derives it on
+  every check from `subscriptions`: Pro means `status = active`, or a
+  cancel-at-period-end `cancelled` subscription whose paid period hasn't ended.
+  With `BILLING` off, everyone gets Pro limits.
+- **Who writes `subscriptions`.** Only `SubscriptionSyncService.apply`, fed by
+  verified webhooks or the success-page sync. It always writes the state
+  fetched from Dodo, under a `pg_advisory_xact_lock` keyed on the Dodo
+  subscription id.
+- **`billing_events`** is the webhook idempotency ledger, keyed by the Dodo
+  `webhook-id` header. Its claim commits in the same transaction as the event's
+  effects.
+- **AI tokens.** They live on `users`:
+  - `free_ai_tokens_used` is lifetime (cap 3).
+  - `pro_ai_tokens_used` plus `pro_ai_window_start` form a rolling 7-day
+    window, reset lazily by the next reservation.
+  - Spending is one conditional `UPDATE`. Each spend adds an
+    `ai_token_reservations` row whose hashed release token allows exactly one
+    refund, into the same window only.
+- Billing uses **no Redis keys**.
 
 ## Redis keyspace (complete map)
 
@@ -128,7 +156,8 @@ the server **refuses to boot without it**.
 1. Host: `POST /api/game-sessions` → `GameSession` row + unique code.
 2. Guest: `POST /api/players` (Player row + player JWT) → `POST
 /api/game-sessions/join` — serializable transaction enforces the host's
-   `hostSizeLimit` cap without double-join overshoot; rejects banned players.
+   plan room cap (`EntitlementsService.maxPlayersFor`) without double-join
+   overshoot; rejects banned players.
 3. Sockets connect → `engine.ensureLiveSession` seeds `game:{code}:meta`
    (idempotent).
 4. `start-game` → engine snapshots quiz questions from Postgres into Redis,

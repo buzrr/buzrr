@@ -8,7 +8,7 @@
 ```mermaid
 flowchart LR
     B([Browser])
-    B -- "SSR / Better Auth cookies" --> W["apps/web — Next.js 15<br/>hosts /api/auth/*"]
+    B -- "SSR / Better Auth cookies" --> W["apps/web — Next.js 15<br/>hosts /api/auth/* + /api/webhooks/dodo"]
     B -- "REST /api/* (JWT bearer)" --> S["apps/server — NestJS 11"]
     B -- "Socket.IO (JWT or cookie)" --> S
     W -- "Prisma (auth tables, role reads)" --> PG[(PostgreSQL)]
@@ -57,15 +57,16 @@ row and all Redis keys are deleted.
 
 ## Request/data paths at a glance
 
-| Interaction                         | Path                                                                                                                                                             |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sign in                             | Browser → web `/api/auth/*` (Better Auth, Google OAuth) → Postgres session                                                                                       |
-| Web → API auth                      | Browser fetches `/api/auth/access-token` (web signs HS256 JWT with `BETTER_AUTH_SECRET`) → sends `Authorization: Bearer` to Nest                                 |
-| CRUD (quizzes, questions, history…) | React Query hooks (`apps/web/src/lib/modules/*`) → axios → Nest controllers → services → Prisma                                                                  |
-| Live gameplay                       | Socket.IO client hooks (`apps/web/src/hooks/use*Socket*.ts`) → `RealtimeGateway` → `GameEngineService` → Redis; engine broadcasts to rooms via the Redis adapter |
-| Matchmaking                         | Socket `userType=duel` → `MatchmakingService` (Redis zset queue, 2s worker) → `engine.startDuel`                                                                 |
-| AI quiz generation                  | Nest `POST /api/quizzes/ai` → Gemini (`quizzes.service.ts`) — server-side only                                                                                   |
-| Image upload                        | Multipart `POST /api/quizzes/:quizId/questions` → Cloudinary (`common/services/cloudinary.service.ts`)                                                           |
+| Interaction                         | Path                                                                                                                                                                                                                                                                                           |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sign in                             | Browser → web `/api/auth/*` (Better Auth, Google OAuth) → Postgres session                                                                                                                                                                                                                     |
+| Upgrade to Pro                      | Browser → Nest `POST /api/billing/checkout` → Dodo hosted checkout → Dodo webhook → web `/api/webhooks/dodo` (verify) → Nest `POST /api/billing/webhooks/dodo` (re-verify, fetch subscription from Dodo, apply) → Postgres `subscriptions` ([ADR-010](../adr/010-billing-and-entitlements.md)) |
+| Web → API auth                      | Browser fetches `/api/auth/access-token` (web signs HS256 JWT with `BETTER_AUTH_SECRET`) → sends `Authorization: Bearer` to Nest                                                                                                                                                               |
+| CRUD (quizzes, questions, history…) | React Query hooks (`apps/web/src/lib/modules/*`) → axios → Nest controllers → services → Prisma                                                                                                                                                                                                |
+| Live gameplay                       | Socket.IO client hooks (`apps/web/src/hooks/use*Socket*.ts`) → `RealtimeGateway` → `GameEngineService` → Redis; engine broadcasts to rooms via the Redis adapter                                                                                                                               |
+| Matchmaking                         | Socket `userType=duel` → `MatchmakingService` (Redis zset queue, 2s worker) → `engine.startDuel`                                                                                                                                                                                               |
+| AI quiz generation                  | Nest `POST /api/quizzes/ai` → Gemini (`quizzes.service.ts`) — server-side only                                                                                                                                                                                                                 |
+| Image upload                        | Multipart `POST /api/quizzes/:quizId/questions` → Cloudinary (`common/services/cloudinary.service.ts`)                                                                                                                                                                                         |
 
 ## Key directories
 

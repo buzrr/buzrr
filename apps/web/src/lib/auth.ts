@@ -1,6 +1,7 @@
 import "server-only";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { APIError } from "better-auth/api";
 import { prisma } from "@buzrr/prisma";
 
 type Auth = ReturnType<typeof betterAuth>;
@@ -32,7 +33,27 @@ function getAuth(): Auth {
     user: {
       // Powers the settings danger-zone "Delete profile" flow; related rows
       // (quizzes, sessions, accounts, …) go with the user via FK cascades.
-      deleteUser: { enabled: true },
+      deleteUser: {
+        enabled: true,
+        // A subscription that will still renew would keep billing an account
+        // that no longer exists, so it has to be cancelled first. Read-only
+        // check; billing writes stay in the API.
+        beforeDelete: async (user) => {
+          const renewing = await prisma.subscription.count({
+            where: {
+              userId: user.id,
+              status: { in: ["active", "on_hold", "past_due", "paused"] },
+              cancelAtPeriodEnd: false,
+            },
+          });
+          if (renewing > 0) {
+            throw new APIError("BAD_REQUEST", {
+              message:
+                "Cancel your Buzrr Pro subscription from Plan & Billing before deleting your profile.",
+            });
+          }
+        },
+      },
     },
   }) as unknown as Auth;
 

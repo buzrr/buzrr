@@ -54,7 +54,9 @@ itself (`PlayersService.create`).
   `User.role` per request** — JWTs live 7 days and a demotion must bite
   immediately. Never derive role from the token.
 - Public routes (verified): `POST/PATCH/GET /api/players*`, `GET
-/api/game-sessions/player-play/:playerId`, `GET /health`.
+/api/game-sessions/player-play/:playerId`, `GET /health`,
+  and `POST /api/billing/webhooks/dodo` (authenticated by the Dodo webhook
+  signature instead of a JWT).
 - Ownership checks are per-service (`where: { id, userId }` patterns in
   quizzes/questions/game-sessions services) — resource-level, not just
   authentication.
@@ -99,6 +101,34 @@ state on `io server disconnect` (`useGameSocket.ts`).
   yourself; cannot touch superadmins; superadmin is **not grantable** via the
   API (`UpdateUserRoleDto` allows only `admin|user`). The first superadmin was
   bootstrapped in migration `20260714000001` by email.
+
+## Plans, billing webhooks & AI tokens
+
+- **Plan checks hit the DB, like role checks.**
+  `EntitlementsService.resolvePlan` reads `subscriptions` on every request.
+  Plans never go into the 7-day JWT, so a lapsed subscription takes effect
+  immediately. Plan badges and upgrade prompts on the web are UX only.
+- **Webhook trust chain.**
+  - Dodo signs each event with the endpoint secret
+    (`DODO_PAYMENTS_WEBHOOK_KEY`, set on both web and server).
+  - The web route verifies it over the raw body, then forwards the untouched
+    body and `webhook-*` headers.
+  - Nest verifies again. The forward carries no service credential, and a
+    request sent straight to the Nest endpoint gets exactly the same check.
+  - Standard Webhooks' timestamp tolerance rejects replays; `billing_events`
+    makes redelivery idempotent.
+- **Grants come from Dodo, keyed by identifiers Buzrr set.** A subscription is
+  tied to a user through, in order:
+  1. `metadata.userId`, written by Nest when it creates the checkout session
+  2. an existing subscription row
+  3. `users.dodo_customer_id`
+
+  Never by email. The checkout `return_url` grants nothing.
+
+- **Buzrr-AI spends tokens as the user.** It forwards the caller's bearer JWT
+  to `POST /api/billing/ai-tokens/reserve`. Refunds need the reservation's
+  release token (stored hashed), which the AI service never returns to the
+  browser.
 
 ## Rate limiting (adjacent concern)
 

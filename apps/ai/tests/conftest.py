@@ -11,6 +11,8 @@ os.environ.setdefault("REDIS_URL", "redis://localhost:6379")
 os.environ.setdefault("BETTER_AUTH_SECRET", "test-secret-not-used-in-production")
 os.environ.setdefault("GEMINI_API_KEY", "test-key")
 os.environ.setdefault("AI_WEB_ORIGIN", "http://localhost:3000")
+# Never contacted: the billing client is overridden with a fake in tests.
+os.environ.setdefault("AI_BUZRR_API_URL", "http://billing.test")
 
 import time  # noqa: E402
 

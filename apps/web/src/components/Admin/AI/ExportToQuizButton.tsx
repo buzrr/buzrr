@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import type { GeneratedQuestion } from "@/lib/modules/ai/api";
 import { useImportAsQuizMutation } from "@/lib/modules/ai/hooks";
+import { usePlanLimitPrompt } from "@/components/Billing/UpgradePrompt";
 
 export default function ExportToQuizButton({
   title,
@@ -19,6 +20,7 @@ export default function ExportToQuizButton({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const mutation = useImportAsQuizMutation();
+  const { handlePlanLimit, upgradePrompt } = usePlanLimitPrompt();
 
   const keepers = questions.filter((question) => !question.discarded);
 
@@ -39,7 +41,13 @@ export default function ExportToQuizButton({
           toast.success(`Saved ${result.questionCount} questions`);
           router.push(`/admin/quiz/${result.quizId}`);
         },
-        onError: (error) => toast.error(getApiErrorMessage(error)),
+        onError: (error) => {
+          if (handlePlanLimit(error)) {
+            setOpen(false);
+            return;
+          }
+          toast.error(getApiErrorMessage(error));
+        },
       },
     );
   }
@@ -58,6 +66,7 @@ export default function ExportToQuizButton({
         confirmingLabel="Saving…"
         onClick={submit}
       />
+      {upgradePrompt}
     </>
   );
 }

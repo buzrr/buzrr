@@ -18,6 +18,10 @@ export const queryKeys = {
   users: {
     myStats: ["users", "me", "stats"] as const,
   },
+  billing: {
+    me: ["billing", "me"] as const,
+    pricing: (region: string) => ["billing", "pricing", region] as const,
+  },
   ai: {
     spaces: ["ai", "spaces"] as const,
     space: (spaceId: string) => ["ai", "spaces", spaceId] as const,

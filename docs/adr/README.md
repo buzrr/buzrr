@@ -18,6 +18,8 @@ Format: Title · Status · Context · Decision · Consequences · Alternatives
 | [006](006-duels-elo-and-bots.md)                | ELO matchmaking with widening bands, bot fallback, unrated friend invites     | Accepted                            |
 | [007](007-question-moderation-gate.md)          | Per-question moderation gate feeding the public duel pool                     | Accepted                            |
 | [008](008-vinext-parallel-toolchain.md)         | Parallel vinext/Vite toolchain alongside the Next CLI                         | Adopted but non-default; unresolved |
+| [009](009-buzrr-ai-rag-service.md)              | Separate Python service (Buzrr-AI) for document RAG                           | Accepted                            |
+| [010](010-billing-and-entitlements.md)          | Buzrr Pro: Dodo subscriptions, webhook-verified, server-side entitlements     | Accepted                            |
 
 New ADRs: next number, same format, add a row here. Reversing a decision:
 mark the old one "Superseded by NNN", don't delete it.

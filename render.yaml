@@ -39,6 +39,9 @@ services:
         sync: false
       - key: AI_WEB_ORIGIN
         sync: false
+      # Nest API origin — generation reserves AI plan tokens there.
+      - key: AI_BUZRR_API_URL
+        sync: false
       - key: AI_PORT
         value: "3002"
 
@@ -61,4 +64,7 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: AI_WEB_ORIGIN
+        sync: false
+      # Nest API origin — generation reserves AI plan tokens there.
+      - key: AI_BUZRR_API_URL
         sync: false

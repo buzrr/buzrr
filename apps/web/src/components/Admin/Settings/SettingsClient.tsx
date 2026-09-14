@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { toast } from "react-toastify";
 import { z } from "zod";
 import GridListToggle from "@/components/Admin/GridListToggle";
@@ -17,6 +18,7 @@ import Button from "@/components/ui/Button";
 import TextInput from "@/components/ui/TextInput";
 import { DEFAULT_AVATAR } from "@/constants";
 import { authClient } from "@/lib/auth-client";
+import { useEntitlementsQuery } from "@/lib/modules/billing/hooks";
 
 const accountSchema = z.object({
   name: z
@@ -197,6 +199,32 @@ function AccountCard() {
   );
 }
 
+function PlanCard() {
+  const { data } = useEntitlementsQuery();
+  return (
+    <SettingsCard
+      title="Plan"
+      description="Your Buzrr plan, usage and subscription."
+    >
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm text-dark dark:text-white">
+          {data
+            ? data.plan === "pro"
+              ? "You're on Buzrr Pro."
+              : "You're on the Free plan."
+            : "Loading your plan…"}
+        </p>
+        <Link
+          href="/admin/billing"
+          className="text-sm font-bold text-lprimary dark:text-dprimary underline underline-offset-2"
+        >
+          Plan & Billing
+        </Link>
+      </div>
+    </SettingsCard>
+  );
+}
+
 function DangerZoneCard() {
   return (
     <SettingsCard
@@ -234,6 +262,7 @@ export default function SettingsClient() {
       <div className="flex flex-col gap-6">
         <PreferencesCard />
         <AccountCard />
+        <PlanCard />
         <DangerZoneCard />
       </div>
     </div>

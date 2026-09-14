@@ -66,6 +66,11 @@ services:
     environment:
       AI_DATABASE_URL: postgresql://buzrr:buzrr@postgres:5432/buzrr
       REDIS_URL: redis://redis:6379
+      # The Nest API runs on the host (`yarn dev`); generation reserves AI
+      # plan tokens there.
+      AI_BUZRR_API_URL: http://host.docker.internal:3001
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "3002:3002"
     depends_on:

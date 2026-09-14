@@ -23,6 +23,7 @@ flowchart LR
     W --> PG
     S --> PGP[("Postgres<br/>schema public")]
     B -- "export questions" --> S
+    A -- "reserve AI token<br/>(caller's JWT)" --> S
 ```
 
 Two processes from one image: the HTTP service and the worker. Ingestion is
@@ -31,11 +32,11 @@ CPU-bound (PDF parsing) and must never share an event loop with request handling
 
 ## Ownership boundaries
 
-|               | Owns                                                         | Never                                                  |
-| ------------- | ------------------------------------------------------------ | ------------------------------------------------------ |
-| `apps/ai`     | `ai` schema, `ai:*` Redis keys, spaces/documents/chunks/runs | Writes to `public.*`; mints tokens; touches game state |
-| `apps/server` | `public` schema, quizzes, gameplay                           | Reads the `ai` schema; calls the AI service            |
-| `apps/web`    | Both clients, and the export handoff                         | —                                                      |
+|               | Owns                                                         | Never                                                                                                                        |
+| ------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `apps/ai`     | `ai` schema, `ai:*` Redis keys, spaces/documents/chunks/runs | Writes to `public.*` (AI token spend goes through Nest's `/api/billing/ai-tokens/*` instead); mints JWTs; touches game state |
+| `apps/server` | `public` schema, quizzes, gameplay                           | Reads the `ai` schema; calls the AI service                                                                                  |
+| `apps/web`    | Both clients, and the export handoff                         | —                                                                                                                            |
 
 **Alembic never touches `public`; Prisma never touches `ai`** ([invariant #30](invariants.md)).
 `alembic/env.py` enforces this with `include_object`, and there are deliberately
@@ -99,6 +100,16 @@ The worker then:
   game engine (invariant #10).
 
 ## Retrieval and generation
+
+Before any model call, `POST /spaces/{id}/generate` reserves one plan token
+from Nest. `buzrr_ai/billing.py` calls `POST /api/billing/ai-tokens/reserve`,
+forwarding the caller's bearer token.
+
+- **Why through Nest:** the ledger lives in `public.users`, which this service
+  never writes (invariant #31).
+- **Limit reached:** a `PLAN_LIMIT` refusal passes through with Nest's fields.
+- **Generation fails:** any exception refunds the token via `/release`.
+- **Nest unreachable:** 503 — generation fails closed.
 
 A request like _"Generate 10 questions for Unit 4, Subsection 2"_ is not a search
 query — "Unit 4" is a **locator**, and its embedding looks nothing like the
@@ -182,7 +193,8 @@ existing `AdminShell` sidebar comes for free. Data through
 `src/lib/modules/ai/{api,hooks}.ts` and `getAiApiClient()`, which reuses the same
 `fetchApiAccessToken()` as the Nest client. Ingestion progress polls
 `/spaces/{id}/status` every 3s **only while `isProcessing`** — an idle workspace
-makes no requests. No Redux: all of it is server state.
+makes no requests. No Redux: all of it is server state. `GeneratePanel` shows the remaining AI
+generations and opens the upgrade prompt on a `PLAN_LIMIT` refusal.
 
 ## Deployment (Render)
 
@@ -237,7 +249,8 @@ yarn workspace ai worker           # ingestion worker
 
 Or `docker compose --profile ai up -d` to run both without a host Python
 toolchain. `BETTER_AUTH_SECRET` must match web and server — `yarn setup` keeps
-all three in sync (`resolveAuthSecret` scans `apps/ai/.env` too).
+all three in sync (`resolveAuthSecret` scans `apps/ai/.env` too). Set `AI_BUZRR_API_URL` to the
+Nest origin (`http://localhost:3001`); generation reserves AI tokens there.
 
 ## Testing
 
@@ -246,5 +259,6 @@ parsers, JWT verification (including the player-token rejection), the structured
 schemas and citation mapping. Integration tests run the real app against real
 pgvector and cover ingestion, retrieval, generation and — most importantly —
 **tenant isolation on every route**. Both providers are faked behind their
-protocols: **no test ever calls Gemini.** Integration tests skip cleanly when no
+protocols: **no test ever calls Gemini.** The Nest billing client is faked the
+same way (`FakeBilling` in `tests/integration/conftest.py`). Integration tests skip cleanly when no
 database is reachable.

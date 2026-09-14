@@ -8,6 +8,7 @@ import ThemeIconToggle from "./ThemeIconToggle";
 import { GITHUB_LINK } from "./links";
 
 const navLinks = [
+  { name: "Pricing", href: "/pricing" },
   { name: "Docs", href: "/docs" },
   { name: "Roadmap", href: "/roadmap" },
   { name: "Changelog", href: "/changelog" },

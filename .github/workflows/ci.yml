@@ -92,6 +92,11 @@ jobs:
       - name: Type-check
         run: yarn check-types
 
+      # Billing/entitlement specs run against the Postgres service above.
+      # BILLING stays unset for the build; the specs configure it themselves.
+      - name: Test (server)
+        run: yarn workspace server test
+
       - name: Build
         run: yarn build
 
@@ -181,6 +186,8 @@ jobs:
       # Never used: both providers are faked in tests.
       GEMINI_API_KEY: ci-dummy-key
       AI_WEB_ORIGIN: http://localhost:3000
+      # Never contacted: tests fake the billing client.
+      AI_BUZRR_API_URL: http://localhost:3001
       AI_TMP_DIR: /tmp/buzrr-ai-ci
 
     defaults:
