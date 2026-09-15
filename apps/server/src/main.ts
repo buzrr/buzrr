@@ -24,7 +24,11 @@ function applyTrustProxy(app: NestExpressApplication): void {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // rawBody: Dodo webhook signatures are computed over the exact request bytes
+  // (billing-webhook.controller.ts); parsed JSON can't be re-serialized to them.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
   app.enableShutdownHooks();
   applyTrustProxy(app);
   app.useWebSocketAdapter(new RedisIoAdapter(app));

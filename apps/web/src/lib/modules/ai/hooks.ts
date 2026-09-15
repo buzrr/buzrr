@@ -106,6 +106,10 @@ export function useGenerateMutation(spaceId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.ai.runs(spaceId) });
     },
+    // Each generation spends an AI token (refunded if it fails).
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.billing.me });
+    },
   });
 }
 
@@ -132,8 +136,10 @@ export function useImportAsQuizMutation() {
   return useMutation({
     mutationFn: aiApi.importAsQuiz,
     onSuccess: () => {
-      // The new quiz shows up in the existing quiz list.
+      // The new quiz shows up in the existing quiz list and counts toward the
+      // plan's quiz cap.
       queryClient.invalidateQueries({ queryKey: queryKeys.quizzes.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.billing.me });
     },
   });
 }

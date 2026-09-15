@@ -8,6 +8,7 @@ from arq import create_pool
 from arq.connections import ArqRedis, RedisSettings
 from fastapi import Depends
 
+from buzrr_ai.billing import BillingClient
 from buzrr_ai.config import Settings, get_settings
 from buzrr_ai.providers.base import EmbeddingProvider, LLMProvider
 from buzrr_ai.providers.gemini import GeminiEmbeddings, GeminiLLM
@@ -34,8 +35,14 @@ def get_llm() -> LLMProvider:
     return GeminiLLM(get_settings())
 
 
+@lru_cache
+def get_billing() -> BillingClient:
+    return BillingClient(get_settings().ai_buzrr_api_url)
+
+
 EmbeddingsDep = Annotated[EmbeddingProvider, Depends(get_embeddings)]
 LLMDep = Annotated[LLMProvider, Depends(get_llm)]
+BillingDep = Annotated[BillingClient, Depends(get_billing)]
 
 _pool: ArqRedis | None = None
 _pool_lock = asyncio.Lock()

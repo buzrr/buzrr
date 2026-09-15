@@ -5,6 +5,7 @@ import { AuthModule } from "./modules/auth/auth.module";
 import { CommonModule } from "./common/common.module";
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
 import { AdminUsersModule } from "./modules/admin-users/admin-users.module";
+import { BillingModule } from "./modules/billing/billing.module";
 import { GameSessionsModule } from "./modules/game-sessions/game-sessions.module";
 import { HealthModule } from "./modules/health/health.module";
 import { ModerationModule } from "./modules/moderation/moderation.module";
@@ -31,6 +32,7 @@ import { RedisModule } from "./redis/redis.module";
     QuestionsModule,
     ModerationModule,
     AdminUsersModule,
+    BillingModule,
     DuelModule,
     UsersModule,
     RealtimeModule,

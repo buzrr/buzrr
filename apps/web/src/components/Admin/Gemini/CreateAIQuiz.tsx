@@ -19,6 +19,10 @@ import { useRouter } from "next/navigation";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { createAiQuizSchema } from "@/lib/modules/forms/schemas";
 import { useCreateAiQuizMutation } from "@/lib/modules/quizzes/hooks";
+import {
+  AiTokenBalance,
+  usePlanLimitPrompt,
+} from "@/components/Billing/UpgradePrompt";
 
 type FormValues = z.infer<typeof createAiQuizSchema>;
 
@@ -27,6 +31,7 @@ export default function CreateAIQuiz() {
   const [open, setOpen] = useState(false);
   const view = useAppSelector((state) => state.gridListToggle.view);
   const mutation = useCreateAiQuizMutation();
+  const { handlePlanLimit, upgradePrompt } = usePlanLimitPrompt();
   const { control, handleSubmit, reset } = useForm<FormValues>({
     resolver: zodResolver(createAiQuizSchema) as Resolver<FormValues>,
     defaultValues: {
@@ -52,6 +57,10 @@ export default function CreateAIQuiz() {
           router.push(`/admin/quiz/${res.quizId}`);
         },
         onError: (err) => {
+          if (handlePlanLimit(err)) {
+            setOpen(false);
+            return;
+          }
           toast.error(getApiErrorMessage(err));
         },
       },
@@ -119,6 +128,7 @@ export default function CreateAIQuiz() {
               Ready to get started? Just jot down your requirements below to
               begin the quiz!
             </p>
+            <AiTokenBalance className="-mt-2 mb-4" />
             <form onSubmit={onSubmit}>
               <Controller
                 name="title"
@@ -214,6 +224,7 @@ export default function CreateAIQuiz() {
           </div>
         </Box>
       </Modal>
+      {upgradePrompt}
     </>
   );
 }

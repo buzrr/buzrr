@@ -1,14 +1,13 @@
 # Current project context
 
 Snapshot of where Buzrr stands. **Last verified against the code:
-2026-08-14**, through PR #39. Update this file when the picture changes; keep
+2026-09-14**, through the Buzrr Pro billing change. Update this file when the picture changes; keep
 it about the present, not a changelog.
 
 ## Where the project is
 
-Public beta on free-tier infrastructure (user-facing copy in
-`game-sessions.service.ts` says rooms are "capped … while Buzrr is in beta on
-free-tier infrastructure"). Both flagship modes work end-to-end: classic
+Public beta. The hosted version now has a paid **Buzrr Pro** plan (Dodo
+Payments, ADR-010); self-hosted instances run with billing off and Pro limits. Both flagship modes work end-to-end: classic
 hosted rooms (join by code/link/QR, kick/ban, host-abandon cleanup) and 1v1
 duels (ELO matchmaking, bot fallback, unrated friend invites). Supporting
 features shipped: AI quiz generation, question moderation + roles, profile
@@ -16,6 +15,15 @@ stats/history, health endpoint, Vercel Analytics.
 
 ## Recent architectural moves (still fresh, know they exist)
 
+- **Buzrr Pro (billing & entitlements)** — Dodo Payments subscriptions:
+  - **Limits:** Free is 50 players, 10 quizzes, 3 lifetime AI generations.
+    Pro is 250 players, unlimited quizzes, 10 AI generations per week.
+  - **Plans** are derived per request from `subscriptions`.
+  - **Webhooks** are verified in `apps/web`, then re-verified and applied by
+    `apps/server/src/modules/billing` from Dodo-fetched state.
+  - **`apps/ai`** reserves AI tokens through Nest.
+  - **Rollout:** off unless `BILLING=ON`; migration `20260914000001` needs
+    `migrate:deploy`. See ADR-010.
 - **Server-authoritative rewrite** (PR #17): engine + Redis live state +
   state-sync contract — the defining refactor; see ADR-002.
 - **Moderation & roles** (PR #18), **beta room cap** `hostSizeLimit` (#25),
@@ -39,15 +47,22 @@ stats/history, health endpoint, Vercel Analytics.
    unknown (ADR-008).
 2. **Duplicate client socket typings** — `apps/web/src/types/socket-events.ts`
    is a hand-kept mirror of the server contract; nothing enforces sync.
+3. **Dodo dashboard configuration lives outside the repo.** The Pro product,
+   its ₹399 INR localized price and pricing mode,
+   any product-level discount, the Adaptive Currency setting, the webhook endpoint and events, and the
+   recovery/portal settings are set by hand (checklist in ADR-010). Live prices and the
+   promotion are read from Dodo; `apps/web/src/lib/pricing.ts` and the server's
+   `FALLBACK_PRO_PRICE` are only fallbacks.
 
 ## Known debt & risks (grounded, ranked by blast radius)
 
-1. **Zero automated tests in the Node apps.** CI runs lint + typecheck + build
-   for `apps/web` and `apps/server` (`.github/workflows/ci.yml`). The most
-   intricate logic (engine phase machine, Lua-scripted races, ELO transactions)
-   is exactly the kind that regresses silently, and there is still no runner
-   configured for either app. `apps/ai` does have a pytest suite (75 tests, its
-   own CI job) — a template if that gap ever gets closed, not a fix for it.
+1. **Thin automated test coverage in the Node apps.** `apps/server` has a
+   vitest runner, but it only covers billing/entitlements
+   (`src/modules/billing/__tests__`, run in CI against Postgres). The most
+   intricate logic — the engine phase machine, Lua-scripted races and ELO
+   transactions — is exactly the kind that regresses silently, and it is still
+   untested. `apps/web` has no tests at all (including the Dodo webhook
+   forwarder). `apps/ai` has its own pytest suite and CI job.
 2. **Redis is a single point of failure** for all realtime + matchmaking;
    the server won't boot without it. No degraded mode. It now also carries
    Buzrr-AI's ingestion queue, so an outage degrades two subsystems (AI
@@ -72,6 +87,9 @@ stats/history, health endpoint, Vercel Analytics.
 8. **Host-screen roster state is triplicated** (REST lobby snapshot,
    `playersSlice`, `game.players`) — coherent today but easy to desync when
    editing lobby UI.
+9. **Refunds and lost disputes don't revoke Pro automatically.** Access follows
+   Dodo's subscription status; `refund.succeeded` / `dispute.lost` are only
+   logged for manual review.
 
 ## Active development areas (inferred from recent PR cadence)
 

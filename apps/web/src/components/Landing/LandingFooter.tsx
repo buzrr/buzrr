@@ -15,6 +15,7 @@ const columns = [
   {
     title: "Product",
     links: [
+      { name: "Pricing", href: "/pricing" },
       { name: "Docs", href: "/docs" },
       { name: "Roadmap", href: "/roadmap" },
       { name: "Changelog", href: "/changelog" },

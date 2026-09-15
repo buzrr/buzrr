@@ -10,6 +10,7 @@ import { ConfigService } from "@nestjs/config";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
+import { EntitlementsService } from "../billing/entitlements.service";
 import { CreateAiQuizDto } from "./dto/create-ai-quiz.dto";
 import { ImportQuizDto } from "./dto/import-quiz.dto";
 import { CreateQuizDto } from "./dto/create-quiz.dto";
@@ -63,18 +64,22 @@ export class QuizzesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async create(
     user: AuthUser,
     dto: CreateQuizDto,
   ): Promise<{ quizId: string }> {
-    const quiz = await this.prisma.db.quiz.create({
-      data: {
-        title: dto.title,
-        description: dto.description ?? null,
-        userId: user.userId,
-      },
+    const quiz = await this.prisma.db.$transaction(async (tx) => {
+      await this.entitlements.assertQuizCapacity(tx, user.userId);
+      return tx.quiz.create({
+        data: {
+          title: dto.title,
+          description: dto.description ?? null,
+          userId: user.userId,
+        },
+      });
     });
     return { quizId: quiz.id };
   }
@@ -189,6 +194,7 @@ export class QuizzesService {
     }
 
     const quiz = await this.prisma.db.$transaction(async (tx) => {
+      await this.entitlements.assertQuizCapacity(tx, user.userId);
       return tx.quiz.create({
         data: {
           title: dto.title,
@@ -223,6 +229,41 @@ export class QuizzesService {
       throw new BadRequestException("GEMINI_API_KEY is not configured");
     }
 
+    // Fail fast on a full quiz list before spending an AI token on a quiz that
+    // could never be saved. Re-checked inside the insert transaction below.
+    await this.prisma.db.$transaction((tx) =>
+      this.entitlements.assertQuizCapacity(tx, user.userId),
+    );
+
+    const reservation = await this.entitlements.reserveAiToken(
+      user.userId,
+      "quiz_ai",
+    );
+    try {
+      return await this.generateAndSaveAiQuiz(user, dto, apiKey);
+    } catch (err) {
+      // A failed generation must not cost the user a token.
+      await this.entitlements
+        .releaseAiToken(
+          user.userId,
+          reservation.reservationId,
+          reservation.releaseToken,
+        )
+        .catch((releaseErr: unknown) =>
+          this.logger.error(
+            `Failed to refund AI token ${reservation.reservationId}`,
+            releaseErr instanceof Error ? releaseErr.stack : String(releaseErr),
+          ),
+        );
+      throw err;
+    }
+  }
+
+  private async generateAndSaveAiQuiz(
+    user: AuthUser,
+    dto: CreateAiQuizDto,
+    apiKey: string,
+  ): Promise<{ msg: string; quizId: string }> {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
@@ -269,6 +310,7 @@ export class QuizzesService {
     }
 
     const quiz = await this.prisma.db.$transaction(async (tx) => {
+      await this.entitlements.assertQuizCapacity(tx, user.userId);
       return tx.quiz.create({
         data: {
           title: dto.title,

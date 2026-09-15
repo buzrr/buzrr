@@ -24,15 +24,15 @@ Open-source "QuizUp + Kahoot in one app":
 
 Turborepo + Yarn 4 workspaces:
 
-| Path                                                   | What it is                                                                                                              |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| `apps/web`                                             | Next.js 15 frontend (React 19, App Router). Also hosts **Better Auth** (`/api/auth/*`) — the only web-owned API routes. |
-| `apps/server`                                          | NestJS 11 — REST API (`/api/*`) + Socket.IO gateway + the server-authoritative game engine.                             |
-| `apps/ai`                                              | **Buzrr-AI** — Python 3.12 + FastAPI + arq worker. Knowledge Spaces, document ingestion, RAG quiz generation. Optional. |
-| `packages/prisma`                                      | `@buzrr/prisma`: Prisma schema, migrations, generated client, shared by both apps.                                      |
-| `packages/eslint-config`, `packages/typescript-config` | Shared lint/tsconfig presets.                                                                                           |
-| `scripts/setup.mjs`                                    | One-command local bootstrap (Docker Postgres+Redis, .env files, schema push).                                           |
-| `docs/`                                                | Architecture docs, ADRs, current-state context (see below).                                                             |
+| Path                                                   | What it is                                                                                                                                                                    |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web`                                             | Next.js 15 frontend (React 19, App Router). Also hosts **Better Auth** (`/api/auth/*`) and the Dodo webhook forwarder (`/api/webhooks/dodo`) — the only web-owned API routes. |
+| `apps/server`                                          | NestJS 11 — REST API (`/api/*`) + Socket.IO gateway + the server-authoritative game engine.                                                                                   |
+| `apps/ai`                                              | **Buzrr-AI** — Python 3.12 + FastAPI + arq worker. Knowledge Spaces, document ingestion, RAG quiz generation. Optional.                                                       |
+| `packages/prisma`                                      | `@buzrr/prisma`: Prisma schema, migrations, generated client, shared by both apps.                                                                                            |
+| `packages/eslint-config`, `packages/typescript-config` | Shared lint/tsconfig presets.                                                                                                                                                 |
+| `scripts/setup.mjs`                                    | One-command local bootstrap (Docker Postgres+Redis, .env files, schema push).                                                                                                 |
+| `docs/`                                                | Architecture docs, ADRs, current-state context (see below).                                                                                                                   |
 
 Local dev: `yarn setup` then `yarn dev` (web :3000, api :3001). The AI service
 is opt-in — `yarn workspace ai setup` then `yarn workspace ai dev` (:3002); with
@@ -49,18 +49,19 @@ is opt-in — `yarn workspace ai setup` then `yarn workspace ai dev` (:3002); wi
 
 ## Task → reading map
 
-| If your task touches…                                                           | Read                                                                                                   |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Anything (orientation)                                                          | [ARCHITECTURE.md](ARCHITECTURE.md) then [docs/architecture/overview.md](docs/architecture/overview.md) |
-| Live gameplay, phases, timers, scoring, reconnect, kick/ban                     | [docs/architecture/realtime.md](docs/architecture/realtime.md)                                         |
-| Matchmaking, duel invites, bots, ELO                                            | [docs/architecture/duels.md](docs/architecture/duels.md) + realtime.md                                 |
-| Database schema, Redis keys, what's stored where                                | [docs/architecture/data.md](docs/architecture/data.md)                                                 |
-| Login, JWTs, socket auth, roles, guards                                         | [docs/architecture/auth.md](docs/architecture/auth.md)                                                 |
-| REST endpoints, Nest modules, validation, rate limiting, moderation             | [docs/architecture/backend.md](docs/architecture/backend.md)                                           |
-| React pages, components, Redux/React-Query state, socket hooks                  | [docs/architecture/frontend.md](docs/architecture/frontend.md)                                         |
-| Knowledge Spaces, document ingestion, embeddings, RAG, the Python service       | [docs/architecture/ai.md](docs/architecture/ai.md)                                                     |
-| Env vars, deployment, CI, Docker, external services (Gemini/Cloudinary/Upstash) | [docs/architecture/infrastructure.md](docs/architecture/infrastructure.md)                             |
-| "Why is it built this way?"                                                     | [docs/adr/](docs/adr/)                                                                                 |
+| If your task touches…                                                           | Read                                                                                                                                               |
+| ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Anything (orientation)                                                          | [ARCHITECTURE.md](ARCHITECTURE.md) then [docs/architecture/overview.md](docs/architecture/overview.md)                                             |
+| Live gameplay, phases, timers, scoring, reconnect, kick/ban                     | [docs/architecture/realtime.md](docs/architecture/realtime.md)                                                                                     |
+| Matchmaking, duel invites, bots, ELO                                            | [docs/architecture/duels.md](docs/architecture/duels.md) + realtime.md                                                                             |
+| Database schema, Redis keys, what's stored where                                | [docs/architecture/data.md](docs/architecture/data.md)                                                                                             |
+| Login, JWTs, socket auth, roles, guards                                         | [docs/architecture/auth.md](docs/architecture/auth.md)                                                                                             |
+| REST endpoints, Nest modules, validation, rate limiting, moderation             | [docs/architecture/backend.md](docs/architecture/backend.md)                                                                                       |
+| React pages, components, Redux/React-Query state, socket hooks                  | [docs/architecture/frontend.md](docs/architecture/frontend.md)                                                                                     |
+| Knowledge Spaces, document ingestion, embeddings, RAG, the Python service       | [docs/architecture/ai.md](docs/architecture/ai.md)                                                                                                 |
+| Env vars, deployment, CI, Docker, external services (Gemini/Cloudinary/Upstash) | [docs/architecture/infrastructure.md](docs/architecture/infrastructure.md)                                                                         |
+| Plans, Buzrr Pro billing, Dodo webhooks, AI token limits                        | [backend.md § Billing](docs/architecture/backend.md#billing--entitlements-srcmodulesbilling) + [ADR-010](docs/adr/010-billing-and-entitlements.md) |
+| "Why is it built this way?"                                                     | [docs/adr/](docs/adr/)                                                                                                                             |
 
 **Step-by-step playbooks for the four most common multi-file changes** —
 schema/migration: [data.md § Changing the schema](docs/architecture/data.md#changing-the-schema-the-workflow-this-repo-actually-uses) ·
@@ -120,7 +121,9 @@ keep `docs/CONTEXT.md` about the present, not history.
 
 - Conventional Commits (`feat:`, `fix:`, `refactor:`…) — see CONTRIBUTING.md.
 - Husky pre-commit runs `lint-staged` + `yarn lint` + `yarn check-types`.
-- CI = lint, typecheck, build (no test suite exists — don't claim tests pass).
+- CI = lint, typecheck, `yarn workspace server test` (vitest billing specs
+  against Postgres), build; `apps/ai` has its own pytest job. The web app and
+  the game engine have no tests — don't claim those pass.
 - DB changes go through `packages/prisma/schema.prisma` **plus** a migration in
   `packages/prisma/migrations/` for anything headed to production (local dev
   uses `db push`).

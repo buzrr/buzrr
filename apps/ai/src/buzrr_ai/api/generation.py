@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
@@ -19,7 +19,7 @@ from buzrr_ai.auth import CurrentUser
 from buzrr_ai.db.models import GeneratedQuestion, GenerationRun
 from buzrr_ai.db.repositories import spaces as spaces_repo
 from buzrr_ai.db.session import DbSession
-from buzrr_ai.deps import EmbeddingsDep, LLMDep, QueueDep, SettingsDep
+from buzrr_ai.deps import BillingDep, EmbeddingsDep, LLMDep, QueueDep, SettingsDep
 from buzrr_ai.errors import BadRequest, NotFound
 from buzrr_ai.generation.service import generate_questions
 from buzrr_ai.ratelimit import enforce
@@ -79,12 +79,14 @@ async def _load_run(db: DbSession, user_id: str, run_id: uuid.UUID) -> Generatio
 async def generate(
     space_id: uuid.UUID,
     body: GenerateBody,
+    request: Request,
     user: CurrentUser,
     db: DbSession,
     settings: SettingsDep,
     llm: LLMDep,
     embeddings: EmbeddingsDep,
     queue: QueueDep,
+    billing: BillingDep,
 ) -> RunOut:
     await enforce(
         queue,
@@ -94,17 +96,27 @@ async def generate(
         window_seconds=3600,
     )
 
-    run = await generate_questions(
-        db,
-        settings=settings,
-        llm=llm,
-        embeddings=embeddings,
-        user_id=user.user_id,
-        space_id=space_id,
-        prompt=body.prompt,
-        question_types=body.questionTypes,
-        count=body.count,
-    )
+    # One plan token per generation request, spent before any model call. The
+    # header is already verified by `CurrentUser`; Nest re-verifies it and only
+    # ever touches this user's own allowance.
+    authorization = request.headers.get("authorization", "")
+    reservation = await billing.reserve(authorization)
+    try:
+        run = await generate_questions(
+            db,
+            settings=settings,
+            llm=llm,
+            embeddings=embeddings,
+            user_id=user.user_id,
+            space_id=space_id,
+            prompt=body.prompt,
+            question_types=body.questionTypes,
+            count=body.count,
+        )
+    except Exception:
+        # A failed generation (empty space, provider error, …) costs nothing.
+        await billing.release(authorization, reservation)
+        raise
     return _run_out(await _load_run(db, user.user_id, run.id))
 
 

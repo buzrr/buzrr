@@ -7,6 +7,10 @@ import { Button } from "@/components/ui/Button";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import type { GenerationRun } from "@/lib/modules/ai/api";
 import { useGenerateMutation } from "@/lib/modules/ai/hooks";
+import {
+  AiTokenBalance,
+  usePlanLimitPrompt,
+} from "@/components/Billing/UpgradePrompt";
 
 const MIN_COUNT = 1;
 const MAX_COUNT = 15;
@@ -31,6 +35,7 @@ export default function GeneratePanel({
   const [count, setCount] = useState("10");
   const [types, setTypes] = useState<string[]>(["MCQ"]);
   const mutation = useGenerateMutation(spaceId);
+  const { handlePlanLimit, upgradePrompt } = usePlanLimitPrompt();
 
   function clampCount(value: string): number {
     const parsed = Number.parseInt(value, 10);
@@ -62,13 +67,16 @@ export default function GeneratePanel({
             `Generated ${run.questions.length} question${run.questions.length === 1 ? "" : "s"}`,
           );
         },
-        onError: (error) => toast.error(getApiErrorMessage(error)),
+        onError: (error) => {
+          if (!handlePlanLimit(error)) toast.error(getApiErrorMessage(error));
+        },
       },
     );
   }
 
   return (
     <form onSubmit={submit}>
+      {upgradePrompt}
       <label
         htmlFor="ai-prompt"
         className="block text-sm font-bold text-dark dark:text-white"
@@ -142,6 +150,7 @@ export default function GeneratePanel({
         >
           Generate
         </Button>
+        <AiTokenBalance className="self-center" />
       </div>
     </form>
   );

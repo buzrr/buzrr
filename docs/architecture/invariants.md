@@ -102,9 +102,10 @@ the docs, and write an ADR.
 22. **[explicit] Kicked/banned guests keep their Player identity** — only room
     membership is dropped (service comments; `usePlayerSocket` mirrors this).
     Don't delete Player rows on kick.
-23. **[explicit] Room size is capped by the host's `hostSizeLimit`** under a
-    serializable transaction; rejoins bypass the cap. (Beta/free-tier
-    protection — schema comment.)
+23. **[explicit] Room size is capped by the host's plan** —
+    `EntitlementsService.maxPlayersFor` = max(plan cap, `hostSizeLimit`
+    override) — under a serializable transaction; rejoins bypass the cap and
+    a mid-game downgrade never evicts anyone.
 24. **[implied] The 6h Redis TTL bounds a game's life** and acts as GC for
     abandoned rooms; every store write renews it; the ban set rides the
     meta's renewal. Don't remove renewals or extend TTLs casually.
@@ -126,6 +127,9 @@ the docs, and write an ADR.
 28. **[implied] The web app talks to the domain only through the Nest API**
     (React Query modules). Direct Prisma from web is limited to the three
     `server-only` auth/role/stats modules — don't widen that exception.
+    (`lib/auth.ts`'s `deleteUser.beforeDelete` only _reads_ `subscriptions`;
+    `/api/webhooks/dodo` only verifies and forwards — billing writes stay in
+    Nest.)
 29. **[explicit] DB changes ship as schema + committed migration**
     (CONTRIBUTING.md); local dev may `db push`, production runs
     `migrate deploy`.
@@ -142,7 +146,8 @@ the docs, and write an ADR.
 31. **[explicit] The AI service never writes to `public`.** Generated questions
     become a real quiz only through `POST /api/quizzes/import` on the Nest
     server, so ownership checks, question `order` and the `moderationStatus`
-    default stay in one place (ADR-007). Don't let `apps/ai` reach into quizzes.
+    default stay in one place (ADR-007). Don't let `apps/ai` reach into quizzes. AI token spend likewise goes through
+    Nest (`POST /api/billing/ai-tokens/*`), never a direct write.
 32. **[explicit] Buzrr-AI is a third JWT _verifier_, not a third identity.**
     Same `BETTER_AUTH_SECRET`, same claims, and `typ: "player"` is rejected
     (see #12). Never mint a token there, and never add a separate credential.
@@ -156,3 +161,25 @@ the docs, and write an ADR.
 35. **[explicit] Every `ai` query is tenant-scoped.** Repository functions take
     `user_id`; missing and not-yours both return 404 (`"Unauthorized or ..."`),
     matching the Nest services so ownership never leaks via a 403/404 split.
+
+## Billing & entitlements (Buzrr Pro)
+
+36. **[explicit] Plans come from the DB at request time, never from the JWT.**
+    `EntitlementsService.resolvePlan` reads `subscriptions` on every check
+    (same reasoning as #13). Web plan gates and upgrade prompts are UX; every
+    limit is enforced in Nest (#17).
+37. **[explicit] Only Dodo-verified state writes `subscriptions`.**
+    - Writes go through `SubscriptionSyncService.apply` with a Dodo-fetched
+      subscription, under the per-subscription advisory lock. Webhook payloads
+      are never applied directly, because delivery is unordered.
+    - The `billing_events` idempotency claim commits in the same transaction as
+      its effects.
+    - Users are matched by server-set `metadata.userId`, an existing row, or
+      `dodo_customer_id` — never by email, never from the checkout `return_url`.
+38. **[explicit] AI tokens are spent only through `reserveAiToken`** — a single
+    conditional `UPDATE`, so concurrent requests can't overspend. Refunds need
+    the reservation's release token, flip its status at most once, and never
+    credit a newer Pro window.
+39. **[explicit] `BILLING` off means Pro limits for everyone.** Self-hosted
+    instances must keep working without a payment provider; don't make any
+    feature depend on a subscription existing.

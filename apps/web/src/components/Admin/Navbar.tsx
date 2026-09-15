@@ -8,6 +8,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LuBookText,
+  LuCrown,
   LuHistory,
   LuLogOut,
   LuSettings,
@@ -25,6 +26,7 @@ import SignOutButton from "./SignOutButton";
 const NavLinks = [
   { href: "/admin", label: "Quizzes", icon: LuBookText },
   { href: "/admin/history", label: "History", icon: LuHistory },
+  { href: "/admin/billing", label: "Plan & Billing", icon: LuCrown },
   { href: "/admin/settings", label: "Settings", icon: LuSettings },
 ];
 

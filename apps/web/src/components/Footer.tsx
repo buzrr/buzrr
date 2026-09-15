@@ -14,7 +14,11 @@ const ROUTES_WITH_OWN_FOOTER = [
   "/roadmap",
   "/changelog",
   "/support",
+  "/pricing",
 ];
+
+// Route prefixes where the bar is hidden on every subpage (checkout flow).
+const PREFIXES_WITHOUT_FOOTER = ["/billing/"];
 
 const Links = [
   {
@@ -57,7 +61,12 @@ const Links = [
 
 const Footer = () => {
   const pathname = usePathname();
-  if (ROUTES_WITH_OWN_FOOTER.includes(pathname)) return null;
+  if (
+    ROUTES_WITH_OWN_FOOTER.includes(pathname) ||
+    PREFIXES_WITHOUT_FOOTER.some((prefix) => pathname.startsWith(prefix))
+  ) {
+    return null;
+  }
 
   return (
     <div className="fixed bottom-0 right-3 md:right-0 md:left-0 z-50 w-fit md:w-full md:bg-light-bg md:dark:bg-dark-bg">

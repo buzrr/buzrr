@@ -9,7 +9,7 @@ setup exists (see [infrastructure.md](infrastructure.md#vinext)).
 
 | Route group                                                                     | Audience                  | Gate                                                          |
 | ------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------- |
-| `/` landing, `/changelog`, `/roadmap`, `/docs`, `/support`                      | public                    | —                                                             |
+| `/` landing, `/pricing`, `/changelog`, `/roadmap`, `/docs`, `/support`          | public                    | —                                                             |
 | `/auth/login`                                                                   | public                    | —                                                             |
 | `/admin/(mains)` — quiz list, history, profile, settings                        | host (account)            | session in `admin/layout.tsx` (+ role via `SessionProvider`)  |
 | `/admin/(quiz)/quiz/*` — quiz detail/create, post-game leaderboard              | host                      | same                                                          |
@@ -20,6 +20,8 @@ setup exists (see [infrastructure.md](infrastructure.md#vinext)).
 | `/player`, `/player/joinRoom/[playerId]`, `/player/play/[playerId]`             | anonymous guests          | none (player identity in localStorage)                        |
 | `/join/[gameCode]`                                                              | guests via shared link/QR | none                                                          |
 | `/duel`, `/duel/game/[gameCode]`, `/duel/invite/[code]`, `/duel/profile`        | account                   | per-page `requireDuelSession`                                 |
+| `/billing/checkout` (pay page), `/billing/success` (Dodo `return_url`)          | account                   | per-page `requireBillingSession(callbackURL)`                 |
+| `/admin/(mains)/billing` — plan, usage, portal                                  | host (account)            | session in `admin/layout.tsx`                                 |
 
 Server components handle session/role gating and param unwrapping; nearly all
 real UI is in `"use client"` components under `src/components/` (`Admin/`,
@@ -71,7 +73,9 @@ Guest identity is _localStorage_, not Redux: `playerId` + `playerToken`
   (localStorage `playerToken`), `getPublicApiClient()`.
 - `get-access-token.ts` — in-memory cache of the 7d JWT from
   `/api/auth/access-token` (see [auth.md](auth.md)).
-- `errors.ts` — `getApiErrorMessage` for toasts.
+- `errors.ts` — `getApiErrorMessage` for toasts; `getPlanLimitError` spots
+  `code: "PLAN_LIMIT"` refusals (from Nest or Buzrr-AI) so callers open
+  `Billing/UpgradePrompt` (`usePlanLimitPrompt`) instead of toasting.
 
 ## Socket hooks (`src/hooks/`)
 
@@ -139,7 +143,7 @@ disconnect`), emits `request-sync` on connect as a safety net, and exposes a
 ## Direct DB access from web — the exception, not the rule
 
 Only two `server-only` modules touch Prisma directly: `lib/auth.ts` (Better
-Auth adapter) and `lib/get-current-role.ts` (role for layout gates). (The
+Auth adapter, plus a read-only `subscriptions` check in `deleteUser.beforeDelete`) and `lib/get-current-role.ts` (role for layout gates). (The
 third `server-only` module, `lib/github-stats.ts`, calls the GitHub REST API
 for landing-page stats, 1h revalidate — no DB.) Everything else must go
 through the Nest API. Client components
@@ -173,3 +177,15 @@ the Prisma runtime out of the client bundle).
 - Admin route-group chrome: `(mains)` and `(privileged)` wrap children in
   `AdminShell` (navbar shell); `(gameplay)` and `(quiz)` don't — pick the
   group accordingly when adding an admin page.
+- `app/api/webhooks/dodo/route.ts` is the only non-auth web API route. It
+  verifies the Dodo signature and forwards the raw body to the Nest API
+  ([backend.md](backend.md#billing--entitlements-srcmodulesbilling)); it never
+  writes billing state itself.
+- Plan and usage data (`useEntitlementsQuery`, key `billing.me`) must be
+  invalidated by any mutation that spends or frees an allowance: quiz
+  create/delete/import and AI generation. `/pricing` prices are display-only
+  (`GET /api/billing/pricing`, quoted by Dodo's checkout preview, with
+  `lib/pricing.ts` fallbacks; INR for India, USD elsewhere — region from the edge
+  country header, or the browser timezone/locale via `usePriceRegion` when there
+  is none); Dodo decides the
+  charged amount from the billing country.

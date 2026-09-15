@@ -11,12 +11,14 @@ import { useRouter } from "next/navigation";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { createQuizSchema } from "@/lib/modules/forms/schemas";
 import { useCreateQuizMutation } from "@/lib/modules/quizzes/hooks";
+import { usePlanLimitPrompt } from "@/components/Billing/UpgradePrompt";
 
 type FormValues = z.infer<typeof createQuizSchema>;
 
 const CreateBuzrrForm = (params: { setTitle: (title: string) => void }) => {
   const router = useRouter();
   const mutation = useCreateQuizMutation();
+  const { handlePlanLimit, upgradePrompt } = usePlanLimitPrompt();
   const { control, handleSubmit } = useForm<FormValues>({
     resolver: zodResolver(createQuizSchema),
     defaultValues: { title: "", description: "" },
@@ -33,6 +35,7 @@ const CreateBuzrrForm = (params: { setTitle: (title: string) => void }) => {
           router.push(`/admin/quiz/${res.quizId}`);
         },
         onError: (err) => {
+          if (handlePlanLimit(err)) return;
           toast.error(getApiErrorMessage(err));
         },
       },
@@ -84,6 +87,7 @@ const CreateBuzrrForm = (params: { setTitle: (title: string) => void }) => {
         )}
       />
       <SubmitButton isPending={mutation.isPending} />
+      {upgradePrompt}
     </form>
   );
 };

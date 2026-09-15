@@ -98,6 +98,9 @@ CLOUDINARY_API_SECRET=""
 # Rate limiting — only used when RATELIMIT=ON in apps/web/.env
 UPSTASH_REDIS_REST_URL=""
 UPSTASH_REDIS_REST_TOKEN=""
+# Buzrr Pro billing via Dodo Payments. Off locally: every account gets Pro
+# limits. See apps/server/.env.example to turn it on.
+BILLING="OFF"
 `,
 
   "apps/web/.env": `# --- Next.js web app (hosts Better Auth) ---
@@ -133,6 +136,8 @@ GITHUB_TOKEN=""
 RATELIMIT="OFF"
 UPSTASH_REDIS_REST_URL=""
 UPSTASH_REDIS_REST_TOKEN=""
+# Dodo webhook signing secret — only needed when the API runs with BILLING=ON.
+DODO_PAYMENTS_WEBHOOK_KEY=""
 `,
 };
 

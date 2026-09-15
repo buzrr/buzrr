@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     # value here fails closed — no reason to repeat that known debt in new code.
     ai_web_origin: str
 
+    # Nest API origin (no /api suffix). AI generation tokens live in Nest's ledger
+    # (`apps/server/src/modules/billing`), so each generation reserves one there
+    # with the caller's own bearer token. Unreachable = generation fails closed.
+    ai_buzrr_api_url: str
+
     # --- optional -----------------------------------------------------------
     ai_port: int = 3002
     ai_log_level: str = "INFO"

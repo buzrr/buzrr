@@ -20,6 +20,9 @@ Format:
 
 ## Entries
 
+- 2026-09-14 — Pricing docs aligned with the configured Dodo product: ₹399 INR localized price (fallbacks set to 39900), `by_currency`/`by_country` both supported, product-level discount shown, Adaptive Currency caveat. Docs: ADR-010, infrastructure.md, CONTEXT.md.
+- 2026-09-14 — Pricing shows INR for India / USD elsewhere as the headline price, read live from the Dodo product (`GET /api/billing/pricing`); Dodo discount codes: auto-applied promotion (`DODO_PROMO_DISCOUNT_CODE`) plus customer-entered codes validated server-side. Docs: backend.md, frontend.md, infrastructure.md, ADR-010, CONTEXT.md.
+- 2026-09-14 — Buzrr Pro: Dodo Payments subscriptions, a Nest `billing` module (entitlements, webhook apply, checkout/portal, AI token ledger), Next.js `/api/webhooks/dodo` forwarder plus pricing/checkout/success/billing pages, plan enforcement for the quiz cap, room cap and AI generations (including Buzrr-AI via Nest), and migration `20260914000001`. Added the first vitest suite to `apps/server`. Docs touched: ADR-010 (new), data.md, backend.md, auth.md, frontend.md, infrastructure.md, ai.md, invariants.md (#23/#28/#31 amended, #36–39 new), CONTEXT.md, AGENTS.md. Also added the missing ADR-009 row to the ADR index.
 - 2026-08-18 (7440e2d) — Added **`apps/ai`** (Buzrr-AI): a FastAPI + arq service for Knowledge Spaces, document ingestion and cited RAG quiz generation, on a new Alembic-owned `ai` Postgres schema (pgvector) and an `ai:*` Redis prefix, reaching real quizzes only via `POST /api/quizzes/import` on Nest. Docs touched: ai.md (new), ADR-009 (new), overview.md, data.md, auth.md, backend.md, frontend.md, infrastructure.md, invariants.md (#30–#35), ARCHITECTURE.md, AGENTS.md, CONTEXT.md.
 - 2026-08-16 (28aa264 + follow-up) — Duels now **pause** while no human is
   connected (`pausedAt` in game meta, parked deadline, `pauseDuel`/`resumeDuel`,

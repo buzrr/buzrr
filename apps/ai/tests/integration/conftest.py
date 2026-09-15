@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import NullPool
 
 if TYPE_CHECKING:
+    from buzrr_ai.billing import TokenReservation
     from tests.fakes import FakeLLM
 
 from buzrr_ai.db.models import SCHEMA, Base
@@ -227,6 +228,38 @@ async def stub_queue() -> StubQueue:
     return StubQueue()
 
 
+class FakeBilling:
+    """Stands in for the Nest token ledger. Set `limit_reached` to refuse reservations."""
+
+    def __init__(self) -> None:
+        self.reserved: list[str] = []
+        self.released: list[str] = []
+        self.limit_reached = False
+
+    async def reserve(self, authorization: str) -> "TokenReservation":
+        from buzrr_ai.billing import TokenReservation
+        from buzrr_ai.errors import PlanLimitReached
+
+        if self.limit_reached:
+            raise PlanLimitReached(
+                "You've used all 3 free AI generations.",
+                {"code": "PLAN_LIMIT", "limit": "ai_tokens", "max": 3, "resetsAt": None},
+            )
+        reservation = TokenReservation(
+            reservation_id=f"res_{len(self.reserved) + 1}", release_token="secret"
+        )
+        self.reserved.append(reservation.reservation_id)
+        return reservation
+
+    async def release(self, authorization: str, reservation: "TokenReservation") -> None:
+        self.released.append(reservation.reservation_id)
+
+
+@pytest_asyncio.fixture
+async def fake_billing() -> FakeBilling:
+    return FakeBilling()
+
+
 @pytest_asyncio.fixture
 async def fake_llm() -> "FakeLLM":
     from tests.fakes import FakeLLM
@@ -236,11 +269,15 @@ async def fake_llm() -> "FakeLLM":
 
 @pytest_asyncio.fixture
 async def client(
-    engine: AsyncEngine, clean_tables: None, stub_queue: StubQueue, fake_llm: "FakeLLM"
+    engine: AsyncEngine,
+    clean_tables: None,
+    stub_queue: StubQueue,
+    fake_llm: "FakeLLM",
+    fake_billing: FakeBilling,
 ) -> AsyncIterator[AsyncClient]:
-    """The real app, wired to the test DB with both providers faked."""
+    """The real app, wired to the test DB with both providers and billing faked."""
     from buzrr_ai.db.session import get_session
-    from buzrr_ai.deps import get_embeddings, get_llm, get_queue
+    from buzrr_ai.deps import get_billing, get_embeddings, get_llm, get_queue
     from buzrr_ai.main import create_app
     from tests.fakes import FakeEmbeddings
 
@@ -255,6 +292,7 @@ async def client(
     app.dependency_overrides[get_queue] = lambda: stub_queue
     app.dependency_overrides[get_embeddings] = lambda: FakeEmbeddings()
     app.dependency_overrides[get_llm] = lambda: fake_llm
+    app.dependency_overrides[get_billing] = lambda: fake_billing
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as http:
         yield http
