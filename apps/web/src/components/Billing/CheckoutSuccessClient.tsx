@@ -25,7 +25,9 @@ export default function CheckoutSuccessClient() {
   const sync = useSyncBillingMutation();
   const { data } = useEntitlementsQuery({
     refetchInterval: (latest) =>
-      latest?.plan === "pro" || timedOut ? false : POLL_MS,
+      latest?.plan === "pro" || latest?.billingEnabled === false || timedOut
+        ? false
+        : POLL_MS,
   });
 
   useEffect(() => {
@@ -34,17 +36,20 @@ export default function CheckoutSuccessClient() {
   }, []);
 
   const isPro = Boolean(data?.billingEnabled && data.plan === "pro");
+  // Without billing every account resolves to Pro, so there is nothing to
+  // confirm — and nothing to poll or sync.
+  const billingOff = data?.billingEnabled === false;
 
   // The API still grants only what Dodo reports; this just doesn't wait for
   // a webhook that may never arrive.
   const runSync = sync.mutate;
   useEffect(() => {
-    if (isPro) return;
+    if (isPro || billingOff) return;
     const timers = AUTO_SYNC_AT_MS.map((delay) =>
       setTimeout(() => runSync(undefined), delay),
     );
     return () => timers.forEach(clearTimeout);
-  }, [isPro, runSync]);
+  }, [isPro, billingOff, runSync]);
 
   if (isPro && data) {
     return (
@@ -75,6 +80,26 @@ export default function CheckoutSuccessClient() {
             View plan & billing
           </Link>
         </div>
+      </div>
+    );
+  }
+
+  if (billingOff) {
+    return (
+      <div className="max-w-lg mx-auto text-center">
+        <h1 className="text-3xl font-black text-dark dark:text-white">
+          Billing isn&apos;t enabled
+        </h1>
+        <p className="mt-2 text-off-dark dark:text-off-white">
+          This Buzrr instance doesn&apos;t take payments — every account already
+          has Pro limits.
+        </p>
+        <Link
+          href="/admin"
+          className="mt-8 inline-block rounded-xl px-5 py-3 font-bold bg-lprimary dark:bg-dprimary text-white dark:text-dark hover:opacity-90"
+        >
+          Go to your quizzes
+        </Link>
       </div>
     );
   }

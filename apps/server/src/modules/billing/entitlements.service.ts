@@ -110,7 +110,6 @@ export class EntitlementsService {
       this.prisma.db.subscription.findMany({
         where: { userId },
         orderBy: { updatedAt: "desc" },
-        take: 20,
       }),
     ]);
     if (!user) {
