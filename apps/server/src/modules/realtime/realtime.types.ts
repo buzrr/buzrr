@@ -5,17 +5,17 @@ import type {
 } from "../game-engine/game-engine.types";
 
 // ---------------------------------------------------------------------------
-// Socket contract payloads. The server owns all timing: clients render
-// countdowns from `deadline`, correcting for clock skew via `serverNow`.
+// Socket contract payloads. The server owns all timing: deadlines go out as
+// `remainingMs` durations, so clients count down on their own clock and never
+// need to compare timestamps across machines.
 // ---------------------------------------------------------------------------
 
 export interface QuestionStartPayload {
   index: number;
   qCount: number;
   question: PublicQuestion;
-  startAt: number;
-  deadline: number;
-  serverNow: number;
+  /** Time left to answer, as of this event being sent. */
+  remainingMs: number;
 }
 
 export interface QuestionEndPayload {
@@ -85,11 +85,10 @@ export interface StateSyncPayload {
   mode: "classic" | "duel";
   qIndex: number;
   qCount: number;
-  serverNow: number;
   /** Present while phase is "question". */
   question?: PublicQuestion;
-  startAt?: number;
-  deadline?: number;
+  /** Present while phase is "question": time left, as of this snapshot. */
+  remainingMs?: number;
   /** Present while phase is "reveal". */
   reveal?: QuestionEndPayload;
   /** Present while phase is "final" or "ended". */
@@ -118,6 +117,8 @@ export interface ServerToClientEvents {
   "game-over": (payload: GameOverPayload) => void;
   "state-sync": (payload: StateSyncPayload) => void;
   "player-connection": (payload: PlayerConnectionPayload) => void;
+  /** Round-trip probe; the client acks immediately (see latency-monitor.ts). */
+  "latency-probe": (ack: () => void) => void;
   // -- duel matchmaking --
   "duel:matched": (payload: DuelMatchedPayload) => void;
   "duel:queued": (payload: { elo: number }) => void;

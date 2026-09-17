@@ -25,7 +25,7 @@ matchmaking, and invite services in `afterInit` (`setServer(...)`).
 lobby → starting → question ⇄ reveal → final → ended
         (3.2s)     (timeOut    (duel: 4s auto;
                    +300ms       classic: host-paced)
-                   grace)
+                   answer grace)
 ```
 
 - Transitions are executed **only** by the engine: `enterQuestion`,
@@ -104,15 +104,33 @@ quitter finish on score instead of forfeiting.
 
 `submitAnswer(gameCode, playerId, qIndex, optionId)`:
 
-1. Rejects unless phase is `question`, `qIndex` matches, and now ≤ deadline.
+1. Rejects unless phase is `question`, `qIndex` matches, and the window is
+   stamped (`qStartAt` non-zero).
 2. Rejects players not in the Redis roster (kicked players may still hold a
    live socket).
-3. Time taken is **server-measured** (`now - meta.qStartAt`) — client clocks
-   are never trusted, and no endpoint accepts a client-supplied elapsed time.
+3. Timing (`resolveAnswerTiming`, `common/utils/answer-timing.ts`) uses server
+   clocks only. The receive time is taken on entry; half the socket's rolling
+   median RTT (capped at `MAX_CREDITED_RTT_MS` = 600ms, since a client controls
+   its own ack speed) is subtracted to get the corrected answer time. Accepted
+   only if receive ≤ `qDeadline + ANSWER_GRACE_MS` (300ms) **and** corrected
+   time ≤ `qDeadline`; `timeTakenMs = corrected - qStartAt`. No endpoint
+   accepts a client-supplied time.
 4. Score: `computeScore` (`common/utils/compute-score.ts`) — correct answers
    decay 1000 → 100 linearly over the question's `timeOut`; wrong = 0.
 5. First write wins via `HSETNX` (`store.putAnswer`); duplicates rejected.
 6. Score added to the Redis leaderboard zset; `maybeRevealEarly` runs.
+
+**Window stamping.** `enterQuestion` writes a provisional `games:deadlines`
+entry, opens the phase with `qStartAt`/`qDeadline` = 0, emits `question-start`,
+and only then stamps `qStartAt = now`, `qDeadline = now + timeOut` (the real
+window, no grace) plus the bot plan. The reveal timer fires at
+`qDeadline + ANSWER_GRACE_MS`. A question found unstamped by `handleDeadline`
+(crash between the two writes) is re-entered.
+
+**RTT measurement.** `monitorLatency` (`realtime/latency-monitor.ts`) runs per
+player socket, in-process: every 3s it emits `latency-probe` with an ack
+(5s timeout) and keeps the median of the last 5 samples. The gateway passes it
+into `submitAnswer`; bots pass 0.
 
 Questions are sent to clients as `PublicQuestion` — **correctness stripped**
 (`toPublicQuestion` in `game-engine.types.ts`). Never leak `isCorrect` before
@@ -136,9 +154,11 @@ reveal.
   `question-end`. The other order flashes the timeout state: clients switch to
   the reveal screen with no personal result yet, and "no answer" is the only
   thing that screen can render.
-- All countdowns render from server-issued `deadline` + `serverNow`; the
-  client stores `clockOffset = serverNow - Date.now()` and never advances
-  phases itself (`useServerCountdown.ts`).
+- Deadlines go out as durations: `question-start` and question-phase
+  `state-sync` carry `remainingMs`. The client converts it to a local-clock
+  `deadline` on receipt (`gameSlice.ts`), so no cross-machine clock comparison
+  happens, and never advances phases itself (`useServerCountdown.ts`).
+- Every game socket acks `latency-probe` immediately (`useGameSocket.ts`).
 - Per-player personal results go to the room `player:{playerId}`
   (`answer-result` events), which also works cross-instance via the Redis
   adapter.

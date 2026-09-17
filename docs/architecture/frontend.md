@@ -95,8 +95,9 @@ disconnect`), emits `request-sync` on connect as a safety net, and exposes a
 - `useDuelQueue` / `useDuelInvite` — standalone duel sockets (queue /
   invite waiting room), navigation on `duel:matched`
   ([duels.md](duels.md#client-side-flow-web)).
-- `useServerCountdown` — display-only countdown from `deadline` +
-  `clockOffset`; never triggers transitions.
+- `useServerCountdown` — display-only countdown to the slice's local-clock
+  `deadline` (derived from the server's `remainingMs`); never triggers
+  transitions.
 
 ## Gameplay screens (who renders what)
 

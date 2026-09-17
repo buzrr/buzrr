@@ -10,8 +10,8 @@ export interface PlayerRemovedPayload extends PlayerPayload {
 }
 
 // ---------------------------------------------------------------------------
-// Socket contract — the server owns all timing. Clients render countdowns from
-// `deadline`, correcting for clock skew via `serverNow`.
+// Socket contract — the server owns all timing. Deadlines arrive as
+// `remainingMs` durations; clients count down on their own clock.
 // ---------------------------------------------------------------------------
 
 export type GamePhase =
@@ -35,9 +35,8 @@ export interface QuestionStartPayload {
   index: number;
   qCount: number;
   question: PublicQuestion;
-  startAt: number;
-  deadline: number;
-  serverNow: number;
+  /** Time left to answer, as of this event being sent. */
+  remainingMs: number;
 }
 
 export interface QuestionEndPayload {
@@ -113,10 +112,9 @@ export interface StateSyncPayload {
   mode: "classic" | "duel";
   qIndex: number;
   qCount: number;
-  serverNow: number;
   question?: PublicQuestion;
-  startAt?: number;
-  deadline?: number;
+  /** Present while phase is "question": time left, as of this snapshot. */
+  remainingMs?: number;
   reveal?: QuestionEndPayload;
   leaderboard?: LiveLeaderboardEntry[];
   players: {
@@ -145,6 +143,8 @@ export interface ServerToClientEvents {
   "game-over": (payload: GameOverPayload) => void;
   "state-sync": (payload: StateSyncPayload) => void;
   "player-connection": (payload: PlayerConnectionPayload) => void;
+  /** Server round-trip probe — ack immediately, it times the reply. */
+  "latency-probe": (ack: () => void) => void;
   "player-joined": (player: PlayerPayload) => void;
   "player-removed": (player: PlayerRemovedPayload) => void;
   /** A player left on their own (distinct from a host kick / player-removed). */

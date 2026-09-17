@@ -100,11 +100,13 @@ crash mid-question.
   dropping it, which keeps the room visible to the sweeper that ends games whose
   host has been gone for 5 minutes.
 
-Clients render countdowns from the `deadline` the server sends, correcting for
-clock skew with the `serverNow` stamped on the same payload — never from a local
-timer. A reconnecting client emits `request-sync` and gets a full `state-sync`
-snapshot (phase, question, deadline, roster, its own answer) instead of replaying
-missed events.
+The server sends time left as a duration (`remainingMs`), which clients turn
+into a countdown on their own clock; the countdown never drives a transition.
+The answer window starts when `question-start` has been broadcast, answers are
+credited half their socket's measured round trip, and a 300ms grace lets
+in-time answers arrive. A reconnecting client emits `request-sync` and gets a
+full `state-sync` snapshot (phase, question, time left, roster, its own answer)
+instead of replaying missed events.
 
 ## Where state lives
 

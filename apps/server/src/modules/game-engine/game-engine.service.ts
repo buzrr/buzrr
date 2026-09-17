@@ -5,6 +5,10 @@ import {
   OnApplicationShutdown,
 } from "@nestjs/common";
 import { nanoid } from "nanoid";
+import {
+  ANSWER_GRACE_MS,
+  resolveAnswerTiming,
+} from "../../common/utils/answer-timing";
 import { computeScore } from "../../common/utils/compute-score";
 import { BotTier, planBotAnswer } from "../../common/utils/duel-bot";
 import { applyFloor, eloDelta, kFactor } from "../../common/utils/elo";
@@ -28,8 +32,6 @@ import { GameStoreService } from "./game-store.service";
 
 /** Countdown shown on clients between "start game" and the first question. */
 const START_COUNTDOWN_MS = 3_200;
-/** Latency grace added to every question deadline. */
-const DEADLINE_GRACE_MS = 300;
 /** Auto-advance delay after a reveal in hostless (duel) games. */
 const DUEL_REVEAL_MS = 4_000;
 /** How long a disconnected lobby player is kept before removal. */
@@ -327,7 +329,12 @@ export class GameEngineService
     playerId: string,
     qIndex: number,
     optionId: string,
+    /** Rolling median round trip of the answering socket; 0 for bots. */
+    rttMs = 0,
   ): Promise<SubmitAnswerAck> {
+    // Taken before any Redis round trip so store latency isn't billed to the
+    // player.
+    const receivedAt = Date.now();
     const meta = await this.store.getMeta(gameCode);
     if (!meta || meta.phase !== "question") {
       return { accepted: false, reason: "No question is active" };
@@ -335,8 +342,20 @@ export class GameEngineService
     if (qIndex !== meta.qIndex) {
       return { accepted: false, reason: "Question already advanced" };
     }
-    const now = Date.now();
-    if (now > meta.qDeadline) {
+    // enterQuestion stamps the window only after broadcasting the question.
+    if (!meta.qStartAt) {
+      return { accepted: false, reason: "Question has not started" };
+    }
+    // Server-measured time: never trust the client clock. Half the socket's
+    // round trip is credited back (capped), and answers are accepted for a
+    // short grace past the deadline so ones sent in time can still arrive.
+    const timing = resolveAnswerTiming({
+      receivedAt,
+      qStartAt: meta.qStartAt,
+      qDeadline: meta.qDeadline,
+      rttMs,
+    });
+    if (!timing.accepted) {
       return { accepted: false, reason: "Time is up" };
     }
 
@@ -357,13 +376,12 @@ export class GameEngineService
       return { accepted: false, reason: "Invalid option" };
     }
 
-    // Server-measured time: never trust the client clock.
-    const timeTakenMs = Math.max(0, now - meta.qStartAt);
+    const { timeTakenMs } = timing;
     const score = computeScore(option.isCorrect, timeTakenMs, question.timeOut);
 
     const stored = await this.store.putAnswer(gameCode, qIndex, playerId, {
       optionId,
-      answeredAt: now,
+      answeredAt: receivedAt,
       timeTakenMs,
       isCorrect: option.isCorrect,
       score,
@@ -572,7 +590,7 @@ export class GameEngineService
     const pausedFor = Math.max(0, now - meta.pausedAt);
     const patch: Partial<GameMeta> = {};
     if (meta.qDeadline > 0) patch.qDeadline = meta.qDeadline + pausedFor;
-    if (meta.phase === "question") {
+    if (meta.phase === "question" && meta.qStartAt) {
       patch.qStartAt = meta.qStartAt + pausedFor;
       if (meta.botAnswerAt) patch.botAnswerAt = meta.botAnswerAt + pausedFor;
     }
@@ -582,9 +600,19 @@ export class GameEngineService
     if (!(await this.store.claimResume(gameCode, patch))) return;
 
     if (patch.qDeadline) {
-      await this.store.setDeadline(gameCode, patch.qDeadline);
+      const fireAt =
+        meta.phase === "question"
+          ? patch.qDeadline + ANSWER_GRACE_MS
+          : patch.qDeadline;
+      await this.store.setDeadline(gameCode, fireAt);
       await this.store.ensureOwner(gameCode, this.instanceId);
-      this.armTimer(gameCode, patch.qDeadline - now);
+      this.armTimer(gameCode, fireAt - now);
+    } else if (meta.phase === "question") {
+      // Paused before enterQuestion stamped the window: fire now so
+      // handleDeadline re-opens the question.
+      await this.store.setDeadline(gameCode, now);
+      await this.store.ensureOwner(gameCode, this.instanceId);
+      this.armTimer(gameCode, 0);
     }
     // Re-arms the bot from the (now shifted) plan in meta, unless it already
     // answered before the pause.
@@ -684,7 +712,6 @@ export class GameEngineService
       mode: meta.mode,
       qIndex: meta.qIndex,
       qCount: meta.qCount,
-      serverNow: now,
       players: roster.map((p) => ({
         id: p.id,
         name: p.name,
@@ -699,8 +726,11 @@ export class GameEngineService
       if (question) {
         if (meta.phase === "question") {
           payload.question = toPublicQuestion(question);
-          payload.startAt = meta.qStartAt;
-          payload.deadline = meta.qDeadline;
+          // Unstamped means the question-start broadcast is still going out;
+          // the full window is what the player will get.
+          payload.remainingMs = meta.qStartAt
+            ? Math.max(0, meta.qDeadline - now)
+            : question.timeOut * 1000;
         } else {
           const answers = await this.store.getAnswers(gameCode, meta.qIndex);
           payload.reveal = {
@@ -746,35 +776,51 @@ export class GameEngineService
       this.logger.error(`Question ${index} missing for ${gameCode}`);
       return;
     }
-    const now = Date.now();
-    const deadline = now + question.timeOut * 1000 + DEADLINE_GRACE_MS;
+    const windowMs = question.timeOut * 1000;
 
-    // Planned before the meta write so it rides the same round trip: the
-    // answer has to be durable for recoverTimers to re-arm it after a restart.
-    const plan =
-      meta.botId && meta.botTier ? planBotAnswer(question, meta.botTier) : null;
-    const botAnswerAt = plan ? now + plan.delayMs : 0;
-
+    // Open the phase with the window unstamped (qStartAt 0), broadcast, and
+    // only then start the clock: the Redis writes and the broadcast itself
+    // would otherwise come out of every player's answering time. The
+    // provisional schedule entry keeps the sweeper from reading the previous
+    // phase's (already due) entry as this question's in the meantime.
+    await this.store.setDeadline(
+      gameCode,
+      Date.now() + windowMs + ANSWER_GRACE_MS,
+    );
     await this.store.patchMeta(gameCode, {
       phase: "question",
       qIndex: index,
       qId: question.id,
-      qStartAt: now,
-      qDeadline: deadline,
-      ...(plan ? { botOptionId: plan.optionId, botAnswerAt } : {}),
+      qStartAt: 0,
+      qDeadline: 0,
     });
-    await this.store.setDeadline(gameCode, deadline);
 
     this.emitRoom(gameCode).emit("question-start", {
       index,
       qCount: questions.length,
       question: toPublicQuestion(question),
-      startAt: now,
-      deadline,
-      serverNow: now,
+      remainingMs: windowMs,
     });
 
-    this.armTimer(gameCode, deadline - now);
+    const startAt = Date.now();
+    const deadline = startAt + windowMs;
+    // Answers are taken until the grace runs out; the reveal waits for it.
+    const closeAt = deadline + ANSWER_GRACE_MS;
+
+    // Planned into the same meta write as the window: the answer has to be
+    // durable for recoverTimers to re-arm it after a restart.
+    const plan =
+      meta.botId && meta.botTier ? planBotAnswer(question, meta.botTier) : null;
+    const botAnswerAt = plan ? startAt + plan.delayMs : 0;
+
+    await this.store.patchMeta(gameCode, {
+      qStartAt: startAt,
+      qDeadline: deadline,
+      ...(plan ? { botOptionId: plan.optionId, botAnswerAt } : {}),
+    });
+    await this.store.setDeadline(gameCode, closeAt);
+
+    this.armTimer(gameCode, closeAt - Date.now());
 
     // Arming here rather than at duel start keeps the bot's timer on whichever
     // instance currently owns the game's deadlines.
@@ -947,7 +993,10 @@ export class GameEngineService
         await this.enterQuestion(gameCode, 0, meta);
         break;
       case "question":
-        if (Date.now() >= meta.qDeadline) {
+        if (!meta.qStartAt) {
+          // Died between opening the question and stamping its window.
+          await this.enterQuestion(gameCode, meta.qIndex, meta);
+        } else if (Date.now() >= meta.qDeadline + ANSWER_GRACE_MS) {
           await this.enterReveal(gameCode);
         }
         break;

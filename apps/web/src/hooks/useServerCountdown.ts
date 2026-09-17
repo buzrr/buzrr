@@ -2,33 +2,29 @@
 import { useEffect, useState } from "react";
 
 /**
- * Seconds remaining until a server-issued deadline, corrected for clock skew.
- * The countdown is display-only — phase transitions always come from the
- * server, never from this timer reaching zero.
+ * Seconds remaining until a deadline on the local clock (the slice derives it
+ * from the server's `remainingMs`). The countdown is display-only — phase
+ * transitions always come from the server, never from this timer reaching
+ * zero.
  */
-export function useServerCountdown(
-  deadline: number,
-  clockOffset: number,
-): number {
-  const [remaining, setRemaining] = useState(() =>
-    computeRemaining(deadline, clockOffset),
-  );
+export function useServerCountdown(deadline: number): number {
+  const [remaining, setRemaining] = useState(() => computeRemaining(deadline));
 
   useEffect(() => {
-    setRemaining(computeRemaining(deadline, clockOffset));
+    setRemaining(computeRemaining(deadline));
     if (!deadline) return;
     const interval = setInterval(() => {
-      const next = computeRemaining(deadline, clockOffset);
+      const next = computeRemaining(deadline);
       setRemaining(next);
       if (next <= 0) clearInterval(interval);
     }, 250);
     return () => clearInterval(interval);
-  }, [deadline, clockOffset]);
+  }, [deadline]);
 
   return remaining;
 }
 
-function computeRemaining(deadline: number, clockOffset: number): number {
+function computeRemaining(deadline: number): number {
   if (!deadline) return 0;
-  return Math.max(0, (deadline - (Date.now() + clockOffset)) / 1000);
+  return Math.max(0, (deadline - Date.now()) / 1000);
 }

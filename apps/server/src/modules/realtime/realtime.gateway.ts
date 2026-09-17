@@ -11,6 +11,7 @@ import { DuelInviteService } from "../duel/duel-invite.service";
 import { MatchmakingService } from "../duel/matchmaking.service";
 import { GameEngineService } from "../game-engine/game-engine.service";
 import { GameStoreService } from "../game-engine/game-store.service";
+import { monitorLatency } from "./latency-monitor";
 import { RealtimeService } from "./realtime.service";
 import type {
   DuelInviteAcceptAck,
@@ -361,6 +362,8 @@ export class RealtimeGateway
   }
 
   private registerPlayerHandlers(socket: TypedSocket, gameCode: string): void {
+    const latency = monitorLatency(socket);
+
     socket.on("leave-room", async () => {
       const playerId = socket.data.playerId;
       if (!playerId) return;
@@ -402,6 +405,7 @@ export class RealtimeGateway
           playerId,
           payload.qIndex,
           payload.optionId,
+          latency.rttMs(),
         );
         ack?.(result);
       } catch (error) {
