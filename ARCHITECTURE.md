@@ -100,11 +100,14 @@ crash mid-question.
   dropping it, which keeps the room visible to the sweeper that ends games whose
   host has been gone for 5 minutes.
 
-Clients render countdowns from the `deadline` the server sends, correcting for
-clock skew with the `serverNow` stamped on the same payload — never from a local
-timer. A reconnecting client emits `request-sync` and gets a full `state-sync`
-snapshot (phase, question, deadline, roster, its own answer) instead of replaying
-missed events.
+The server sends time left as a duration (`remainingMs`), which clients turn
+into a countdown on their own clock; the countdown never drives a transition.
+The answer window is durable in Redis before `question-start` is broadcast, so
+an answer sent the moment the question appears cannot outrun it; a flat 300ms
+grace past the deadline lets in-time answers arrive, scored as if they landed
+on the deadline. No client-measured latency feeds scoring. A reconnecting client emits `request-sync` and gets a
+full `state-sync` snapshot (phase, question, time left, roster, its own answer)
+instead of replaying missed events.
 
 ## Where state lives
 

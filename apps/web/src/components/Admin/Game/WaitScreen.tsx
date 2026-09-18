@@ -9,8 +9,7 @@ import { useServerCountdown } from "@/hooks/useServerCountdown";
  */
 export default function WaitScreen() {
   const deadline = useAppSelector((state) => state.game.deadline);
-  const clockOffset = useAppSelector((state) => state.game.clockOffset);
-  const remaining = useServerCountdown(deadline, clockOffset);
+  const remaining = useServerCountdown(deadline);
   const seconds = Math.ceil(remaining);
 
   return (

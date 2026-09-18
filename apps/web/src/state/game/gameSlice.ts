@@ -21,10 +21,11 @@ export interface GameLiveState {
   qIndex: number;
   qCount: number;
   question: PublicQuestion | null;
-  startAt: number;
+  /**
+   * Local-clock ms when answering closes, derived from the server's
+   * `remainingMs` on receipt. Display only; 0 when no question is open.
+   */
   deadline: number;
-  /** serverNow - clientNow at last sync; add to Date.now() to get server time. */
-  clockOffset: number;
   reveal: QuestionEndPayload | null;
   leaderboard: LiveLeaderboardEntry[];
   isFinalLeaderboard: boolean;
@@ -49,9 +50,7 @@ const initialState: GameLiveState = {
   qIndex: 0,
   qCount: 0,
   question: null,
-  startAt: 0,
   deadline: 0,
-  clockOffset: 0,
   reveal: null,
   leaderboard: [],
   isFinalLeaderboard: false,
@@ -73,10 +72,9 @@ const gameSlice = createSlice({
       state.mode = s.mode;
       state.qIndex = s.qIndex;
       state.qCount = s.qCount;
-      state.clockOffset = s.serverNow - Date.now();
       state.question = s.question ?? null;
-      state.startAt = s.startAt ?? 0;
-      state.deadline = s.deadline ?? 0;
+      state.deadline =
+        s.remainingMs === undefined ? 0 : Date.now() + s.remainingMs;
       state.reveal = s.reveal ?? null;
       state.leaderboard = s.leaderboard ?? [];
       state.isFinalLeaderboard = s.phase === "final" || s.phase === "ended";
@@ -93,9 +91,7 @@ const gameSlice = createSlice({
       state.qIndex = q.index;
       state.qCount = q.qCount;
       state.question = q.question;
-      state.startAt = q.startAt;
-      state.deadline = q.deadline;
-      state.clockOffset = q.serverNow - Date.now();
+      state.deadline = Date.now() + q.remainingMs;
       state.reveal = null;
       state.you = null;
     },

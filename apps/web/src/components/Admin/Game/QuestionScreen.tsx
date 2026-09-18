@@ -24,8 +24,7 @@ export default function QuestionScreen(props: QuestionScreenProps) {
   const { gameCode, quizTitle, socket } = props;
   const question = useAppSelector((state) => state.game.question);
   const deadline = useAppSelector((state) => state.game.deadline);
-  const clockOffset = useAppSelector((state) => state.game.clockOffset);
-  const remaining = useServerCountdown(deadline, clockOffset);
+  const remaining = useServerCountdown(deadline);
 
   if (!question) return null;
 

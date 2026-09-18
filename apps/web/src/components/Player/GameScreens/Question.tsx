@@ -22,7 +22,6 @@ const Question = (params: {
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const you = useAppSelector((state) => state.game.you);
   const deadline = useAppSelector((state) => state.game.deadline);
-  const clockOffset = useAppSelector((state) => state.game.clockOffset);
   const [optionId, setOptionId] = useState("");
   const [submitted, setSubmitted] = useState(false);
   /**
@@ -94,13 +93,13 @@ const Question = (params: {
     }
     const resend = unacked.current;
     unacked.current = null;
-    if (resend && Date.now() + clockOffset < deadline) {
+    if (resend && Date.now() < deadline) {
       send(resend, { silent: true });
       return;
     }
     setOptionId("");
     setSubmitted(false);
-  }, [you, clockOffset, deadline, send]);
+  }, [you, deadline, send]);
 
   const submitAnswer = (optId: string) => {
     if (submitted) return;

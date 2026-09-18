@@ -42,13 +42,12 @@ const QuestionAndResult = (params: {
 }) => {
   const options = params?.question?.options ?? [];
   const deadline = useAppSelector((state) => state.game.deadline);
-  const clockOffset = useAppSelector((state) => state.game.clockOffset);
   const connection = useAppSelector((state) => state.game.connection);
   // Answers submitted while offline would be rejected anyway — lock the UI.
   const offline = connection !== "connected";
   // Display-only countdown against the server deadline; the reveal is pushed
   // by the server regardless of what this shows.
-  const remaining = useServerCountdown(deadline, clockOffset);
+  const remaining = useServerCountdown(deadline);
   const timeOut = params?.question?.timeOut ?? 1;
   const percent = Math.max(
     0,

@@ -174,8 +174,7 @@ function DuelStartingScreen({
 }) {
   const players = useAppSelector((state) => state.game.players);
   const deadline = useAppSelector((state) => state.game.deadline);
-  const clockOffset = useAppSelector((state) => state.game.clockOffset);
-  const remaining = Math.ceil(useServerCountdown(deadline, clockOffset));
+  const remaining = Math.ceil(useServerCountdown(deadline));
 
   const opponent =
     players.find((p) => p.id !== myId) ?? readStoredOpponent(gameCode);
