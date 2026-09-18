@@ -117,8 +117,6 @@ export interface ServerToClientEvents {
   "game-over": (payload: GameOverPayload) => void;
   "state-sync": (payload: StateSyncPayload) => void;
   "player-connection": (payload: PlayerConnectionPayload) => void;
-  /** Round-trip probe; the client acks immediately (see latency-monitor.ts). */
-  "latency-probe": (ack: () => void) => void;
   // -- duel matchmaking --
   "duel:matched": (payload: DuelMatchedPayload) => void;
   "duel:queued": (payload: { elo: number }) => void;

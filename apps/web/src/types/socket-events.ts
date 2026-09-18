@@ -143,8 +143,6 @@ export interface ServerToClientEvents {
   "game-over": (payload: GameOverPayload) => void;
   "state-sync": (payload: StateSyncPayload) => void;
   "player-connection": (payload: PlayerConnectionPayload) => void;
-  /** Server round-trip probe — ack immediately, it times the reply. */
-  "latency-probe": (ack: () => void) => void;
   "player-joined": (player: PlayerPayload) => void;
   "player-removed": (player: PlayerRemovedPayload) => void;
   /** A player left on their own (distinct from a host kick / player-removed). */

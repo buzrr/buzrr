@@ -329,8 +329,6 @@ export class GameEngineService
     playerId: string,
     qIndex: number,
     optionId: string,
-    /** Rolling median round trip of the answering socket; 0 for bots. */
-    rttMs = 0,
   ): Promise<SubmitAnswerAck> {
     // Taken before any Redis round trip so store latency isn't billed to the
     // player.
@@ -342,18 +340,18 @@ export class GameEngineService
     if (qIndex !== meta.qIndex) {
       return { accepted: false, reason: "Question already advanced" };
     }
-    // enterQuestion stamps the window only after broadcasting the question.
+    // enterQuestion stamps the window before broadcasting; an unstamped one
+    // can only be meta left behind by an older build.
     if (!meta.qStartAt) {
       return { accepted: false, reason: "Question has not started" };
     }
-    // Server-measured time: never trust the client clock. Half the socket's
-    // round trip is credited back (capped), and answers are accepted for a
-    // short grace past the deadline so ones sent in time can still arrive.
+    // Server-measured time: never trust the client clock, and never take a
+    // correction the client can influence. Answers are accepted for a short
+    // fixed grace past the deadline so ones sent in time can still arrive.
     const timing = resolveAnswerTiming({
       receivedAt,
       qStartAt: meta.qStartAt,
       qDeadline: meta.qDeadline,
-      rttMs,
     });
     if (!timing.accepted) {
       return { accepted: false, reason: "Time is up" };
@@ -726,8 +724,9 @@ export class GameEngineService
       if (question) {
         if (meta.phase === "question") {
           payload.question = toPublicQuestion(question);
-          // Unstamped means the question-start broadcast is still going out;
-          // the full window is what the player will get.
+          // Unstamped is only possible for meta written by an older build
+          // (the window is now durable before the broadcast); fall back to the
+          // full window rather than showing a dead countdown.
           payload.remainingMs = meta.qStartAt
             ? Math.max(0, meta.qDeadline - now)
             : question.timeOut * 1000;
@@ -778,30 +777,6 @@ export class GameEngineService
     }
     const windowMs = question.timeOut * 1000;
 
-    // Open the phase with the window unstamped (qStartAt 0), broadcast, and
-    // only then start the clock: the Redis writes and the broadcast itself
-    // would otherwise come out of every player's answering time. The
-    // provisional schedule entry keeps the sweeper from reading the previous
-    // phase's (already due) entry as this question's in the meantime.
-    await this.store.setDeadline(
-      gameCode,
-      Date.now() + windowMs + ANSWER_GRACE_MS,
-    );
-    await this.store.patchMeta(gameCode, {
-      phase: "question",
-      qIndex: index,
-      qId: question.id,
-      qStartAt: 0,
-      qDeadline: 0,
-    });
-
-    this.emitRoom(gameCode).emit("question-start", {
-      index,
-      qCount: questions.length,
-      question: toPublicQuestion(question),
-      remainingMs: windowMs,
-    });
-
     const startAt = Date.now();
     const deadline = startAt + windowMs;
     // Answers are taken until the grace runs out; the reveal waits for it.
@@ -813,12 +788,30 @@ export class GameEngineService
       meta.botId && meta.botTier ? planBotAnswer(question, meta.botTier) : null;
     const botAnswerAt = plan ? startAt + plan.delayMs : 0;
 
+    // The whole window is durable *before* the broadcast: submitAnswer reads
+    // it back from Redis, so a player answering the instant `question-start`
+    // lands would otherwise race the write and be turned away as "not
+    // started". The schedule entry goes first so the sweeper never reads the
+    // previous phase's (already due) entry as this question's.
+    await this.store.setDeadline(gameCode, closeAt);
     await this.store.patchMeta(gameCode, {
+      phase: "question",
+      qIndex: index,
+      qId: question.id,
       qStartAt: startAt,
       qDeadline: deadline,
       ...(plan ? { botOptionId: plan.optionId, botAnswerAt } : {}),
     });
-    await this.store.setDeadline(gameCode, closeAt);
+
+    // What is left of the window once those writes are done — the clock has
+    // been running since startAt, so the client is told the truth rather than
+    // the full timeOut.
+    this.emitRoom(gameCode).emit("question-start", {
+      index,
+      qCount: questions.length,
+      question: toPublicQuestion(question),
+      remainingMs: Math.max(0, deadline - Date.now()),
+    });
 
     this.armTimer(gameCode, closeAt - Date.now());
 
@@ -994,7 +987,7 @@ export class GameEngineService
         break;
       case "question":
         if (!meta.qStartAt) {
-          // Died between opening the question and stamping its window.
+          // Legacy meta only — the window and the phase are one write now.
           await this.enterQuestion(gameCode, meta.qIndex, meta);
         } else if (Date.now() >= meta.qDeadline + ANSWER_GRACE_MS) {
           await this.enterReveal(gameCode);

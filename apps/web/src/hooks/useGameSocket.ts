@@ -91,9 +91,6 @@ export function useGameSocket({
       dispatch(setConnection("reconnecting"));
     });
 
-    // Acked straight away: the server times the round trip and credits half
-    // of it back to our answers.
-    conn.on("latency-probe", (ack) => ack());
     conn.on("state-sync", (payload) => dispatch(applySync(payload)));
     conn.on("game-started", () => dispatch(gameStarted()));
     conn.on("question-start", (payload) => dispatch(questionStart(payload)));

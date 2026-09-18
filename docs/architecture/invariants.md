@@ -19,11 +19,13 @@ the docs, and write an ADR.
    so no client ever supplies a question index. Client countdowns are
    display-only (`useServerCountdown.ts`).
 2. **[explicit] Answer timing is server-measured.** `submitAnswer` computes
-   `timeTakenMs` from `meta.qStartAt` and the server receive time, minus half
-   the server-measured socket RTT (capped — see
+   `timeTakenMs` from `meta.qStartAt` and the server receive time alone (see
    [realtime.md § Answer path](realtime.md#answer-path-anti-cheat-properties)).
-   Never trust a client clock for scoring, and never accept a client-supplied
-   elapsed time.
+   Never trust a client clock for scoring, never accept a client-supplied
+   elapsed time, and never credit a per-client latency correction: a client
+   sets its own ack speed, so an RTT it can inflate buys it both time and
+   score. Wire time is covered by `ANSWER_GRACE_MS`, the same flat allowance
+   for everyone.
 3. **[explicit] Live state in Redis; Postgres = lobby record + final result.**
    (`game-store.service.ts` header comment; migration
    `20260712000003_drop_unused_tables`.) Do not add per-answer or mid-game

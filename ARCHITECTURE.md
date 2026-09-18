@@ -102,9 +102,10 @@ crash mid-question.
 
 The server sends time left as a duration (`remainingMs`), which clients turn
 into a countdown on their own clock; the countdown never drives a transition.
-The answer window starts when `question-start` has been broadcast, answers are
-credited half their socket's measured round trip, and a 300ms grace lets
-in-time answers arrive. A reconnecting client emits `request-sync` and gets a
+The answer window is durable in Redis before `question-start` is broadcast, so
+an answer sent the moment the question appears cannot outrun it; a flat 300ms
+grace past the deadline lets in-time answers arrive, scored as if they landed
+on the deadline. No client-measured latency feeds scoring. A reconnecting client emits `request-sync` and gets a
 full `state-sync` snapshot (phase, question, time left, roster, its own answer)
 instead of replaying missed events.
 

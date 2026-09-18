@@ -20,6 +20,7 @@ Format:
 
 ## Entries
 
+- 2026-09-18 — Answer window is stamped into meta **before** `question-start` goes out (was: broadcast first, stamp after), and the per-socket RTT credit is gone — `latency-probe`/`monitorLatency` removed from the socket contract, and `ANSWER_GRACE_MS` is now a flat allowance that accepts late-arriving answers at deadline score. Docs touched: realtime.md, invariants.md, ARCHITECTURE.md.
 - 2026-09-16 — Answer window stamped after `question-start` is broadcast; per-socket RTT probe (`latency-probe`, rolling median) credits half the round trip; 300ms grace past the real deadline; clients receive `remainingMs` instead of `deadline`/`serverNow`/`startAt`. Docs touched: realtime.md, invariants.md, frontend.md, ARCHITECTURE.md.
 - 2026-09-14 — Pricing docs aligned with the configured Dodo product: ₹399 INR localized price (fallbacks set to 39900), `by_currency`/`by_country` both supported, product-level discount shown, Adaptive Currency caveat. Docs: ADR-010, infrastructure.md, CONTEXT.md.
 - 2026-09-14 — Pricing shows INR for India / USD elsewhere as the headline price, read live from the Dodo product (`GET /api/billing/pricing`); Dodo discount codes: auto-applied promotion (`DODO_PROMO_DISCOUNT_CODE`) plus customer-entered codes validated server-side. Docs: backend.md, frontend.md, infrastructure.md, ADR-010, CONTEXT.md.
