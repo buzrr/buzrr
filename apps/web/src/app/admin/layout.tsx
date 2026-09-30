@@ -6,6 +6,7 @@ import ClientImage from "@/components/ClientImage";
 import SupportNudge from "@/components/SupportNudge";
 import ToastViewport from "@/components/ToastViewport";
 import type { Metadata } from "next";
+import { NOINDEX_METADATA } from "@/lib/seo/metadata";
 
 import { auth } from "@/lib/auth";
 import { getUserRole } from "@/lib/get-current-role";
@@ -14,6 +15,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Admin Panel",
+  ...NOINDEX_METADATA,
 };
 
 export default async function RootLayout({

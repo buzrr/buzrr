@@ -1,3 +1,8 @@
+import { NOINDEX_METADATA } from "@/lib/seo/metadata";
+
+// App screens, not landing pages: keep them out of search results.
+export const metadata = NOINDEX_METADATA;
+
 export default function DuelLayout({
   children,
 }: {

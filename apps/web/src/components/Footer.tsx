@@ -8,17 +8,18 @@ import ThemeToggle from "./ThemeToggle";
 import supportLinks from "@/data/support-links.json";
 
 // Routes that render their own full footer + theme toggle (landing & co).
-const ROUTES_WITH_OWN_FOOTER = [
-  "/",
-  "/docs",
-  "/roadmap",
-  "/changelog",
-  "/support",
-  "/pricing",
-];
+const ROUTES_WITH_OWN_FOOTER = ["/", "/docs", "/support", "/pricing"];
 
-// Route prefixes where the bar is hidden on every subpage (checkout flow).
-const PREFIXES_WITHOUT_FOOTER = ["/billing/"];
+// Route prefixes where the bar is hidden on every subpage: the checkout flow,
+// and the marketing pages in app/(marketing), which render LandingFooter.
+const PREFIXES_WITHOUT_FOOTER = [
+  "/billing/",
+  "/alternatives",
+  "/compare/",
+  "/use-cases",
+  "/open-source-quiz-platform",
+  "/self-hosted-quiz",
+];
 
 const Links = [
   {

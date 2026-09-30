@@ -47,3 +47,4 @@ Format:
 - 2026-08-14 — Documentation system created from a full codebase audit
   (AGENTS.md, docs/architecture/\*, docs/adr/001–008, CONTEXT.md, this log).
   No application code changed.
+- 2026-10-01 — SEO/GEO layer: `(marketing)` static pages, `lib/seo`, sitemap/robots/OG routes, www canonical, and public routes now server-render past `PersistGate` (frontend.md § SEO).

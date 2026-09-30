@@ -2,6 +2,11 @@ import "../globals.css";
 import "./styles.css";
 import ToastViewport from "@/components/ToastViewport";
 
+import { NOINDEX_METADATA } from "@/lib/seo/metadata";
+
+// App screens, not landing pages: keep them out of search results.
+export const metadata = NOINDEX_METADATA;
+
 export default function RootLayout({
   children,
 }: Readonly<{

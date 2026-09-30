@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import clsx from "clsx";
 import { IBM_Plex_Sans } from "next/font/google";
 import ReduxProvider from "@/state/ReduxProvider";
@@ -6,43 +6,34 @@ import QueryProvider from "@/providers/QueryProvider";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { Analytics } from "@vercel/analytics/next";
 import Footer from "@/components/Footer";
+import {
+  DEFAULT_TITLE,
+  REPO_URL,
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_URL,
+} from "@/lib/seo/site";
 import "./globals.css";
 
-const baseUrl = "https://buzrr.in";
-
+/**
+ * Site-wide defaults only. Canonical URLs are per page (`buildPageMetadata`) —
+ * a canonical here would be inherited by every page that forgets its own and
+ * point it at the homepage. Social images come from the `opengraph-image.png`
+ * / `twitter-image.png` files next to this layout unless a page sets its own.
+ */
 export const metadata: Metadata = {
-  metadataBase: new URL(baseUrl),
-
+  metadataBase: new URL(SITE_URL),
   title: {
-    default:
-      "Buzrr - Open Source QuizUp & Kahoot in One: 1v1 Quiz Battles + Live Multiplayer Quizzes",
-    template: "%s | Buzrr",
+    default: DEFAULT_TITLE,
+    template: `%s | ${SITE_NAME}`,
   },
-
-  description:
-    "Buzrr is QuizUp and Kahoot together, open source. Go head-to-head in ranked 1v1 quiz battles like QuizUp, or host live multiplayer quiz rooms your friends join with a code like Kahoot — with instant scoring and leaderboards.",
-
-  keywords: [
-    "quizup alternative",
-    "open source quizup alternative",
-    "kahoot alternative",
-    "kahoot competitor",
-    "open source kahoot alternative",
-    "1v1 quiz battles",
-    "1v1 quiz platform",
-    "1v1 quiz app",
-    "ranked quiz duels",
-    "real-time quiz platform",
-    "multiplayer quiz app",
-    "online quiz competition",
-    "live classroom quiz tool",
-    "interactive quiz software",
-    "quiz battles",
-    "Buzrr",
-  ],
-
-  applicationName: "Buzrr",
-
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  authors: [{ name: "Buzrr contributors", url: REPO_URL }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
+  category: "education",
+  formatDetection: { telephone: false, email: false, address: false },
   robots: {
     index: true,
     follow: true,
@@ -51,44 +42,32 @@ export const metadata: Metadata = {
       follow: true,
       "max-image-preview": "large",
       "max-snippet": -1,
+      "max-video-preview": -1,
     },
   },
-
-  alternates: {
-    canonical: baseUrl,
-  },
-
   openGraph: {
     type: "website",
-    url: baseUrl,
-    siteName: "Buzrr",
-    title:
-      "Buzrr - Open Source QuizUp & Kahoot in One: 1v1 Battles + Live Quiz Rooms",
-    description:
-      "Ranked 1v1 quiz duels like QuizUp, live hosted multiplayer quiz rooms like Kahoot — one open source app with instant scoring and leaderboards.",
-    images: [
-      {
-        url: `${baseUrl}/opengraph-image.png`,
-        width: 1200,
-        height: 630,
-        alt: "Buzrr - Open Source QuizUp & Kahoot in One",
-      },
-    ],
+    siteName: SITE_NAME,
+    locale: "en_US",
+    url: SITE_URL,
+    title: DEFAULT_TITLE,
+    description: SITE_DESCRIPTION,
   },
-
   twitter: {
     card: "summary_large_image",
-    title:
-      "Buzrr - Open Source QuizUp & Kahoot in One: 1v1 Battles + Live Quiz Rooms",
-    description:
-      "Ranked 1v1 quiz duels like QuizUp, live hosted multiplayer rooms like Kahoot — open source.",
-    images: [`${baseUrl}/opengraph-image.png`],
+    title: DEFAULT_TITLE,
+    description: SITE_DESCRIPTION,
   },
+  appleWebApp: { title: SITE_NAME },
+};
 
-  icons: {
-    icon: "/favicon.ico",
-    apple: "/apple-touch-icon.png",
-  },
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f5f3ff" },
+    { media: "(prefers-color-scheme: dark)", color: "#1e1e1e" },
+  ],
 };
 
 const sans = IBM_Plex_Sans({
@@ -109,21 +88,6 @@ export default async function RootLayout({
           "bg-light-bg dark:bg-dark-bg h-fit overflow-x-hidden",
         )}
       >
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "SoftwareApplication",
-              name: "Buzrr",
-              applicationCategory: "GameApplication",
-              operatingSystem: "Web",
-              description:
-                "Buzrr is QuizUp and Kahoot together, open source. Go head-to-head in ranked 1v1 quiz battles like QuizUp, or host live multiplayer quiz rooms like Kahoot — with instant scoring and leaderboards.",
-              url: baseUrl,
-            }),
-          }}
-        />
         <ReduxProvider>
           <QueryProvider>
             {children}

@@ -1,6 +1,11 @@
 import LandingNavbar from "@/components/Landing/LandingNavbar";
 import ToastViewport from "@/components/ToastViewport";
 
+import { NOINDEX_METADATA } from "@/lib/seo/metadata";
+
+// App screens, not landing pages: keep them out of search results.
+export const metadata = NOINDEX_METADATA;
+
 export default function BillingLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
