@@ -6,15 +6,17 @@ import PricingPlans from "@/components/Pricing/PricingPlans";
 import PricingFaq from "@/components/Pricing/PricingFaq";
 import PlanComparison from "@/components/Pricing/PlanComparison";
 import { auth } from "@/lib/auth";
+import { buildPageMetadata } from "@/lib/seo/metadata";
 import { getVisitorPriceRegion } from "@/lib/visitor-region";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Pricing",
+export const metadata: Metadata = buildPageMetadata({
+  title: "Pricing: Free and Pro Plans",
   description:
     "Buzrr is free to start. Buzrr Pro unlocks 250-player rooms, unlimited quizzes and 10 AI quiz generations every week.",
-};
+  path: "/pricing",
+});
 
 export default async function PricingPage() {
   const [region, session] = await Promise.all([

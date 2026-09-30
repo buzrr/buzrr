@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import ComingSoon from "@/components/Landing/ComingSoon";
 import { GITHUB_LINK } from "@/components/Landing/links";
 
+// Placeholder page until real content ships: kept out of the index.
 export const metadata: Metadata = {
+  robots: { index: false, follow: true },
+  alternates: { canonical: "/docs" },
   title: "Docs",
   description:
     "Buzrr documentation — setup guides, self-hosting and API reference are on the way.",

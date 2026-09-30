@@ -9,9 +9,9 @@ import { GITHUB_LINK } from "./links";
 
 const navLinks = [
   { name: "Pricing", href: "/pricing" },
+  { name: "Use cases", href: "/use-cases" },
+  { name: "Alternatives", href: "/alternatives" },
   { name: "Docs", href: "/docs" },
-  { name: "Roadmap", href: "/roadmap" },
-  { name: "Changelog", href: "/changelog" },
 ];
 
 const LandingNavbar = () => {

@@ -8,11 +8,14 @@ import {
   ISSUES_LINK,
 } from "@/components/Landing/links";
 import supportLinks from "@/data/support-links.json";
+import { buildPageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
-  title: "❤️ Support Buzrr",
-  description: "Help keep Buzrr open source and growing.",
-};
+export const metadata: Metadata = buildPageMetadata({
+  title: "Support Buzrr",
+  description:
+    "Buzrr is free, open-source software maintained by one developer. Donations pay for servers, infrastructure and new features.",
+  path: "/support",
+});
 
 const stats = [
   { title: "Open Source", subtitle: "Always free" },

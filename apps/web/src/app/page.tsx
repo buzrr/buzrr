@@ -22,6 +22,23 @@ import LandingFooter from "@/components/Landing/LandingFooter";
 import HeroVisual from "@/components/Landing/HeroVisual";
 import { GITHUB_LINK } from "@/components/Landing/links";
 import { getGithubStats } from "@/lib/github-stats";
+import { JsonLd, LinkCards } from "@/components/Marketing/primitives";
+import {
+  OPEN_SOURCE_CARD,
+  SELF_HOST_CARD,
+  WhatIsBuzrr,
+  cardsForUseCases,
+} from "@/components/Marketing/product";
+import { siteGraph, webPageSchema } from "@/lib/seo/json-ld";
+import { buildPageMetadata } from "@/lib/seo/metadata";
+import { DEFAULT_TITLE, SITE_DESCRIPTION } from "@/lib/seo/site";
+
+export const metadata = buildPageMetadata({
+  title: DEFAULT_TITLE,
+  absoluteTitle: true,
+  description: SITE_DESCRIPTION,
+  path: "/",
+});
 
 const heroBadges = [
   { icon: <LuUsers size={13} />, label: "Contributors Welcome" },
@@ -91,6 +108,16 @@ export default async function Home() {
 
   return (
     <div className="min-h-dvh bg-light-bg dark:bg-dark-bg">
+      <JsonLd
+        nodes={[
+          ...siteGraph(),
+          webPageSchema({
+            path: "/",
+            title: DEFAULT_TITLE,
+            description: SITE_DESCRIPTION,
+          }),
+        ]}
+      />
       <LandingNavbar />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -185,6 +212,40 @@ export default async function Home() {
                 </p>
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* What is Buzrr + where it fits (internal links to the SEO pages) */}
+        <section className="py-14 max-w-5xl mx-auto">
+          <WhatIsBuzrr />
+          <h2 className="mt-14 text-center text-2xl sm:text-3xl font-black text-dark dark:text-white">
+            What people use Buzrr for
+          </h2>
+          <div className="mt-8">
+            <LinkCards
+              items={cardsForUseCases([
+                "classroom-quizzes",
+                "college-events",
+                "corporate-training",
+                "team-building",
+                "pub-trivia",
+                "live-audience-quizzes",
+              ])}
+            />
+          </div>
+          <div className="mt-4">
+            <LinkCards
+              items={[
+                {
+                  href: "/alternatives",
+                  title:
+                    "Alternatives to Kahoot, Slido, Mentimeter and Quizizz",
+                  text: "How Buzrr compares, with sources — and when another tool fits better.",
+                },
+                OPEN_SOURCE_CARD,
+                SELF_HOST_CARD,
+              ]}
+            />
           </div>
         </section>
 

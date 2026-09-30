@@ -94,8 +94,7 @@ stats/history, health endpoint, Vercel Analytics.
 ## Active development areas (inferred from recent PR cadence)
 
 Duel-mode depth (bots were last), host quality-of-life (kick/ban, room caps),
-and UX polish. No public roadmap file exists in-repo beyond the marketing
-`/roadmap` page.
+and UX polish. There is no public roadmap; planned work lives in GitHub issues.
 
 ## Operational facts worth knowing
 

@@ -1,5 +1,10 @@
 import JoinViaLinkClient from "@/components/Player/Setup/JoinViaLinkClient";
 
+import { NOINDEX_METADATA } from "@/lib/seo/metadata";
+
+// App screens, not landing pages: keep them out of search results.
+export const metadata = NOINDEX_METADATA;
+
 export default async function JoinViaLink({
   params,
 }: {

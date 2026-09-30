@@ -22,6 +22,23 @@ const nextConfig: NextConfig = {
     "kysely",
   ],
   transpilePackages: ["@buzrr/prisma"],
+  // App screens are never search results. Their layouts also set a robots
+  // meta tag, but on dynamic routes Next streams metadata via JS for most
+  // crawlers — the header works without JS.
+  async headers() {
+    const noindex = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
+    return [
+      "/admin",
+      "/admin/:path*",
+      "/player",
+      "/player/:path*",
+      "/duel",
+      "/duel/:path*",
+      "/join/:path*",
+      "/auth/:path*",
+      "/billing/:path*",
+    ].map((source) => ({ source, headers: noindex }));
+  },
   images: {
     remotePatterns: [
       {

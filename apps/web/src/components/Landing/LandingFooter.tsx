@@ -2,12 +2,17 @@ import Link from "next/link";
 import { LuGithub, LuHeart, LuInstagram, LuYoutube } from "react-icons/lu";
 import ClientImage from "@/components/ClientImage";
 import {
+  COMPETITORS,
+  COMPETITOR_SLUGS,
+  alternativePath,
+} from "@/data/marketing/competitors";
+import { USE_CASES, USE_CASE_SLUGS } from "@/data/marketing/use-cases";
+import {
   AUTHOR_LINK,
   CONTRIBUTING_LINK,
   GITHUB_LINK,
   INSTAGRAM_LINK,
   LICENSE_LINK,
-  SELF_HOSTING_LINK,
   YOUTUBE_LINK,
 } from "./links";
 
@@ -17,9 +22,26 @@ const columns = [
     links: [
       { name: "Pricing", href: "/pricing" },
       { name: "Docs", href: "/docs" },
-      { name: "Roadmap", href: "/roadmap" },
-      { name: "Changelog", href: "/changelog" },
+      { name: "Open-source quiz platform", href: "/open-source-quiz-platform" },
+      { name: "Self-hosted quiz", href: "/self-hosted-quiz" },
     ],
+  },
+  {
+    title: "Alternatives",
+    links: [
+      { name: "All alternatives", href: "/alternatives" },
+      ...COMPETITOR_SLUGS.map((slug) => ({
+        name: `${COMPETITORS[slug].displayName.replace(/ \(.*\)$/, "")} alternative`,
+        href: alternativePath(slug),
+      })),
+    ],
+  },
+  {
+    title: "Use cases",
+    links: USE_CASE_SLUGS.map((slug) => ({
+      name: USE_CASES[slug].name,
+      href: `/use-cases/${slug}`,
+    })),
   },
   {
     title: "Community",
@@ -33,7 +55,6 @@ const columns = [
     title: "Resources",
     links: [
       { name: "Contributing", href: CONTRIBUTING_LINK, external: true },
-      { name: "Self Hosting", href: SELF_HOSTING_LINK, external: true },
       { name: "License (GPL-3.0)", href: LICENSE_LINK, external: true },
     ],
   },
@@ -43,8 +64,8 @@ const LandingFooter = () => {
   return (
     <footer className="border-t border-card-light dark:border-card-dark bg-white dark:bg-dark">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
-          <div className="col-span-2">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-8">
+          <div className="col-span-2 md:col-span-4 lg:col-span-2">
             <ClientImage
               props={{
                 src: "/images/logo.svg",

@@ -1,6 +1,11 @@
 import Link from "next/link";
 import ClientImage from "@/components/ClientImage";
 
+import { NOINDEX_METADATA } from "@/lib/seo/metadata";
+
+// App screens, not landing pages: keep them out of search results.
+export const metadata = NOINDEX_METADATA;
+
 const AuthLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <>
