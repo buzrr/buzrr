@@ -6,7 +6,7 @@ import type { Option } from "@/types/db";
 import type { PlayerPayload } from "@/types/socket-events";
 import { useAdminSocket } from "@/hooks/useAdminSocket";
 import ConnectionBanner from "@/components/ConnectionBanner";
-import ConnectionStatusPill from "@/components/ConnectionStatusPill";
+import { GameTopBar } from "@/components/Game/GameUI";
 import EndQuizButton from "@/components/Admin/EndQuizButton";
 import WaitScreen from "./WaitScreen";
 import QuestionScreen from "./QuestionScreen";
@@ -40,6 +40,8 @@ const GameLobby = (params: {
 }) => {
   const dispatch = useAppDispatch();
   const phase = useAppSelector((state) => state.game.phase);
+  const qIndex = useAppSelector((state) => state.game.qIndex);
+  const qCount = useAppSelector((state) => state.game.qCount);
 
   useEffect(() => {
     dispatch(setPlayers(params.players));
@@ -54,32 +56,49 @@ const GameLobby = (params: {
   // yet, so the button must still end (and save); only "ended" is a plain exit.
   const showLeaderboard = phase === "final" || phase === "ended";
   const alreadyEnded = phase === "ended";
+  const inGame = phase === "question" || phase === "reveal" || showLeaderboard;
+  const title = params.quizQuestions?.title ?? "Quiz";
+
+  if (!socket) return null;
+
+  if (!inGame) {
+    // idle / lobby / starting — the full-screen pre-question countdown
+    return (
+      <>
+        <ConnectionBanner />
+        <WaitScreen />
+      </>
+    );
+  }
 
   return (
-    <>
-      {/* Always available to the host, on every in-game phase. */}
-      <EndQuizButton roomId={params.roomId} alreadyEnded={alreadyEnded} />
-      {socket && (
-        <>
-          <ConnectionBanner />
-          <ConnectionStatusPill className="fixed left-3 bottom-3 z-40" />
-          {phase === "question" ? (
-            <QuestionScreen
-              socket={socket}
-              gameCode={params.gameCode}
-              quizTitle={params.quizQuestions?.title}
-            />
-          ) : phase === "reveal" ? (
-            <QuesResult socket={socket} roomId={params.roomId} />
-          ) : showLeaderboard ? (
-            <LeaderBoard />
-          ) : (
-            // idle / lobby / starting — the pre-question countdown screen
-            <WaitScreen />
-          )}
-        </>
+    <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 pb-16 md:pb-0 md:h-[calc(100dvh-7rem)] text-dark dark:text-white">
+      <ConnectionBanner />
+      <GameTopBar
+        title={title}
+        qIndex={qIndex}
+        qCount={qCount}
+        final={showLeaderboard}
+        right={
+          <EndQuizButton
+            inline
+            roomId={params.roomId}
+            alreadyEnded={alreadyEnded}
+          />
+        }
+      />
+      {phase === "question" ? (
+        <QuestionScreen socket={socket} gameCode={params.gameCode} />
+      ) : phase === "reveal" ? (
+        <QuesResult socket={socket} roomId={params.roomId} />
+      ) : (
+        <LeaderBoard
+          roomId={params.roomId}
+          quizTitle={title}
+          alreadyEnded={alreadyEnded}
+        />
       )}
-    </>
+    </div>
   );
 };
 

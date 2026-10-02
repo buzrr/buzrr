@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { useEffect } from "react";
-import SubmitButton from "@/components/SubmitButton";
+import clsx from "clsx";
 import SelectProfile from "@/components/Player/SelectProfile";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
@@ -15,12 +15,21 @@ import { useCreatePlayerMutation } from "@/lib/modules/players/hooks";
 import { useJoinRoomMutation } from "@/lib/modules/game-sessions/hooks";
 import { clearPlayerLocalSession } from "@/lib/player-session";
 import { isAxiosError } from "axios";
-import { TextInput } from "@/components/ui/TextInput";
+import { mutedText, primaryButtonClass } from "@/components/Game/GameUI";
+import {
+  BackSquare,
+  Steps,
+  joinCounterClass,
+  joinInputClass,
+  joinLabelClass,
+} from "@/components/Player/Setup/JoinShell";
 
 type FormValues = z.infer<typeof createPlayerSchema>;
 
+const NAME_MAX = 30;
+
 const sanitizeName = (value: string) =>
-  value.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 30);
+  value.replace(/[^a-zA-Z0-9_]/g, "").slice(0, NAME_MAX);
 
 const CreatePlayerForm = (props: {
   data: {
@@ -88,6 +97,8 @@ const CreatePlayerForm = (props: {
     );
   };
 
+  const pending = mutation.isPending || joinMutation.isPending;
+
   const onSubmit = handleSubmit((data) => {
     mutation.mutate(
       {
@@ -114,13 +125,35 @@ const CreatePlayerForm = (props: {
 
   return (
     <form
-      className="flex flex-col w-full max-w-xl animate-fade-up"
+      className="flex flex-col gap-5 md:gap-6 animate-fade-up"
       onSubmit={onSubmit}
     >
-      <h1 className="text-3xl md:text-5xl py-2 font-extrabold dark:text-white">
-        Create a custom profile
-      </h1>
-      <h2 className="md:text-lg py-2 dark:text-white">Join a private quiz</h2>
+      <div className="flex items-center justify-between">
+        <BackSquare href="/" />
+        {!props.joinGameCode && <Steps step={1} />}
+      </div>
+      <div>
+        <h1 className="text-[32px] md:text-[44px] font-extrabold tracking-[-0.03em] leading-[1.06]">
+          Create a custom profile
+        </h1>
+        <p className={clsx("mt-2.5 text-base", mutedText)}>
+          {props.joinGameCode ? (
+            <>
+              Joining room{" "}
+              <b className="font-bold tracking-[0.1em] text-lprimary dark:text-dprimary">
+                {props.joinGameCode}
+              </b>
+            </>
+          ) : (
+            <>
+              Joining a{" "}
+              <b className="font-semibold text-dark dark:text-white">
+                private quiz
+              </b>
+            </>
+          )}
+        </p>
+      </div>
 
       <SelectProfile {...props} />
 
@@ -128,34 +161,51 @@ const CreatePlayerForm = (props: {
         name="username"
         control={control}
         render={({ field, fieldState }) => (
-          <TextInput
-            type="text"
-            id="displayName"
-            name={field.name}
-            placeholder="Enter Display Name"
-            className="w-full my-2"
-            required
-            autoComplete="off"
-            maxLength={30}
-            value={field.value}
-            onBlur={field.onBlur}
-            ref={field.ref}
-            onChange={(e) => {
-              handleNameChange(e.target.value);
-              field.onChange(sanitizeName(e.target.value));
-            }}
-            error={fieldState.error?.message}
-          />
+          <label className="block">
+            <span className={joinLabelClass}>
+              Display name
+              <span className={joinCounterClass}>
+                {field.value.length}/{NAME_MAX}
+              </span>
+            </span>
+            <input
+              type="text"
+              id="displayName"
+              name={field.name}
+              placeholder="Enter display name"
+              className={clsx(joinInputClass, "mt-2")}
+              required
+              autoComplete="off"
+              maxLength={NAME_MAX}
+              value={field.value}
+              onBlur={field.onBlur}
+              ref={field.ref}
+              aria-invalid={!!fieldState.error}
+              onChange={(e) => {
+                handleNameChange(e.target.value);
+                field.onChange(sanitizeName(e.target.value));
+              }}
+            />
+            {fieldState.error?.message ? (
+              <span className="mt-1.5 block text-sm text-red-light dark:text-red-dark">
+                {fieldState.error.message}
+              </span>
+            ) : (
+              <span className={clsx("mt-1.5 block", joinCounterClass)}>
+                Letters, numbers and underscores only.
+              </span>
+            )}
+          </label>
         )}
       />
 
-      <div className="w-full mt-8">
-        <SubmitButton
-          style="game"
-          text={props.joinGameCode ? "Join Game" : undefined}
-          isPending={mutation.isPending || joinMutation.isPending}
-        />
-      </div>
+      <button
+        type="submit"
+        disabled={!props.data.name.trim() || pending}
+        className={clsx(primaryButtonClass, "w-full py-4 text-[17px]")}
+      >
+        {pending ? "Loading..." : props.joinGameCode ? "Join game" : "Next"}
+      </button>
     </form>
   );
 };

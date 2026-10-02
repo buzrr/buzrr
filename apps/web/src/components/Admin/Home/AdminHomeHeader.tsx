@@ -25,11 +25,11 @@ export default function AdminHomeHeader() {
         />
       </Link>
       <span>
-        <p className="dark:text-white text-xs md:text-base">
-          Hey {firstName ?? "There"}👋!
+        <p className="text-xs md:text-[17px] font-medium text-off-dark dark:text-[#9a9aa2]">
+          Hey {firstName ?? "There"} 👋!
         </p>
-        <h1 className="text-md md:text-3xl font-black text-dark dark:text-white">
-          Welcome to Your Quiz Hub!
+        <h1 className="text-md md:text-4xl font-bold tracking-[-0.02em] leading-tight md:mt-1 text-dark dark:text-white">
+          Welcome Back To Your Quiz Hub!
         </h1>
       </span>
     </div>

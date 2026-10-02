@@ -2,10 +2,10 @@
 
 import clsx from "clsx";
 import Image from "next/image";
-import { useEffect, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { LuCheck, LuShuffle } from "react-icons/lu";
+import { joinLabelClass } from "@/components/Player/Setup/JoinShell";
 
-const PROFILES = [
+export const PROFILES = [
   "/images/player_profile/profile1.png",
   "/images/player_profile/profile2.png",
   "/images/player_profile/profile3.png",
@@ -26,50 +26,68 @@ export default function SelectProfile(props: {
   };
   setData: (data: { name: string; image: string }) => void;
 }) {
-  const [avatar, setAvatar] = useState({
-    profile: PROFILES[0],
-    index: 0,
-  });
-  function handleProfile(src: string, index: number) {
-    setAvatar({ index, profile: src });
-    props.setData({
-      ...props.data,
-      image: src,
-    });
-  }
-  const { pending } = useFormStatus();
+  const selected = Math.max(0, PROFILES.indexOf(props.data.image));
 
-  useEffect(() => {
-    if (pending) {
-      setAvatar({
-        profile: PROFILES[0],
-        index: 0,
-      });
-    }
-  }, [pending]);
+  function pick(index: number) {
+    props.setData({ ...props.data, image: PROFILES[index] });
+  }
+
+  function shuffle() {
+    const offset = 1 + Math.floor(Math.random() * (PROFILES.length - 1));
+    pick((selected + offset) % PROFILES.length);
+  }
 
   return (
-    <div className="whitespace-nowrap items-center mt-2 bg-transparent mb-6 max-h-[25vh] overflow-x-scroll overflow-y-hidden">
-      {PROFILES.map((pr, index) => (
-        <div className="inline-block p-3" key={index}>
-          <button
-            type="button"
-            className="bg-transparent p-0 border-0 cursor-pointer"
-            onClick={() => handleProfile(pr, index)}
-          >
-            <Image
-              alt="profile option"
-              width={128}
-              height={128}
-              src={pr}
+    <div>
+      <div className={joinLabelClass}>
+        Pick an avatar
+        <button
+          type="button"
+          onClick={shuffle}
+          className="flex items-center gap-1.5 rounded-[9px] px-[11px] py-1.5 text-[12.5px] font-semibold bg-lprimary/8 dark:bg-white/5 hover:bg-lprimary/15 dark:hover:bg-white/10 transition-colors cursor-pointer"
+        >
+          <LuShuffle size={14} />
+          Shuffle
+        </button>
+      </div>
+      <div
+        role="radiogroup"
+        aria-label="Avatar"
+        className="mt-2.5 grid grid-cols-4 sm:grid-cols-6 gap-2.5 md:gap-3"
+      >
+        {PROFILES.map((src, index) => {
+          const on = index === selected;
+          return (
+            <button
+              key={src}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              aria-label={`Avatar ${index + 1}`}
+              onClick={() => pick(index)}
               className={clsx(
-                "rounded-full w-20 h-20 border-black cursor-pointer",
-                avatar.index === index && "border-[3px] border-lprimary ease-linear duration-150 scale-[1.2] shadow-lg"
+                "relative aspect-square rounded-full border-[3px] transition-[transform,border-color,box-shadow] duration-150 hover:-translate-y-0.5 cursor-pointer",
+                on
+                  ? "border-dprimary shadow-[0_0_0_4px_rgba(139,92,246,0.18)]"
+                  : "border-transparent",
               )}
-            />
-          </button>
-        </div>
-      ))}
+            >
+              <Image
+                src={src}
+                width={96}
+                height={96}
+                alt=""
+                className="size-full rounded-full object-cover"
+              />
+              {on && (
+                <span className="absolute -right-0.5 -bottom-0.5 size-[26px] rounded-full bg-lprimary text-white flex items-center justify-center border-[3px] border-white dark:border-dark">
+                  <LuCheck size={13} strokeWidth={3.2} />
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

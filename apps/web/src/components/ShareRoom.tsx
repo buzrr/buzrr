@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/Button";
 
 /**
  * Share widget: a scannable QR + copyable link. Used for hosted-quiz join links
- * (lobby `full`, in-game sidebar `compact`) and for 1v1 friend challenges — it
+ * (in-game sidebar `compact`) and for 1v1 friend challenges (`full`) — it
  * takes a ready-made URL so it stays agnostic about what it's sharing.
  */
 export default function ShareRoom({

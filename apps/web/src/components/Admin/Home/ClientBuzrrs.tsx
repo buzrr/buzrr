@@ -1,35 +1,36 @@
 "use client";
-import type { Quiz } from "@/types/db";
 import clsx from "clsx";
-import Link from "next/link";
 import { useState } from "react";
-import CreateAIQuiz from "../Gemini/CreateAIQuiz";
-import ClientImage from "@/components/ClientImage";
-import { useAppSelector } from "@/state/hooks";
-import useContextMenu from "@/hooks/useContextMenu";
-import ConfirmationModal from "../ConfirmationModal";
-import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
+import QuizCard from "./QuizCard";
+import EditQuizModal from "./EditQuizModal";
+import ConfirmationModal from "../ConfirmationModal";
+import { EmptyState } from "@/components/ui/Card";
+import { useAppSelector } from "@/state/hooks";
 import { getApiErrorMessage } from "@/lib/api/errors";
+import type { QuizListItem } from "@/lib/modules/quizzes/api";
 import { useDeleteQuizMutation } from "@/lib/modules/quizzes/hooks";
 
-export default function ClientBuzrrs({ quizzes }: { quizzes: Quiz[] }) {
-  const router = useRouter();
-  const deleteQuizMutation = useDeleteQuizMutation();
+export function quizGridClass(view: "grid" | "list") {
+  return clsx(
+    "gap-3 md:gap-4",
+    view === "grid" ? "grid grid-cols-2 md:grid-cols-3" : "flex flex-col",
+  );
+}
 
+export default function ClientBuzrrs({ quizzes }: { quizzes: QuizListItem[] }) {
+  const deleteQuizMutation = useDeleteQuizMutation();
   const view = useAppSelector((state) => state.gridListToggle.view);
-  const className = view === "grid" ? "w-11 h-11" : "w-6 h-6";
-  const { clicked, setClicked, points, setPoints } = useContextMenu();
 
   const [delModalOpen, setDelModalOpen] = useState(false);
   const [quizId, setQuizId] = useState("");
+  const [editQuiz, setEditQuiz] = useState<QuizListItem | null>(null);
 
   function deleteQuiz(id: string) {
     deleteQuizMutation.mutate(id, {
       onSuccess: () => {
         toast.success("Successfully deleted quiz");
         setDelModalOpen(false);
-        setClicked(false);
       },
       onError: (err) => {
         toast.error(getApiErrorMessage(err));
@@ -37,150 +38,30 @@ export default function ClientBuzrrs({ quizzes }: { quizzes: Quiz[] }) {
     });
   }
 
+  if (quizzes.length === 0) {
+    return (
+      <EmptyState
+        title="No quizzes yet"
+        hint="Create one from scratch or let AI draft it for you."
+      />
+    );
+  }
+
   return (
     <>
-      <div
-        className={clsx(
-          "w-full mt-4 md:max-h-[60vh] overflow-y-auto gap-3",
-          view === "list"
-            ? "flex flex-col"
-            : "grid grid-cols-2 md:flex md:flex-wrap",
-        )}
-      >
-        <Link
-          href="/admin/quiz/createQuiz"
-          className={clsx(
-            "border border-[#c2b4fe] dark:border-transparent w-full bg-card-light hover:bg-cardhover-light dark:bg-card-dark hover:dark:bg-cardhover-dark transition-all duration-300 ease-in-out text-dark dark:text-white rounded flex justify-center items-center",
-            view === "list"
-              ? "md:w-full flex-row gap-x-3 md:gap-x-1 py-4 px-2"
-              : "p-2 flex-col h-40 md:w-40 md:h-44",
-          )}
-        >
-          <div className="h-full w-full flex gap-x-4 justify-center items-center">
-            <ClientImage
-              props={{
-                src: "/images/add.svg",
-                darksrc: "/images/add-dark.svg",
-                alt: "Create Quiz",
-                width: 45,
-                height: 45,
-                classname: className,
-              }}
-            />
-
-            {view === "list" && (
-              <div className="text-base font-bold w-full">
-                Create a new quiz
-              </div>
-            )}
-          </div>
-          {view === "grid" && (
-            <div className="text-xs font-bold w-full">Create a new quiz</div>
-          )}
-          <div
-            className={clsx(
-              view === "grid" ? "text-xs" : "text-base",
-              "w-full",
-            )}
-          >
-            Build from the ground up
-          </div>
-        </Link>
-        <Link
-          href="#"
-          className={clsx(
-            "border border-[#c2b4fe] dark:border-transparent w-full bg-card-light hover:bg-cardhover-light dark:bg-card-dark hover:dark:bg-cardhover-dark transition-all duration-300 ease-in-out text-dark dark:text-white rounded flex justify-center items-center",
-            view === "list"
-              ? "md:w-full flex-row gap-x-3 md:gap-x-1 py-4 px-2"
-              : "p-2 flex-col h-40 md:w-40 md:h-44",
-          )}
-        >
-          <div className="h-full w-full flex gap-x-4 justify-center items-center">
-            <ClientImage
-              props={{
-                src: "/images/download.svg",
-                darksrc: "/images/download-dark.svg",
-                alt: "Import Quiz",
-                width: 45,
-                height: 45,
-                classname: className,
-              }}
-            />
-            {view === "list" && (
-              <div className="text-base font-bold w-full">
-                Import an existing quiz
-              </div>
-            )}
-          </div>
-          {view === "grid" && (
-            <div className="text-xs font-bold w-full">
-              Import an existing quiz
-            </div>
-          )}
-          <div
-            className={clsx(
-              view === "grid" ? "text-xs" : "text-base",
-              "w-full",
-            )}
-          >
-            Coming soon...
-          </div>
-        </Link>
-        <CreateAIQuiz />
+      <div className={quizGridClass(view)}>
         {quizzes.map((quiz) => (
-          <Link
-            href={`/admin/quiz/${quiz.id}`}
+          <QuizCard
             key={quiz.id}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              setClicked(true);
-              setPoints({ x: e.pageX, y: e.pageY });
+            quiz={quiz}
+            view={view}
+            onEdit={() => setEditQuiz(quiz)}
+            onDelete={() => {
               setQuizId(quiz.id);
+              setDelModalOpen(true);
             }}
-            className={clsx(
-              "border border-[#c2b4fe] dark:border-transparent w-full bg-card-light hover:bg-cardhover-light dark:bg-card-dark hover:dark:bg-cardhover-dark transition-all duration-300 ease-in-out text-dark dark:text-white rounded flex items-center",
-              view === "list"
-                ? "md:w-full flex-row gap-x-3 md:gap-x-1 py-4 px-2"
-                : "p-2 flex-col h-40 md:w-40 md:h-44",
-            )}
-          >
-            <h2 className="text-md font-bold dark:text-white w-full">
-              {quiz.title}
-            </h2>
-            <p
-              className={clsx(
-                view === "grid" ? "text-xs" : "text-base",
-                "w-full text-off-dark dark:text-off-white",
-              )}
-            >
-              {quiz.description}
-            </p>
-          </Link>
+          />
         ))}
-        {clicked && (
-          <div
-            role="menu"
-            className="absolute z-50 text-sm bg-white dark:bg-dark rounded-lg shadow-lg border border-[#DADADD] dark:border-[#3A3A3A]"
-            style={{ top: points.y, left: points.x }}
-          >
-            <button
-              role="menuitem"
-              type="button"
-              className="px-8 py-1 m-1 rounded-md text-dark dark:text-white hover:bg-card-light dark:hover:bg-off-dark cursor-pointer w-full text-left"
-              onClick={() => router.push(`/admin/quiz/${quizId}`)}
-            >
-              Open
-            </button>
-            <button
-              role="menuitem"
-              type="button"
-              className="px-8 py-1 rounded-md text-red-light m-1 hover:bg-card-light dark:hover:bg-off-dark cursor-pointer w-full text-left"
-              onClick={() => setDelModalOpen(true)}
-            >
-              Delete
-            </button>
-          </div>
-        )}
       </div>
       <ConfirmationModal
         open={delModalOpen}
@@ -189,6 +70,13 @@ export default function ClientBuzrrs({ quizzes }: { quizzes: Quiz[] }) {
           deleteQuiz(quizId);
         }}
         desc="Are you sure you want to delete this quiz?"
+      />
+      <EditQuizModal
+        quiz={editQuiz}
+        open={editQuiz !== null}
+        setOpen={(open) => {
+          if (!open) setEditQuiz(null);
+        }}
       />
     </>
   );

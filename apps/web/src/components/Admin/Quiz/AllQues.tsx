@@ -3,6 +3,7 @@
 import clsx from "clsx";
 import ShowMedia from "./ShowMediaComp";
 import Image from "next/image";
+import { LuClock, LuGripVertical } from "react-icons/lu";
 import AddQuesForm from "./AddQuesForm";
 import BasicModal from "@/components/Modal";
 import { toast } from "react-toastify";
@@ -11,8 +12,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { queryKeys } from "@/lib/modules/query-keys";
 import ConfirmationModal from "../ConfirmationModal";
-import ClientImage from "@/components/ClientImage";
-import Skeleton from "@/components/ui/Skeleton";
 import { useAppSelector } from "@/state/hooks";
 import { HideQuestions } from "@/state/hideQuestionsSlice";
 import { getApiErrorMessage } from "@/lib/api/errors";
@@ -100,12 +99,12 @@ export default function AllQues(props: { quizId: string }) {
 
   if (isPending) {
     return (
-      <div className="p-4">
-        <div className="space-y-3">
+      <div>
+        <div className="space-y-4">
           {Array.from({ length: 4 }).map((_, index) => (
-            <Skeleton
+            <div
               key={index}
-              className="h-36 w-full rounded-xl bg-[#f5f5f5] dark:bg-[#3b3c3f]"
+              className="h-44 w-full rounded-[18px] animate-pulse bg-lprimary/10 dark:bg-white/10"
             />
           ))}
         </div>
@@ -132,101 +131,98 @@ export default function AllQues(props: { quizId: string }) {
                   <Draggable key={ques.id} draggableId={ques.id} index={index}>
                     {(provided) => (
                       <div
-                        className="w-full my-2 flex items-center"
+                        className="w-full mb-4"
                         ref={provided.innerRef}
                         {...provided.draggableProps}
                         {...provided.dragHandleProps}
                       >
-                        <div className="p-2 cursor-grab hidden md:block">
-                          <Image
-                            src="/images/selection-indicator.svg"
-                            alt="selection-indicator"
-                            width={20}
-                            height={20}
-                            draggable={false}
-                          />
-                        </div>
-                        <div className="bg-[#f5f5f5] dark:bg-[#3b3c3f] rounded-xl w-full">
-                          <div className="p-3">
-                            <div className="flex flex-col">
-                              <div className="flex justify-between items-center">
-                                <p className="text-md font-semibold flex items-center w-[70%] wrap-break-word">
-                                  {index + 1}. {ques?.title}
+                        <div className="relative rounded-[18px] overflow-hidden border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 transition-[border-color,box-shadow] hover:border-lprimary dark:hover:border-dprimary hover:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.5)]">
+                          <div className="flex gap-3.5 px-4 md:px-[22px] pt-4 md:pt-5 pb-4">
+                            <span className="hidden md:flex shrink-0 pt-[3px] cursor-grab text-[#8a8896] dark:text-[#6f6f78]">
+                              <LuGripVertical size={18} />
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-4 mb-3.5">
+                                <p className="text-base md:text-[17px] font-bold leading-[1.35] wrap-break-word min-w-0">
+                                  <span className="text-lprimary dark:text-dprimary">
+                                    {index + 1}.
+                                  </span>{" "}
+                                  {ques?.title}
                                 </p>
-                                <p className="text-sm text-dark font-black p-1 rounded-md bg-[#dadadd] dark:text-white dark:bg-transparent w-fit">
+                                <span className="shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap rounded-[9px] px-3 py-1.5 text-[13px] font-bold bg-lprimary/10 dark:bg-white/5">
+                                  <LuClock size={14} />
                                   {ques?.timeOut} sec
-                                </p>
+                                </span>
                               </div>
-                            </div>
-                            <div className="flex flex-col md:grid md:grid-cols-4">
-                              {ques?.options?.map(
-                                (
-                                  op: { title?: string; isCorrect?: boolean },
-                                  opIndex: number,
-                                ) => {
-                                  return (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                                {ques?.options?.map(
+                                  (
+                                    op: { title?: string; isCorrect?: boolean },
+                                    opIndex: number,
+                                  ) => (
                                     <p
                                       key={opIndex}
-                                      className="break-word text-md my-2 flex items-center"
-                                    >
-                                      {op.isCorrect ? (
-                                        <ClientImage
-                                          props={{
-                                            src: "/images/radio-btn-selected.svg",
-                                            darksrc:
-                                              "/images/radio-btn-dark-selected.svg",
-                                            alt: "option",
-                                            width: 25,
-                                            height: 25,
-                                          }}
-                                        />
-                                      ) : (
-                                        <ClientImage
-                                          props={{
-                                            src: "/images/radio-btn.svg",
-                                            darksrc:
-                                              "/images/radio-btn-dark.svg",
-                                            alt: "option",
-                                            width: 25,
-                                            height: 25,
-                                          }}
-                                        />
+                                      className={clsx(
+                                        "flex items-center gap-[11px] rounded-xl border-[1.5px] px-3.5 py-3 text-[14.5px] wrap-break-word min-w-0",
+                                        op.isCorrect
+                                          ? "font-semibold border-lprimary dark:border-dprimary bg-lprimary/10 dark:bg-dprimary/15"
+                                          : "font-medium border-lprimary/15 dark:border-white/10",
                                       )}
-                                      <span>{op.title}</span>
+                                    >
+                                      <span
+                                        aria-hidden="true"
+                                        className={clsx(
+                                          "relative size-5 shrink-0 rounded-full border-2",
+                                          op.isCorrect
+                                            ? "border-lprimary dark:border-dprimary after:absolute after:inset-[3px] after:rounded-full after:bg-lprimary dark:after:bg-dprimary"
+                                            : "border-[#8a8896] dark:border-[#6f6f78]",
+                                        )}
+                                      />
+                                      <span className="min-w-0">
+                                        {op.title}
+                                      </span>
+                                      {op.isCorrect && (
+                                        <span className="sr-only">
+                                          (correct)
+                                        </span>
+                                      )}
                                     </p>
-                                  );
-                                },
-                              )}
+                                  ),
+                                )}
+                              </div>
                             </div>
                           </div>
-                          <div className="bg-card-light dark:bg-[#332d40] p-2 px-3 rounded-b-xl">
-                            <div className="flex *:text-xs *:font-semibold">
-                              <button
-                                type="button"
-                                className="p-1 mr-1 text-red-light hover:bg-[#fccccc] rounded-md"
-                                onClick={() => {
-                                  setDelQuesId(ques.id);
-                                  setDelQuesModalOpen(true);
-                                }}
-                              >
-                                Delete
-                              </button>
-                              <BasicModal
-                                isEdit={true}
-                                btnTitle="Edit Question"
-                              >
+                          <div className="flex items-center gap-[22px] px-4 md:px-[22px] py-3 bg-lprimary/10 dark:bg-dprimary/10 border-t border-lprimary/15 dark:border-white/10">
+                            <button
+                              type="button"
+                              className="text-sm font-semibold text-red-light dark:text-red-dark hover:underline cursor-pointer"
+                              onClick={() => {
+                                setDelQuesId(ques.id);
+                                setDelQuesModalOpen(true);
+                              }}
+                            >
+                              Delete
+                            </button>
+                            <BasicModal
+                              isEdit={true}
+                              btnTitle="Edit Question"
+                              subtitle={`Question ${index + 1} · changes apply the next time you host.`}
+                              btnStyle="text-sm font-semibold text-lprimary dark:text-dprimary hover:underline cursor-pointer"
+                            >
+                              {(close) => (
                                 <AddQuesForm
                                   quizId={props.quizId}
                                   question={ques}
-                                />
-                              </BasicModal>
-                              {ques.media && (
-                                <ShowMedia
-                                  media={ques.media}
-                                  mediaType={ques.mediaType ?? ""}
+                                  onDone={close}
                                 />
                               )}
-                            </div>
+                            </BasicModal>
+                            {ques.media && (
+                              <ShowMedia
+                                media={ques.media}
+                                mediaType={ques.mediaType ?? ""}
+                              />
+                            )}
                           </div>
                         </div>
                       </div>

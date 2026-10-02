@@ -90,6 +90,8 @@ export interface LeaderboardEntry {
   profilePic: string | null;
   score: number;
   rank: number;
+  /** Points earned on the question just revealed; absent outside a reveal. */
+  delta?: number;
 }
 
 export function toPublicQuestion(q: LiveQuestion): PublicQuestion {

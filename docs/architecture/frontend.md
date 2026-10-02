@@ -103,8 +103,10 @@ disconnect`), emits `request-sync` on connect as a safety net, and exposes a
 ## Gameplay screens (who renders what)
 
 - Host live screen: `Admin/AdminGameLobbyClient` → `Admin/Game/*`
-  (`GameLobby`, `QuestionScreen`, `QuesResult` + chart, `Leaderboard`) —
-  drives the game exclusively via `start-game` / `host-next` emits.
+  (`GameLobby`, `QuestionScreen`, `QuesResult`, `Leaderboard`) —
+  drives the game exclusively via `start-game` / `host-next` emits. Host and
+  guest in-game screens share the top bar, timer ring, option keys and panel
+  styles in `components/Game/GameUI.tsx`.
 - Guest screen: `Player/PlayPageClient` → `Player/GamePage` →
   `Player/GameScreens/*` (`Question` submits with ack + rollback toast,
   `Result`, `WaitGameStart` with the canvas bubble mini-game in `Game.tsx`,

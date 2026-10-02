@@ -13,9 +13,9 @@ export class UpdateQuizDto {
   @MaxLength(200)
   title?: string;
 
+  /** An empty string clears the description. */
   @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(1000)
   description?: string;
 

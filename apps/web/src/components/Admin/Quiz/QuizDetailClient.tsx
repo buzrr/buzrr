@@ -3,6 +3,7 @@
 import { useState } from "react";
 import clsx from "clsx";
 import { RxCross2 } from "react-icons/rx";
+import { LuPlus } from "react-icons/lu";
 import BasicModal from "@/components/Modal";
 import AddQuesForm from "@/components/Admin/Quiz/AddQuesForm";
 import AllQues from "@/components/Admin/Quiz/AllQues";
@@ -130,8 +131,8 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
                 <p className="text-dark dark:text-white font-black">
                   {quiz.title}
                 </p>
-                <span className="ml-auto text-xs bg-[#c4f849] border border-[#9dc048] p-1 text-dark rounded-lg">
-                  {`Total number of questions: ${questionCount}`}
+                <span className="ml-auto text-xs font-semibold rounded-lg px-2 py-1 bg-[#c4ee4f] text-[#2c3a08] dark:bg-[#b8e94a] dark:text-[#15200a]">
+                  {`Questions: ${questionCount}`}
                 </span>
               </div>
               <div className="w-[95%] mx-auto my-2 md:hidden">
@@ -141,9 +142,19 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
                   className="w-full"
                 />
               </div>
-              <div className="flex flex-col flex-1 min-h-0 md:overflow-y-auto p-4 gap-4">
-                <div className="flex justify-center items-center gap-2">
-                  <BasicModal btnTitle="+ Add Question">
+              <div className="relative flex flex-col flex-1 min-h-0 md:overflow-y-auto p-4 md:px-6 gap-4 md:gap-[18px]">
+                <div className="flex items-center gap-2 md:gap-3.5">
+                  <BasicModal
+                    btnTitle="Add Question"
+                    subtitle="Write the question, fill in four options and mark the correct one."
+                    btnContent={
+                      <>
+                        <LuPlus size={20} strokeWidth={2.4} />
+                        Add Question
+                      </>
+                    }
+                    btnStyle="flex-1 flex items-center justify-center gap-2 rounded-[14px] p-3.5 md:p-4 text-[15px] md:text-base font-bold text-white bg-[#1c1b22] dark:bg-dark-bg transition-[filter] hover:brightness-125 cursor-pointer"
+                  >
                     <AddQuesForm quizId={quizId} />
                   </BasicModal>
                   <HideQuestions />

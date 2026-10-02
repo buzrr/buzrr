@@ -120,7 +120,10 @@ quitter finish on score instead of forfeiting.
 4. Score: `computeScore` (`common/utils/compute-score.ts`) — correct answers
    decay 1000 → 100 linearly over the question's `timeOut`; wrong = 0.
 5. First write wins via `HSETNX` (`store.putAnswer`); duplicates rejected.
-6. Score added to the Redis leaderboard zset; `maybeRevealEarly` runs.
+6. Score added to the Redis leaderboard zset; `maybeRevealEarly` runs. It
+   first broadcasts `answer-count` (`{ index, answered }`, total answers so
+   far) — the host's "answers in" meter; question-phase `state-sync` carries
+   the same number as `answeredCount` for reconnects.
 
 **Window stamping.** `enterQuestion` writes the `games:deadlines` entry, then
 opens the phase in one meta write carrying `qStartAt = now`,
@@ -161,8 +164,13 @@ reveal.
 - Per-player personal results go to the room `player:{playerId}`
   (`answer-result` events), which also works cross-instance via the Redis
   adapter.
+- `question-end` (and reveal-phase `state-sync.reveal`) carries `avgTimeMs`,
+  the mean answer time of everyone who answered (`null` if nobody did).
+  Reveal-time `leaderboard` entries (the `enterReveal` broadcast and
+  reveal-phase `state-sync`) carry `delta` — points earned on that question;
+  final/ended leaderboards omit it.
 - Event names: `question-start`, `question-end`, `answer-result`,
-  `leaderboard`, `game-over`, `state-sync`, `player-connection`,
+  `answer-count`, `leaderboard`, `game-over`, `state-sync`, `player-connection`,
   `player-joined/removed/left`, `game-started`, `game-session-ended`, plus the
   `duel:*` family.
 - The contract has **one version**. The old v1 events (`get-question-index`,

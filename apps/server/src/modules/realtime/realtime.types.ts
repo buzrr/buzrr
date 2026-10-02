@@ -23,6 +23,14 @@ export interface QuestionEndPayload {
   /** Answer counts aligned with the question's option order. */
   counts: number[];
   correctOptionIds: string[];
+  /** Mean answer time across everyone who answered; null when nobody did. */
+  avgTimeMs: number | null;
+}
+
+/** Answers received so far for the open question (classic host meter). */
+export interface AnswerCountPayload {
+  index: number;
+  answered: number;
 }
 
 /** Personal outcome, emitted to the per-player room `player:{id}`. */
@@ -89,6 +97,8 @@ export interface StateSyncPayload {
   question?: PublicQuestion;
   /** Present while phase is "question": time left, as of this snapshot. */
   remainingMs?: number;
+  /** Present while phase is "question": answers received so far. */
+  answeredCount?: number;
   /** Present while phase is "reveal". */
   reveal?: QuestionEndPayload;
   /** Present while phase is "final" or "ended". */
@@ -113,6 +123,7 @@ export interface ServerToClientEvents {
   "question-start": (payload: QuestionStartPayload) => void;
   "question-end": (payload: QuestionEndPayload) => void;
   "answer-result": (payload: AnswerResultPayload) => void;
+  "answer-count": (payload: AnswerCountPayload) => void;
   leaderboard: (payload: LeaderboardPayload) => void;
   "game-over": (payload: GameOverPayload) => void;
   "state-sync": (payload: StateSyncPayload) => void;

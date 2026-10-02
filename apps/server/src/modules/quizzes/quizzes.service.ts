@@ -92,7 +92,7 @@ export class QuizzesService {
     const data = {
       ...(dto.title !== undefined ? { title: dto.title } : {}),
       ...(dto.description !== undefined
-        ? { description: dto.description }
+        ? { description: dto.description.trim() || null }
         : {}),
       ...(dto.isPublic !== undefined ? { isPublic: dto.isPublic } : {}),
     };
@@ -144,6 +144,9 @@ export class QuizzesService {
     return this.prisma.db.quiz.findMany({
       where: { userId: user.userId },
       orderBy: { createdAt: "desc" },
+      include: {
+        _count: { select: { questions: true, gameResults: true } },
+      },
     });
   }
 

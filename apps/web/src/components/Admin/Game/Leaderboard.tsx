@@ -1,101 +1,189 @@
+"use client";
+
 import clsx from "clsx";
-import { DEFAULT_AVATAR } from "@/constants";
 import Image from "next/image";
+import { DEFAULT_AVATAR } from "@/constants";
 import { useAppSelector } from "@/state/hooks";
+import EndQuizButton from "@/components/Admin/EndQuizButton";
+import {
+  labelClass,
+  mutedText,
+  ordinal,
+  panelClass,
+  subtleCardClass,
+} from "@/components/Game/GameUI";
+import type { LiveLeaderboardEntry } from "@/types/socket-events";
+import { rankBadgeClass } from "./QuesResult";
 
-export default function LeaderBoard() {
+const PODIUM = {
+  1: {
+    color: "#f4c542",
+    text: "text-[#9a6b00] dark:text-[#f4c542]",
+    step: "h-[140px] md:h-[220px]",
+    avatar: "size-[76px] md:size-[104px]",
+  },
+  2: {
+    color: "#b9bfcc",
+    text: "text-[#5d6370] dark:text-[#b9bfcc]",
+    step: "h-[104px] md:h-[160px]",
+    avatar: "size-[60px] md:size-20",
+  },
+  3: {
+    color: "#e0a173",
+    text: "text-[#9a5524] dark:text-[#e0a173]",
+    step: "h-20 md:h-[120px]",
+    avatar: "size-[60px] md:size-20",
+  },
+} as const;
+
+function PodiumSpot({
+  entry,
+  place,
+}: {
+  entry: LiveLeaderboardEntry | undefined;
+  place: 1 | 2 | 3;
+}) {
+  const p = PODIUM[place];
+  if (!entry) return <div />;
+  return (
+    <div className="flex flex-col items-center gap-1.5 min-w-0">
+      <span className="rounded-full p-1" style={{ background: p.color }}>
+        <Image
+          src={entry.profilePic || DEFAULT_AVATAR}
+          width={104}
+          height={104}
+          alt=""
+          className={clsx("rounded-full object-cover", p.avatar)}
+        />
+      </span>
+      <span
+        className={clsx(
+          "mt-1.5 max-w-full truncate font-bold",
+          place === 1 ? "text-base md:text-xl" : "text-sm md:text-[17px]",
+        )}
+      >
+        {entry.name}
+      </span>
+      <span className={clsx("text-xs md:text-sm font-semibold", mutedText)}>
+        {entry.score.toLocaleString()} pts
+      </span>
+      <div
+        className={clsx(
+          "mt-2.5 w-full rounded-t-[18px] rounded-b-lg border-t-[5px] flex flex-col items-center pt-4",
+          subtleCardClass,
+          p.step,
+        )}
+        style={{ borderTopColor: p.color }}
+      >
+        <b
+          className={clsx(
+            "text-2xl md:text-[34px] font-extrabold tracking-[-0.02em] leading-none",
+            p.text,
+          )}
+        >
+          {ordinal(place)}
+        </b>
+      </div>
+    </div>
+  );
+}
+
+export default function LeaderBoard({
+  roomId,
+  quizTitle,
+  alreadyEnded,
+}: {
+  roomId: string;
+  quizTitle: string;
+  alreadyEnded: boolean;
+}) {
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
-
-  const firstThree = leaderboard.slice(0, 3);
-  const leaderboardRest = leaderboard.slice(3);
+  const qCount = useAppSelector((state) => state.game.qCount);
+  const rest = leaderboard.slice(3);
 
   return (
-    <>
-      <div className="flex flex-col h-full w-full px-4 pt-6 text-dark dark:text-white">
-        <p className="text-2xl font-black">Thank you for joining!</p>
-        <div className="w-[95vw] my-3 flex flex-col md:flex-row md:justify-between items-center">
-          {firstThree.length > 0
-            ? firstThree.map((lead, index) => {
-                return (
-                  <div
-                    key={lead.playerId}
-                    className={clsx(
-                      "flex md:flex-col md:justify-center items-center w-full md:w-[25vw] p-2 md:p-4 my-2 rounded-lg border-2 *:my-1",
-                      index === 0 && "md:order-2 order-0 border-yellow-500",
-                      index === 1 && "md:order-1 order-0 border-gray",
-                      index === 2 && "md:order-3 order-0 border-[#ec7070e8]",
-                    )}
-                  >
-                    {index == 0 ? (
-                      <span className="text-xl md:text-3xl overflow-hidden text-[#F2AB53]">
-                        1
-                        <sup className="bg-linear-to-b from-[#FFFF00] to-[#FFA800] text-transparent bg-clip-text">
-                          st
-                        </sup>
-                      </span>
-                    ) : index == 1 ? (
-                      <span className="text-xl md:text-3xl overflow-hidden bg-linear-to-b from-[#27272A] to-[#A6A6A6] text-transparent bg-clip-text">
-                        2
-                        <sup className="bg-linear-to-b from-[#27272A] to-[#A6A6A6] text-transparent bg-clip-text">
-                          nd
-                        </sup>
-                      </span>
-                    ) : index == 2 ? (
-                      <span className="text-xl md:text-3xl overflow-hidden bg-linear-to-b from-[#EC7070F0] to-[#6D1E1EE5] text-transparent bg-clip-text">
-                        3
-                        <sup className="bg-linear-to-b from-[#EC7070F0] to-[#6D1E1EE5] text-transparent bg-clip-text">
-                          rd
-                        </sup>
-                      </span>
-                    ) : (
-                      `#${index + 1}`
-                    )}
-                    <div className="flex flex-row items-center gap-x-2 ml-3">
-                      <Image
-                        src={lead.profilePic || DEFAULT_AVATAR}
-                        className="w-12 h-12 rounded-full"
-                        width={50}
-                        height={50}
-                        alt="profile pic"
-                      />
-                      <p className="text-base md:text-xl font-black wrap-break-word md:w-fit w-[40%]">
-                        {lead.name}
-                      </p>
-                    </div>
-                    <p className="text-xs md:text-sm text-off-dark dark:text-off-white ml-auto md:ml-0">
-                      Total Points: {lead.score}
-                    </p>
-                  </div>
-                );
-              })
-            : ""}
+    <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-2 gap-3.5 md:gap-5 md:pb-[18px]">
+      <section
+        className={clsx(
+          panelClass,
+          "flex flex-col gap-5 p-5 md:p-[30px] md:min-h-0",
+        )}
+      >
+        <div>
+          <span className={labelClass}>Final results</span>
+          <h2 className="mt-2 text-[26px] md:text-[34px] font-extrabold tracking-[-0.02em] leading-[1.1]">
+            Thank you for joining!
+          </h2>
+          <p className={clsx("mt-2 text-[15px]", mutedText)}>
+            {quizTitle} · {qCount} question{qCount === 1 ? "" : "s"} ·{" "}
+            {leaderboard.length} player{leaderboard.length === 1 ? "" : "s"}
+          </p>
         </div>
-        <div className="flex flex-col items-center gap-4 my-3 py-3 px-2 w-[95vw] max-h-[35dvh] overflow-y-auto rounded-2xl">
-          {leaderboardRest.length > 0
-            ? leaderboardRest.map((lead) => {
-                return (
-                  <div
-                    key={lead.playerId}
-                    className="flex items-center w-full py-2 px-6 bg-white rounded-lg"
-                  >
-                    <span className="text-3xl mr-3">{lead.rank}</span>
-                    <div className="flex flex-row items-center gap-x-2 z-20">
-                      <Image
-                        src={lead.profilePic || DEFAULT_AVATAR}
-                        className="w-12 h-12 rounded-full"
-                        width={50}
-                        height={50}
-                        alt="profile pic"
-                      />
-                      <p>{lead.name}</p>
-                    </div>
-                    <p className="ml-auto">{lead.score}</p>
-                  </div>
-                );
-              })
-            : ""}
+        <div className="flex-1 grid grid-cols-[1fr_1.15fr_1fr] gap-3 items-end min-h-0">
+          <PodiumSpot entry={leaderboard[1]} place={2} />
+          <PodiumSpot entry={leaderboard[0]} place={1} />
+          <PodiumSpot entry={leaderboard[2]} place={3} />
         </div>
-      </div>
-    </>
+        <div className="flex flex-col-reverse md:flex-row gap-3 md:justify-end pt-[18px] border-t border-lprimary/15 dark:border-white/10 [&>button]:w-full md:[&>button]:w-auto">
+          <EndQuizButton
+            roomId={roomId}
+            redirectTo="/admin"
+            alreadyEnded={alreadyEnded}
+            primaryLabel="Back to quizzes"
+          />
+        </div>
+      </section>
+
+      <section
+        className={clsx(
+          panelClass,
+          "flex flex-col md:min-h-0 md:overflow-hidden",
+        )}
+      >
+        <div className="flex items-center justify-between px-5 md:px-[26px] pt-5 md:pt-6 pb-3.5">
+          <h3 className="text-xl md:text-[22px] font-bold">Full rankings</h3>
+          <span className={clsx("text-[13.5px]", mutedText)}>
+            {leaderboard.length} player{leaderboard.length === 1 ? "" : "s"}
+          </span>
+        </div>
+        <div className="md:flex-1 md:min-h-0 md:overflow-y-auto px-3 md:px-[18px] pb-4 flex flex-col gap-1.5">
+          {rest.map((lead) => (
+            <div
+              key={lead.playerId}
+              className="flex items-center gap-3 md:gap-[13px] rounded-[14px] border border-transparent px-2.5 py-[9px] transition-colors hover:bg-light-bg dark:hover:bg-card-dark hover:border-lprimary/15 dark:hover:border-white/5"
+            >
+              <span
+                className={clsx(
+                  "size-[30px] shrink-0 rounded-[9px] flex items-center justify-center text-sm font-bold",
+                  rankBadgeClass(lead.rank),
+                )}
+              >
+                {lead.rank}
+              </span>
+              <Image
+                src={lead.profilePic || DEFAULT_AVATAR}
+                className="size-9 shrink-0 rounded-full object-cover"
+                width={36}
+                height={36}
+                alt=""
+              />
+              <span className="flex-1 min-w-0 truncate text-[15px] font-semibold">
+                {lead.name}
+              </span>
+              <span className="min-w-16 text-right text-base font-bold tabular-nums">
+                {lead.score.toLocaleString()}
+              </span>
+            </div>
+          ))}
+          {rest.length === 0 && (
+            <p className={clsx("text-center text-sm py-10", mutedText)}>
+              {leaderboard.length === 0
+                ? "No players finished this quiz."
+                : "Everyone made the podium!"}
+            </p>
+          )}
+        </div>
+      </section>
+    </div>
   );
 }

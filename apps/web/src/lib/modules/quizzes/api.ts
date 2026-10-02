@@ -9,8 +9,12 @@ export type QuizDetail = Quiz & {
   _count: { questions: number };
 };
 
+export type QuizListItem = Quiz & {
+  _count?: { questions: number; gameResults: number };
+};
+
 export async function listQuizzes(client: AxiosInstance) {
-  const { data } = await client.get<Quiz[]>("/quizzes");
+  const { data } = await client.get<QuizListItem[]>("/quizzes");
   return data;
 }
 

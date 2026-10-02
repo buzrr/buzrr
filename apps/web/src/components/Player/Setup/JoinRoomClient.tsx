@@ -1,12 +1,11 @@
 "use client";
 
-import BackNavButton from "@/components/BackNavButton";
 import SetLocalItem from "@/components/Player/SetLocalItem";
 import ResetReduxStates from "@/components/Player/ResetReduxStates";
 import Skeleton from "@/components/ui/Skeleton";
 import JoinRoomForm from "@/components/Player/Setup/JoinRoomForm";
 import JoinRoomProfileCard from "@/components/Player/Setup/JoinRoomProfileCard";
-import ClientImage from "@/components/ClientImage";
+import JoinShell from "@/components/Player/Setup/JoinShell";
 import {
   useClearPlayerGameMutation,
   usePlayerQuery,
@@ -17,11 +16,11 @@ import { useEffect, useState } from "react";
 
 function JoinRoomSkeleton() {
   return (
-    <div className="p-4 md:p-8">
-      <Skeleton className="mb-6 h-20 w-20 rounded bg-white dark:bg-card-dark" />
-      <div className="flex h-[81vh] w-full gap-4">
-        <Skeleton className="h-full w-full md:w-80 rounded-xl bg-white dark:bg-card-dark" />
-        <Skeleton className="hidden md:block h-full flex-1 rounded-xl bg-white dark:bg-card-dark" />
+    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <Skeleton className="my-4 h-10 w-20 rounded bg-white dark:bg-card-dark" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 h-[80dvh]">
+        <Skeleton className="h-full rounded-3xl bg-white dark:bg-dark" />
+        <Skeleton className="hidden md:block h-full rounded-3xl bg-white dark:bg-dark" />
       </div>
     </div>
   );
@@ -53,6 +52,8 @@ export default function JoinRoomClient({ playerId }: { playerId: string }) {
   }, [player?.gameId, clearGame]);
 
   const blockJoin = Boolean(player?.gameId) || clearingGame;
+  const [name, setName] = useState<string | null>(null);
+  const displayName = name ?? player?.name ?? "";
 
   if (!sessionAllowed) {
     return <JoinRoomSkeleton />;
@@ -77,34 +78,30 @@ export default function JoinRoomClient({ playerId }: { playerId: string }) {
     <>
       <SetLocalItem mapKey="playerId" value={playerId} />
       <ResetReduxStates />
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="py-4 flex justify-between">
-          <ClientImage
-            props={{
-              src: "/images/logo.svg",
-              darksrc: "/images/logo-dark.svg",
-              alt: "Buzrr Logo",
-              width: 80,
-              height: 80,
-            }}
+      <JoinShell
+        form={
+          <JoinRoomForm
+            joiningAs={
+              <JoinRoomProfileCard
+                variant="chip"
+                playerId={playerId}
+                name={displayName}
+                profilePic={player.profilePic}
+                onNameSaved={setName}
+              />
+            }
           />
-        </div>
-        <div className="w-full min-h-[81vh] md:h-[81vh] flex flex-col md:flex-row gap-4 pb-4 md:pb-0 *:bg-white dark:*:bg-dark *:rounded-xl">
-          <div className="w-full md:flex-1 flex flex-col py-4">
-            <div className="px-4 md:px-8 pt-2">
-              <BackNavButton href="/" />
-            </div>
-            <div className="flex-1 flex items-center justify-center px-4 md:px-8 py-8 md:py-4">
-              <JoinRoomForm />
-            </div>
-          </div>
+        }
+        preview={
           <JoinRoomProfileCard
+            variant="card"
             playerId={playerId}
-            initialPlayerName={player.name}
+            name={displayName}
             profilePic={player.profilePic}
+            onNameSaved={setName}
           />
-        </div>
-      </div>
+        }
+      />
     </>
   );
 }

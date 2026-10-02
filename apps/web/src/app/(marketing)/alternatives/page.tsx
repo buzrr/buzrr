@@ -89,7 +89,7 @@ export default function AlternativesHubPage() {
         intro={`One-line summaries from each product's own public pages (checked ${FACTS_CHECKED}). Follow a link for the full comparison and sources.`}
       >
         <div className="overflow-x-auto rounded-2xl border border-card-light dark:border-off-dark bg-white dark:bg-dark">
-          <table className="w-full min-w-[640px] text-sm text-left text-dark dark:text-off-white">
+          <table className="w-full min-w-160 text-sm text-left text-dark dark:text-off-white">
             <caption className="sr-only">
               Overview of Buzrr and popular live quiz tools
             </caption>

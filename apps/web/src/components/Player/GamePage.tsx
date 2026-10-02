@@ -92,7 +92,9 @@ const GamePage = (params: {
   return (
     <>
       <ConnectionBanner />
-      <ConnectionStatusPill className="fixed left-3 bottom-3 z-40" />
+      {phase !== "question" && phase !== "reveal" && (
+        <ConnectionStatusPill className="fixed left-3 bottom-3 z-40" />
+      )}
       <ConfirmationModal
         open={showLeaveModal}
         setOpen={setShowLeaveModal}

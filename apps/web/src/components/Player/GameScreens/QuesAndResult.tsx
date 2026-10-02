@@ -1,10 +1,21 @@
 "use client";
 import clsx from "clsx";
 import Image from "next/image";
+import { LuCheck, LuClock, LuX } from "react-icons/lu";
 import { DEFAULT_AVATAR } from "@/constants";
 import { useAppSelector } from "@/state/hooks";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
-import CountdownRing from "@/components/CountdownRing";
+import {
+  GameTopBar,
+  OptionKey,
+  StatTile,
+  TimerRing,
+  WaitingDots,
+  mutedText,
+  ordinal,
+  panelClass,
+  subtleCardClass,
+} from "@/components/Game/GameUI";
 
 interface QuestionOption {
   id: string;
@@ -20,20 +31,86 @@ interface QuestionWithOptions {
   options?: QuestionOption[];
 }
 
+export interface IndexedOption {
+  index: number;
+  title: string;
+}
+
+const STATUS = {
+  correct: {
+    heading: "Correct!",
+    icon: <LuCheck size={56} strokeWidth={3} />,
+    circle:
+      "bg-green-500 shadow-[0_0_0_14px_rgba(34,197,94,0.14),0_0_0_30px_rgba(34,197,94,0.06)]",
+    accent: "text-green-600 dark:text-green-500",
+    answer: "border-green-500 bg-green-500/8",
+  },
+  incorrect: {
+    heading: "Not quite",
+    icon: <LuX size={56} strokeWidth={3} />,
+    circle:
+      "bg-[#e5544e] shadow-[0_0_0_14px_rgba(229,84,78,0.14),0_0_0_30px_rgba(229,84,78,0.06)]",
+    accent: "text-[#e5544e]",
+    answer: "border-[#e5544e] bg-[#e5544e]/8",
+  },
+  timesout: {
+    heading: "Time's up!",
+    icon: <LuClock size={52} strokeWidth={2.6} />,
+    circle:
+      "bg-[#e0a020] shadow-[0_0_0_14px_rgba(224,160,32,0.14),0_0_0_30px_rgba(224,160,32,0.06)]",
+    accent: "text-[#c98a0e] dark:text-[#e0a020]",
+    answer: "border-[#e0a020] bg-[#e0a020]/8",
+  },
+} as const;
+
+function AnswerRow({
+  label,
+  option,
+  className,
+  emptyText,
+}: {
+  label: string;
+  option: IndexedOption | null;
+  className?: string;
+  emptyText?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-2 w-full">
+      <span className="text-xs font-semibold tracking-[0.1em] uppercase text-[#8a8896] dark:text-[#71717a]">
+        {label}
+      </span>
+      <div
+        className={clsx(
+          "flex items-center gap-3.5 rounded-2xl border-[1.5px] px-[18px] py-3.5 text-[17px] font-semibold text-left",
+          className,
+        )}
+      >
+        {option ? (
+          <>
+            <OptionKey index={option.index} className="size-9 text-base" />
+            <span className="min-w-0 wrap-break-word">{option.title}</span>
+          </>
+        ) : (
+          <span className={mutedText}>{emptyText}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const QuestionAndResult = (params: {
   question?: QuestionWithOptions;
   quizTitle: string;
   gameCode: string;
-  screen: string;
+  screen: "question" | "result";
   submitAnswer?: (optionId: string) => void;
   optionId?: string;
   locked?: boolean;
-  status?: string;
-  message?: string;
-  /** Shown on a miss (wrong answer / timeout): the correct option title(s). */
-  correctAnswer?: string;
-  /** The player's own pick on a wrong answer; null when they never answered. */
-  yourAnswer?: string | null;
+  status?: keyof typeof STATUS;
+  /** Points earned this question (result screen). */
+  points?: number;
+  yourOption?: IndexedOption | null;
+  correctOptions?: IndexedOption[];
   /** Hide the "Room code" line (e.g. 1v1 duels, where the code is internal). */
   hideRoomCode?: boolean;
   /** Host of the quiz — shown as "Quiz by". Omitted for duels (no host). */
@@ -43,16 +120,19 @@ const QuestionAndResult = (params: {
   const options = params?.question?.options ?? [];
   const deadline = useAppSelector((state) => state.game.deadline);
   const connection = useAppSelector((state) => state.game.connection);
+  const qIndex = useAppSelector((state) => state.game.qIndex);
+  const qCount = useAppSelector((state) => state.game.qCount);
+  const players = useAppSelector((state) => state.game.players);
+  const you = useAppSelector((state) => state.game.you);
   // Answers submitted while offline would be rejected anyway — lock the UI.
   const offline = connection !== "connected";
   // Display-only countdown against the server deadline; the reveal is pushed
   // by the server regardless of what this shows.
   const remaining = useServerCountdown(deadline);
   const timeOut = params?.question?.timeOut ?? 1;
-  const percent = Math.max(
-    0,
-    Math.min(100, Math.floor((remaining * 100) / timeOut)),
-  );
+  const isQuestion = params.screen === "question";
+  const status = STATUS[params.status ?? "timesout"];
+  const isLast = qCount > 0 && qIndex >= qCount - 1;
 
   function handleSubmit(id: string) {
     if (params.locked || offline) return;
@@ -60,183 +140,224 @@ const QuestionAndResult = (params: {
   }
 
   return (
-    <>
-      {params.screen === "question" && (
-        <div
-          style={{
-            width: `${percent}%`,
-            transition: "width 1s linear",
-          }}
-          className="w-full h-2 dark:bg-dprimary bg-lprimary block md:hidden"
-        ></div>
-      )}
-      <div className="w-full max-w-7xl mx-auto h-[85dvh] flex gap-4 md:py-4 px-4 sm:px-6 lg:px-8 *:bg-white dark:*:bg-dark md:*:rounded-xl overflow-y-auto">
-        <div className="hidden md:w-1/3 md:flex flex-col justify-between py-6 px-5 h-full">
-          <div className="flex items-center justify-center mx-auto">
-            {params.screen === "question" ? (
-              <CountdownRing
+    <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 pb-16 md:pb-6 md:min-h-[calc(100dvh-7.5rem)] text-dark dark:text-white">
+      <GameTopBar title={params.quizTitle} qIndex={qIndex} qCount={qCount} />
+      <div className="flex-1 flex flex-col md:grid md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3.5 md:gap-5">
+        <section
+          className={clsx(
+            panelClass,
+            "flex flex-col justify-center gap-6 px-4 py-3.5 md:p-[30px]",
+          )}
+        >
+          <div className="flex items-center gap-3.5 md:gap-[26px]">
+            {isQuestion ? (
+              <TimerRing
                 key={params.question?.id ?? params.question?.title}
-                duration={timeOut}
-                remaining={remaining}
-                size={128}
+                value={Math.ceil(remaining)}
+                max={timeOut}
+                label="seconds"
+                className="size-[72px] md:size-[150px] [&_span]:hidden md:[&_span]:block"
+                valueClassName="text-2xl md:text-5xl"
               />
             ) : (
-              <div className="border-12 dark:border-lprimary border-dprimary rounded-full w-32 h-32 flex items-center justify-center">
-                <span className="font-semibold text-3xl dark:text-white">
-                  0
+              <TimerRing
+                value={0}
+                max={1}
+                label="time's up"
+                className="size-[72px] md:size-[150px] [&_span]:hidden md:[&_span]:block"
+                valueClassName="text-2xl md:text-5xl"
+              />
+            )}
+            <div className="flex flex-col gap-0.5 md:gap-2.5 min-w-0">
+              <h2 className="text-xl md:text-[30px] font-bold tracking-[-0.02em] truncate capitalize">
+                {params.quizTitle}
+              </h2>
+              {!params.hideRoomCode && (
+                <span
+                  className={clsx(
+                    "text-[13px] md:text-sm whitespace-nowrap",
+                    mutedText,
+                  )}
+                >
+                  Room code{" "}
+                  <b className="tracking-[0.08em] text-dark dark:text-white">
+                    {params.gameCode}
+                  </b>
                 </span>
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col">
-            <div className="flex items-center gap-1 rounded-xl bg-green-100 dark:bg-green-900/40 w-fit p-1 py-[2px]">
-              <div className="rounded-full w-3 h-3 bg-green-500"></div>
-              <p className="text-xs text-green-600 dark:text-green-400">Live</p>
+              )}
+              {qCount > 0 && (
+                <span
+                  className={clsx(
+                    "text-[13px] md:text-sm whitespace-nowrap",
+                    mutedText,
+                  )}
+                >
+                  Question {qIndex + 1} of {qCount}
+                </span>
+              )}
             </div>
-            <p className="font-extrabold mt-2 mb-4 dark:text-white capitalize text-xl">
-              {params.quizTitle}
-            </p>
-            {!params.hideRoomCode && (
-              <p className="dark:text-white mb-1">
-                Room code: {params.gameCode}
-              </p>
-            )}
-            {params.hostName && (
-              <>
-                <p className="dark:text-white mb-1">Quiz by</p>
-                <div className="flex gap-2 items-center">
-                  <Image
-                    src={params.hostImage || DEFAULT_AVATAR}
-                    width={48}
-                    height={48}
-                    alt={params.hostName}
-                    className="rounded-full h-12 w-12"
-                  />
-                  <p className="dark:text-white">{params.hostName}</p>
-                </div>
-              </>
-            )}
           </div>
-        </div>
-        {params.screen === "question" ? (
-          <div className="w-full p-4 sm:p-6 flex flex-col min-h-full h-fit">
-            <div className="w-full max-w-3xl mx-auto flex flex-col flex-1 justify-center">
-              {params.question?.mediaType === "image" && (
+          {params.hostName && (
+            <div
+              className={clsx(
+                "hidden md:flex items-center gap-3 rounded-2xl px-4 py-3.5",
+                subtleCardClass,
+              )}
+            >
+              <Image
+                src={params.hostImage || DEFAULT_AVATAR}
+                width={42}
+                height={42}
+                alt=""
+                className="size-[42px] rounded-full object-cover"
+              />
+              <div className={clsx("flex flex-col text-[12.5px]", mutedText)}>
+                Quiz by
+                <b className="text-[15px] font-semibold text-dark dark:text-white">
+                  {params.hostName}
+                </b>
+              </div>
+            </div>
+          )}
+          {!isQuestion && you && (
+            <div className="hidden md:grid grid-cols-2 gap-3">
+              <StatTile
+                value={you.rank ? ordinal(you.rank) : "—"}
+                suffix={players.length > 0 ? ` /${players.length}` : undefined}
+                label="Your rank"
+              />
+              <StatTile
+                value={you.totalScore.toLocaleString()}
+                label="Total points"
+              />
+            </div>
+          )}
+        </section>
+
+        {isQuestion ? (
+          <section
+            className={clsx(
+              panelClass,
+              "flex flex-col p-5 md:px-[34px] md:py-8",
+            )}
+          >
+            {params.question?.mediaType === "image" &&
+              params.question.media && (
                 <Image
-                  src={params.question?.media ?? ""}
-                  className="mb-6 md:mb-10 mx-auto max-h-[30vh] w-auto"
-                  alt="media Image"
+                  src={params.question.media}
+                  className="mb-5 mx-auto max-h-[28dvh] w-auto rounded-2xl"
+                  alt="Question image"
                   height={320}
                   width={500}
                 />
               )}
-              <p className="dark:text-white">Question</p>
-              <p className="font-bold text-xl sm:text-2xl dark:text-white animate-fade-up">
-                {params.question?.title ?? ""}
-              </p>
-
-              <div
-                className={clsx(
-                  "grid grid-cols-1 sm:grid-cols-2 gap-x-4",
-                  params.question?.mediaType === "image" ? "my-2" : "my-4",
-                )}
-              >
-                {options.map((option: QuestionOption) => (
+            <span className="w-fit text-[12.5px] font-bold tracking-[0.06em] uppercase rounded-full px-3 py-1.5 text-lprimary dark:text-dprimary bg-lprimary/8 dark:bg-white/5">
+              Question {qIndex + 1}
+              {qCount > 0 && ` of ${qCount}`}
+            </span>
+            <h2 className="mt-[18px] text-2xl md:text-[34px] font-bold tracking-[-0.02em] leading-[1.22] text-pretty wrap-break-word animate-fade-up">
+              {params.question?.title ?? ""}
+            </h2>
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 md:auto-rows-fr gap-3.5 mt-7">
+              {options.map((option, index) => {
+                const picked = option.id === params.optionId;
+                const disabled = offline || params.locked;
+                return (
                   <button
                     key={option.id}
                     type="button"
-                    disabled={offline || params.locked}
-                    className={clsx(
-                      "cursor-pointer p-4 rounded-xl text-base sm:text-lg mt-4 text-left w-full transition-all duration-150",
-                      option.id === params.optionId
-                        ? "dark:bg-dprimary bg-lprimary text-white dark:text-dark font-semibold shadow-md animate-pop"
-                        : "bg-light-bg dark:bg-off-dark dark:text-white",
-                      !offline &&
-                        !params.locked &&
-                        "hover:scale-[1.01] hover:shadow active:scale-[0.98]",
-                      (offline ||
-                        (params.locked && option.id !== params.optionId)) &&
-                        "opacity-50 cursor-default",
-                    )}
+                    disabled={disabled}
                     onClick={() => handleSubmit(option.id)}
-                    aria-pressed={option.id === params.optionId}
+                    aria-pressed={picked}
+                    className={clsx(
+                      "flex items-center gap-4 rounded-[18px] border-[1.5px] px-4 py-3.5 md:px-[22px] md:py-[18px] min-h-16 md:min-h-[84px] text-[17px] md:text-xl font-semibold text-left wrap-break-word min-w-0 transition-all duration-150",
+                      picked
+                        ? "border-lprimary dark:border-dprimary bg-lprimary/10 dark:bg-dprimary/15 shadow-[0_10px_24px_-14px_#7c4ddb] animate-pop"
+                        : subtleCardClass,
+                      !disabled &&
+                        "cursor-pointer hover:border-dprimary hover:-translate-y-0.5 active:scale-[0.98]",
+                      disabled && !picked && "opacity-50 cursor-default",
+                    )}
                   >
-                    {option.title}
+                    <OptionKey
+                      index={index}
+                      className="size-10 md:size-11 text-lg"
+                    />
+                    <span className="min-w-0">{option.title}</span>
                   </button>
-                ))}
-              </div>
-
-              {params.locked && (
-                <p className="dark:text-white text-center font-bold my-2 animate-fade-up">
-                  Answer received — waiting for the results…
-                </p>
-              )}
-
-              {!params.hideRoomCode && (
-                <p className="dark:text-white mb-1 md:hidden font-bold text-center my-6 text-lg">
-                  Room code: {params.gameCode}
-                </p>
-              )}
+                );
+              })}
             </div>
-          </div>
+            {params.locked && (
+              <div className="mt-6 flex justify-center animate-fade-up">
+                <WaitingDots>
+                  Answer received — waiting for the results
+                </WaitingDots>
+              </div>
+            )}
+          </section>
         ) : (
-          <div className="w-full p-6 flex flex-col justify-center min-h-full">
+          <section
+            className={clsx(
+              panelClass,
+              "flex flex-col items-center justify-center text-center gap-2.5 px-5 py-7 md:p-10",
+            )}
+          >
             <div
               className={clsx(
-                "flex flex-col justify-center items-center",
+                "size-[92px] md:size-[120px] rounded-full text-white flex items-center justify-center mb-[22px] animate-pop-in",
+                status.circle,
                 params.status === "incorrect" && "animate-shake",
               )}
             >
-              <Image
-                src={`${
-                  params.status === "correct"
-                    ? "/images/correct.svg"
-                    : params.status === "incorrect"
-                      ? "/images/incorrect.svg"
-                      : "/images/timesOut.svg"
-                }`}
-                width={160}
-                height={160}
-                alt="Logo"
-                className="w-1/2 h-1/2 md:w-2/5 md:h-2/5 animate-pop-in"
-              />
-              <p
-                className={clsx(
-                  "text-xl xl:text-3xl font-medium mt-2 animate-fade-up [animation-delay:150ms]",
-                  params.status === "correct"
-                    ? "text-[#20A97C]"
-                    : params.status === "incorrect"
-                      ? "text-red-dark"
-                      : "text-[#F2AB53]",
-                )}
-              >
-                {params.message}
-              </p>
-              {params.status !== "correct" &&
-                (params.correctAnswer || params.yourAnswer !== undefined) && (
-                  <div className="mt-6 w-full max-w-md rounded-xl bg-light-bg dark:bg-off-dark p-4 text-left animate-fade-up [animation-delay:300ms]">
-                    <p className="dark:text-white mb-2">
-                      <span className="font-bold text-[#20A97C]">
-                        Correct answer:{" "}
-                      </span>
-                      {params.correctAnswer ?? "—"}
-                    </p>
-                    <p className="dark:text-white">
-                      <span className="font-bold text-red-dark">
-                        Your answer:{" "}
-                      </span>
-                      {params.yourAnswer ??
-                        (params.status === "timesout"
-                          ? "No answer (time limit exceeded)"
-                          : "—")}
-                    </p>
-                  </div>
-                )}
+              {status.icon}
             </div>
-          </div>
+            <h2 className="text-[32px] md:text-[40px] font-extrabold tracking-[-0.02em]">
+              {status.heading}
+            </h2>
+            <span
+              className={clsx(
+                "text-xl md:text-[26px] font-bold animate-fade-up",
+                status.accent,
+              )}
+            >
+              {params.status === "timesout"
+                ? "No answer this round"
+                : `+${params.points ?? 0} points`}
+            </span>
+            <div className="mt-[22px] flex flex-col gap-4 w-full max-w-[420px] animate-fade-up [animation-delay:150ms]">
+              <AnswerRow
+                label="Your answer"
+                option={params.yourOption ?? null}
+                className={status.answer}
+                emptyText="You didn't answer in time"
+              />
+              {params.status !== "correct" &&
+                (params.correctOptions?.length ?? 0) > 0 &&
+                params.correctOptions!.map((opt) => (
+                  <AnswerRow
+                    key={opt.index}
+                    label="Correct answer"
+                    option={opt}
+                    className={STATUS.correct.answer}
+                  />
+                ))}
+            </div>
+            <div className="mt-[26px]">
+              <WaitingDots>
+                {params.hideRoomCode
+                  ? isLast
+                    ? "Final results coming up"
+                    : "Next question coming up"
+                  : isLast
+                    ? "Waiting for the final results"
+                    : `Waiting for the host to start question ${qIndex + 2}`}
+              </WaitingDots>
+            </div>
+          </section>
         )}
       </div>
-    </>
+    </div>
   );
 };
 

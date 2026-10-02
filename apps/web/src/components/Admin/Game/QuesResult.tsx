@@ -1,38 +1,42 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { useState } from "react";
-import { DEFAULT_AVATAR } from "@/constants";
-import { useAppDispatch, useAppSelector } from "@/state/hooks";
+import clsx from "clsx";
 import Image from "next/image";
-import { LuBan, LuUserMinus } from "react-icons/lu";
+import { useState } from "react";
+import { LuBan, LuCheck, LuPlay, LuX } from "react-icons/lu";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { Button } from "@/components/ui/Button";
-import { IconButton } from "@/components/ui/IconButton";
+import { DEFAULT_AVATAR } from "@/constants";
+import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import ConfirmationModal from "@/components/Admin/ConfirmationModal";
 import { playerRemoved } from "@/state/game/gameSlice";
 import {
   useBanRoomPlayerMutation,
   useRemoveRoomPlayerMutation,
 } from "@/lib/modules/game-sessions/hooks";
+import {
+  OPTION_KEYS,
+  StatTile,
+  labelClass,
+  mutedText,
+  panelClass,
+  primaryButtonClass,
+} from "@/components/Game/GameUI";
 import type { GameSocket } from "@/types/socket-events";
-
-// Lazy-load chart to keep @mui/x-charts out of main bundle until result screen is shown.
-const Barchart = dynamic(
-  () => import("./QuesResultChart").then((m) => m.default),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-[300px] w-full max-w-[550px] animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
-    ),
-  },
-);
 
 interface QuesResultProps {
   socket: GameSocket;
   roomId: string;
 }
+
+export const rankBadgeClass = (rank: number) =>
+  rank === 1
+    ? "bg-[#f4c542] text-[#3a2a00]"
+    : rank === 2
+      ? "bg-[#cfd3dc] text-[#2a2d33]"
+      : rank === 3
+        ? "bg-[#e0a173] text-[#3a1d06]"
+        : "bg-lprimary/8 dark:bg-white/5 text-off-dark dark:text-[#a1a1aa]";
 
 /**
  * Per-question results. All data (answer counts, running leaderboard,
@@ -61,8 +65,21 @@ export default function QuesResult(props: QuesResultProps) {
   const removePlayerMutation = useRemoveRoomPlayerMutation();
   const banPlayerMutation = useBanRoomPlayerMutation();
 
+  const options = question?.options ?? [];
   const counts = reveal?.counts ?? [];
-  const response = counts.reduce((sum, c) => sum + c, 0);
+  const correctIds = reveal?.correctOptionIds ?? [];
+  const responses = counts.reduce((sum, c) => sum + c, 0);
+  const maxCount = Math.max(1, ...counts);
+  const correctResponses = options.reduce(
+    (sum, o, i) => sum + (correctIds.includes(o.id) ? (counts[i] ?? 0) : 0),
+    0,
+  );
+  const correctPct =
+    responses > 0 ? Math.round((correctResponses / responses) * 100) : 0;
+  const avgTime =
+    reveal?.avgTimeMs != null
+      ? `${(reveal.avgTimeMs / 1000).toFixed(1)}s`
+      : "—";
   const isLastQuestion = qIndex === qCount - 1;
   const connectedById = new Map(players.map((p) => [p.id, p.connected]));
 
@@ -99,120 +116,196 @@ export default function QuesResult(props: QuesResultProps) {
   }
 
   return (
-    <>
-      <div className="px-5">
-        <div className="grid gap-y-4 md:grid-cols-2 md:gap-y-0 md:gap-x-4 w-full m-auto h-full">
-          <div className="flex flex-col p-6 rounded-xl bg-white dark:bg-dark md:h-[83dvh]">
-            <p className="font-extrabold text-2xl mb-3 dark:text-white">
-              {response} Responses
-              <span className="font-normal ml-1 text-base">
-                /{players.length}
-              </span>{" "}
-            </p>
-            <p className="capitalize text-dark dark:text-white">
-              <span className="font-semibold">Question:</span> {question?.title}
-            </p>
-            <Barchart
-              result={counts}
-              options={question?.options ?? []}
-              correctOptionIds={reveal?.correctOptionIds ?? []}
-            />
-          </div>
-
-          <div className="md:rounded-xl ">
-            <div className="bg-white dark:bg-dark p-6 w-full h-[72dvh] mb-4 rounded-xl">
-              <p className="font-extrabold text-2xl mb-5 dark:text-white">
-                Leaderboard
-              </p>
-              <div className="h-[90%] overflow-y-auto">
-                {leaderboard.length > 0
-                  ? leaderboard.map((lead) => {
-                      return (
-                        <div
-                          className="flex justify-between items-center mb-3 text-dark dark:text-white"
-                          key={lead.playerId}
-                        >
-                          <div className="flex gap-x-3 items-center">
-                            <span>{lead.rank}. </span>
-                            <span className="relative">
-                              <Image
-                                src={lead.profilePic || DEFAULT_AVATAR}
-                                className="w-12 h-12 rounded-full"
-                                width={40}
-                                height={40}
-                                alt="profile pic"
-                              />
-                              <span
-                                title={
-                                  connectedById.get(lead.playerId)
-                                    ? "Connected"
-                                    : "Disconnected"
-                                }
-                                className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border border-white ${
-                                  connectedById.get(lead.playerId)
-                                    ? "bg-green-500"
-                                    : "bg-gray"
-                                }`}
-                              />
-                            </span>
-                            <span className="font-bold">{lead.name}</span>
-                          </div>
-                          <div className="flex items-center gap-x-1">
-                            <p>{lead.score}</p>
-                            <IconButton
-                              aria-label={`Remove ${lead.name} from this game`}
-                              title="Kick — can rejoin with the room code"
-                              disabled={removePlayerMutation.isPending}
-                              className="cursor-pointer text-off-dark dark:text-off-white hover:text-red-500 dark:hover:text-red-500 transition"
-                              onClick={() =>
-                                handleKick(lead.playerId, lead.name)
-                              }
-                              icon={<LuUserMinus size={18} />}
-                            />
-                            <IconButton
-                              aria-label={`Ban ${lead.name} from this room`}
-                              title="Ban — blocked from rejoining this room"
-                              className="cursor-pointer text-off-dark dark:text-off-white hover:text-red-500 dark:hover:text-red-500 transition"
-                              onClick={() =>
-                                setPlayerToBan({
-                                  playerId: lead.playerId,
-                                  name: lead.name,
-                                })
-                              }
-                              icon={<LuBan size={18} />}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })
-                  : null}
-              </div>
-            </div>
-
-            <ConfirmationModal
-              open={playerToBan !== null}
-              setOpen={(open) => {
-                if (!open) setPlayerToBan(null);
-              }}
-              onClick={handleBan}
-              desc={`${playerToBan?.name ?? "This player"} will be removed and blocked from rejoining this room. The ban lasts until this room ends.`}
-              confirmLabel="Ban Player"
-              confirming={banPlayerMutation.isPending}
-              confirmingLabel="Banning…"
-            />
-            <Button
-              fullWidth
-              disabled={advancing}
-              onClick={() => {
-                setAdvancing(true);
-                socket.emit("host-next");
-              }}
-            >
-              {isLastQuestion ? "Final Leaderboard" : "Next Question"}
-            </Button>
-          </div>
+    <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-2 gap-3.5 md:gap-5 md:pb-[18px]">
+      <section
+        className={clsx(
+          panelClass,
+          "flex flex-col gap-5 md:gap-[22px] p-5 md:px-[30px] md:py-7 md:min-h-0 md:overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        )}
+      >
+        <div>
+          <span className={labelClass}>Question {qIndex + 1} results</span>
+          <h2 className="mt-2 text-lg md:text-[22px] font-bold leading-[1.3] tracking-[-0.01em] text-pretty wrap-break-word">
+            {question?.title}
+          </h2>
         </div>
-      </div>
-    </>
+        <div className="grid grid-cols-3 gap-2 md:gap-3">
+          <StatTile
+            value={responses}
+            suffix={` /${players.length}`}
+            label="Responses"
+          />
+          <StatTile value={`${correctPct}%`} label="Got it right" />
+          <StatTile value={avgTime} label="Avg. answer time" />
+        </div>
+        <div className="flex-1 flex flex-col justify-center gap-3.5">
+          {options.map((opt, i) => {
+            const count = counts[i] ?? 0;
+            const ok = correctIds.includes(opt.id);
+            const pct =
+              responses > 0 ? Math.round((count / responses) * 100) : 0;
+            return (
+              <div key={opt.id} className="flex flex-col gap-[7px]">
+                <div
+                  className={clsx(
+                    "flex items-center gap-2.5 text-[15px] font-semibold",
+                    ok && "text-green-600 dark:text-green-500",
+                  )}
+                >
+                  <span className="flex-1 min-w-0 truncate">
+                    {OPTION_KEYS[i]}. {opt.title}
+                  </span>
+                  {ok && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-green-500 px-2 py-0.5 text-[11.5px] font-bold tracking-[0.04em] uppercase text-white">
+                      <LuCheck size={13} strokeWidth={3} />
+                      Correct
+                    </span>
+                  )}
+                  <span className={clsx("text-sm font-medium", mutedText)}>
+                    {count} {count === 1 ? "vote" : "votes"}
+                  </span>
+                </div>
+                <div className="relative h-[38px] rounded-xl overflow-hidden bg-lprimary/8 dark:bg-white/5">
+                  <div
+                    className={clsx(
+                      "h-full rounded-xl transition-[width] duration-500",
+                      ok
+                        ? "bg-green-500"
+                        : "bg-[#8a8896]/45 dark:bg-[#71717a]/45",
+                    )}
+                    style={{ width: `${(count / maxCount) * 100}%` }}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[13.5px] font-bold">
+                    {pct}%
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section
+        className={clsx(
+          panelClass,
+          "flex flex-col md:min-h-0 md:overflow-hidden",
+        )}
+      >
+        <div className="flex items-center justify-between px-5 md:px-[26px] pt-5 md:pt-6 pb-3.5">
+          <h3 className="text-xl md:text-[22px] font-bold">Leaderboard</h3>
+          <span className={clsx("text-[13.5px]", mutedText)}>
+            {leaderboard.length} player{leaderboard.length === 1 ? "" : "s"}
+          </span>
+        </div>
+        <div className="md:flex-1 md:min-h-0 md:overflow-y-auto px-3 md:px-[18px] pb-2.5 flex flex-col gap-1.5">
+          {leaderboard.map((lead) => {
+            const connected = connectedById.get(lead.playerId);
+            return (
+              <div
+                key={lead.playerId}
+                className="group flex items-center gap-3 md:gap-[13px] rounded-[14px] border border-transparent px-2.5 py-[9px] transition-colors hover:bg-light-bg dark:hover:bg-card-dark hover:border-lprimary/15 dark:hover:border-white/5"
+              >
+                <span
+                  className={clsx(
+                    "size-[30px] shrink-0 rounded-[9px] flex items-center justify-center text-sm font-bold",
+                    rankBadgeClass(lead.rank),
+                  )}
+                >
+                  {lead.rank}
+                </span>
+                <span className="relative shrink-0">
+                  <Image
+                    src={lead.profilePic || DEFAULT_AVATAR}
+                    className="size-9 rounded-full object-cover"
+                    width={36}
+                    height={36}
+                    alt=""
+                  />
+                  <span
+                    title={connected ? "Connected" : "Disconnected"}
+                    className={clsx(
+                      "absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-white dark:border-dark",
+                      connected ? "bg-green-500" : "bg-gray",
+                    )}
+                  />
+                </span>
+                <span className="flex-1 min-w-0 truncate text-[15px] font-semibold">
+                  {lead.name}
+                </span>
+                {lead.delta !== undefined && (
+                  <span
+                    className={clsx(
+                      "min-w-11 text-right text-[12.5px]",
+                      lead.delta > 0
+                        ? "font-bold text-green-600 dark:text-green-500"
+                        : "font-medium text-[#8a8896] dark:text-[#71717a]",
+                    )}
+                  >
+                    +{lead.delta}
+                  </span>
+                )}
+                <span className="min-w-[52px] text-right text-base font-bold tabular-nums">
+                  {lead.score}
+                </span>
+                <span className="flex gap-0.5 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    aria-label={`Remove ${lead.name} from this game`}
+                    title="Kick — can rejoin with the room code"
+                    disabled={removePlayerMutation.isPending}
+                    onClick={() => handleKick(lead.playerId, lead.name)}
+                    className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-[#a1a1aa] hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
+                  >
+                    <LuX size={17} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Ban ${lead.name} from this room`}
+                    title="Ban — blocked from rejoining this room"
+                    onClick={() =>
+                      setPlayerToBan({
+                        playerId: lead.playerId,
+                        name: lead.name,
+                      })
+                    }
+                    className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-[#a1a1aa] hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
+                  >
+                    <LuBan size={17} />
+                  </button>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="sticky bottom-12 md:static px-4 md:px-[22px] py-4 border-t border-lprimary/15 dark:border-white/10 bg-white dark:bg-dark rounded-b-3xl">
+          <button
+            type="button"
+            disabled={advancing}
+            onClick={() => {
+              setAdvancing(true);
+              socket.emit("host-next");
+            }}
+            className={clsx(primaryButtonClass, "w-full")}
+          >
+            {isLastQuestion
+              ? "Final leaderboard"
+              : `Next question · ${qIndex + 2} of ${qCount}`}
+            <LuPlay size={17} className="fill-current" />
+          </button>
+        </div>
+      </section>
+
+      <ConfirmationModal
+        open={playerToBan !== null}
+        setOpen={(open) => {
+          if (!open) setPlayerToBan(null);
+        }}
+        onClick={handleBan}
+        desc={`${playerToBan?.name ?? "This player"} will be removed and blocked from rejoining this room. The ban lasts until this room ends.`}
+        confirmLabel="Ban Player"
+        confirming={banPlayerMutation.isPending}
+        confirmingLabel="Banning…"
+      />
+    </div>
   );
 }
