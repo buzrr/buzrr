@@ -4,6 +4,7 @@ import { io } from "socket.io-client";
 import { useAppDispatch } from "@/state/hooks";
 import {
   answerResult,
+  answerCount,
   applySync,
   gameOver,
   gameStarted,
@@ -96,6 +97,7 @@ export function useGameSocket({
     conn.on("question-start", (payload) => dispatch(questionStart(payload)));
     conn.on("question-end", (payload) => dispatch(questionEnd(payload)));
     conn.on("answer-result", (payload) => dispatch(answerResult(payload)));
+    conn.on("answer-count", (payload) => dispatch(answerCount(payload)));
     conn.on("leaderboard", (payload) => dispatch(leaderboardReceived(payload)));
     conn.on("game-over", (payload) =>
       dispatch(

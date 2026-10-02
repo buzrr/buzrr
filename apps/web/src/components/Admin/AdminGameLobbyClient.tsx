@@ -52,7 +52,7 @@ export default function AdminGameLobbyClient({
   }));
 
   return (
-    <div className="flex justify-center items-center h-fit md:h-[85dvh] w-full bg-light-bg dark:bg-dark-bg">
+    <div className="w-full bg-light-bg dark:bg-dark-bg">
       <GameLobby
         roomId={roomId}
         userId={userId}

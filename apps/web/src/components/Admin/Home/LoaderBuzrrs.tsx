@@ -1,47 +1,60 @@
 "use client";
 import clsx from "clsx";
-import React from "react";
-import { Skeleton } from "@mui/material";
+import { quizCardClass } from "./QuizCard";
+import { quizGridClass } from "./ClientBuzrrs";
 import { useAppSelector } from "@/state/hooks";
 
-const CardSkeleton = (): React.ReactNode => {
-  const view = useAppSelector((state) => state.gridListToggle.view);
+function Bone({ className }: { className?: string }) {
   return (
     <div
       className={clsx(
-        "border border-[#c2b4fe] dark:border-transparent w-full bg-card-light dark:bg-card-dark text-dark dark:text-white rounded",
-        view === "list" ? "md:w-full py-4 px-2" : "p-2 h-40 md:w-40 md:h-44",
+        "animate-pulse rounded-md bg-lprimary/10 dark:bg-white/10",
+        className,
       )}
-    >
-      {view === "grid" ? (
-        <>
-          <Skeleton variant="text" sx={{ fontSize: "1rem" }} />
-          <Skeleton variant="text" sx={{ fontSize: "0.75rem" }} />
-        </>
-      ) : (
-        <Skeleton variant="rectangular" width="full" />
-      )}
-    </div>
+    />
   );
-};
+}
 
-const LoaderBuzrrs = ({ cardCount }: { cardCount: number }) => {
-  const cards: Array<React.ReactNode> = [];
-  const view = useAppSelector((state) => state.gridListToggle.view);
-
-  for (let i = 0; i < cardCount; i++) {
-    cards.push(<CardSkeleton key={`card-skel-${i}`} />);
+function CardSkeleton({ view }: { view: "grid" | "list" }) {
+  if (view === "list") {
+    return (
+      <div className={quizCardClass("list")}>
+        <Bone className="size-10 md:size-12 rounded-[13px] shrink-0" />
+        <div className="flex-1 min-w-0 space-y-2">
+          <Bone className="h-4 w-1/3" />
+          <Bone className="h-3 w-1/2" />
+        </div>
+        <Bone className="hidden sm:block h-3 w-40 shrink-0" />
+      </div>
+    );
   }
   return (
+    <div className={quizCardClass("grid")}>
+      <div className="flex items-center gap-3.5">
+        <Bone className="size-10 md:size-12 rounded-[13px] shrink-0" />
+        <Bone className="h-4 w-1/2" />
+      </div>
+      <Bone className="h-3 w-3/4" />
+      <div className="mt-auto pt-3 border-t border-lprimary/15 dark:border-white/10 flex gap-4">
+        <Bone className="h-3 w-20" />
+        <Bone className="h-3 w-14" />
+      </div>
+    </div>
+  );
+}
+
+const LoaderBuzrrs = ({ cardCount }: { cardCount: number }) => {
+  const view = useAppSelector((state) => state.gridListToggle.view);
+
+  return (
     <div
-      className={clsx(
-        "w-full mt-4 gap-3",
-        view === "list"
-          ? "flex flex-col"
-          : "grid grid-cols-2 md:flex md:flex-wrap",
-      )}
+      className={quizGridClass(view)}
+      aria-busy="true"
+      aria-label="Loading quizzes"
     >
-      {cards}
+      {Array.from({ length: cardCount }, (_, i) => (
+        <CardSkeleton key={`card-skel-${i}`} view={view} />
+      ))}
     </div>
   );
 };

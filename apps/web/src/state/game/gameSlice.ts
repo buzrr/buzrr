@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import type {
+  AnswerCountPayload,
   AnswerResultPayload,
   ConnectionStatus,
   GamePhase,
@@ -26,6 +27,8 @@ export interface GameLiveState {
    * `remainingMs` on receipt. Display only; 0 when no question is open.
    */
   deadline: number;
+  /** Answers received for the open question (host meter). */
+  answeredCount: number;
   reveal: QuestionEndPayload | null;
   leaderboard: LiveLeaderboardEntry[];
   isFinalLeaderboard: boolean;
@@ -51,6 +54,7 @@ const initialState: GameLiveState = {
   qCount: 0,
   question: null,
   deadline: 0,
+  answeredCount: 0,
   reveal: null,
   leaderboard: [],
   isFinalLeaderboard: false,
@@ -75,6 +79,7 @@ const gameSlice = createSlice({
       state.question = s.question ?? null;
       state.deadline =
         s.remainingMs === undefined ? 0 : Date.now() + s.remainingMs;
+      state.answeredCount = s.answeredCount ?? 0;
       state.reveal = s.reveal ?? null;
       state.leaderboard = s.leaderboard ?? [];
       state.isFinalLeaderboard = s.phase === "final" || s.phase === "ended";
@@ -92,6 +97,7 @@ const gameSlice = createSlice({
       state.qCount = q.qCount;
       state.question = q.question;
       state.deadline = Date.now() + q.remainingMs;
+      state.answeredCount = 0;
       state.reveal = null;
       state.you = null;
     },
@@ -102,6 +108,11 @@ const gameSlice = createSlice({
     },
     answerResult: (state, action: PayloadAction<AnswerResultPayload>) => {
       state.you = action.payload;
+    },
+    answerCount: (state, action: PayloadAction<AnswerCountPayload>) => {
+      if (action.payload.index === state.qIndex) {
+        state.answeredCount = action.payload.answered;
+      }
     },
     leaderboardReceived: (
       state,
@@ -164,6 +175,7 @@ export const {
   questionStart,
   questionEnd,
   answerResult,
+  answerCount,
   leaderboardReceived,
   gameOver,
   playerConnection,

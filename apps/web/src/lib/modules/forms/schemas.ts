@@ -9,7 +9,11 @@ export const createAiQuizSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
   questions: z.coerce.number().int().min(1).max(15),
-  time: z.coerce.number().int().min(1),
+  time: z.coerce
+    .number()
+    .int("Use whole seconds")
+    .min(5, "At least 5 seconds")
+    .max(600, "At most 600 seconds"),
 });
 
 export const createPlayerSchema = z.object({
@@ -19,10 +23,6 @@ export const createPlayerSchema = z.object({
     .max(30)
     .regex(/^[a-zA-Z0-9_]*$/, "Only letters, numbers, and underscore"),
   profile: z.string().min(1),
-});
-
-export const joinRoomSchema = z.object({
-  gameCode: z.string().min(1, "Room code is required"),
 });
 
 export const updatePlayerNameSchema = z.object({

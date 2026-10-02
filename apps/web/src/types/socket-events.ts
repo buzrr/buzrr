@@ -43,6 +43,13 @@ export interface QuestionEndPayload {
   index: number;
   counts: number[];
   correctOptionIds: string[];
+  /** Mean answer time across everyone who answered; null when nobody did. */
+  avgTimeMs?: number | null;
+}
+
+export interface AnswerCountPayload {
+  index: number;
+  answered: number;
 }
 
 export interface AnswerResultPayload {
@@ -60,6 +67,8 @@ export interface LiveLeaderboardEntry {
   profilePic: string | null;
   score: number;
   rank: number;
+  /** Points earned on the question just revealed; absent outside a reveal. */
+  delta?: number;
 }
 
 export interface LeaderboardPayload {
@@ -115,6 +124,8 @@ export interface StateSyncPayload {
   question?: PublicQuestion;
   /** Present while phase is "question": time left, as of this snapshot. */
   remainingMs?: number;
+  /** Present while phase is "question": answers received so far. */
+  answeredCount?: number;
   reveal?: QuestionEndPayload;
   leaderboard?: LiveLeaderboardEntry[];
   players: {
@@ -139,6 +150,7 @@ export interface ServerToClientEvents {
   "question-start": (payload: QuestionStartPayload) => void;
   "question-end": (payload: QuestionEndPayload) => void;
   "answer-result": (payload: AnswerResultPayload) => void;
+  "answer-count": (payload: AnswerCountPayload) => void;
   leaderboard: (payload: LeaderboardPayload) => void;
   "game-over": (payload: GameOverPayload) => void;
   "state-sync": (payload: StateSyncPayload) => void;

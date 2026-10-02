@@ -7,8 +7,16 @@ import { removePlayer, setPlayers } from "@/state/admin/playersSlice";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { RxCross2 } from "react-icons/rx";
-import { LuBan } from "react-icons/lu";
+import { QRCodeSVG } from "qrcode.react";
+import {
+  LuBan,
+  LuCheck,
+  LuCopy,
+  LuPlay,
+  LuSearch,
+  LuShare2,
+  LuX,
+} from "react-icons/lu";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import ConnectionStatusPill from "@/components/ConnectionStatusPill";
@@ -18,10 +26,7 @@ import {
   useRemoveRoomPlayerMutation,
 } from "@/lib/modules/game-sessions/hooks";
 import type { PlayerPayload } from "@/types/socket-events";
-import { Button } from "@/components/ui/Button";
-import { IconButton } from "@/components/ui/IconButton";
 import ConfirmationModal from "@/components/Admin/ConfirmationModal";
-import ShareRoom from "@/components/ShareRoom";
 import { buildJoinUrl } from "@/lib/join-link";
 import EndQuizButton from "@/components/Admin/EndQuizButton";
 
@@ -126,140 +131,296 @@ const Lobby = (params: {
     router.push(`/admin/game/${params.roomId}`);
   }
 
-  return (
-    <>
-      <EndQuizButton
-        roomId={params.roomId}
-        redirectTo={`/admin/quiz/${params.quizId}`}
-      />
+  const [query, setQuery] = useState("");
+  const [copied, setCopied] = useState<"code" | "link" | null>(null);
+  const [canShare, setCanShare] = useState(false);
+  const joinUrl = buildJoinUrl(params.gameCode);
+  const isFull = players.length >= maxPlayers;
+  const fillPct = Math.min(100, (players.length / maxPlayers) * 100);
+  const visiblePlayers = players.filter((p) =>
+    (p.name ?? "").toLowerCase().includes(query.trim().toLowerCase()),
+  );
 
-      <div className="bg-white dark:bg-dark md:rounded-xl md:mx-8 py-6 md:py-10 my-4 min-h-[81dvh] px-6 relative flex flex-col items-center overflow-y-auto">
-        <div className="absolute left-4 top-4 z-10 flex flex-col items-start gap-2">
-          <ConnectionStatusPill />
-          <span
-            className={clsx(
-              "px-2 py-1 text-xs md:text-sm dark:text-white border rounded-xl font-bold bg-light-bg dark:bg-cardhover-dark",
-              players.length >= maxPlayers
-                ? "border-red-light dark:border-red-dark"
-                : "border-lprimary dark:border-dprimary",
-            )}
-          >
-            Participants: {players.length} / {maxPlayers}
+  useEffect(() => {
+    setCanShare(typeof navigator.share === "function");
+  }, []);
+
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(null), 1600);
+    return () => clearTimeout(t);
+  }, [copied]);
+
+  function copy(what: "code" | "link", text: string) {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => setCopied(what))
+      .catch(() => toast.error("Failed to copy"));
+  }
+
+  const startDisabled = players.length === 0 || load || !socket?.connected;
+
+  return (
+    <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 pb-16 md:pb-0 md:h-[calc(100dvh-7rem)] text-dark dark:text-white">
+      <div className="flex flex-wrap md:flex-nowrap items-center gap-2.5 md:gap-[18px] py-3.5 md:py-[18px] shrink-0">
+        <ConnectionStatusPill className="!shadow-none !text-[13px] !font-semibold !px-3 !py-1.5 !border-lprimary/15 dark:!border-white/10 !bg-white dark:!bg-white/5" />
+        <div className="order-last md:order-none basis-full md:basis-auto flex-1 min-w-0 flex flex-col md:flex-row md:items-baseline gap-0.5 md:gap-3">
+          <h1 className="text-[22px] md:text-2xl font-bold tracking-[-0.01em] truncate">
+            {params?.quizTitle}
+          </h1>
+          <span className="text-sm text-off-dark dark:text-[#a1a1aa] whitespace-nowrap">
+            Waiting for players
           </span>
         </div>
+        <span className="flex-1 md:hidden" />
+        <EndQuizButton
+          inline
+          roomId={params.roomId}
+          redirectTo={`/admin/quiz/${params.quizId}`}
+        />
+      </div>
 
-        <h1 className="font-extrabold text-2xl md:text-4xl italic dark:text-white mb-4 md:mb-6 mt-8 md:mt-0 text-center">
-          {params?.quizTitle}
-        </h1>
-
-        <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-12">
+      <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3.5 md:gap-5 pb-0 md:pb-[18px]">
+        <section className="rounded-3xl border bg-white dark:bg-dark border-lprimary/15 dark:border-white/5 flex flex-col gap-4 md:gap-3.5 [@media(min-height:900px)]:md:gap-5 p-[18px] md:p-[22px] [@media(min-height:900px)]:md:p-[26px] md:min-h-0 md:overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <span className="text-xs font-semibold tracking-[0.12em] uppercase text-[#8a8896] dark:text-[#71717a]">
+            Room code
+          </span>
           <button
             type="button"
-            onClick={() => {
-              navigator.clipboard
-                .writeText(params?.gameCode)
-                .then(() => {
-                  toast.success("Room code copied!");
-                })
-                .catch(() => {
-                  toast.error("Failed to copy room code");
-                });
-            }}
-            className="cursor-pointer select-none bg-light-bg dark:bg-cardhover-dark border-2 border-lprimary dark:border-dprimary rounded-2xl px-8 py-6 md:px-12 md:py-8 text-center shadow-lg hover:scale-[1.02] transition-all duration-300"
+            onClick={() => copy("code", params.gameCode)}
+            className="group w-full flex flex-col items-center gap-1.5 rounded-[18px] border-[1.5px] border-dashed hover:border-solid border-dprimary bg-[#f4efff] dark:bg-[#8b5cf6]/12 px-3 pt-5 pb-4 md:pt-4 md:pb-3 [@media(min-height:900px)]:md:pt-5 [@media(min-height:900px)]:md:pb-4 cursor-pointer transition-transform active:scale-[0.99]"
           >
-            <p className="text-sm tracking-[4px] text-gray-500 dark:text-gray-300 mb-2 md:mb-3">
-              ROOM CODE
-            </p>
-
-            <h2 className="text-4xl md:text-5xl font-extrabold tracking-[12px] text-lprimary dark:text-dprimary font-mono drop-shadow-lg">
+            <b className="text-[38px] md:text-[40px] [@media(min-height:900px)]:md:text-[46px] font-extrabold tracking-[0.14em] pl-[0.14em] leading-[1.1] tabular-nums text-lprimary dark:text-dprimary">
               {params?.gameCode}
-            </h2>
-
-            <p className="mt-2 md:mt-3 text-sm text-stone-500 dark:text-stone-400">
-              Click to copy & share with players
-            </p>
+            </b>
+            <small
+              className={clsx(
+                "flex items-center gap-1.5 text-[13px]",
+                copied === "code"
+                  ? "text-green-500"
+                  : "text-off-dark dark:text-[#a1a1aa]",
+              )}
+            >
+              {copied === "code" ? (
+                <>
+                  <LuCheck size={16} />
+                  Code copied
+                </>
+              ) : (
+                <>
+                  <LuCopy size={16} />
+                  Click to copy
+                </>
+              )}
+            </small>
           </button>
 
-          <ShareRoom url={buildJoinUrl(params.gameCode)} variant="full" />
-        </div>
-
-        <p className="mt-4 md:mt-6 text-xs text-stone-500 dark:text-stone-400 text-center max-w-md">
-          This room can hold up to {maxPlayers} players.
-          {params.plan === "free" && (
-            <>
-              {" "}
-              <Link
-                href="/pricing"
-                className="font-bold text-lprimary dark:text-dprimary underline underline-offset-2"
-              >
-                Upgrade to Pro
-              </Link>{" "}
-              for rooms of up to 250.
-            </>
-          )}
-        </p>
-
-        <div className="h-fit mt-8 mx-auto max-h-[40vh] flex flex-wrap justify-center overflow-y-auto gap-y-4 gap-x-3 w-full">
-          {players.length === 0 ? (
-            <div className="p-2 mx-auto w-fit dark:text-white text-lg">
-              Waiting for players to join...
+          <div className="flex items-center gap-[18px]">
+            <div className="size-[140px] md:size-[150px] [@media(min-height:900px)]:md:size-[200px] shrink-0 rounded-[14px] bg-white p-2 md:p-2.5 border border-lprimary/15 dark:border-white/5">
+              <QRCodeSVG
+                value={joinUrl}
+                marginSize={0}
+                level="M"
+                className="size-full"
+              />
             </div>
-          ) : (
-            players.map((player) => (
+            <div className="flex flex-col gap-1.5 min-w-0">
+              <span className="text-xs font-semibold tracking-[0.12em] uppercase text-[#8a8896] dark:text-[#71717a]">
+                Scan to join
+              </span>
+              <p className="text-[13.5px] leading-normal text-off-dark dark:text-[#a1a1aa]">
+                Players can scan this with their phone camera, or open the link
+                below.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-xl border bg-lprimary/8 dark:bg-white/5 border-lprimary/15 dark:border-white/5 px-3.5 py-2.5">
+            <p className="truncate text-[13.5px] text-off-dark dark:text-[#a1a1aa]">
+              {joinUrl}
+            </p>
+          </div>
+          <div
+            className={clsx(
+              "grid gap-2.5",
+              canShare ? "grid-cols-2" : "grid-cols-1",
+            )}
+          >
+            <button
+              type="button"
+              onClick={() => copy("link", joinUrl)}
+              className={clsx(
+                "flex items-center justify-center gap-2 rounded-xl border-[1.5px] bg-light-bg dark:bg-card-dark p-[11px] text-sm font-semibold cursor-pointer transition-colors",
+                copied === "link"
+                  ? "border-green-500 text-green-500"
+                  : "border-lprimary/15 dark:border-white/5 hover:border-dprimary",
+              )}
+            >
+              {copied === "link" ? <LuCheck size={16} /> : <LuCopy size={16} />}
+              {copied === "link" ? "Copied" : "Copy link"}
+            </button>
+            {canShare && (
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.share({ url: joinUrl }).catch(() => {});
+                }}
+                className="flex items-center justify-center gap-2 rounded-xl border-[1.5px] bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 hover:border-dprimary p-[11px] text-sm font-semibold cursor-pointer transition-colors"
+              >
+                <LuShare2 size={16} />
+                Share
+              </button>
+            )}
+          </div>
+
+          <div className="md:mt-auto pt-[18px] md:pt-3.5 [@media(min-height:900px)]:md:pt-[18px] border-t border-lprimary/15 dark:border-white/10 flex flex-col gap-[9px]">
+            <div className="flex justify-between items-baseline text-[13.5px] text-off-dark dark:text-[#a1a1aa]">
+              <span>Participants</span>
+              <span>
+                <b
+                  className={clsx(
+                    "text-xl font-bold",
+                    isFull
+                      ? "text-red-light dark:text-red-dark"
+                      : "text-dark dark:text-white",
+                  )}
+                >
+                  {players.length}
+                </b>{" "}
+                / {maxPlayers}
+              </span>
+            </div>
+            <div className="h-2 rounded-lg overflow-hidden bg-lprimary/8 dark:bg-white/5">
+              <div
+                className={clsx(
+                  "h-full rounded-lg transition-[width] duration-300",
+                  isFull
+                    ? "bg-red-light dark:bg-red-dark"
+                    : "bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb]",
+                )}
+                style={{ width: `${fillPct}%` }}
+              />
+            </div>
+            <p className="text-[12.5px] text-off-dark dark:text-[#a1a1aa]">
+              This room can hold up to {maxPlayers} players.
+              {params.plan === "free" && (
+                <>
+                  {" "}
+                  <Link
+                    href="/pricing"
+                    className="font-semibold text-lprimary dark:text-dprimary hover:underline"
+                  >
+                    Upgrade to Pro
+                  </Link>{" "}
+                  for rooms of up to 250.
+                </>
+              )}
+            </p>
+          </div>
+        </section>
+
+        <section className="rounded-3xl border bg-white dark:bg-dark border-lprimary/15 dark:border-white/5 flex flex-col md:min-h-0 md:overflow-hidden">
+          <div className="flex flex-wrap items-center gap-3.5 p-4 md:px-[22px] md:pt-5 md:pb-4 border-b border-lprimary/15 dark:border-white/10">
+            <h2 className="flex items-center gap-[7px] text-sm font-semibold">
+              Players
+              <span className="rounded-full px-2 py-px text-xs bg-lprimary/8 dark:bg-white/5 text-off-dark dark:text-[#a1a1aa]">
+                {players.length}
+              </span>
+            </h2>
+            <label className="flex-1 min-w-40 flex items-center gap-2 rounded-xl border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 focus-within:border-dprimary px-3 text-[#8a8896] dark:text-[#71717a]">
+              <LuSearch size={17} />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search players"
+                aria-label="Search players"
+                className="flex-1 min-w-0 bg-transparent outline-none py-2.5 text-sm text-dark dark:text-white"
+              />
+            </label>
+          </div>
+
+          <div className="md:flex-1 md:min-h-0 md:overflow-y-auto px-4 py-3 md:px-[22px] md:py-4 grid grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-2.5 content-start">
+            {visiblePlayers.map((player) => (
               <div
                 key={player.id}
-                className="border flex justify-between items-center w-fit gap-3 rounded-full py-2 px-3 text-dark dark:text-white text-base shadow-sm"
+                className="group flex items-center gap-[11px] min-w-0 rounded-[14px] border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 hover:border-dprimary py-2 pr-2 pl-[9px] transition-colors animate-pop-in"
               >
                 <Image
                   src={player.profilePic || DEFAULT_AVATAR}
-                  width={40}
-                  height={40}
-                  alt="Profile"
-                  className="rounded-full h-10 w-10"
+                  width={36}
+                  height={36}
+                  alt=""
+                  className="size-9 shrink-0 rounded-full object-cover"
                 />
-                {player.name}
-                <IconButton
-                  aria-label={`Ban ${player.name} from this room`}
-                  title="Ban from this room"
-                  className="cursor-pointer font-bold text-lg hover:text-red-500 transition"
-                  onClick={() => setPlayerToBan(player)}
-                  icon={<LuBan size={18} />}
-                />
-                <IconButton
-                  aria-label={`Remove ${player.name}`}
-                  title="Remove from this room"
-                  className="cursor-pointer font-bold text-lg hover:text-red-500 transition"
-                  onClick={() => handlePlayerRemove(player)}
-                  icon={<RxCross2 size={20} />}
-                />
+                <span
+                  className="flex-1 min-w-0 truncate text-[14.5px] font-medium"
+                  title={player.name ?? undefined}
+                >
+                  {player.name}
+                </span>
+                <span className="flex gap-0.5 shrink-0 md:opacity-55 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    aria-label={`Ban ${player.name} from this room`}
+                    title="Ban (can't rejoin)"
+                    onClick={() => setPlayerToBan(player)}
+                    className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-[#a1a1aa] hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
+                  >
+                    <LuBan size={17} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${player.name}`}
+                    title="Kick (can rejoin)"
+                    onClick={() => handlePlayerRemove(player)}
+                    className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-[#a1a1aa] hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
+                  >
+                    <LuX size={17} />
+                  </button>
+                </span>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+            {visiblePlayers.length === 0 && (
+              <div className="col-span-full text-center text-sm py-10 text-[#8a8896] dark:text-[#71717a]">
+                {query.trim()
+                  ? "No players match your search."
+                  : "Waiting for players to join…"}
+              </div>
+            )}
+          </div>
 
-        <ConfirmationModal
-          open={playerToBan !== null}
-          setOpen={(open) => {
-            if (!open) setPlayerToBan(null);
-          }}
-          onClick={handlePlayerBan}
-          desc={`${playerToBan?.name ?? "This player"} will be removed and blocked from rejoining this room. The ban lasts until this room ends.`}
-          confirmLabel="Ban Player"
-          confirming={banPlayerMutation.isPending}
-          confirmingLabel="Banning…"
-        />
-
-        <Button
-          className="mt-10 w-64 sm:w-96 absolute bottom-10"
-          disabled={players.length === 0 || load || !socket?.connected}
-          isLoading={load}
-          loadingText="Loading..."
-          onClick={handleGameStart}
-        >
-          Start Game
-        </Button>
+          <div className="sticky bottom-12 md:static flex flex-col md:flex-row items-stretch md:items-center gap-2.5 md:gap-4 px-4 py-3.5 md:px-[22px] md:py-4 border-t border-lprimary/15 dark:border-white/10 bg-white dark:bg-dark rounded-b-3xl">
+            <p className="flex-1 text-[13.5px] text-off-dark dark:text-[#a1a1aa]">
+              {players.length}{" "}
+              {players.length === 1 ? "player is" : "players are"} ready. More
+              can join until you start.
+            </p>
+            <button
+              type="button"
+              disabled={startDisabled}
+              onClick={handleGameStart}
+              className="flex items-center justify-center gap-2.5 whitespace-nowrap rounded-[14px] px-[30px] py-3.5 text-base font-bold text-white bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] shadow-[0_10px_24px_-10px_#7c4ddb] transition-[filter,transform] hover:brightness-108 active:translate-y-px cursor-pointer disabled:opacity-50 disabled:cursor-default disabled:hover:brightness-100"
+            >
+              <LuPlay size={17} className="fill-current" />
+              {load ? "Loading..." : "Start Game"}
+            </button>
+          </div>
+        </section>
       </div>
-    </>
+
+      <ConfirmationModal
+        open={playerToBan !== null}
+        setOpen={(open) => {
+          if (!open) setPlayerToBan(null);
+        }}
+        onClick={handlePlayerBan}
+        desc={`${playerToBan?.name ?? "This player"} will be removed and blocked from rejoining this room. The ban lasts until this room ends.`}
+        confirmLabel="Ban Player"
+        confirming={banPlayerMutation.isPending}
+        confirmingLabel="Banning…"
+      />
+    </div>
   );
 };
 

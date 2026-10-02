@@ -1,84 +1,24 @@
 "use client";
+import { useState } from "react";
 import CheckLocalPlayer from "@/components/Player/CheckLocalPlayer";
 import CreatePlayerForm from "@/components/Player/Setup/CreatePlayerForm";
-import ClientImage from "@/components/ClientImage";
-import Image from "next/image";
-import { useState } from "react";
-import BackNavButton from "@/components/BackNavButton";
+import JoinShell from "@/components/Player/Setup/JoinShell";
+import ProfilePreview from "@/components/Player/Setup/ProfilePreview";
+import { PROFILES } from "@/components/Player/SelectProfile";
 
 function Player() {
   const [data, setData] = useState({
     name: "",
-    // Must match default selection in SelectProfile so RHF `profile` validates without an extra click.
-    image: "/images/player_profile/profile1.png",
+    image: PROFILES[0],
   });
 
   return (
     <>
       <CheckLocalPlayer />
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="py-4 flex justify-between">
-          <ClientImage
-            props={{
-              src: "/images/logo.svg",
-              darksrc: "/images/logo-dark.svg",
-              alt: "Buzrr Logo",
-              width: 80,
-              height: 80,
-            }}
-          />
-        </div>
-        <div className="w-full min-h-[81vh] md:h-[81vh] flex gap-4 pb-4 md:pb-0 *:bg-white dark:*:bg-dark *:rounded-xl">
-          <div className="w-full mx-auto md:w-[60vw] flex flex-col p-4 sm:p-6">
-            <div className="self-start">
-              <BackNavButton href="/" />
-            </div>
-            <div className="flex-1 flex items-center justify-center py-8 md:py-4">
-              <CreatePlayerForm data={data} setData={setData} />
-            </div>
-          </div>
-          <div className="w-[40vw] hidden md:flex justify-center items-center">
-            <div className="flex flex-col justify-center items-center">
-              <ClientImage
-                props={{
-                  src: "/images/top-cards.svg",
-                  darksrc: "/images/top-cards-dark.svg",
-                  alt: "Top Card",
-                  width: 350,
-                  height: 350,
-                }}
-              />
-              <div className="flex items-center w-[105%] my-2 p-1 px-2 border dark:border-white rounded-lg">
-                <span className="text-lg font-bold mr-2 text-dark dark:text-white">
-                  2<sup>nd</sup>
-                </span>
-                <Image
-                  src={`${data?.image ? data.image : "/images/player_profile/profile1.png"}`}
-                  alt="Card 2"
-                  width={128}
-                  height={128}
-                  className="rounded-full inline w-16 h-16"
-                />
-                <span className="mx-3 font-bold text-dark dark:text-white">
-                  {data.name ? data.name : "Your Name"}
-                </span>
-                <span className="mx-1 ml-auto text-off-dark dark:text-off-white">
-                  1250 pt.
-                </span>
-              </div>
-              <ClientImage
-                props={{
-                  src: "/images/bottom-cards.svg",
-                  darksrc: "/images/bottom-cards-dark.svg",
-                  alt: "Top Card",
-                  width: 350,
-                  height: 350,
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+      <JoinShell
+        form={<CreatePlayerForm data={data} setData={setData} />}
+        preview={<ProfilePreview name={data.name} image={data.image} />}
+      />
     </>
   );
 }

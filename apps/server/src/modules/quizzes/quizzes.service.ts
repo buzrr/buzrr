@@ -144,6 +144,9 @@ export class QuizzesService {
     return this.prisma.db.quiz.findMany({
       where: { userId: user.userId },
       orderBy: { createdAt: "desc" },
+      include: {
+        _count: { select: { questions: true, gameResults: true } },
+      },
     });
   }
 

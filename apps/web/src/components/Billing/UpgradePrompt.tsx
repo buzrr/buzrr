@@ -123,6 +123,47 @@ export function usePlanLimitPrompt() {
 }
 
 /** Remaining AI generations, next to the controls that spend them. */
+/** AI generation quota as a labelled progress bar (AI quiz modal). */
+export function AiQuotaBar({ className }: { className?: string }) {
+  const { data } = useEntitlementsQuery();
+  if (!data) return null;
+  const { aiTokensRemaining, aiTokensResetAt } = data.usage;
+  const { amount, kind } = data.limits.ai;
+  const period =
+    kind === "lifetime"
+      ? " (one-time)"
+      : aiTokensResetAt
+        ? ` this week · refills ${new Date(aiTokensResetAt).toLocaleDateString()}`
+        : " this week";
+  const pct =
+    amount > 0 ? Math.min(100, (aiTokensRemaining / amount) * 100) : 0;
+  const empty = aiTokensRemaining === 0;
+  return (
+    <div
+      className={clsx(
+        "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[13px] bg-lprimary/8 dark:bg-white/5",
+        empty
+          ? "text-red-light dark:text-red-dark"
+          : "text-off-dark dark:text-[#a1a1aa]",
+        className,
+      )}
+    >
+      <span>
+        <b className={empty ? "" : "text-dark dark:text-white"}>
+          {aiTokensRemaining} of {amount}
+        </b>{" "}
+        AI generations left{period}
+      </span>
+      <span className="flex-1 min-w-12 h-1.5 rounded-md overflow-hidden bg-lprimary/15 dark:bg-white/10">
+        <i
+          className="block h-full bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb]"
+          style={{ width: `${pct}%` }}
+        />
+      </span>
+    </div>
+  );
+}
+
 export function AiTokenBalance({ className }: { className?: string }) {
   const { data } = useEntitlementsQuery();
   if (!data) return null;

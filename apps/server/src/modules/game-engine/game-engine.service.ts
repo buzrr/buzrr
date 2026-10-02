@@ -42,6 +42,14 @@ const HOST_ABANDON_MS = 5 * 60_000;
 const DUEL_FORFEIT_MS = 30_000;
 const SWEEP_INTERVAL_MS = 15_000;
 
+function averageAnswerMs(answers: Record<string, StoredAnswer>): number | null {
+  const list = Object.values(answers);
+  if (list.length === 0) return null;
+  return Math.round(
+    list.reduce((sum, a) => sum + a.timeTakenMs, 0) / list.length,
+  );
+}
+
 /**
  * Server-authoritative game loop. All timing, question advancement and
  * scoring decisions happen here; the gateway only relays client intent
@@ -718,6 +726,7 @@ export class GameEngineService
       })),
     };
 
+    let revealAnswers: Record<string, StoredAnswer> | undefined;
     if (meta.phase === "question" || meta.phase === "reveal") {
       const questions = await this.store.getQuestions(gameCode);
       const question = questions?.[meta.qIndex];
@@ -730,8 +739,11 @@ export class GameEngineService
           payload.remainingMs = meta.qStartAt
             ? Math.max(0, meta.qDeadline - now)
             : question.timeOut * 1000;
+          const answers = await this.store.getAnswers(gameCode, meta.qIndex);
+          payload.answeredCount = Object.keys(answers).length;
         } else {
           const answers = await this.store.getAnswers(gameCode, meta.qIndex);
+          revealAnswers = answers;
           payload.reveal = {
             index: meta.qIndex,
             counts: question.options.map(
@@ -742,6 +754,7 @@ export class GameEngineService
             correctOptionIds: question.options
               .filter((o) => o.isCorrect)
               .map((o) => o.id),
+            avgTimeMs: averageAnswerMs(answers),
           };
         }
       }
@@ -752,7 +765,10 @@ export class GameEngineService
       meta.phase === "final" ||
       meta.phase === "ended"
     ) {
-      payload.leaderboard = await this.buildLeaderboard(gameCode);
+      payload.leaderboard = await this.buildLeaderboard(
+        gameCode,
+        revealAnswers,
+      );
     }
 
     if (playerId) {
@@ -883,10 +899,11 @@ export class GameEngineService
       index: meta.qIndex,
       counts,
       correctOptionIds,
+      avgTimeMs: averageAnswerMs(answers),
     });
 
     // Running leaderboard so the host screen needs no REST round-trip.
-    const entries = await this.buildLeaderboard(gameCode);
+    const entries = await this.buildLeaderboard(gameCode, answers);
     this.emitRoom(gameCode).emit("leaderboard", { entries, isFinal: false });
   }
 
@@ -915,6 +932,10 @@ export class GameEngineService
     const connected = roster.filter((p) => p.connected).length;
     if (connected === 0) return;
     const answers = await this.store.getAnswers(gameCode, qIndex);
+    this.emitRoom(gameCode).emit("answer-count", {
+      index: qIndex,
+      answered: Object.keys(answers).length,
+    });
     const answeredConnected = roster.filter(
       (p) => p.connected && answers[p.id],
     ).length;
@@ -1307,6 +1328,7 @@ export class GameEngineService
 
   private async buildLeaderboard(
     gameCode: string,
+    revealAnswers?: Record<string, StoredAnswer>,
   ): Promise<LeaderboardEntry[]> {
     const [scores, roster] = await Promise.all([
       this.store.leaderboard(gameCode),
@@ -1319,6 +1341,9 @@ export class GameEngineService
       profilePic: byId.get(s.playerId)?.profilePic ?? null,
       score: s.score,
       rank: i + 1,
+      ...(revealAnswers
+        ? { delta: revealAnswers[s.playerId]?.score ?? 0 }
+        : {}),
     }));
     // Players who never scored still belong on the board.
     for (const p of roster) {
@@ -1329,6 +1354,7 @@ export class GameEngineService
           profilePic: p.profilePic,
           score: 0,
           rank: entries.length + 1,
+          ...(revealAnswers ? { delta: 0 } : {}),
         });
       }
     }

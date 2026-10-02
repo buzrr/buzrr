@@ -1,34 +1,42 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import SubmitButton from "@/components/SubmitButton";
+import clsx from "clsx";
+import { useState, type ReactNode } from "react";
+import { LuScanLine } from "react-icons/lu";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
 import "react-toastify/dist/ReactToastify.css";
 import { getApiErrorMessage } from "@/lib/api/errors";
-import { joinRoomSchema } from "@/lib/modules/forms/schemas";
 import { useJoinRoomMutation } from "@/lib/modules/game-sessions/hooks";
 import { clearPlayerLocalSession } from "@/lib/player-session";
 import { isAxiosError } from "axios";
-import { TextInput } from "@/components/ui/TextInput";
+import { mutedText, primaryButtonClass } from "@/components/Game/GameUI";
+import {
+  BackSquare,
+  Steps,
+  joinCounterClass,
+  joinLabelClass,
+} from "./JoinShell";
 
-type FormValues = z.infer<typeof joinRoomSchema>;
+const CODE_LENGTH = 6;
 
-const JoinRoomForm = () => {
+const normalizeCode = (value: string) =>
+  value
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, CODE_LENGTH);
+
+const JoinRoomForm = ({ joiningAs }: { joiningAs?: ReactNode }) => {
   const router = useRouter();
   const mutation = useJoinRoomMutation();
-  const { register, handleSubmit } = useForm<FormValues>({
-    resolver: zodResolver(joinRoomSchema),
-    defaultValues: { gameCode: "" },
-  });
+  const [code, setCode] = useState("");
+  const [focused, setFocused] = useState(false);
 
-  const onSubmit = handleSubmit((data) => {
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (code.length < CODE_LENGTH) return;
     mutation.mutate(
-      {
-        gameCode: data.gameCode.replace(/\s/g, "").toUpperCase(),
-      },
+      { gameCode: code },
       {
         onSuccess: (res) => {
           router.push(`/player/play/${res.playerId}`);
@@ -44,38 +52,92 @@ const JoinRoomForm = () => {
         },
       },
     );
-  });
+  };
+
+  const cursor = Math.min(code.length, CODE_LENGTH - 1);
 
   return (
     <form
-      className="flex flex-col w-full max-w-xl animate-fade-up"
+      className="flex flex-col gap-5 md:gap-6 animate-fade-up"
       onSubmit={onSubmit}
     >
-      <h1 className="text-3xl md:text-5xl py-2 font-extrabold dark:text-white">
-        Enter room code
-      </h1>
-      <p className="text-md md:text-lg py-2 dark:text-white">
-        Enter room code provided by the admin
-      </p>
-      <label htmlFor="gameCode" className="sr-only">
-        Room Code
-      </label>
-      <TextInput
-        id="gameCode"
-        type="text"
-        {...register("gameCode")}
-        placeholder="Enter Code"
-        className="w-full uppercase tracking-widest font-mono my-6"
-        autoComplete="off"
-        required
-        onInput={(e: React.FormEvent<HTMLInputElement>) => {
-          const input = e.currentTarget;
-          input.value = input.value.replace(/\s/g, "").toUpperCase();
-        }}
-      />
-      <div className="w-full mt-2">
-        <SubmitButton text="Join" isPending={mutation.isPending} />
+      <div className="flex items-center justify-between">
+        <BackSquare href="/" />
+        <Steps step={2} />
       </div>
+      {joiningAs}
+      <div>
+        <h1 className="text-[32px] md:text-[44px] font-extrabold tracking-[-0.03em] leading-[1.06]">
+          Enter room code
+        </h1>
+        <p className={clsx("mt-2.5 text-base", mutedText)}>
+          Enter the 6-character code provided by the admin.
+        </p>
+      </div>
+      <div>
+        <span className={joinLabelClass}>
+          Room code
+          <span className={joinCounterClass}>
+            {code.length}/{CODE_LENGTH}
+          </span>
+        </span>
+        <div className="relative mt-2">
+          <input
+            id="gameCode"
+            value={code}
+            onChange={(e) => setCode(normalizeCode(e.target.value))}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            autoFocus
+            autoCapitalize="characters"
+            autoComplete="off"
+            spellCheck={false}
+            inputMode="text"
+            aria-label="Room code"
+            className="absolute inset-0 z-10 size-full opacity-0 text-base cursor-text"
+          />
+          <div
+            className="grid grid-cols-6 gap-[7px] md:gap-2.5"
+            aria-hidden="true"
+          >
+            {Array.from({ length: CODE_LENGTH }, (_, i) => {
+              const char = code[i];
+              const isCursor =
+                focused && i === cursor && code.length < CODE_LENGTH;
+              return (
+                <span
+                  key={i}
+                  className={clsx(
+                    "aspect-[1/1.12] rounded-xl md:rounded-[14px] border-[1.5px] flex items-center justify-center text-2xl md:text-[30px] font-extrabold bg-light-bg dark:bg-card-dark transition-[border-color,box-shadow]",
+                    char || isCursor
+                      ? "border-dprimary"
+                      : "border-lprimary/15 dark:border-white/10",
+                    isCursor && "shadow-[0_0_0_4px_rgba(139,92,246,0.15)]",
+                  )}
+                >
+                  {char ??
+                    (isCursor && (
+                      <span className="h-[30px] w-0.5 bg-dprimary animate-pulse" />
+                    ))}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      <span
+        className={clsx("flex items-center gap-2 text-[13.5px]", mutedText)}
+      >
+        <LuScanLine size={16} className="shrink-0" />
+        Got a QR code? Scan it with your camera to skip this step.
+      </span>
+      <button
+        type="submit"
+        disabled={code.length < CODE_LENGTH || mutation.isPending}
+        className={clsx(primaryButtonClass, "w-full py-4 text-[17px]")}
+      >
+        {mutation.isPending ? "Joining..." : "Join"}
+      </button>
     </form>
   );
 };

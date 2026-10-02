@@ -1,17 +1,23 @@
 "use client";
 import * as React from "react";
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
+import clsx from "clsx";
 import Modal from "@mui/material/Modal";
-import style from "@/utils/modalStyle";
-import ModalCloseButton from "@/components/ModalCloseButton";
+import { LuPencil, LuPlus, LuX } from "react-icons/lu";
+import { mutedText } from "@/components/Game/GameUI";
 
+/**
+ * Trigger button + dialog. The dialog is a centred card on desktop and a
+ * bottom sheet on small screens. `children` may be a function receiving
+ * `close`, so forms can dismiss the dialog once they are done.
+ */
 export default function BasicModal(props: {
   btnTitle: string;
   /** Custom trigger-button content (e.g. icon + label); falls back to btnTitle. */
   btnContent?: React.ReactNode;
   btnStyle?: string;
-  children: React.ReactNode;
+  /** Line under the dialog title. */
+  subtitle?: string;
+  children: React.ReactNode | ((close: () => void) => React.ReactNode);
   isEdit?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -19,11 +25,11 @@ export default function BasicModal(props: {
   const handleClose = () => setOpen(false);
   const id = React.useId();
   const titleId = `${id}-title`;
-  const descId = `${id}-desc`;
 
   return (
     <>
       <button
+        type="button"
         onClick={handleOpen}
         className={
           props.btnStyle ||
@@ -39,23 +45,58 @@ export default function BasicModal(props: {
         open={open}
         onClose={handleClose}
         aria-labelledby={titleId}
-        aria-describedby={descId}
+        slotProps={{
+          backdrop: {
+            className: "!bg-[rgba(10,8,20,0.55)] backdrop-blur-[3px]",
+          },
+        }}
       >
-        <Box
-          sx={style}
-          className="dark:bg-dark-bg bg-light-bg rounded-xl w-4/5 md:w-1/2 max-w-[600px] p-6 overflow-y-auto max-h-[90vh]"
+        <div
+          className="fixed inset-0 flex items-end md:items-center justify-center md:p-6 outline-none"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) handleClose();
+          }}
         >
-          <ModalCloseButton onClose={handleClose} />
-          <Typography
-            id={titleId}
-            variant="h6"
-            component="h2"
-            className="font-bold text-center w-full mb-4 dark:text-white"
-          >
-            {props.btnTitle}
-          </Typography>
-          <div id={descId}>{props.children}</div>
-        </Box>
+          <div className="w-full md:max-w-[640px] max-h-[92dvh] overflow-y-auto flex flex-col rounded-t-[26px] md:rounded-[26px] border bg-white dark:bg-dark border-lprimary/15 dark:border-white/5 shadow-[0_40px_80px_-30px_rgba(0,0,0,0.6)] text-dark dark:text-white">
+            <div className="flex items-start gap-4 px-5 pt-[22px] md:px-7 md:pt-[26px]">
+              <span className="size-12 shrink-0 rounded-[14px] bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] text-white flex items-center justify-center shadow-[0_10px_24px_-10px_#7c4ddb]">
+                {props.isEdit ? <LuPencil size={22} /> : <LuPlus size={24} />}
+              </span>
+              <div className="min-w-0">
+                <h2
+                  id={titleId}
+                  className="text-xl md:text-[22px] font-bold tracking-[-0.01em]"
+                >
+                  {props.btnTitle}
+                </h2>
+                {props.subtitle && (
+                  <p
+                    className={clsx(
+                      "mt-1 text-[14.5px] leading-normal",
+                      mutedText,
+                    )}
+                  >
+                    {props.subtitle}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={handleClose}
+                className={clsx(
+                  "ml-auto size-9 shrink-0 rounded-[10px] flex items-center justify-center hover:bg-lprimary/8 dark:hover:bg-white/5 hover:text-dark dark:hover:text-white transition-colors cursor-pointer",
+                  mutedText,
+                )}
+              >
+                <LuX size={18} />
+              </button>
+            </div>
+            {typeof props.children === "function"
+              ? props.children(handleClose)
+              : props.children}
+          </div>
+        </div>
       </Modal>
     </>
   );

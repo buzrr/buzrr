@@ -22,14 +22,14 @@ const Result = (params: {
   const question = useAppSelector((state) => state.game.question);
   const reveal = useAppSelector((state) => state.game.reveal);
 
-  const optionTitle = (id: string | null | undefined) =>
-    question?.options?.find((o) => o.id === id)?.title;
-
-  const correctAnswer =
-    reveal?.correctOptionIds
-      ?.map((id) => optionTitle(id))
-      .filter(Boolean)
-      .join(", ") || undefined;
+  const options = question?.options ?? [];
+  const indexed = (id: string | null | undefined) => {
+    const index = options.findIndex((o) => o.id === id);
+    return index === -1 ? null : { index, title: options[index].title };
+  };
+  const correctOptions = (reveal?.correctOptionIds ?? [])
+    .map((id) => indexed(id))
+    .filter((o): o is { index: number; title: string } => o !== null);
 
   // Until the personal result lands, "didn't answer" is unknown rather than
   // true — rendering the timeout verdict in that gap flashes a wrong outcome
@@ -47,48 +47,20 @@ const Result = (params: {
   }
 
   return (
-    <>
-      {!you.answered ? (
-        <QuestionAndResult
-          quizTitle={params.quizTitle}
-          gameCode={params.gameCode}
-          hideRoomCode={params.hideRoomCode}
-          hostName={params.hostName}
-          hostImage={params.hostImage}
-          screen="result"
-          status="timesout"
-          message="Time Limit Exceeded"
-          correctAnswer={correctAnswer}
-          yourAnswer={null}
-        />
-      ) : you.isCorrect ? (
-        <QuestionAndResult
-          quizTitle={params.quizTitle}
-          gameCode={params.gameCode}
-          hideRoomCode={params.hideRoomCode}
-          hostName={params.hostName}
-          hostImage={params.hostImage}
-          screen="result"
-          status="correct"
-          message={
-            you.score ? `+${you.score} points` : "Your answer was correct"
-          }
-        />
-      ) : (
-        <QuestionAndResult
-          quizTitle={params.quizTitle}
-          gameCode={params.gameCode}
-          hideRoomCode={params.hideRoomCode}
-          hostName={params.hostName}
-          hostImage={params.hostImage}
-          screen="result"
-          status="incorrect"
-          message="Your answer was wrong"
-          correctAnswer={correctAnswer}
-          yourAnswer={optionTitle(you.optionId) ?? null}
-        />
-      )}
-    </>
+    <QuestionAndResult
+      quizTitle={params.quizTitle}
+      gameCode={params.gameCode}
+      hideRoomCode={params.hideRoomCode}
+      hostName={params.hostName}
+      hostImage={params.hostImage}
+      screen="result"
+      status={
+        !you.answered ? "timesout" : you.isCorrect ? "correct" : "incorrect"
+      }
+      points={you.score}
+      yourOption={you.answered ? indexed(you.optionId) : null}
+      correctOptions={correctOptions}
+    />
   );
 };
 

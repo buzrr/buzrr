@@ -46,7 +46,7 @@ export const FEATURES = {
     title: "Speed-based scoring",
     text: "A correct answer earns up to 1,000 points, sliding to 100 at the time limit; wrong answers score 0. Answer time is measured on the server, not on the player's device.",
   },
-  // Admin/Game/QuesResultChart.tsx, Leaderboard.tsx, GameResult model
+  // Admin/Game/QuesResult.tsx (answer bars), Leaderboard.tsx, GameResult model
   liveResults: {
     icon: LuChartColumn,
     title: "Answer charts and leaderboards",
