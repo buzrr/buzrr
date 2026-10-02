@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import ConnectionStatusPill from "@/components/ConnectionStatusPill";
 
 export const OPTION_KEYS = ["A", "B", "C", "D", "E", "F"];
@@ -157,6 +157,8 @@ export function TimerRing({
   className?: string;
   valueClassName?: string;
 }) {
+  // Unique per ring: a shared id would bind every ring to the first gradient.
+  const gradientId = `ring-grad-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const r = 44;
   const c = 2 * Math.PI * r;
   const low = value <= 5;
@@ -165,7 +167,7 @@ export function TimerRing({
     <div className={clsx("relative shrink-0", className)}>
       <svg viewBox="0 0 100 100" className="block size-full -rotate-90">
         <defs>
-          <linearGradient id="game-ring-grad" x1="0" x2="1">
+          <linearGradient id={gradientId} x1="0" x2="1">
             <stop offset="0" stopColor="#a78bfa" />
             <stop offset="1" stopColor="#7c4ddb" />
           </linearGradient>
@@ -185,7 +187,7 @@ export function TimerRing({
           fill="none"
           strokeWidth="7"
           strokeLinecap="round"
-          stroke={low ? "#e5544e" : "url(#game-ring-grad)"}
+          stroke={low ? "#e5544e" : `url(#${gradientId})`}
           strokeDasharray={c}
           strokeDashoffset={c * (1 - frac)}
           className="transition-[stroke-dashoffset,stroke] duration-1000 ease-linear"

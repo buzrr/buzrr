@@ -152,8 +152,10 @@ const Lobby = (params: {
   }, [copied]);
 
   function copy(what: "code" | "link", text: string) {
-    navigator.clipboard
-      .writeText(text)
+    (
+      navigator.clipboard?.writeText(text) ??
+      Promise.reject(new Error("Clipboard unavailable"))
+    )
       .then(() => setCopied(what))
       .catch(() => toast.error("Failed to copy"));
   }

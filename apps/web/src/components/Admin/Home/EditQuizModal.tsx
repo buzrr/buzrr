@@ -41,12 +41,11 @@ export default function EditQuizModal({
   const onSubmit = handleSubmit((data) => {
     if (!quiz) return;
     const title = data.title.trim();
-    const description = data.description?.trim();
     mutation.mutate(
       {
         quizId: quiz.id,
         title,
-        description: description || undefined,
+        description: data.description?.trim(),
       },
       {
         onSuccess: () => {
@@ -70,7 +69,11 @@ export default function EditQuizModal({
         sx={style}
         className="bg-light-bg dark:bg-[#27272A] rounded-xl w-4/5 md:w-1/2 max-w-[600px]"
       >
-        <ModalCloseButton onClose={() => setOpen(false)} />
+        <ModalCloseButton
+          onClose={() => {
+            if (!mutation.isPending) setOpen(false);
+          }}
+        />
         <div className="p-6">
           <p
             id="edit-quiz-title"

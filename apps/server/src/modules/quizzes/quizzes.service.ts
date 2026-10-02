@@ -92,7 +92,7 @@ export class QuizzesService {
     const data = {
       ...(dto.title !== undefined ? { title: dto.title } : {}),
       ...(dto.description !== undefined
-        ? { description: dto.description }
+        ? { description: dto.description.trim() || null }
         : {}),
       ...(dto.isPublic !== undefined ? { isPublic: dto.isPublic } : {}),
     };

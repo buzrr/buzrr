@@ -120,8 +120,10 @@ export default function QuestionScreen(props: QuestionScreenProps) {
                 <button
                   type="button"
                   onClick={() =>
-                    navigator.clipboard
-                      .writeText(joinUrl)
+                    (
+                      navigator.clipboard?.writeText(joinUrl) ??
+                      Promise.reject(new Error("Clipboard unavailable"))
+                    )
                       .then(() => setCopied(true))
                       .catch(() => toast.error("Failed to copy link"))
                   }
