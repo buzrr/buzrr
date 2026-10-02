@@ -10,6 +10,7 @@ import {
   OptionKey,
   StatTile,
   TimerBar,
+  TimerRing,
   WaitingDots,
   mutedText,
   ordinal,
@@ -147,7 +148,7 @@ const QuestionAndResult = (params: {
           key={params.question?.id ?? params.question?.title}
           value={remaining}
           max={timeOut}
-          className="mb-2.5 md:mb-5"
+          className="mb-2.5 md:hidden"
         />
       )}
       <div className="flex-1 flex flex-col md:grid md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3.5 md:gap-5">
@@ -157,33 +158,53 @@ const QuestionAndResult = (params: {
             "hidden md:flex flex-col justify-center gap-6 p-[30px]",
           )}
         >
-          <div className="flex flex-col gap-2.5 min-w-0">
-            <h2 className="text-xl md:text-[30px] font-bold tracking-[-0.02em] truncate capitalize">
-              {params.quizTitle}
-            </h2>
-            {!params.hideRoomCode && (
-              <span
-                className={clsx(
-                  "text-[13px] md:text-sm whitespace-nowrap",
-                  mutedText,
-                )}
-              >
-                Room code{" "}
-                <b className="tracking-[0.08em] text-dark dark:text-white">
-                  {params.gameCode}
-                </b>
-              </span>
+          <div className="flex items-center gap-[26px]">
+            {isQuestion ? (
+              <TimerRing
+                key={params.question?.id ?? params.question?.title}
+                value={Math.ceil(remaining)}
+                max={timeOut}
+                label="seconds"
+                className="size-[150px]"
+                valueClassName="text-5xl"
+              />
+            ) : (
+              <TimerRing
+                value={0}
+                max={1}
+                label="time's up"
+                className="size-[150px]"
+                valueClassName="text-5xl"
+              />
             )}
-            {qCount > 0 && (
-              <span
-                className={clsx(
-                  "text-[13px] md:text-sm whitespace-nowrap",
-                  mutedText,
-                )}
-              >
-                Question {qIndex + 1} of {qCount}
-              </span>
-            )}
+            <div className="flex flex-col gap-2.5 min-w-0">
+              <h2 className="text-xl md:text-[30px] font-bold tracking-[-0.02em] truncate capitalize">
+                {params.quizTitle}
+              </h2>
+              {!params.hideRoomCode && (
+                <span
+                  className={clsx(
+                    "text-[13px] md:text-sm whitespace-nowrap",
+                    mutedText,
+                  )}
+                >
+                  Room code{" "}
+                  <b className="tracking-[0.08em] text-dark dark:text-white">
+                    {params.gameCode}
+                  </b>
+                </span>
+              )}
+              {qCount > 0 && (
+                <span
+                  className={clsx(
+                    "text-[13px] md:text-sm whitespace-nowrap",
+                    mutedText,
+                  )}
+                >
+                  Question {qIndex + 1} of {qCount}
+                </span>
+              )}
+            </div>
           </div>
           {params.hostName && (
             <div
