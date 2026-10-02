@@ -69,7 +69,7 @@ function Progress({
     <div
       className={clsx(
         "flex items-center gap-3.5 rounded-[14px] border px-3.5 py-[7px] bg-white dark:bg-dark border-lprimary/15 dark:border-white/5",
-        "order-last basis-full justify-between md:order-none md:basis-auto md:justify-start",
+        "flex-1 min-w-0 md:flex-none md:justify-start",
       )}
     >
       <span className="text-[13.5px] font-semibold whitespace-nowrap">
@@ -85,8 +85,8 @@ function Progress({
           </>
         )}
       </span>
-      {segmented ? (
-        <span className="flex gap-1" aria-hidden="true">
+      {segmented && (
+        <span className="hidden md:flex gap-1" aria-hidden="true">
           {Array.from({ length: qCount }, (_, i) => (
             <i
               key={i}
@@ -101,18 +101,26 @@ function Progress({
             />
           ))}
         </span>
-      ) : (
-        <span
-          className="h-1.5 w-28 rounded bg-lprimary/10 dark:bg-white/10 overflow-hidden"
-          aria-hidden="true"
-        >
-          <i
-            className="block h-full rounded bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb]"
-            style={{ width: `${final ? 100 : (current / qCount) * 100}%` }}
-          />
-        </span>
       )}
-      <span className={clsx("text-[12.5px] whitespace-nowrap", mutedText)}>
+      {/* Continuous bar on mobile (and on desktop for long quizzes). */}
+      <span
+        className={clsx(
+          "h-1.5 flex-1 md:flex-none md:w-28 rounded bg-lprimary/10 dark:bg-white/10 overflow-hidden",
+          segmented && "md:hidden",
+        )}
+        aria-hidden="true"
+      >
+        <i
+          className="block h-full rounded bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb]"
+          style={{ width: `${final ? 100 : (current / qCount) * 100}%` }}
+        />
+      </span>
+      <span
+        className={clsx(
+          "hidden md:inline text-[12.5px] whitespace-nowrap",
+          mutedText,
+        )}
+      >
         {final ? `${qCount} of ${qCount}` : `${qCount - current} left`}
       </span>
     </div>
@@ -133,9 +141,9 @@ export function GameTopBar({
   right?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap md:flex-nowrap items-center gap-2.5 md:gap-[18px] py-3.5 md:py-[18px] shrink-0">
+    <div className="flex items-center gap-2.5 md:gap-[18px] py-2 md:py-[18px] shrink-0">
       <ConnectionStatusPill className="!shadow-none !text-[13px] !font-semibold !px-3 !py-1.5 !border-lprimary/15 dark:!border-white/10 !bg-white dark:!bg-white/5" />
-      <h1 className="flex-1 min-w-0 text-xl md:text-2xl font-bold tracking-[-0.01em] truncate">
+      <h1 className="hidden md:block flex-1 min-w-0 text-2xl font-bold tracking-[-0.01em] truncate">
         {title}
       </h1>
       {qCount > 0 && <Progress qIndex={qIndex} qCount={qCount} final={final} />}
@@ -209,6 +217,45 @@ export function TimerRing({
           </span>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Horizontal countdown bar — compact alternative to `TimerRing`. */
+export function TimerBar({
+  value,
+  max,
+  className,
+}: {
+  value: number;
+  max: number;
+  className?: string;
+}) {
+  const low = value <= 5;
+  const frac = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
+  return (
+    <div
+      role="timer"
+      aria-label={`${Math.ceil(value)} seconds left`}
+      className={clsx("flex items-center gap-3", className)}
+    >
+      <span className="flex-1 h-2.5 rounded-full overflow-hidden bg-lprimary/10 dark:bg-white/10">
+        <i
+          className={clsx(
+            "block h-full rounded-full transition-[width,background-color] duration-250 ease-linear",
+            low ? "bg-[#e5544e]" : "bg-linear-to-r from-[#a78bfa] to-[#7c4ddb]",
+          )}
+          style={{ width: `${frac * 100}%` }}
+        />
+      </span>
+      <b
+        className={clsx(
+          "w-9 text-right text-lg font-extrabold tabular-nums leading-none",
+          low && "text-[#e5544e]",
+        )}
+      >
+        {Math.ceil(value)}s
+      </b>
     </div>
   );
 }
