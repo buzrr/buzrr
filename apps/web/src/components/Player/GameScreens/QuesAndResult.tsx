@@ -9,7 +9,7 @@ import {
   GameTopBar,
   OptionKey,
   StatTile,
-  TimerRing,
+  TimerBar,
   WaitingDots,
   mutedText,
   ordinal,
@@ -41,7 +41,7 @@ const STATUS = {
     heading: "Correct!",
     icon: <LuCheck size={56} strokeWidth={3} />,
     circle:
-      "bg-green-500 shadow-[0_0_0_14px_rgba(34,197,94,0.14),0_0_0_30px_rgba(34,197,94,0.06)]",
+      "bg-green-500 shadow-[0_0_0_8px_rgba(34,197,94,0.14),0_0_0_16px_rgba(34,197,94,0.06)] md:shadow-[0_0_0_14px_rgba(34,197,94,0.14),0_0_0_30px_rgba(34,197,94,0.06)]",
     accent: "text-green-600 dark:text-green-500",
     answer: "border-green-500 bg-green-500/8",
   },
@@ -49,7 +49,7 @@ const STATUS = {
     heading: "Not quite",
     icon: <LuX size={56} strokeWidth={3} />,
     circle:
-      "bg-[#e5544e] shadow-[0_0_0_14px_rgba(229,84,78,0.14),0_0_0_30px_rgba(229,84,78,0.06)]",
+      "bg-[#e5544e] shadow-[0_0_0_8px_rgba(229,84,78,0.14),0_0_0_16px_rgba(229,84,78,0.06)] md:shadow-[0_0_0_14px_rgba(229,84,78,0.14),0_0_0_30px_rgba(229,84,78,0.06)]",
     accent: "text-[#e5544e]",
     answer: "border-[#e5544e] bg-[#e5544e]/8",
   },
@@ -57,7 +57,7 @@ const STATUS = {
     heading: "Time's up!",
     icon: <LuClock size={52} strokeWidth={2.6} />,
     circle:
-      "bg-[#e0a020] shadow-[0_0_0_14px_rgba(224,160,32,0.14),0_0_0_30px_rgba(224,160,32,0.06)]",
+      "bg-[#e0a020] shadow-[0_0_0_8px_rgba(224,160,32,0.14),0_0_0_16px_rgba(224,160,32,0.06)] md:shadow-[0_0_0_14px_rgba(224,160,32,0.14),0_0_0_30px_rgba(224,160,32,0.06)]",
     accent: "text-[#c98a0e] dark:text-[#e0a020]",
     answer: "border-[#e0a020] bg-[#e0a020]/8",
   },
@@ -75,13 +75,13 @@ function AnswerRow({
   emptyText?: string;
 }) {
   return (
-    <div className="flex flex-col gap-2 w-full">
+    <div className="flex flex-col gap-1.5 md:gap-2 w-full">
       <span className="text-xs font-semibold tracking-[0.1em] uppercase text-[#8a8896] dark:text-[#71717a]">
         {label}
       </span>
       <div
         className={clsx(
-          "flex items-center gap-3.5 rounded-2xl border-[1.5px] px-[18px] py-3.5 text-[17px] font-semibold text-left",
+          "flex items-center gap-3.5 rounded-2xl border-[1.5px] px-4 py-2.5 md:px-[18px] md:py-3.5 text-base md:text-[17px] font-semibold text-left",
           className,
         )}
       >
@@ -142,60 +142,48 @@ const QuestionAndResult = (params: {
   return (
     <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 pb-16 md:pb-6 md:min-h-[calc(100dvh-7.5rem)] text-dark dark:text-white">
       <GameTopBar title={params.quizTitle} qIndex={qIndex} qCount={qCount} />
+      {isQuestion && (
+        <TimerBar
+          key={params.question?.id ?? params.question?.title}
+          value={remaining}
+          max={timeOut}
+          className="mb-2.5 md:mb-5"
+        />
+      )}
       <div className="flex-1 flex flex-col md:grid md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3.5 md:gap-5">
         <section
           className={clsx(
             panelClass,
-            "flex flex-col justify-center gap-6 px-4 py-3.5 md:p-[30px]",
+            "hidden md:flex flex-col justify-center gap-6 p-[30px]",
           )}
         >
-          <div className="flex items-center gap-3.5 md:gap-[26px]">
-            {isQuestion ? (
-              <TimerRing
-                key={params.question?.id ?? params.question?.title}
-                value={Math.ceil(remaining)}
-                max={timeOut}
-                label="seconds"
-                className="size-[72px] md:size-[150px] [&_span]:hidden md:[&_span]:block"
-                valueClassName="text-2xl md:text-5xl"
-              />
-            ) : (
-              <TimerRing
-                value={0}
-                max={1}
-                label="time's up"
-                className="size-[72px] md:size-[150px] [&_span]:hidden md:[&_span]:block"
-                valueClassName="text-2xl md:text-5xl"
-              />
+          <div className="flex flex-col gap-2.5 min-w-0">
+            <h2 className="text-xl md:text-[30px] font-bold tracking-[-0.02em] truncate capitalize">
+              {params.quizTitle}
+            </h2>
+            {!params.hideRoomCode && (
+              <span
+                className={clsx(
+                  "text-[13px] md:text-sm whitespace-nowrap",
+                  mutedText,
+                )}
+              >
+                Room code{" "}
+                <b className="tracking-[0.08em] text-dark dark:text-white">
+                  {params.gameCode}
+                </b>
+              </span>
             )}
-            <div className="flex flex-col gap-0.5 md:gap-2.5 min-w-0">
-              <h2 className="text-xl md:text-[30px] font-bold tracking-[-0.02em] truncate capitalize">
-                {params.quizTitle}
-              </h2>
-              {!params.hideRoomCode && (
-                <span
-                  className={clsx(
-                    "text-[13px] md:text-sm whitespace-nowrap",
-                    mutedText,
-                  )}
-                >
-                  Room code{" "}
-                  <b className="tracking-[0.08em] text-dark dark:text-white">
-                    {params.gameCode}
-                  </b>
-                </span>
-              )}
-              {qCount > 0 && (
-                <span
-                  className={clsx(
-                    "text-[13px] md:text-sm whitespace-nowrap",
-                    mutedText,
-                  )}
-                >
-                  Question {qIndex + 1} of {qCount}
-                </span>
-              )}
-            </div>
+            {qCount > 0 && (
+              <span
+                className={clsx(
+                  "text-[13px] md:text-sm whitespace-nowrap",
+                  mutedText,
+                )}
+              >
+                Question {qIndex + 1} of {qCount}
+              </span>
+            )}
           </div>
           {params.hostName && (
             <div
@@ -238,27 +226,27 @@ const QuestionAndResult = (params: {
           <section
             className={clsx(
               panelClass,
-              "flex flex-col p-5 md:px-[34px] md:py-8",
+              "flex flex-col p-4 md:px-[34px] md:py-8",
             )}
           >
             {params.question?.mediaType === "image" &&
               params.question.media && (
                 <Image
                   src={params.question.media}
-                  className="mb-5 mx-auto max-h-[28dvh] w-auto rounded-2xl"
+                  className="mb-4 md:mb-5 mx-auto max-h-[28dvh] w-auto rounded-2xl"
                   alt="Question image"
                   height={320}
                   width={500}
                 />
               )}
-            <span className="w-fit text-[12.5px] font-bold tracking-[0.06em] uppercase rounded-full px-3 py-1.5 text-lprimary dark:text-dprimary bg-lprimary/8 dark:bg-white/5">
+            <span className="hidden md:inline-block w-fit text-[12.5px] font-bold tracking-[0.06em] uppercase rounded-full px-3 py-1.5 text-lprimary dark:text-dprimary bg-lprimary/8 dark:bg-white/5">
               Question {qIndex + 1}
               {qCount > 0 && ` of ${qCount}`}
             </span>
-            <h2 className="mt-[18px] text-2xl md:text-[34px] font-bold tracking-[-0.02em] leading-[1.22] text-pretty wrap-break-word animate-fade-up">
+            <h2 className="md:mt-[18px] text-[22px] md:text-[34px] font-bold tracking-[-0.02em] leading-[1.22] text-pretty wrap-break-word animate-fade-up">
               {params.question?.title ?? ""}
             </h2>
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 md:auto-rows-fr gap-3.5 mt-7">
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 md:auto-rows-fr gap-2.5 md:gap-3.5 mt-4 md:mt-7">
               {options.map((option, index) => {
                 const picked = option.id === params.optionId;
                 const disabled = offline || params.locked;
@@ -270,7 +258,7 @@ const QuestionAndResult = (params: {
                     onClick={() => handleSubmit(option.id)}
                     aria-pressed={picked}
                     className={clsx(
-                      "flex items-center gap-4 rounded-[18px] border-[1.5px] px-4 py-3.5 md:px-[22px] md:py-[18px] min-h-16 md:min-h-[84px] text-[17px] md:text-xl font-semibold text-left wrap-break-word min-w-0 transition-all duration-150",
+                      "flex items-center gap-4 rounded-[18px] border-[1.5px] px-3.5 py-2.5 md:px-[22px] md:py-[18px] min-h-14 md:min-h-[84px] text-[17px] md:text-xl font-semibold text-left wrap-break-word min-w-0 transition-all duration-150",
                       picked
                         ? "border-lprimary dark:border-dprimary bg-lprimary/10 dark:bg-dprimary/15 shadow-[0_10px_24px_-14px_#7c4ddb] animate-pop"
                         : subtleCardClass,
@@ -281,7 +269,7 @@ const QuestionAndResult = (params: {
                   >
                     <OptionKey
                       index={index}
-                      className="size-10 md:size-11 text-lg"
+                      className="size-9 md:size-11 text-lg"
                     />
                     <span className="min-w-0">{option.title}</span>
                   </button>
@@ -300,24 +288,24 @@ const QuestionAndResult = (params: {
           <section
             className={clsx(
               panelClass,
-              "flex flex-col items-center justify-center text-center gap-2.5 px-5 py-7 md:p-10",
+              "flex flex-col items-center justify-center text-center gap-1.5 md:gap-2.5 px-5 pt-7 pb-5 md:p-10",
             )}
           >
             <div
               className={clsx(
-                "size-[92px] md:size-[120px] rounded-full text-white flex items-center justify-center mb-[22px] animate-pop-in",
+                "size-16 md:size-[120px] rounded-full text-white flex items-center justify-center mb-5 md:mb-[22px] animate-pop-in [&_svg]:size-8 md:[&_svg]:size-auto",
                 status.circle,
                 params.status === "incorrect" && "animate-shake",
               )}
             >
               {status.icon}
             </div>
-            <h2 className="text-[32px] md:text-[40px] font-extrabold tracking-[-0.02em]">
+            <h2 className="text-[26px] md:text-[40px] font-extrabold tracking-[-0.02em]">
               {status.heading}
             </h2>
             <span
               className={clsx(
-                "text-xl md:text-[26px] font-bold animate-fade-up",
+                "text-lg md:text-[26px] font-bold animate-fade-up",
                 status.accent,
               )}
             >
@@ -325,7 +313,7 @@ const QuestionAndResult = (params: {
                 ? "No answer this round"
                 : `+${params.points ?? 0} points`}
             </span>
-            <div className="mt-[22px] flex flex-col gap-4 w-full max-w-[420px] animate-fade-up [animation-delay:150ms]">
+            <div className="mt-3 md:mt-[22px] flex flex-col gap-3 md:gap-4 w-full max-w-[420px] animate-fade-up [animation-delay:150ms]">
               <AnswerRow
                 label="Your answer"
                 option={params.yourOption ?? null}
@@ -343,7 +331,7 @@ const QuestionAndResult = (params: {
                   />
                 ))}
             </div>
-            <div className="mt-[26px]">
+            <div className="mt-4 md:mt-[26px]">
               <WaitingDots>
                 {params.hideRoomCode
                   ? isLast

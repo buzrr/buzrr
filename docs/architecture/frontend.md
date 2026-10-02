@@ -105,8 +105,9 @@ disconnect`), emits `request-sync` on connect as a safety net, and exposes a
 - Host live screen: `Admin/AdminGameLobbyClient` → `Admin/Game/*`
   (`GameLobby`, `QuestionScreen`, `QuesResult`, `Leaderboard`) —
   drives the game exclusively via `start-game` / `host-next` emits. Host and
-  guest in-game screens share the top bar, timer ring, option keys and panel
-  styles in `components/Game/GameUI.tsx`.
+  guest in-game screens share the top bar, option keys and panel styles in
+  `components/Game/GameUI.tsx`; the host screen shows a `TimerRing`, the
+  guest/duel screen a compact `TimerBar`.
 - Guest screen: `Player/PlayPageClient` → `Player/GamePage` →
   `Player/GameScreens/*` (`Question` submits with ack + rollback toast,
   `Result`, `WaitGameStart` with the canvas bubble mini-game in `Game.tsx`,

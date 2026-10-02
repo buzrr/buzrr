@@ -13,7 +13,7 @@ interface BotProfile {
 
 /** Expected totals over 7x15s questions: easy ~1300, medium ~2700, hard ~4650. */
 const BOT_PROFILES: Record<BotTier, BotProfile> = {
-  easy: { accuracy: 0.45, minDelayFrac: 0.5, maxDelayFrac: 0.8 },
+  easy: { accuracy: 0.3, minDelayFrac: 0.55, maxDelayFrac: 0.85 },
   medium: { accuracy: 0.7, minDelayFrac: 0.35, maxDelayFrac: 0.65 },
   hard: { accuracy: 0.88, minDelayFrac: 0.15, maxDelayFrac: 0.4 },
 };
