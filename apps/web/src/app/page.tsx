@@ -20,6 +20,7 @@ import {
 import LandingNavbar from "@/components/Landing/LandingNavbar";
 import LandingFooter from "@/components/Landing/LandingFooter";
 import HeroVisual from "@/components/Landing/HeroVisual";
+import LandingVideo from "@/components/Landing/LandingVideo";
 import { GITHUB_LINK } from "@/components/Landing/links";
 import { getGithubStats } from "@/lib/github-stats";
 import { JsonLd, LinkCards } from "@/components/Marketing/primitives";
@@ -218,6 +219,7 @@ export default async function Home() {
         {/* What is Buzrr + where it fits (internal links to the SEO pages) */}
         <section className="py-14 max-w-5xl mx-auto">
           <WhatIsBuzrr />
+          <LandingVideo />
           <h2 className="mt-14 text-center text-2xl sm:text-3xl font-black text-dark dark:text-white">
             What people use Buzrr for
           </h2>

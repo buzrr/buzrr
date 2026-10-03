@@ -27,7 +27,8 @@
     "APP_URL",
     "DODO_PROMO_DISCOUNT_CODE",
     "API_INTERNAL_URL",
-    "AI_BUZRR_API_URL"
+    "AI_BUZRR_API_URL",
+    "LANDING_VIDEO_URL"
   ],
   "tasks": {
     "build": {

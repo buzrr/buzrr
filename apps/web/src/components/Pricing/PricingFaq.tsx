@@ -14,6 +14,10 @@ const FAQS = [
     a: `You keep Pro until the end of the period you’ve paid for, then move to Free. Nothing is deleted: if you have more than ${PLAN_COPY.free.maxQuizzes} quizzes you can still host all of them, but you’ll need to delete some before creating new ones.`,
   },
   {
+    q: "Can I get a refund?",
+    a: "No. Pro payments are non-refundable, including partial months. If you cancel, Pro stays active until the end of the month you’ve paid for. Details are in our Refund & Cancellation Policy.",
+  },
+  {
     q: "What if a payment fails?",
     a: "We’ll retry, and your account uses Free limits until the payment goes through. Update your payment method from the Plan & Billing page and Pro comes back straight away.",
   },

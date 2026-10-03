@@ -132,6 +132,8 @@ NEXT_PUBLIC_AI_API_URL="http://localhost:3002"
 GEMINI_API_KEY=""
 # Landing-page GitHub stats (https://github.com/settings/tokens — no scopes needed for public repos)
 GITHUB_TOKEN=""
+# Landing-page video (MP4 URL; empty hides the section)
+LANDING_VIDEO_URL="https://res.cloudinary.com/dov6iolx4/video/upload/v1791041857/buzrr-reel-60s_qchy3y.mp4"
 # Rate limiting: ON | OFF
 RATELIMIT="OFF"
 UPSTASH_REDIS_REST_URL=""
