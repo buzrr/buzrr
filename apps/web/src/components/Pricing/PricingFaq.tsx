@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PLAN_COPY } from "@/lib/pricing";
 
 const FAQS = [
@@ -15,7 +16,20 @@ const FAQS = [
   },
   {
     q: "Can I get a refund?",
-    a: "No. Pro payments are non-refundable, including partial months. If you cancel, Pro stays active until the end of the month you’ve paid for. Details are in our Refund & Cancellation Policy.",
+    a: (
+      <>
+        No. Pro payments are non-refundable, including partial months. If you
+        cancel, Pro stays active until the end of the month you’ve paid for.
+        Details are in our{" "}
+        <Link
+          href="/refund-policy"
+          className="text-lprimary dark:text-dprimary underline underline-offset-2"
+        >
+          Refund &amp; Cancellation Policy
+        </Link>
+        .
+      </>
+    ),
   },
   {
     q: "What if a payment fails?",

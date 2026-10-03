@@ -87,15 +87,15 @@ That's it. Everything else is optional.
 
 ### Optional features
 
-| Feature              | Add to `.env`                                                          | Where to get it                                                                                         |
-| -------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| AI quiz generation   | `GEMINI_API_KEY`                                                       | [Google AI Studio](https://aistudio.google.com/app/apikey)                                              |
-| Image uploads        | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | [Cloudinary](https://cloudinary.com)                                                                    |
-| Landing GitHub stats | `GITHUB_TOKEN` (in `apps/web/.env`)                                    | [GitHub personal access tokens](https://github.com/settings/tokens) — no scopes needed for public repos |
-| Rate limiting        | `RATELIMIT=ON` + `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`  | [Upstash](https://upstash.com)                                                                          |
-| AI Knowledge Spaces  | `NEXT_PUBLIC_AI_API_URL` (web) + `apps/ai/.env`                        | See [apps/ai/README.md](apps/ai/README.md)                                                              |
-| Billing (Buzrr Pro)  | `BILLING=ON` + `DODO_*` (server), `DODO_PAYMENTS_WEBHOOK_KEY` (web)    | [Dodo Payments](https://dodopayments.com) — hosted version only; leave off when self-hosting            |
-| Landing-page video   | `LANDING_VIDEO_URL` (in `apps/web/.env`) — an MP4 URL                  | Any video host; Cloudinary URLs also get a poster frame                                                 |
+| Feature              | Add to `.env`                                                                  | Where to get it                                                                                         |
+| -------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| AI quiz generation   | `GEMINI_API_KEY`                                                               | [Google AI Studio](https://aistudio.google.com/app/apikey)                                              |
+| Image uploads        | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`         | [Cloudinary](https://cloudinary.com)                                                                    |
+| Landing GitHub stats | `GITHUB_TOKEN` (in `apps/web/.env`)                                            | [GitHub personal access tokens](https://github.com/settings/tokens) — no scopes needed for public repos |
+| Rate limiting        | `RATELIMIT=ON` + `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`          | [Upstash](https://upstash.com)                                                                          |
+| AI Knowledge Spaces  | `NEXT_PUBLIC_AI_API_URL` (web) + `apps/ai/.env`                                | See [apps/ai/README.md](apps/ai/README.md)                                                              |
+| Billing (Buzrr Pro)  | `BILLING=ON` + `DODO_*`, `APP_URL` (server), `DODO_PAYMENTS_WEBHOOK_KEY` (web) | [Dodo Payments](https://dodopayments.com) — hosted version only; leave off when self-hosting            |
+| Landing-page video   | `LANDING_VIDEO_URL` (in `apps/web/.env`) — an MP4 URL                          | Any video host; Cloudinary URLs also get a poster frame                                                 |
 
 ## 🔧 Environment variables
 
@@ -114,7 +114,7 @@ the [`.env.example`](.env.example) files for the full, commented list.
 | `GITHUB_TOKEN`                                   |    ➖    | Raises GitHub API rate limits for landing-page repo stats (web).    |
 | `LANDING_VIDEO_URL`                              |    ➖    | MP4 shown on the landing page (web); unset hides the section.       |
 | `NEXT_PUBLIC_AI_API_URL`                         |    ➖    | Where the browser reaches Buzrr-AI; unset hides AI Spaces.          |
-| `BILLING` + `DODO_*`                             |    ➖    | Enables Buzrr Pro billing. Off = no billing, everyone gets Pro.     |
+| `BILLING` + `DODO_*` + `APP_URL`                 |    ➖    | Enables Buzrr Pro billing. Off = no billing, everyone gets Pro.     |
 | `UPSTASH_REDIS_REST_*` + `RATELIMIT`             |    ➖    | Enables rate limiting.                                              |
 | `DUEL_BOTS`                                      |    ➖    | Set to `OFF` to disable bot opponents in 1v1 matchmaking.           |
 

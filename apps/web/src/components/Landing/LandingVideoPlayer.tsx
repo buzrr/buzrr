@@ -70,7 +70,8 @@ export default function LandingVideoPlayer({
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        inView = Boolean(entry?.isIntersecting);
+        // isIntersecting stays true below the threshold; use the ratio.
+        inView = (entry?.intersectionRatio ?? 0) >= 0.5;
         if (inView) {
           if (!userPaused && !reducedMotion && video.paused) play();
         } else if (!video.paused) {
