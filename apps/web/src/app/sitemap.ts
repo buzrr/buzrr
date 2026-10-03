@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { LEGAL_PAGES } from "@/data/legal";
 import { MARKETING_PAGES } from "@/data/marketing/pages";
 import { absoluteUrl } from "@/lib/seo/site";
 
@@ -22,5 +23,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
     })),
     { url: absoluteUrl("/support"), changeFrequency: "yearly", priority: 0.3 },
+    ...LEGAL_PAGES.map((page) => ({
+      url: absoluteUrl(page.path),
+      changeFrequency: "yearly" as const,
+      priority: 0.2,
+    })),
   ];
 }

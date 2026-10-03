@@ -244,6 +244,18 @@ export default function CheckoutClient({
             ? "Price includes applicable taxes."
             : "Any taxes are added at checkout."}
         </p>
+        <p className="mt-2 text-xs text-center text-off-dark dark:text-off-white">
+          By continuing you agree to our{" "}
+          <Link href="/terms" className="underline underline-offset-2">
+            Terms
+          </Link>
+          . Payments are non-refundable; if you cancel, Pro stays active until
+          the end of the paid month. See the{" "}
+          <Link href="/refund-policy" className="underline underline-offset-2">
+            Refund Policy
+          </Link>
+          .
+        </p>
       </section>
 
       <p className="mt-6 text-center text-sm">

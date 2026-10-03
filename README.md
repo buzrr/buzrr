@@ -17,9 +17,11 @@ Kahoot, and generate whole quizzes with AI.
 
 ## ✨ Features
 
-- 🎮 **Live multiplayer quizzes** (the Kahoot half) — host a room, players join with a code, everyone answers in real time over WebSockets.
-- ⚔️ **Ranked 1v1 duels** (the QuizUp half) — matchmaking with an **ELO** rating system, backed by difficulty-scaled bot opponents when nobody else is queuing.
+- 🎮 **Live multiplayer quizzes** (the Kahoot half) — host a room, players join with a code, link or QR code (no account needed), everyone answers in real time over WebSockets. Hosts can kick or ban players.
+- ⚔️ **Ranked 1v1 duels** (the QuizUp half) — matchmaking with an **ELO** rating system, backed by difficulty-scaled bot opponents when nobody else is queuing. Challenge a friend with an unrated invite link.
 - 🤖 **AI quiz generation** — describe a topic and let **Gemini** draft the questions (optional).
+- 📚 **AI Knowledge Spaces** — upload PDF, DOCX, TXT or Markdown documents and generate cited questions from them with RAG (optional Python service).
+- 💳 **Buzrr Pro** — the hosted version's paid plan (bigger rooms, unlimited quizzes, more AI generations) via Dodo Payments. Self-hosted instances run without billing and every account gets Pro limits.
 - 🛡️ **Public question moderation** — community questions feed the duel pool behind an approve/report workflow.
 - 🖼️ **Media questions** — image uploads via **Cloudinary** (optional).
 - 🔐 **Google sign-in** — authentication powered by [Better Auth](https://better-auth.com).
@@ -29,12 +31,15 @@ Kahoot, and generate whole quizzes with AI.
 
 Buzrr is a [Turborepo](https://turbo.build/repo) monorepo: a Next.js frontend
 (`apps/web`, which also hosts auth), a NestJS server (`apps/server`) that owns
-every game rule over Socket.IO, and a shared Prisma package. Live game state
-lives in Redis; Postgres keeps the lobby record and the final result.
+every game rule over Socket.IO, an optional Python service for AI Knowledge
+Spaces (`apps/ai`), and a shared Prisma package. Live game state lives in
+Redis; Postgres keeps the lobby record and the final result.
 
 📐 **[Read ARCHITECTURE.md](ARCHITECTURE.md)** for the full picture — the
 server-authoritative game loop, how timer ownership survives crashes and
-multiple instances, and the Redis/Postgres split.
+multiple instances, and the Redis/Postgres split. Detailed docs live in
+[`docs/`](docs/) — architecture by area, decision records (ADRs) and the
+current project state. Coding agents start at [AGENTS.md](AGENTS.md).
 
 ## 🚀 Quick start
 
@@ -42,6 +47,7 @@ multiple instances, and the Redis/Postgres split.
 
 - [Node.js](https://nodejs.org) **≥ 18** (20 LTS recommended) — Yarn 4 is bundled via Corepack.
 - [Docker](https://docs.docker.com/get-docker/) (for the local Postgres + Redis).
+- [Python](https://www.python.org/) **3.12** — only if you want the AI Knowledge Spaces service.
 - **Google OAuth credentials** — the only thing you _must_ provide, or login won't work.
   Create them in the [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
   with redirect URI `http://localhost:3000/api/auth/callback/google`.
@@ -73,16 +79,23 @@ GOOGLE_CLIENT_SECRET="your-client-secret"
 yarn dev                 # web → http://localhost:3000   api → http://localhost:3001
 ```
 
+`yarn dev` also starts the AI service (`apps/ai`, :3002), which needs a one-time
+`yarn workspace ai setup` first. If you don't want it, run
+`yarn dev:web` and `yarn dev:server` instead.
+
 That's it. Everything else is optional.
 
 ### Optional features
 
-| Feature              | Add to `.env`                                                          | Where to get it                                                                                         |
-| -------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| AI quiz generation   | `GEMINI_API_KEY`                                                       | [Google AI Studio](https://aistudio.google.com/app/apikey)                                              |
-| Image uploads        | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | [Cloudinary](https://cloudinary.com)                                                                    |
-| Landing GitHub stats | `GITHUB_TOKEN` (in `apps/web/.env`)                                    | [GitHub personal access tokens](https://github.com/settings/tokens) — no scopes needed for public repos |
-| Rate limiting        | `RATELIMIT=ON` + `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`  | [Upstash](https://upstash.com)                                                                          |
+| Feature              | Add to `.env`                                                                  | Where to get it                                                                                         |
+| -------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| AI quiz generation   | `GEMINI_API_KEY`                                                               | [Google AI Studio](https://aistudio.google.com/app/apikey)                                              |
+| Image uploads        | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`         | [Cloudinary](https://cloudinary.com)                                                                    |
+| Landing GitHub stats | `GITHUB_TOKEN` (in `apps/web/.env`)                                            | [GitHub personal access tokens](https://github.com/settings/tokens) — no scopes needed for public repos |
+| Rate limiting        | `RATELIMIT=ON` + `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`          | [Upstash](https://upstash.com)                                                                          |
+| AI Knowledge Spaces  | `NEXT_PUBLIC_AI_API_URL` (web) + `apps/ai/.env`                                | See [apps/ai/README.md](apps/ai/README.md)                                                              |
+| Billing (Buzrr Pro)  | `BILLING=ON` + `DODO_*`, `APP_URL` (server), `DODO_PAYMENTS_WEBHOOK_KEY` (web) | [Dodo Payments](https://dodopayments.com) — hosted version only; leave off when self-hosting            |
+| Landing-page video   | `LANDING_VIDEO_URL` (in `apps/web/.env`) — an MP4 URL                          | Any video host; Cloudinary URLs also get a poster frame                                                 |
 
 ## 🔧 Environment variables
 
@@ -99,6 +112,9 @@ the [`.env.example`](.env.example) files for the full, commented list.
 | `GEMINI_API_KEY`                                 |    ➖    | Enables AI quiz generation.                                         |
 | `CLOUDINARY_*`                                   |    ➖    | Enables image uploads.                                              |
 | `GITHUB_TOKEN`                                   |    ➖    | Raises GitHub API rate limits for landing-page repo stats (web).    |
+| `LANDING_VIDEO_URL`                              |    ➖    | MP4 shown on the landing page (web); unset hides the section.       |
+| `NEXT_PUBLIC_AI_API_URL`                         |    ➖    | Where the browser reaches Buzrr-AI; unset hides AI Spaces.          |
+| `BILLING` + `DODO_*` + `APP_URL`                 |    ➖    | Enables Buzrr Pro billing. Off = no billing, everyone gets Pro.     |
 | `UPSTASH_REDIS_REST_*` + `RATELIMIT`             |    ➖    | Enables rate limiting.                                              |
 | `DUEL_BOTS`                                      |    ➖    | Set to `OFF` to disable bot opponents in 1v1 matchmaking.           |
 
@@ -113,11 +129,13 @@ Run from the repo root:
 | `yarn dev:web` / `yarn dev:server`    | Run a single app.                                        |
 | `yarn build`                          | Build all apps (what CI runs).                           |
 | `yarn lint` / `yarn check-types`      | Lint / type-check.                                       |
+| `yarn workspace server test`          | Server tests (billing/entitlements, needs Postgres).     |
 | `yarn format`                         | Prettier over the repo.                                  |
 | `yarn db:push`                        | Sync the Prisma schema to the database.                  |
 | `yarn db:studio`                      | Open Prisma Studio.                                      |
 | `yarn docker:up` / `yarn docker:down` | Start / stop the Postgres + Redis containers.            |
 | `yarn docker:reset`                   | Wipe the databases and re-run setup.                     |
+| `yarn workspace ai setup`             | Create the AI service's Python virtualenv.               |
 
 ### Troubleshooting
 
@@ -135,30 +153,38 @@ Run from the repo root:
 buzrr/
 ├── apps/
 │   ├── web/        # Next.js app (+ Better Auth)
-│   └── server/     # NestJS API + Socket.IO
+│   ├── server/     # NestJS API + Socket.IO
+│   └── ai/         # Buzrr-AI: Python FastAPI + worker (optional)
 ├── packages/
 │   ├── prisma/     # schema, migrations, generated client
 │   ├── eslint-config/
 │   └── typescript-config/
-├── docker-compose.yml   # local Postgres + Redis
+├── docs/                # architecture, ADRs, current state
+├── docker-compose.yml   # local Postgres (pgvector) + Redis
+├── render.yaml          # Render blueprint for apps/ai
 └── scripts/setup.mjs    # one-command bootstrap
 ```
 
 ## 🚢 Deployment & CI
 
-Every push and PR runs the [`CI` workflow](.github/workflows/ci.yml) (lint,
-type-check, build against real Postgres + Redis). To gate production deploys on
+Every push and PR runs the [`CI` workflow](.github/workflows/ci.yml): lint,
+type-check, server tests and build against real Postgres + Redis; a check that
+the Docker dev setup boots; and a Buzrr-AI job (ruff, mypy, migrations,
+pytest). To gate production deploys on
 it, open your Vercel project → **Settings → Git → Deployment Checks** and add
 the CI workflow's **"Lint, typecheck & build"** job as a required check —
 deployments then only go live once CI is green, and a failing run leaves the
 current production deployment in place.
 
 `apps/web` deploys to Vercel; `apps/server` (Socket.IO, long-lived) needs a
-container/VM host such as Render, Railway or Fly. Both apps read their config
+container/VM host such as Render, Railway or Fly. `apps/ai` deploys to Render
+from [`render.yaml`](render.yaml) (a web service plus a cron-driven ingestion
+worker). Both apps read their config
 from environment variables — see the [`.env.example`](apps/web/.env.example)
 [files](apps/server/.env.example) for what each host needs. For production
 databases, apply the committed migrations with `prisma migrate deploy` (local
-dev uses `db push` via `yarn setup`).
+dev uses `db push` via `yarn setup`). With billing on, register
+`https://<web app>/api/webhooks/dodo` as the webhook endpoint in Dodo.
 
 ## 🤝 Contributing
 

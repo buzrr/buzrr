@@ -11,7 +11,7 @@ import supportLinks from "@/data/support-links.json";
 const ROUTES_WITH_OWN_FOOTER = ["/", "/docs", "/support", "/pricing"];
 
 // Route prefixes where the bar is hidden on every subpage: the checkout flow,
-// and the marketing pages in app/(marketing), which render LandingFooter.
+// and the marketing + legal pages in app/(marketing), which render LandingFooter.
 const PREFIXES_WITHOUT_FOOTER = [
   "/billing/",
   "/alternatives",
@@ -19,6 +19,9 @@ const PREFIXES_WITHOUT_FOOTER = [
   "/use-cases",
   "/open-source-quiz-platform",
   "/self-hosted-quiz",
+  "/privacy",
+  "/terms",
+  "/refund-policy",
 ];
 
 const Links = [

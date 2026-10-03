@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LuGithub, LuHeart, LuInstagram, LuYoutube } from "react-icons/lu";
 import ClientImage from "@/components/ClientImage";
+import { LEGAL_PAGES } from "@/data/legal";
 import {
   COMPETITORS,
   COMPETITOR_SLUGS,
@@ -56,6 +57,7 @@ const columns = [
     links: [
       { name: "Contributing", href: CONTRIBUTING_LINK, external: true },
       { name: "License (GPL-3.0)", href: LICENSE_LINK, external: true },
+      ...LEGAL_PAGES.map((page) => ({ name: page.name, href: page.path })),
     ],
   },
 ];
