@@ -1,9 +1,10 @@
 "use client";
 
 import clsx from "clsx";
-import { LuDownload, LuPlus } from "react-icons/lu";
+import { LuPlus } from "react-icons/lu";
 import ActionCard from "./ActionCard";
 import CreateAIQuiz from "../Gemini/CreateAIQuiz";
+import ImportQuizModal from "./ImportQuizModal";
 import { useAppSelector } from "@/state/hooks";
 
 export default function QuizActionCards() {
@@ -23,13 +24,7 @@ export default function QuizActionCards() {
         title="Create a new quiz"
         subtitle="Build from the ground up"
       />
-      <ActionCard
-        view={view}
-        variant="soon"
-        icon={<LuDownload />}
-        title="Import an existing quiz"
-        subtitle="Coming soon…"
-      />
+      <ImportQuizModal />
       <CreateAIQuiz
         className={view === "grid" ? "col-span-2 md:col-span-1" : undefined}
       />

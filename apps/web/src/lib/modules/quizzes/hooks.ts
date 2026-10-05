@@ -79,3 +79,14 @@ export function useDeleteQuizMutation() {
     },
   });
 }
+
+export function useImportQuizMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: quizzesApi.import,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.quizzes.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.billing.me });
+    },
+  });
+}
