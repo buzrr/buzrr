@@ -81,6 +81,21 @@ const LandingFooter = () => {
               Open-source quiz platform for everyone. 1v1 duels, live
               multiplayer rooms and AI-generated quizzes.
             </p>
+            <a
+              href="https://www.scrolllaunch.com/products/buzrr?ref=badge"
+              target="_blank"
+              rel="noopener"
+              className="mt-4 inline-block"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="https://www.scrolllaunch.com/api/badge/buzrr"
+                alt="Featured on ScrollLaunch"
+                width="220"
+                height="48"
+                loading="lazy"
+              />
+            </a>
           </div>
 
           {columns.map((col) => (
