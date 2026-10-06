@@ -48,6 +48,8 @@ export default function ImportQuizModal({ className }: { className?: string }) {
       String(data[0]["Quiz Title"] ?? "Imported Quiz") || "Imported Quiz";
     const description = String(data[0]["Quiz Description"] ?? "");
 
+    let hasDataIntegrityIssues = false;
+
     const questions = data
       .map((row) => {
         const options: { title: string; isCorrect: boolean }[] = [];
@@ -71,6 +73,10 @@ export default function ImportQuizModal({ className }: { className?: string }) {
 
         // Ensure exactly one option is correct to satisfy backend constraints
         const correctCount = options.filter((o) => o.isCorrect).length;
+        if (correctCount !== 1) {
+          hasDataIntegrityIssues = true;
+        }
+
         if (correctCount === 0) {
           options[0].isCorrect = true;
         } else if (correctCount > 1) {
@@ -100,7 +106,14 @@ export default function ImportQuizModal({ className }: { className?: string }) {
       { title, description, questions },
       {
         onSuccess: (res) => {
-          toast.success("Quiz imported successfully!");
+          if (hasDataIntegrityIssues) {
+            toast.warning(
+              "Quiz imported, but some questions had missing or multiple correct answers and were adjusted. Please cross-verify.",
+              { autoClose: 6000 }
+            );
+          } else {
+            toast.success("Quiz imported successfully!");
+          }
           close();
           router.push(`/admin/quiz/${res.quizId}`);
         },
@@ -130,6 +143,16 @@ export default function ImportQuizModal({ className }: { className?: string }) {
           header: true,
           skipEmptyLines: true,
           complete: (results) => {
+            if (results.errors && results.errors.length > 0) {
+              const firstErrorRow = results.errors[0].row;
+              toast.error(
+                `Error parsing CSV: ${results.errors[0].message}${
+                  firstErrorRow !== undefined ? ` at row ${firstErrorRow + 1}` : ""
+                }`
+              );
+              setIsParsing(false);
+              return;
+            }
             processData(results.data as Record<string, unknown>[]);
             setIsParsing(false);
           },
