@@ -3448,6 +3448,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/papaparse@npm:^5":
+  version: 5.5.2
+  resolution: "@types/papaparse@npm:5.5.2"
+  dependencies:
+    "@types/node": "npm:*"
+  checksum: 10c0/27b097b6f8f204b20ade1f2cbf4798eb38caa5fbfa3180fd0faa5e3f9aea371c1786ae180d56f3287556463eefe3100c953e316ea6ee99d7ae1d04111cfc9e50
+  languageName: node
+  linkType: hard
+
 "@types/parse-json@npm:^4.0.0":
   version: 4.0.2
   resolution: "@types/parse-json@npm:4.0.2"
@@ -9245,6 +9254,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"papaparse@npm:^5.7.0":
+  version: 5.7.0
+  resolution: "papaparse@npm:5.7.0"
+  checksum: 10c0/aeea2122ffa7abf33206ab9465e1adcb678ca0e9b08fbd3cea53bf6dc07d5903e69f387dc4dde2498e2478130ba3db79d1fd3956bf638c00be802f0d275e006d
+  languageName: node
+  linkType: hard
+
 "parent-module@npm:^1.0.0":
   version: 1.0.1
   resolution: "parent-module@npm:1.0.1"
@@ -12306,6 +12322,7 @@ __metadata:
     "@tanstack/react-query-devtools": "npm:^5.95.2"
     "@tanstack/react-virtual": "npm:^3.14.6"
     "@types/node": "npm:^20"
+    "@types/papaparse": "npm:^5"
     "@types/react": "npm:^19"
     "@types/react-dom": "npm:^19"
     "@upstash/ratelimit": "npm:^2.0.8"
@@ -12322,6 +12339,7 @@ __metadata:
     jose: "npm:^6.2.2"
     next: "npm:15.2.8"
     nitro: "npm:3.0.260610-beta"
+    papaparse: "npm:^5.7.0"
     qrcode.react: "npm:^4.2.0"
     react: "npm:^19.2.7"
     react-countdown-circle-timer: "npm:^3.2.1"
@@ -12340,6 +12358,7 @@ __metadata:
     typescript: "npm:^5"
     vinext: "npm:^0.0.55"
     vite: "npm:^8.0.16"
+    xlsx: "https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz"
     zod: "npm:^4.3.6"
   languageName: unknown
   linkType: soft
@@ -12587,6 +12606,15 @@ __metadata:
     utf-8-validate:
       optional: true
   checksum: 10c0/ef4a243476283fc49bc7550966c4af4aa0eef56273837211e700de3b664e08604a760cdddcb5ba43c049140e74ccfec5b0ee0bb439e08c2adf9138902fdde5f9
+  languageName: node
+  linkType: hard
+
+"xlsx@https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz":
+  version: 0.20.2
+  resolution: "xlsx@https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz"
+  bin:
+    xlsx: ./bin/xlsx.njs
+  checksum: 10c0/664dff22e5ecd83d595f34e00ac90ee852d16e45b72385ada54291551b808c6848b166fb395f5e35249ca976a5b5d514e793ccbcc0a611b87a600ae4024d605a
   languageName: node
   linkType: hard
 

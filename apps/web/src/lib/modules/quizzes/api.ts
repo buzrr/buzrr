@@ -60,6 +60,25 @@ export async function updateQuiz(
   return data;
 }
 
+export async function importQuiz(
+  client: AxiosInstance,
+  body: {
+    title: string;
+    description?: string;
+    questions: {
+      title: string;
+      timeOut?: number;
+      options: { title: string; isCorrect: boolean }[];
+    }[];
+  },
+) {
+  const { data } = await client.post<{ quizId: string }>(
+    "/quizzes/import",
+    body,
+  );
+  return data;
+}
+
 export const quizzesApi = {
   list: () => listQuizzes(getAuthApiClient()),
   getById: (quizId: string) => getQuizById(getAuthApiClient(), quizId),
@@ -67,6 +86,8 @@ export const quizzesApi = {
     createQuiz(getAuthApiClient(), body),
   createAi: (body: Parameters<typeof createAiQuiz>[1]) =>
     createAiQuiz(getAuthApiClient(), body),
+  import: (body: Parameters<typeof importQuiz>[1]) =>
+    importQuiz(getAuthApiClient(), body),
   update: (quizId: string, body: Parameters<typeof updateQuiz>[2]) =>
     updateQuiz(getAuthApiClient(), quizId, body),
   delete: (quizId: string) => deleteQuiz(getAuthApiClient(), quizId),
