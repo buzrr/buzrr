@@ -6,7 +6,7 @@ import { DEFAULT_AVATAR } from "@/constants";
 import { Button } from "@/components/ui/Button";
 import { useDuelInvite } from "@/hooks/useDuelInvite";
 import type { DuelInvite } from "@/lib/modules/duel/api";
-import type { DuelMatchedPayload } from "@/types/socket-events";
+import type { DuelMatchedPayload } from "@buzrr/contract";
 
 /**
  * What the invited friend sees. Accepting is an explicit click rather than an

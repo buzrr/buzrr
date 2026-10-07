@@ -11,7 +11,8 @@
     "build": "prisma generate && tsc",
     "check-types": "tsc --noEmit",
     "migrate:deploy": "prisma migrate deploy",
-    "seed:duel": "node scripts/seed-duel-starter.mjs"
+    "seed:duel": "node scripts/seed-duel-starter.mjs",
+    "deploy": "node scripts/deploy.mjs"
   },
   "files": [
     "dist",

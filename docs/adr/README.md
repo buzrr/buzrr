@@ -20,6 +20,10 @@ Format: Title · Status · Context · Decision · Consequences · Alternatives
 | [008](008-vinext-parallel-toolchain.md)         | Parallel vinext/Vite toolchain alongside the Next CLI                         | Adopted but non-default; unresolved |
 | [009](009-buzrr-ai-rag-service.md)              | Separate Python service (Buzrr-AI) for document RAG                           | Accepted                            |
 | [010](010-billing-and-entitlements.md)          | Buzrr Pro: Dodo subscriptions, webhook-verified, server-side entitlements     | Accepted                            |
+| [011](011-pluggable-question-types.md)          | Pluggable question types: one server handler + one web renderer per type      | Accepted                            |
+| [012](012-pure-engine-core-and-pacing.md)       | Pure engine core `(state, event, now) → (state, effects)`; pacing strategies  | Accepted                            |
+| [013](013-shared-contract-package.md)           | One shared zod contract package for socket + REST shapes                      | Accepted                            |
+| [014](014-self-hosting-without-saas.md)         | Self-hosting with no SaaS lock-in (storage, models, local accounts, compose)  | Accepted                            |
 
 New ADRs: next number, same format, add a row here. Reversing a decision:
 mark the old one "Superseded by NNN", don't delete it.

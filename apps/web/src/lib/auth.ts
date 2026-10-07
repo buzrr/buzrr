@@ -3,6 +3,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
 import { prisma } from "@buzrr/prisma";
+import { getAuthMethods } from "./auth-methods";
 
 type Auth = ReturnType<typeof betterAuth>;
 
@@ -11,9 +12,10 @@ let _auth: Auth | undefined;
 function getAuth(): Auth {
   if (_auth) return _auth;
 
-  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+  const methods = getAuthMethods();
+  if (!methods.google && !methods.emailPassword) {
     throw new Error(
-      "Missing required Google OAuth credentials: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set",
+      "No sign-in method configured: set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, or AUTH_EMAIL_PASSWORD=ON for local accounts",
     );
   }
 
@@ -21,11 +23,20 @@ function getAuth(): Auth {
     baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
     trustedOrigins: process.env.TRUSTED_ORIGINS?.split(",") ?? [],
     database: prismaAdapter(prisma, { provider: "postgresql" }),
-    socialProviders: {
-      google: {
-        clientId: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      },
+    socialProviders: methods.google
+      ? {
+          google: {
+            clientId: process.env.GOOGLE_CLIENT_ID!,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+          },
+        }
+      : {},
+    // Local accounts for installs with no Google (or no internet). No email
+    // verification: an offline server has no way to send mail.
+    emailAndPassword: {
+      enabled: methods.emailPassword,
+      disableSignUp: !methods.emailSignUp,
+      minPasswordLength: 8,
     },
     session: {
       cookieCache: { enabled: true, maxAge: 5 * 60 },

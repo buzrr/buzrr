@@ -3,7 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAppSelector } from "@/state/hooks";
 import { toast } from "react-toastify";
 import QuestionAndResult from "./QuesAndResult";
-import type { GameSocket, PublicQuestion } from "@/types/socket-events";
+import type { PublicQuestion, QuestionAnswer } from "@buzrr/contract";
+import type { GameSocket } from "@/types/socket";
 
 /**
  * Answers go over the socket and the server measures the time taken; the
@@ -22,34 +23,34 @@ const Question = (params: {
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const you = useAppSelector((state) => state.game.you);
   const deadline = useAppSelector((state) => state.game.deadline);
-  const [optionId, setOptionId] = useState("");
+  const [answer, setAnswer] = useState<QuestionAnswer | null>(null);
   const [submitted, setSubmitted] = useState(false);
   /**
    * The pick whose ack has not come back yet. A socket that drops mid-flight
    * never calls it — socket.io discards pending acks on close — so without
    * this the UI would stay locked on an answer the server may never have got.
    */
-  const unacked = useRef<string | null>(null);
+  const unacked = useRef<QuestionAnswer | null>(null);
   /** The question the UI is on, for discarding acks from a previous one. */
   const liveQuestionId = useRef(params.question.id);
 
   // A new question means a fresh answer state.
   useEffect(() => {
     liveQuestionId.current = params.question.id;
-    setOptionId("");
+    setAnswer(null);
     setSubmitted(false);
     unacked.current = null;
   }, [params.question.id]);
 
   const send = useCallback(
-    (optId: string, opts?: { silent?: boolean }) => {
+    (picked: QuestionAnswer, opts?: { silent?: boolean }) => {
       const sentFor = liveQuestionId.current;
-      unacked.current = optId;
-      setOptionId(optId);
+      unacked.current = picked;
+      setAnswer(picked);
       setSubmitted(true);
       params.socket.emit(
         "submit-answer",
-        { qIndex, optionId: optId },
+        { qIndex, answer: picked },
         (result) => {
           // An ack that arrives after the question moved on describes a
           // question this screen has left. Acting on it would clobber the new
@@ -65,7 +66,7 @@ const Question = (params: {
           // drop may have landed after all, and the sync will re-lock if so.
           unacked.current = null;
           setSubmitted(false);
-          setOptionId("");
+          setAnswer(null);
           if (!opts?.silent) {
             toast.error(result.reason ?? "Answer was not accepted");
           }
@@ -87,7 +88,7 @@ const Question = (params: {
     if (!you) return;
     if (you.answered) {
       unacked.current = null;
-      setOptionId(you.optionId ?? "");
+      setAnswer(you.answer);
       setSubmitted(true);
       return;
     }
@@ -97,13 +98,13 @@ const Question = (params: {
       send(resend, { silent: true });
       return;
     }
-    setOptionId("");
+    setAnswer(null);
     setSubmitted(false);
   }, [you, deadline, send]);
 
-  const submitAnswer = (optId: string) => {
+  const submitAnswer = (picked: QuestionAnswer) => {
     if (submitted) return;
-    send(optId);
+    send(picked);
   };
 
   return (
@@ -117,7 +118,7 @@ const Question = (params: {
         hostImage={params.hostImage}
         screen="question"
         submitAnswer={submitAnswer}
-        optionId={optionId}
+        answer={answer}
         locked={submitted}
       />
     </>

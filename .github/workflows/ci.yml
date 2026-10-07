@@ -126,7 +126,7 @@ jobs:
         run: yarn install --immutable
 
       - name: Start Postgres + Redis via docker compose
-        run: docker compose up -d
+        run: docker compose up -d postgres redis
 
       - name: Wait for Postgres health
         run: |
@@ -140,6 +140,38 @@ jobs:
 
       - name: Push schema into the container (matches `yarn setup`)
         run: yarn prisma db push --url "postgresql://buzrr:buzrr@localhost:5432/buzrr"
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+
+  self-host:
+    name: Self-host stack (docker compose up)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # Exactly what docs/self-hosting.md tells people to run: no .env, no
+      # accounts. --wait blocks until every service is healthy (or exited 0).
+      - name: Build and start the stack
+        run: docker compose up -d --build --wait --wait-timeout 300
+
+      - name: Smoke test
+        run: |
+          curl -fsS http://localhost:3001/health
+          curl -fsS http://localhost:3000/auth/login | grep -q 'emailPassword'
+          # A local account can sign up and mint an API token.
+          curl -fsS -c jar -H 'content-type: application/json' \
+            -H 'origin: http://localhost:3000' \
+            -d '{"name":"CI","email":"ci@example.test","password":"ci-password-123"}' \
+            http://localhost:3000/api/auth/sign-up/email > /dev/null
+          curl -fsS -b jar http://localhost:3000/api/auth/access-token | grep -q token
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --no-color
 
       - name: Tear down
         if: always()

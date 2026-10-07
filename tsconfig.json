@@ -1,6 +1,7 @@
 {
   "files": [],
   "references": [
+    { "path": "./packages/contract" },
     { "path": "./packages/prisma" },
     { "path": "./apps/server" }
   ]

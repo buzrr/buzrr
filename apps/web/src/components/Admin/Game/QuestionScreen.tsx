@@ -9,8 +9,8 @@ import { toast } from "react-toastify";
 import { useAppSelector } from "@/state/hooks";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
 import { buildJoinUrl } from "@/lib/join-link";
+import { HostPrompt } from "@/components/QuestionTypes";
 import {
-  OptionKey,
   TimerRing,
   labelClass,
   mutedText,
@@ -18,7 +18,7 @@ import {
   primaryButtonClass,
   subtleCardClass,
 } from "@/components/Game/GameUI";
-import type { GameSocket } from "@/types/socket-events";
+import type { GameSocket } from "@/types/socket";
 
 interface QuestionScreenProps {
   gameCode: string;
@@ -54,7 +54,6 @@ export default function QuestionScreen(props: QuestionScreenProps) {
 
   if (!question) return null;
 
-  const options = question.options ?? [];
   const joinUrl = buildJoinUrl(gameCode);
   const total = Math.max(players.filter((p) => p.connected).length, answered);
   const answeredPct = total > 0 ? (answered / total) * 100 : 0;
@@ -181,20 +180,7 @@ export default function QuestionScreen(props: QuestionScreenProps) {
         <h2 className="mt-[18px] text-2xl md:text-[34px] font-bold tracking-[-0.02em] leading-[1.22] text-pretty wrap-break-word">
           {question.title}
         </h2>
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 md:auto-rows-[minmax(0,1fr)] gap-3.5 mt-7 min-h-0">
-          {options.map((opt, index) => (
-            <div
-              key={opt.id}
-              className={clsx(
-                "flex items-center gap-4 rounded-[18px] border-[1.5px] px-4 py-3.5 md:px-[22px] md:py-[18px] min-h-16 md:min-h-[84px] text-[17px] md:text-xl font-semibold wrap-break-word min-w-0",
-                subtleCardClass,
-              )}
-            >
-              <OptionKey index={index} className="size-10 md:size-11 text-lg" />
-              <span className="min-w-0">{opt.title}</span>
-            </div>
-          ))}
-        </div>
+        <HostPrompt question={question} />
         <div className="flex flex-wrap md:flex-nowrap items-center gap-3.5 mt-[22px] pt-5 border-t border-lprimary/15 dark:border-white/10">
           <p
             className={clsx(

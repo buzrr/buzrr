@@ -12,8 +12,9 @@ the docs, and write an ADR.
 ## Authority & source of truth
 
 1. **[explicit] The server owns the game loop.** Timing, phase transitions,
-   question advancement and scoring happen only in `GameEngineService`
-   (comment at the top of `game-engine.service.ts`). The gateway relays
+   question advancement and scoring are decided only by the engine — the pure
+   core in `game-engine/core/` (`step`, `judgeAnswer`), executed by
+   `GameEngineService` (comments at the top of both). The gateway relays
    intent; clients render pushed state. The host's only pacing intent is
    `host-next` — the server derives what "next" means from the current phase,
    so no client ever supplies a question index. Client countdowns are
@@ -90,8 +91,11 @@ the docs, and write an ADR.
 ## Game-domain rules
 
 18. **[explicit] Correct answers are never sent to clients before reveal** —
-    `toPublicQuestion` strips `isCorrect`; snapshots only include reveal data
-    in the `reveal` phase.
+    questions leave the server only through their type handler's `toPublic`
+    (`toPublicQuestion` in `question-types/registry.ts`); snapshots include
+    reveal data only in the `reveal` phase, and a question-phase snapshot
+    masks the player's own verdict (`you.isCorrect`/`score`/`rank`) too
+    (`buildSnapshot`).
 19. **[explicit] Friend-invite duels are unrated** (`rated: false`) so
     ratings can't be farmed; matchmade (including bot) duels are rated. The
     check is `rated !== false` for pre-field compatibility
@@ -103,7 +107,7 @@ the docs, and write an ADR.
     go through the normal `submitAnswer` path; `duel:matched` payloads are
     shape-identical to human matches; `bot_` id prefix keeps them out of User
     lookups. Bots join `connected: true` because they hold no socket —
-    required by `maybeRevealEarly`.
+    required by the early close (`onAnswerRecorded` in `core/machine.ts`).
 22. **[explicit] Kicked/banned guests keep their Player identity** — only room
     membership is dropped (service comments; `usePlayerSocket` mirrors this).
     Don't delete Player rows on kick.
@@ -117,10 +121,10 @@ the docs, and write an ADR.
 
 ## Contracts & compatibility
 
-25. **[implied] The socket contract is duplicated on purpose** —
-    `apps/server/src/modules/realtime/realtime.types.ts` ⇄
-    `apps/web/src/types/socket-events.ts`. Every event change updates both
-    (there is no codegen).
+25. **[explicit] The socket contract is defined once** — in
+    `@buzrr/contract` (`packages/contract`), imported by both apps
+    ([ADR-013](../adr/013-shared-contract-package.md)). Don't re-declare
+    payload types in either app; the hand-kept web mirror was deleted.
 26. **[explicit] The socket contract has exactly one version.** The v1 events
     and host-intent aliases, and the legacy `POST /:id/answers` route, were
     removed once nothing consumed them (ADR-002). Both apps ship together,
@@ -188,3 +192,39 @@ the docs, and write an ADR.
 39. **[explicit] `BILLING` off means Pro limits for everyone.** Self-hosted
     instances must keep working without a payment provider; don't make any
     feature depend on a subscription existing.
+
+## Engine core & question types
+
+40. **[explicit] The engine core is pure.** Nothing under
+    `game-engine/core/` performs I/O, reads a clock or calls `Math.random`
+    directly: time arrives as `now`, randomness as `StepContext.random`, and
+    every side effect is returned as an `Effect` for the shell to run. Keep
+    atomic operations (first-write answers, Lua claims) in the shell — the
+    core decides, the shell commits. ([ADR-012](../adr/012-pure-engine-core-and-pacing.md))
+41. **[explicit] Effects run in the order returned.** The realtime
+    orderings (the answer window durable before `question-start`, personal
+    results before the reveal) are encoded as effect order and asserted in `machine.spec.ts`.
+    Reordering effects reorders Redis writes and broadcasts.
+42. **[explicit] The engine never branches on question type.** Everything
+    type-specific goes through the registry (`question-types/registry.ts`)
+    on the server and `components/QuestionTypes` on the web; handlers are
+    pure. Both registries are mapped types over the contract's
+    `QuestionType`, so a type can't ship half-wired.
+    ([ADR-011](../adr/011-pluggable-question-types.md))
+43. **[explicit] Stored question content is validated by its type on every
+    write** (editor upsert, import) and re-checked on load; rows that fail
+    (or whose type this build doesn't know) are skipped from a game, never
+    crash it.
+
+## Self-hosting
+
+44. **[explicit] Nothing may require a SaaS account.** Storage, models and
+    sign-in each have an offline option (local disk, an OpenAI-compatible
+    server, email + password), and `docker compose up` with no `.env` must
+    keep working (CI `self-host` job). A new external dependency needs an
+    interface with a self-hostable implementation, like `MediaStorage` and
+    `TextGenerator`. ([ADR-014](../adr/014-self-hosting-without-saas.md))
+45. **[explicit] Stores that serve bytes as-is accept only sniffed raster
+    images.** The `local` and `s3` drivers check magic bytes and refuse
+    everything else (SVG/HTML could carry script on an origin we control);
+    never trust the client's Content-Type or filename.

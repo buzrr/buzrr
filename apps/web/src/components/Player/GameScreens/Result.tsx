@@ -2,7 +2,8 @@
 import React from "react";
 import QuestionAndResult from "./QuesAndResult";
 import { useAppSelector } from "@/state/hooks";
-import type { AnswerResultPayload } from "@/types/socket-events";
+import { correctAnswers, describeAnswer } from "@/components/QuestionTypes";
+import type { AnswerResultPayload } from "@buzrr/contract";
 
 /**
  * Reveal-phase outcome, rendered from the server-pushed personal result:
@@ -22,14 +23,11 @@ const Result = (params: {
   const question = useAppSelector((state) => state.game.question);
   const reveal = useAppSelector((state) => state.game.reveal);
 
-  const options = question?.options ?? [];
-  const indexed = (id: string | null | undefined) => {
-    const index = options.findIndex((o) => o.id === id);
-    return index === -1 ? null : { index, title: options[index].title };
-  };
-  const correctOptions = (reveal?.correctOptionIds ?? [])
-    .map((id) => indexed(id))
-    .filter((o): o is { index: number; title: string } => o !== null);
+  // Both render through the question's type (components/QuestionTypes).
+  const correct =
+    question && reveal ? correctAnswers(question, reveal.summary) : [];
+  const yourAnswer =
+    question && you?.answer ? describeAnswer(question, you.answer) : null;
 
   // Until the personal result lands, "didn't answer" is unknown rather than
   // true — rendering the timeout verdict in that gap flashes a wrong outcome
@@ -58,8 +56,8 @@ const Result = (params: {
         !you.answered ? "timesout" : you.isCorrect ? "correct" : "incorrect"
       }
       points={you.score}
-      yourOption={you.answered ? indexed(you.optionId) : null}
-      correctOptions={correctOptions}
+      yourAnswer={you.answered ? yourAnswer : null}
+      correctAnswers={correct}
     />
   );
 };

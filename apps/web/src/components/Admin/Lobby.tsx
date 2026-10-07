@@ -25,7 +25,7 @@ import {
   useBanRoomPlayerMutation,
   useRemoveRoomPlayerMutation,
 } from "@/lib/modules/game-sessions/hooks";
-import type { PlayerPayload } from "@/types/socket-events";
+import type { PlayerPayload } from "@buzrr/contract";
 import ConfirmationModal from "@/components/Admin/ConfirmationModal";
 import { buildJoinUrl } from "@/lib/join-link";
 import EndQuizButton from "@/components/Admin/EndQuizButton";

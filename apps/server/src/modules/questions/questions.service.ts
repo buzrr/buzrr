@@ -4,18 +4,68 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { CloudinaryService } from "../../common/services/cloudinary.service";
+import {
+  DEFAULT_QUESTION_TYPE,
+  DEFAULT_TIME_OUT,
+  authoredOptionSchema,
+  type AuthoredOption,
+} from "@buzrr/contract";
+import {
+  MediaStorage,
+  UnsupportedMediaError,
+} from "../../common/storage/media-storage";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
+import { QuestionDefinitionError, validateDefinition } from "../question-types";
 import { ReorderQuestionsDto } from "./dto/reorder-questions.dto";
 
 type MultipartBody = Record<string, string | undefined>;
+
+function parseJsonField(raw: string | undefined, field: string): unknown {
+  if (raw === undefined || raw.trim() === "") return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new BadRequestException(`${field} must be valid JSON`);
+  }
+}
+
+/**
+ * Options from a multipart body: either `options` (a JSON array of
+ * `{ title, isCorrect }`, any type) or the original four-option form fields
+ * (`option1`–`option4` + `choose_option` a–d) the multiple-choice editor
+ * still sends.
+ */
+function optionsFromMultipart(body: MultipartBody): AuthoredOption[] {
+  const json = parseJsonField(body.options, "options");
+  if (json !== undefined) {
+    const parsed = authoredOptionSchema.array().safeParse(json);
+    if (!parsed.success) {
+      throw new BadRequestException("options must be [{ title, isCorrect }]");
+    }
+    return parsed.data;
+  }
+
+  const titles = [body.option1, body.option2, body.option3, body.option4];
+  const correctKey = body.choose_option?.trim().toLowerCase();
+  if (titles.some((t) => !t) || !correctKey) {
+    throw new BadRequestException("Missing required fields");
+  }
+  const keys = ["a", "b", "c", "d"];
+  if (!keys.includes(correctKey)) {
+    throw new BadRequestException("choose_option must be a, b, c, or d");
+  }
+  return titles.map((title, i) => ({
+    title: title ?? "",
+    isCorrect: keys[i] === correctKey,
+  }));
+}
 
 @Injectable()
 export class QuestionsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cloudinary: CloudinaryService,
+    private readonly storage: MediaStorage,
   ) {}
 
   private async assertQuizOwned(quizId: string, userId: string) {
@@ -115,61 +165,35 @@ export class QuestionsService {
   ): Promise<void> {
     const quiz = await this.assertQuizOwned(quizId, user.userId);
 
-    const title = body.title;
-    const option1 = body.option1;
-    const option2 = body.option2;
-    const option3 = body.option3;
-    const option4 = body.option4;
+    const title = body.title?.trim();
     const time = body.time;
     const quesId = body.ques_id?.trim() || undefined;
-    const correct_option = body.choose_option;
     const file_link = body.file_link;
     const file_type = body.media_type;
+    const type = body.type?.trim() || DEFAULT_QUESTION_TYPE;
 
-    if (
-      !title ||
-      !option1 ||
-      !option2 ||
-      !option3 ||
-      !option4 ||
-      !correct_option
-    ) {
+    if (!title) {
       throw new BadRequestException("Missing required fields");
     }
 
-    const correctKey = correct_option.trim().toLowerCase();
-    if (!["a", "b", "c", "d"].includes(correctKey)) {
-      throw new BadRequestException("choose_option must be a, b, c, or d");
-    }
-
-    const options = [
-      { title: option1, isCorrect: correctKey === "a" },
-      { title: option2, isCorrect: correctKey === "b" },
-      { title: option3, isCorrect: correctKey === "c" },
-      { title: option4, isCorrect: correctKey === "d" },
-    ];
-
-    let fileLink = "";
-    let mediaType = "";
-
-    if (file && file.size > 0) {
-      const uploaded = await this.cloudinary.uploadBuffer(file.buffer);
-      if (file_link) {
-        await this.cloudinary.destroyIfPresent(file_link);
+    // The question's type owns what valid content looks like.
+    let definition;
+    try {
+      definition = validateDefinition(type, {
+        options: optionsFromMultipart(body),
+        config: parseJsonField(body.config, "config") ?? {},
+      });
+    } catch (err) {
+      if (err instanceof QuestionDefinitionError) {
+        throw new BadRequestException(err.message);
       }
-      fileLink = uploaded.url;
-      mediaType = uploaded.mediaType;
-    } else if (file_link) {
-      fileLink = file_link;
-      mediaType = file_type ?? "";
+      throw err;
     }
+    const { options, config } = definition;
 
-    const timeOut = parseInt(time ?? "15", 10) || 15;
-    // Any create/edit re-enters the moderation queue if the quiz is public --
-    // approved content doesn't stay approved across an edit, since the
-    // reviewed text may have changed.
-    const moderationStatus = quiz.isPublic ? "pending" : "draft";
-
+    // Ownership first: the old media we may delete below is the edited
+    // question's own, read from the database.
+    let existing: { media: string | null } | null = null;
     if (quesId) {
       const question = await this.prisma.db.question.findUnique({
         where: { id: quesId },
@@ -178,12 +202,46 @@ export class QuestionsService {
       if (!question || question.quiz.userId !== user.userId) {
         throw new ForbiddenException("Unauthorized");
       }
+      existing = question;
+    }
 
+    let fileLink = "";
+    let mediaType = "";
+
+    if (file && file.size > 0) {
+      let uploaded;
+      try {
+        uploaded = await this.storage.upload(file.buffer, {
+          contentType: file.mimetype,
+          filename: file.originalname,
+        });
+      } catch (err) {
+        if (err instanceof UnsupportedMediaError) {
+          throw new BadRequestException(err.message);
+        }
+        throw err;
+      }
+      fileLink = uploaded.url;
+      mediaType = uploaded.mediaType;
+    } else if (file_link) {
+      fileLink = file_link;
+      mediaType = file_type ?? "";
+    }
+
+    const timeOut = parseInt(time ?? "", 10) || DEFAULT_TIME_OUT;
+    // Any create/edit re-enters the moderation queue if the quiz is public --
+    // approved content doesn't stay approved across an edit, since the
+    // reviewed text may have changed.
+    const moderationStatus = quiz.isPublic ? "pending" : "draft";
+
+    if (quesId) {
       await this.prisma.db.$transaction(async (tx) => {
         await tx.question.update({
           where: { id: quesId },
           data: {
             title,
+            type,
+            config,
             quizId,
             timeOut,
             media: fileLink || null,
@@ -202,12 +260,19 @@ export class QuestionsService {
         });
         await tx.questionReport.deleteMany({ where: { questionId: quesId } });
       });
+      // Only now, and only the question's own stored media — never a URL
+      // the client sent (`file_link`), which could name anyone's upload.
+      if (existing?.media && existing.media !== fileLink) {
+        await this.storage.remove(existing.media);
+      }
     } else {
       await this.prisma.db.$transaction(async (tx) => {
         const count = await tx.question.count({ where: { quizId } });
         await tx.question.create({
           data: {
             title,
+            type,
+            config,
             options: { create: options },
             quizId,
             timeOut,

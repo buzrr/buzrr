@@ -1,13 +1,15 @@
 "use client";
 import clsx from "clsx";
 import Image from "next/image";
+import type { ReactNode } from "react";
 import { LuCheck, LuClock, LuX } from "react-icons/lu";
+import type { PublicQuestion, QuestionAnswer } from "@buzrr/contract";
 import { DEFAULT_AVATAR } from "@/constants";
 import { useAppSelector } from "@/state/hooks";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
+import { AnswerInput } from "@/components/QuestionTypes";
 import {
   GameTopBar,
-  OptionKey,
   StatTile,
   TimerBar,
   TimerRing,
@@ -17,25 +19,6 @@ import {
   panelClass,
   subtleCardClass,
 } from "@/components/Game/GameUI";
-
-interface QuestionOption {
-  id: string;
-  title: string;
-}
-
-interface QuestionWithOptions {
-  id?: string;
-  title?: string;
-  timeOut?: number;
-  media?: string | null;
-  mediaType?: string | null;
-  options?: QuestionOption[];
-}
-
-export interface IndexedOption {
-  index: number;
-  title: string;
-}
 
 const STATUS = {
   correct: {
@@ -64,14 +47,15 @@ const STATUS = {
   },
 } as const;
 
+/** One labelled answer; `children` is the answer as its type renders it. */
 function AnswerRow({
   label,
-  option,
+  children,
   className,
   emptyText,
 }: {
   label: string;
-  option: IndexedOption | null;
+  children?: ReactNode;
   className?: string;
   emptyText?: string;
 }) {
@@ -86,39 +70,34 @@ function AnswerRow({
           className,
         )}
       >
-        {option ? (
-          <>
-            <OptionKey index={option.index} className="size-9 text-base" />
-            <span className="min-w-0 wrap-break-word">{option.title}</span>
-          </>
-        ) : (
-          <span className={mutedText}>{emptyText}</span>
-        )}
+        {children ? children : <span className={mutedText}>{emptyText}</span>}
       </div>
     </div>
   );
 }
 
 const QuestionAndResult = (params: {
-  question?: QuestionWithOptions;
+  question?: PublicQuestion;
   quizTitle: string;
   gameCode: string;
   screen: "question" | "result";
-  submitAnswer?: (optionId: string) => void;
-  optionId?: string;
+  submitAnswer?: (answer: QuestionAnswer) => void;
+  /** The answer sent (or being sent) for the open question. */
+  answer?: QuestionAnswer | null;
   locked?: boolean;
   status?: keyof typeof STATUS;
   /** Points earned this question (result screen). */
   points?: number;
-  yourOption?: IndexedOption | null;
-  correctOptions?: IndexedOption[];
+  /** The player's answer, rendered by its question type (result screen). */
+  yourAnswer?: ReactNode | null;
+  /** The right answer(s), rendered by the question type (result screen). */
+  correctAnswers?: ReactNode[];
   /** Hide the "Room code" line (e.g. 1v1 duels, where the code is internal). */
   hideRoomCode?: boolean;
   /** Host of the quiz — shown as "Quiz by". Omitted for duels (no host). */
   hostName?: string | null;
   hostImage?: string | null;
 }) => {
-  const options = params?.question?.options ?? [];
   const deadline = useAppSelector((state) => state.game.deadline);
   const connection = useAppSelector((state) => state.game.connection);
   const qIndex = useAppSelector((state) => state.game.qIndex);
@@ -135,9 +114,9 @@ const QuestionAndResult = (params: {
   const status = STATUS[params.status ?? "timesout"];
   const isLast = qCount > 0 && qIndex >= qCount - 1;
 
-  function handleSubmit(id: string) {
+  function handleSubmit(answer: QuestionAnswer) {
     if (params.locked || offline) return;
-    params?.submitAnswer?.(id);
+    params?.submitAnswer?.(answer);
   }
 
   return (
@@ -267,36 +246,14 @@ const QuestionAndResult = (params: {
             <h2 className="md:mt-[18px] text-[22px] md:text-[34px] font-bold tracking-[-0.02em] leading-[1.22] text-pretty wrap-break-word animate-fade-up">
               {params.question?.title ?? ""}
             </h2>
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 md:auto-rows-fr gap-2.5 md:gap-3.5 mt-4 md:mt-7">
-              {options.map((option, index) => {
-                const picked = option.id === params.optionId;
-                const disabled = offline || params.locked;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => handleSubmit(option.id)}
-                    aria-pressed={picked}
-                    className={clsx(
-                      "flex items-center gap-4 rounded-[18px] border-[1.5px] px-3.5 py-2.5 md:px-[22px] md:py-[18px] min-h-14 md:min-h-[84px] text-[17px] md:text-xl font-semibold text-left wrap-break-word min-w-0 transition-all duration-150",
-                      picked
-                        ? "border-lprimary dark:border-dprimary bg-lprimary/10 dark:bg-dprimary/15 shadow-[0_10px_24px_-14px_#7c4ddb] animate-pop"
-                        : subtleCardClass,
-                      !disabled &&
-                        "cursor-pointer hover:border-dprimary hover:-translate-y-0.5 active:scale-[0.98]",
-                      disabled && !picked && "opacity-50 cursor-default",
-                    )}
-                  >
-                    <OptionKey
-                      index={index}
-                      className="size-9 md:size-11 text-lg"
-                    />
-                    <span className="min-w-0">{option.title}</span>
-                  </button>
-                );
-              })}
-            </div>
+            {params.question && (
+              <AnswerInput
+                question={params.question}
+                selected={params.answer ?? null}
+                disabled={offline || Boolean(params.locked)}
+                onSubmit={handleSubmit}
+              />
+            )}
             {params.locked && (
               <div className="mt-6 flex justify-center animate-fade-up">
                 <WaitingDots>
@@ -337,19 +294,20 @@ const QuestionAndResult = (params: {
             <div className="mt-3 md:mt-[22px] flex flex-col gap-3 md:gap-4 w-full max-w-[420px] animate-fade-up [animation-delay:150ms]">
               <AnswerRow
                 label="Your answer"
-                option={params.yourOption ?? null}
                 className={status.answer}
                 emptyText="You didn't answer in time"
-              />
+              >
+                {params.yourAnswer}
+              </AnswerRow>
               {params.status !== "correct" &&
-                (params.correctOptions?.length ?? 0) > 0 &&
-                params.correctOptions!.map((opt) => (
+                params.correctAnswers?.map((node, i) => (
                   <AnswerRow
-                    key={opt.index}
+                    key={i}
                     label="Correct answer"
-                    option={opt}
                     className={STATUS.correct.answer}
-                  />
+                  >
+                    {node}
+                  </AnswerRow>
                 ))}
             </div>
             <div className="mt-4 md:mt-[26px]">

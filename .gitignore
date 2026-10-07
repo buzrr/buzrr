@@ -55,3 +55,6 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# Local question images (STORAGE_DRIVER=local)
+uploads/

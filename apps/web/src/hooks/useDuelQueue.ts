@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { fetchApiAccessToken } from "@/lib/api/get-access-token";
-import type { DuelMatchedPayload, GameSocket } from "@/types/socket-events";
+import type { DuelMatchedPayload } from "@buzrr/contract";
+import type { GameSocket } from "@/types/socket";
 
 export type DuelQueueStatus =
   | "idle"

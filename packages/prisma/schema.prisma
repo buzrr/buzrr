@@ -111,6 +111,13 @@ model Quiz {
 model Question {
   id               String           @id @default(cuid())
   title            String
+  /// Question type key, e.g. "multiple_choice". A plain string rather than an
+  /// enum on purpose: types are registered in code (one handler per type in
+  /// apps/server/src/modules/question-types), so a new type needs no migration.
+  /// Unknown values are rejected by the handler registry, not the database.
+  type             String           @default("multiple_choice")
+  /// Type-specific settings, validated by the type's handler on every write.
+  config           Json             @default("{}")
   quizId           String
   createdAt        DateTime         @default(now())
   timeOut          Int              @default(15)

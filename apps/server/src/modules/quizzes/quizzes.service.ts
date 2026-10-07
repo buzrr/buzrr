@@ -6,13 +6,16 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { DEFAULT_TIME_OUT, type ImportQuiz } from "@buzrr/contract";
+import {
+  LlmTimeoutError,
+  TextGenerator,
+} from "../../common/llm/text-generator";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
 import { EntitlementsService } from "../billing/entitlements.service";
+import { QuestionDefinitionError, validateDefinition } from "../question-types";
 import { CreateAiQuizDto } from "./dto/create-ai-quiz.dto";
-import { ImportQuizDto } from "./dto/import-quiz.dto";
 import { CreateQuizDto } from "./dto/create-quiz.dto";
 
 interface ParsedQuestion {
@@ -63,7 +66,7 @@ export class QuizzesService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
+    private readonly llm: TextGenerator,
     private readonly entitlements: EntitlementsService,
   ) {}
 
@@ -179,22 +182,29 @@ export class QuizzesService {
    * quiz public later moves them to `pending` via `update()`, exactly like
    * hand-authored ones (ADR-007).
    *
-   * Note: `AddQuesForm` / `upsertFromMultipart` still assume exactly 4 options,
-   * so a 2-option True/False question imports and *plays* correctly but cannot
-   * yet be edited in the question editor.
+   * Each question is checked by its own type's handler, the same check the
+   * question editor's endpoint runs.
    */
   async importQuestions(
     user: AuthUser,
-    dto: ImportQuizDto,
+    dto: ImportQuiz,
   ): Promise<{ quizId: string; questionCount: number }> {
-    for (const [index, question] of dto.questions.entries()) {
-      const correct = question.options.filter((o) => o.isCorrect).length;
-      if (correct !== 1) {
-        throw new BadRequestException(
-          `Question ${index + 1} must have exactly one correct option`,
-        );
+    const questions = dto.questions.map((question, index) => {
+      try {
+        const definition = validateDefinition(question.type, {
+          options: question.options,
+          config: question.config,
+        });
+        return { ...question, ...definition };
+      } catch (err) {
+        if (err instanceof QuestionDefinitionError) {
+          throw new BadRequestException(
+            `Question ${index + 1}: ${err.message}`,
+          );
+        }
+        throw err;
       }
-    }
+    });
 
     const quiz = await this.prisma.db.$transaction(async (tx) => {
       await this.entitlements.assertQuizCapacity(tx, user.userId);
@@ -204,10 +214,12 @@ export class QuizzesService {
           description: dto.description ?? null,
           userId: user.userId,
           questions: {
-            create: dto.questions.map((question, index) => ({
+            create: questions.map((question, index) => ({
+              type: question.type,
               title: question.title,
-              timeOut: question.timeOut ?? 15,
+              timeOut: question.timeOut ?? DEFAULT_TIME_OUT,
               order: index + 1,
+              config: question.config,
               options: {
                 create: question.options.map((option) => ({
                   title: option.title,
@@ -227,9 +239,10 @@ export class QuizzesService {
     user: AuthUser,
     dto: CreateAiQuizDto,
   ): Promise<{ msg: string; quizId: string }> {
-    const apiKey = this.config.get<string>("GEMINI_API_KEY");
-    if (!apiKey) {
-      throw new BadRequestException("GEMINI_API_KEY is not configured");
+    if (!this.llm.configured) {
+      throw new BadRequestException(
+        "AI generation is not configured on this server",
+      );
     }
 
     // Fail fast on a full quiz list before spending an AI token on a quiz that
@@ -243,7 +256,7 @@ export class QuizzesService {
       "quiz_ai",
     );
     try {
-      return await this.generateAndSaveAiQuiz(user, dto, apiKey);
+      return await this.generateAndSaveAiQuiz(user, dto);
     } catch (err) {
       // A failed generation must not cost the user a token.
       await this.entitlements
@@ -265,11 +278,7 @@ export class QuizzesService {
   private async generateAndSaveAiQuiz(
     user: AuthUser,
     dto: CreateAiQuizDto,
-    apiKey: string,
   ): Promise<{ msg: string; quizId: string }> {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
-
     const prompt = `Create a multiple choice question for the following description: ${dto.description}.
         The question should have 4 options and the correct answer should be the first option.
         Give the response in the following format:
@@ -281,19 +290,15 @@ export class QuizzesService {
         don't add any extra text other than the question and options.
         Generate a total of ${dto.questions} questions only`;
 
-    let result: Awaited<ReturnType<typeof model.generateContent>>;
+    let response: string;
     try {
-      result = await model.generateContent(prompt);
+      response = await this.llm.generate(prompt);
     } catch (err) {
       this.logger.debug(
-        `Gemini generateContent failed: ${err instanceof Error ? err.message : String(err)}`,
+        `${this.llm.provider} generation failed: ${err instanceof Error ? err.message : String(err)}`,
         err instanceof Error ? err.stack : undefined,
       );
-      const msg = err instanceof Error ? err.message : String(err);
-      const lower = msg.toLowerCase();
-      const isTimeout =
-        lower.includes("timeout") || lower.includes("timed out");
-      if (isTimeout) {
+      if (err instanceof LlmTimeoutError) {
         throw new ServiceUnavailableException(
           "The AI service took too long to respond. Please try again.",
         );
@@ -303,7 +308,6 @@ export class QuizzesService {
       );
     }
 
-    const response = result.response.text();
     const questionsArray = parseQuestions(response);
 
     if (questionsArray.length < dto.questions) {

@@ -1,10 +1,13 @@
 import { Inject, Injectable } from "@nestjs/common";
 import Redis from "ioredis";
 import { REDIS } from "../../redis/redis.constants";
+import { normalizeLiveQuestion } from "../question-types";
+import type { GameState, StatePart } from "./core/state";
 import {
   GameMeta,
   LiveQuestion,
   RosterEntry,
+  ScoreEntry,
   StoredAnswer,
 } from "./game-engine.types";
 
@@ -33,6 +36,59 @@ const NUMERIC_META = new Set([
   "pausedAt",
 ]);
 const BOOLEAN_META = new Set(["hostConnected", "rated"]);
+
+function parseMeta(raw: Record<string, string>): GameMeta | null {
+  if (!raw || Object.keys(raw).length === 0) return null;
+  const meta: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (NUMERIC_META.has(k)) meta[k] = Number(v);
+    else if (BOOLEAN_META.has(k)) meta[k] = v === "1";
+    else meta[k] = v;
+  }
+  return meta as unknown as GameMeta;
+}
+
+function parseQuestions(raw: string | null): LiveQuestion[] | null {
+  if (!raw) return null;
+  return (JSON.parse(raw) as Parameters<typeof normalizeLiveQuestion>[0][]).map(
+    normalizeLiveQuestion,
+  );
+}
+
+/**
+ * Answers stored before answers were type-agnostic carried a bare
+ * `optionId`; a deploy mid-game reads them as multiple-choice answers.
+ */
+function parseAnswer(json: string): StoredAnswer {
+  const stored = JSON.parse(json) as StoredAnswer & { optionId?: string };
+  if (stored.answer === undefined && stored.optionId !== undefined) {
+    const { optionId, ...rest } = stored;
+    return { ...rest, answer: { optionId } };
+  }
+  return stored;
+}
+
+function parseAnswers(
+  raw: Record<string, string> | null,
+): Record<string, StoredAnswer> {
+  const out: Record<string, StoredAnswer> = {};
+  for (const [playerId, json] of Object.entries(raw ?? {})) {
+    out[playerId] = parseAnswer(json);
+  }
+  return out;
+}
+
+function parseScores(flat: string[]): ScoreEntry[] {
+  const out: ScoreEntry[] = [];
+  for (let i = 0; i < flat.length; i += 2) {
+    out.push({ playerId: flat[i], score: Number(flat[i + 1]) });
+  }
+  return out;
+}
+
+function parseRoster(raw: Record<string, string> | null): RosterEntry[] {
+  return Object.values(raw ?? {}).map((v) => JSON.parse(v) as RosterEntry);
+}
 
 // ARGV: [1]=sessionId (HSETNX guard value), [2]=TTL, [3..]=flattened meta pairs.
 const INIT_META_SCRIPT = `
@@ -119,15 +175,57 @@ export class GameStoreService {
   // -- meta ----------------------------------------------------------------
 
   async getMeta(code: string): Promise<GameMeta | null> {
-    const raw = await this.redis.hgetall(keys.meta(code));
-    if (!raw || Object.keys(raw).length === 0) return null;
-    const meta: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(raw)) {
-      if (NUMERIC_META.has(k)) meta[k] = Number(v);
-      else if (BOOLEAN_META.has(k)) meta[k] = v === "1";
-      else meta[k] = v;
+    return parseMeta(await this.redis.hgetall(keys.meta(code)));
+  }
+
+  /**
+   * Everything the engine's phase machine reads, in two round trips: the meta
+   * (which says which question's answers to read), then the requested parts
+   * pipelined. Parts not requested come back empty. Pass `qIndex` to read a
+   * specific question's answers instead of the current one's.
+   */
+  async loadState(
+    code: string,
+    parts: readonly StatePart[],
+    qIndex?: number,
+  ): Promise<GameState | null> {
+    const meta = await this.getMeta(code);
+    if (!meta) return null;
+    const state: GameState = {
+      meta,
+      questions: [],
+      roster: [],
+      answers: {},
+      scores: [],
+    };
+    if (parts.length === 0) return state;
+
+    const pipe = this.redis.pipeline();
+    for (const part of parts) {
+      if (part === "questions") pipe.get(keys.questions(code));
+      if (part === "roster") pipe.hgetall(keys.players(code));
+      if (part === "answers") {
+        pipe.hgetall(keys.answers(code, qIndex ?? meta.qIndex));
+      }
+      if (part === "scores") {
+        pipe.zrevrange(keys.lb(code), 0, -1, "WITHSCORES");
+      }
     }
-    return meta as unknown as GameMeta;
+    const results = (await pipe.exec()) ?? [];
+    parts.forEach((part, i) => {
+      const [err, value] = results[i] ?? [null, null];
+      if (err) throw err;
+      if (part === "questions") {
+        state.questions = parseQuestions(value as string | null) ?? [];
+      } else if (part === "roster") {
+        state.roster = parseRoster(value as Record<string, string>);
+      } else if (part === "answers") {
+        state.answers = parseAnswers(value as Record<string, string>);
+      } else {
+        state.scores = parseScores(value as string[]);
+      }
+    });
+    return state;
   }
 
   async patchMeta(code: string, patch: Partial<GameMeta>): Promise<void> {
@@ -235,11 +333,6 @@ export class GameStoreService {
     );
   }
 
-  async getQuestions(code: string): Promise<LiveQuestion[] | null> {
-    const raw = await this.redis.get(keys.questions(code));
-    return raw ? (JSON.parse(raw) as LiveQuestion[]) : null;
-  }
-
   // -- answers -------------------------------------------------------------
 
   /** First answer wins. Returns false if the player already answered. */
@@ -262,12 +355,7 @@ export class GameStoreService {
     code: string,
     qIndex: number,
   ): Promise<Record<string, StoredAnswer>> {
-    const raw = await this.redis.hgetall(keys.answers(code, qIndex));
-    const out: Record<string, StoredAnswer> = {};
-    for (const [playerId, json] of Object.entries(raw ?? {})) {
-      out[playerId] = JSON.parse(json) as StoredAnswer;
-    }
-    return out;
+    return parseAnswers(await this.redis.hgetall(keys.answers(code, qIndex)));
   }
 
   async answerCount(code: string, qIndex: number): Promise<number> {
@@ -284,27 +372,11 @@ export class GameStoreService {
       .exec();
   }
 
-  async totalScore(code: string, playerId: string): Promise<number> {
-    const score = await this.redis.zscore(keys.lb(code), playerId);
-    return score ? Number(score) : 0;
-  }
-
-  /** 1-based rank by descending score; null when the player has no score yet. */
-  async rank(code: string, playerId: string): Promise<number | null> {
-    const r = await this.redis.zrevrank(keys.lb(code), playerId);
-    return r === null ? null : r + 1;
-  }
-
   /** playerId → score, descending. */
-  async leaderboard(
-    code: string,
-  ): Promise<{ playerId: string; score: number }[]> {
-    const flat = await this.redis.zrevrange(keys.lb(code), 0, -1, "WITHSCORES");
-    const out: { playerId: string; score: number }[] = [];
-    for (let i = 0; i < flat.length; i += 2) {
-      out.push({ playerId: flat[i], score: Number(flat[i + 1]) });
-    }
-    return out;
+  async leaderboard(code: string): Promise<ScoreEntry[]> {
+    return parseScores(
+      await this.redis.zrevrange(keys.lb(code), 0, -1, "WITHSCORES"),
+    );
   }
 
   // -- roster ----------------------------------------------------------------
@@ -357,8 +429,7 @@ export class GameStoreService {
   }
 
   async roster(code: string): Promise<RosterEntry[]> {
-    const raw = await this.redis.hgetall(keys.players(code));
-    return Object.values(raw ?? {}).map((v) => JSON.parse(v) as RosterEntry);
+    return parseRoster(await this.redis.hgetall(keys.players(code)));
   }
 
   // -- bans ------------------------------------------------------------------

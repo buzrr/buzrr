@@ -30,6 +30,25 @@ Two processes from one image: the HTTP service and the worker. Ingestion is
 CPU-bound (PDF parsing) and must never share an event loop with request handling
 — still less with the game engine (ADR-002).
 
+### Model providers
+
+Everything model-specific sits behind the `EmbeddingProvider` / `LLMProvider`
+protocols (`providers/base.py`); `deps.py` picks one implementation at
+startup, importing only that vendor's module:
+
+| Provider          | Module                       | Selected when                                | Notes                                                                                                                                                                                                          |
+| ----------------- | ---------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gemini            | `providers/gemini.py`        | default (`GEMINI_API_KEY`)                   | `google-genai` SDK; asymmetric query/document embeddings; native `response_schema`.                                                                                                                            |
+| OpenAI-compatible | `providers/openai_compat.py` | `LLM_BASE_URL` set, or `LLM_PROVIDER=openai` | Plain `httpx` to `/chat/completions` (`response_format: json_schema`, schema also in the prompt; code fences stripped) and `/embeddings` (`dimensions` requested). Works with Ollama, vLLM, LM Studio, OpenAI. |
+
+Retry/backoff, the outbound token bucket and error mapping are shared
+(`providers/_resilience.py`). `Settings` fails boot unless the chosen provider
+is usable (`GEMINI_API_KEY`, or `LLM_BASE_URL`). With the OpenAI-compatible
+provider, `AI_GENERATION_MODEL` / `AI_EMBEDDING_MODEL` must name models that
+server has, and the embedding model must produce **768** dimensions (e.g.
+`nomic-embed-text`) — any other width is rejected with an explanation rather
+than failing every chunk insert.
+
 ## Ownership boundaries
 
 |               | Owns                                                         | Never                                                                                                                        |
@@ -54,8 +73,9 @@ holding the JWT `sub`.
 | `generated_questions` | `options` JSONB already in Buzrr's `{title,isCorrect}` shape, so export is a pass-through                                                            |
 | `question_citations`  | snapshot of document/page/heading, so a citation still renders after its chunk is re-ingested (`chunk_id` is `ON DELETE SET NULL`, not CASCADE)      |
 
-**Embedding dimension is 768**, from `gemini-embedding-001` truncated via MRL and
-**re-normalised** — truncation breaks the unit length that cosine distance
+**Embedding dimension is 768** — with Gemini, `gemini-embedding-001` truncated
+via MRL; with an OpenAI-compatible server, a native-768 model or one honouring
+`dimensions` — and always **re-normalised** — truncation breaks the unit length that cosine distance
 assumes. 3072 would exceed pgvector's 2000-dimension HNSW ceiling.
 
 Indexes: HNSW (`vector_cosine_ops`, `m=16`, `ef_construction=64`) for ANN, a btree
@@ -178,13 +198,16 @@ unchanged across both services.
 ## Export to a Buzrr quiz
 
 `POST /api/quizzes/import` on the **Nest** server (`QuizzesService.importQuestions`):
-one transaction, questions land as `draft`, `order` assigned 1..n. Accepts 2–6
-options per question.
+one transaction, questions land as `draft`, `order` assigned 1..n. The body is
+the contract's `importQuizSchema` (`@buzrr/contract`); questions without a
+`type` are Buzrr `multiple_choice`, and each is checked by that type's server
+handler (2–6 options, exactly one correct). Both of this service's types
+(`MCQ`, `TRUE_FALSE`) export as `multiple_choice`.
 
-> Gameplay renders `options.map` generically and duel eligibility only requires
-> `options.length >= 2`, so a True/False question **plays** correctly. But
-> `AddQuesForm` / `upsertFromMultipart` still assume exactly 4 options, so an
-> exported True/False question cannot yet be _edited_ in the question editor.
+> Gameplay renders through the question-type renderers, so a 2-option
+> True/False question **plays** correctly. The question editor
+> (`AddQuesForm`) still authors only 4-option questions, so an exported
+> True/False question cannot yet be _edited_ there.
 
 ## Frontend
 
@@ -247,8 +270,15 @@ yarn workspace ai dev              # API  :3002
 yarn workspace ai worker           # ingestion worker
 ```
 
-Or `docker compose --profile ai up -d` to run both without a host Python
-toolchain. `BETTER_AUTH_SECRET` must match web and server — `yarn setup` keeps
+Or run both in Docker against the host apps, without a host Python
+toolchain: `AI_BUZRR_API_URL=http://host.docker.internal:3001 docker compose
+--profile ai up -d ai ai-worker` (they read `apps/ai/.env`; `ai-migrate`
+applies Alembic first). For a fully containerised install see
+[docs/self-hosting.md](../self-hosting.md).
+
+No Gemini key? Point it at a local model instead — e.g. Ollama with
+`LLM_BASE_URL=http://localhost:11434/v1`, `AI_GENERATION_MODEL=llama3.1`,
+`AI_EMBEDDING_MODEL=nomic-embed-text` in `apps/ai/.env`. `BETTER_AUTH_SECRET` must match web and server — `yarn setup` keeps
 all three in sync (`resolveAuthSecret` scans `apps/ai/.env` too). Set `AI_BUZRR_API_URL` to the
 Nest origin (`http://localhost:3001`); generation reserves AI tokens there.
 
@@ -259,6 +289,7 @@ parsers, JWT verification (including the player-token rejection), the structured
 schemas and citation mapping. Integration tests run the real app against real
 pgvector and cover ingestion, retrieval, generation and — most importantly —
 **tenant isolation on every route**. Both providers are faked behind their
-protocols: **no test ever calls Gemini.** The Nest billing client is faked the
+protocols: **no test ever calls a model.** The OpenAI-compatible provider is
+tested against an `httpx.MockTransport` (`tests/unit/test_openai_compat.py`). The Nest billing client is faked the
 same way (`FakeBilling` in `tests/integration/conftest.py`). Integration tests skip cleanly when no
 database is reachable.

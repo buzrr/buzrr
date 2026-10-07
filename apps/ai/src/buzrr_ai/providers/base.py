@@ -1,9 +1,10 @@
 """Provider protocols.
 
 Everything model-specific sits behind these two interfaces so the rest of the
-service never imports a vendor SDK. Swapping Gemini for another provider — or
-faking both in tests, which is how the whole test suite avoids network calls —
-means implementing these and nothing else.
+service never imports a vendor SDK. Two implementations ship — Gemini
+(`gemini.py`) and any OpenAI-compatible server (`openai_compat.py`, which is
+how Ollama and other local models plug in); `deps.py` picks one from settings.
+Faking both in tests is how the whole test suite avoids network calls.
 """
 
 from typing import Protocol, TypeVar

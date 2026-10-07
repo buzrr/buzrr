@@ -9,12 +9,13 @@
  *      never overwritten — but if one is missing a key the apps can't run
  *      without (DB/Redis URLs, auth secret, public API URLs), the local
  *      default is appended. Safe to re-run at any time.
- *   2. Starts the Postgres + Redis containers (docker compose up -d).
+ *   2. Starts the Postgres + Redis containers (docker compose up -d postgres
+ *      redis — the rest of docker-compose.yml is the self-hosted stack).
  *   3. Waits for Postgres to accept connections.
  *   4. Pushes the Prisma schema into the fresh database (prisma db push).
  *
- * After it finishes you only need to drop your Google OAuth credentials into
- * apps/web/.env, then run `yarn dev`. Everything else is optional.
+ * After it finishes, run `yarn dev` and create a local account (email +
+ * password). Google sign-in, AI and Cloudinary are optional extras.
  *
  * Cross-platform: pure Node, no bash-isms.
  */
@@ -89,9 +90,14 @@ DIRECT_URL="${LOCAL_DATABASE_URL}"
 REDIS_URL="${LOCAL_REDIS_URL}"
 
 # --- Optional ---
-# AI quiz generation (https://aistudio.google.com/app/apikey)
+# AI quiz generation: Gemini (https://aistudio.google.com/app/apikey)…
 GEMINI_API_KEY=""
-# Image uploads (https://cloudinary.com)
+# …or any OpenAI-compatible server, e.g. a local Ollama:
+# LLM_BASE_URL="http://localhost:11434/v1"
+# LLM_MODEL="llama3.1"
+# Image uploads are stored in ./uploads and served at /uploads by default.
+# Set these to use Cloudinary instead (https://cloudinary.com), or see
+# apps/server/.env.example for S3-compatible storage.
 CLOUDINARY_CLOUD_NAME=""
 CLOUDINARY_API_KEY=""
 CLOUDINARY_API_SECRET=""
@@ -110,7 +116,10 @@ TRUSTED_ORIGINS="http://localhost:3000,http://localhost:3001"
 # Must match apps/server/.env
 BETTER_AUTH_SECRET="${AUTH_SECRET}"
 
-# REQUIRED for signup/login — create at https://console.cloud.google.com
+# Sign in with a local email + password account — no setup needed.
+AUTH_EMAIL_PASSWORD="ON"
+
+# Optional Google sign-in — create at https://console.cloud.google.com
 # Authorized redirect URI: http://localhost:3000/api/auth/callback/google
 GOOGLE_CLIENT_ID=""
 GOOGLE_CLIENT_SECRET=""
@@ -128,8 +137,6 @@ NEXT_PUBLIC_API_URL="http://localhost:3001"
 NEXT_PUBLIC_AI_API_URL="http://localhost:3002"
 
 # --- Optional ---
-# AI quiz generation (https://aistudio.google.com/app/apikey)
-GEMINI_API_KEY=""
 # Landing-page GitHub stats (https://github.com/settings/tokens — no scopes needed for public repos)
 GITHUB_TOKEN=""
 # Landing-page video (MP4 URL; empty hides the section)
@@ -250,7 +257,9 @@ if (createdAny) info(`Generated a shared BETTER_AUTH_SECRET for local dev.`);
 // 2. start containers
 // ---------------------------------------------------------------------------
 step("Starting Postgres + Redis containers");
-run("docker compose up -d");
+// Only the databases: the other services in docker-compose.yml are the
+// self-hosted stack, and would fight `yarn dev` for ports 3000/3001.
+run("docker compose up -d postgres redis");
 
 // ---------------------------------------------------------------------------
 // 3. wait for Postgres
@@ -318,15 +327,11 @@ ok("Prisma client generated");
 console.log(`\n${c.green}${c.bold}✓ Local environment is ready.${c.reset}\n`);
 console.log(`${c.bold}Next steps:${c.reset}`);
 console.log(
-  `  1. Add your Google OAuth credentials to ${c.cyan}apps/web/.env${c.reset}` +
-    ` (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).`,
+  `  1. Run ${c.cyan}yarn dev${c.reset} — web on :3000, API on :3001.`,
 );
 console.log(
-  `     ${c.dim}Redirect URI: http://localhost:3000/api/auth/callback/google${c.reset}`,
+  `  2. Open http://localhost:3000 and create an account (email + password).`,
 );
 console.log(
-  `  2. Run ${c.cyan}yarn dev${c.reset} — web on :3000, API on :3001.`,
-);
-console.log(
-  `\n${c.dim}Optional: add GEMINI_API_KEY (AI), CLOUDINARY_* (uploads), or GITHUB_TOKEN (landing stats) later.${c.reset}\n`,
+  `\n${c.dim}Optional: Google sign-in (GOOGLE_CLIENT_* in apps/web/.env), AI (GEMINI_API_KEY or LLM_BASE_URL in apps/server/.env), Cloudinary/S3 uploads, GITHUB_TOKEN (landing stats).${c.reset}\n`,
 );

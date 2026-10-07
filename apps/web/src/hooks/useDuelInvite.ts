@@ -2,11 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { fetchApiAccessToken } from "@/lib/api/get-access-token";
-import type {
-  DuelInviteFailure,
-  DuelMatchedPayload,
-  GameSocket,
-} from "@/types/socket-events";
+import type { DuelInviteFailure, DuelMatchedPayload } from "@buzrr/contract";
+import type { GameSocket } from "@/types/socket";
 
 export type DuelInviteStatus =
   | "connecting"

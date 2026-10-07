@@ -25,7 +25,10 @@ export class QuestionsController {
   ) {}
 
   @Patch("reorder")
-  reorder(@CurrentAccountUser() user: AuthUser, @Body() dto: ReorderQuestionsDto) {
+  reorder(
+    @CurrentAccountUser() user: AuthUser,
+    @Body() dto: ReorderQuestionsDto,
+  ) {
     return this.questions.reorder(user, dto);
   }
 

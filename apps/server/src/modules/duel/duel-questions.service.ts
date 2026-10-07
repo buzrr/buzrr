@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
-import type { LiveQuestion } from "../game-engine/game-engine.types";
+import { toLiveQuestion, type LiveQuestion } from "../question-types";
 
 const DUEL_QUESTION_COUNT = 7;
 const MIN_QUESTIONS = 3;
@@ -32,22 +32,11 @@ export class DuelQuestionsService {
     const ordered = ids
       .map((r) => byId.get(r.id))
       .filter((q): q is (typeof rows)[number] => q !== undefined);
-    const questions: LiveQuestion[] = ordered
-      .filter(
-        (q) => q.options.length >= 2 && q.options.some((o) => o.isCorrect),
-      )
-      .map((q) => ({
-        id: q.id,
-        title: q.title,
-        media: q.media,
-        mediaType: q.mediaType,
-        timeOut: q.timeOut,
-        options: q.options.map((o) => ({
-          id: o.id,
-          title: o.title,
-          isCorrect: o.isCorrect,
-        })),
-      }));
+    // Each type's own checks decide what is playable (e.g. multiple choice
+    // needs options and exactly one right answer); anything else is skipped.
+    const questions = ordered
+      .map((q) => toLiveQuestion(q))
+      .filter((q): q is LiveQuestion => q !== null);
     if (questions.length < MIN_QUESTIONS) {
       throw new Error(
         `Only ${questions.length} usable public questions (need ${MIN_QUESTIONS})`,

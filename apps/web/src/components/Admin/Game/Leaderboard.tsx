@@ -12,7 +12,7 @@ import {
   panelClass,
   subtleCardClass,
 } from "@/components/Game/GameUI";
-import type { LiveLeaderboardEntry } from "@/types/socket-events";
+import type { LeaderboardEntry } from "@buzrr/contract";
 import { rankBadgeClass } from "./QuesResult";
 
 const PODIUM = {
@@ -40,7 +40,7 @@ function PodiumSpot({
   entry,
   place,
 }: {
-  entry: LiveLeaderboardEntry | undefined;
+  entry: LeaderboardEntry | undefined;
   place: 1 | 2 | 3;
 }) {
   const p = PODIUM[place];

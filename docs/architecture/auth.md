@@ -5,17 +5,22 @@ need cross-app thinking.
 
 ## Identity kinds
 
-| Identity           | Who                           | Issued by                                       | Carried as                                                                           |
-| ------------------ | ----------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------ |
-| **Account (User)** | Hosts, duelists, admins       | Better Auth (Google OAuth) in the **web** app   | Better Auth session cookie (web) → exchanged for a 7d HS256 JWT to call the API      |
-| **Player**         | Anonymous classic-mode guests | Nest `POST /api/players` (`players.service.ts`) | 7d HS256 JWT with `typ: "player"`, kept in `localStorage` (`playerToken`/`playerId`) |
-| **Bot**            | Duel bot opponents            | Server-internal                                 | No credentials — just a `bot_`-prefixed roster id; never authenticates               |
+| Identity           | Who                           | Issued by                                                                   | Carried as                                                                           |
+| ------------------ | ----------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| **Account (User)** | Hosts, duelists, admins       | Better Auth (Google OAuth and/or local email + password) in the **web** app | Better Auth session cookie (web) → exchanged for a 7d HS256 JWT to call the API      |
+| **Player**         | Anonymous classic-mode guests | Nest `POST /api/players` (`players.service.ts`)                             | 7d HS256 JWT with `typ: "player"`, kept in `localStorage` (`playerToken`/`playerId`) |
+| **Bot**            | Duel bot opponents            | Server-internal                                                             | No credentials — just a `bot_`-prefixed roster id; never authenticates               |
 
 ## The trust chain (web ⇄ server)
 
 1. **Better Auth lives in the web app only.** Config:
    `apps/web/src/lib/auth.ts` (lazy proxy so builds don't need creds); routes:
-   `src/app/api/auth/[...all]/route.ts`. Google is the only provider; session
+   `src/app/api/auth/[...all]/route.ts`. Sign-in methods come from env
+   (`lib/auth-methods.ts`): Google OAuth when `GOOGLE_CLIENT_ID`/`SECRET`
+   are set, local **email + password** when `AUTH_EMAIL_PASSWORD=ON`
+   (min 8 chars; `AUTH_EMAIL_SIGNUP=OFF` disables self-registration; no email
+   verification or password reset — the self-hosted/offline path has no mail
+   server). At least one must be on or auth throws on first use. Session
    cookie has a 5-min cookie cache; `deleteUser` enabled (settings
    danger-zone). Better Auth writes `users/accounts/sessions/verification`
    tables via the Prisma adapter.
@@ -27,7 +32,8 @@ need cross-app thinking.
    (`lib/api/client.ts`).
 3. **The Nest server verifies that JWT** with the same secret — passport-jwt
    strategy `apps/server/src/modules/auth/jwt.strategy.ts`. It never talks to
-   Google and has no login of its own. **Web and server `BETTER_AUTH_SECRET`
+   an identity provider and has no login of its own — which sign-in method
+   produced the session is invisible to it. **Web and server `BETTER_AUTH_SECRET`
    must be identical or every API call 401s.**
 4. **`apps/ai` verifies the very same JWT** (`apps/ai/src/buzrr_ai/auth.py`,
    PyJWT, HS256, same secret) and rejects `typ: "player"` outright — Knowledge
@@ -154,3 +160,10 @@ reports, invites…), not globally. `TRUST_PROXY` in `main.ts` makes
   ability to accept a previously minted JWT (tokens are stateless).
 - `parse-cors-origin.ts`: unset/empty `WEB_ORIGIN` reflects **all** origins
   (dev convenience). Production must set `WEB_ORIGIN`.
+- Local accounts have no recovery path: a forgotten password can only be
+  reset by an operator in the database. Keep `AUTH_EMAIL_SIGNUP=OFF` on
+  internet-facing self-hosted installs unless open registration is intended.
+- The self-host compose file generates `BETTER_AUTH_SECRET` on first boot
+  into the `buzrr-secrets` volume and every container reads it from there,
+  unless `.env` sets one — deleting that volume logs everyone out and
+  invalidates all minted tokens.

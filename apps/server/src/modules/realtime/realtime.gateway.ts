@@ -1,3 +1,4 @@
+import { submitAnswerSchema } from "@buzrr/contract";
 import { Logger } from "@nestjs/common";
 import {
   OnGatewayConnection,
@@ -389,19 +390,18 @@ export class RealtimeGateway
           ack?.({ accepted: false, reason: "Not a player connection" });
           return;
         }
-        if (
-          !payload ||
-          typeof payload.qIndex !== "number" ||
-          typeof payload.optionId !== "string"
-        ) {
+        // The contract's shape check; the question's own type then decides
+        // whether the answer fits the question being asked.
+        const parsed = submitAnswerSchema.safeParse(payload);
+        if (!parsed.success) {
           ack?.({ accepted: false, reason: "Malformed payload" });
           return;
         }
         const result = await this.engine.submitAnswer(
           gameCode,
           playerId,
-          payload.qIndex,
-          payload.optionId,
+          parsed.data.qIndex,
+          parsed.data.answer,
         );
         ack?.(result);
       } catch (error) {

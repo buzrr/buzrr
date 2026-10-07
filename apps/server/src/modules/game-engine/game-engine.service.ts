@@ -4,58 +4,57 @@ import {
   OnApplicationBootstrap,
   OnApplicationShutdown,
 } from "@nestjs/common";
+import type { QuestionAnswer } from "@buzrr/contract";
 import { nanoid } from "nanoid";
-import {
-  ANSWER_GRACE_MS,
-  resolveAnswerTiming,
-} from "../../common/utils/answer-timing";
-import { computeScore } from "../../common/utils/compute-score";
-import { BotTier, planBotAnswer } from "../../common/utils/duel-bot";
+import { BotTier } from "../../common/utils/duel-bot";
 import { applyFloor, eloDelta, kFactor } from "../../common/utils/elo";
 import { PrismaService } from "../../prisma/prisma.service";
+import { toLiveQuestion } from "../question-types";
 import type {
-  AnswerResultPayload,
   StateSyncPayload,
   SubmitAnswerAck,
   TypedServer,
 } from "../realtime/realtime.types";
-import { DuelBotService } from "./duel-bot.service";
 import {
-  GameMeta,
-  LeaderboardEntry,
-  LiveQuestion,
-  RosterEntry,
-  StoredAnswer,
-  toPublicQuestion,
-} from "./game-engine.types";
+  DUEL_FORFEIT_MS,
+  PARTS_FOR,
+  START_COUNTDOWN_MS,
+  botAnswerOf,
+  buildLeaderboard,
+  buildSnapshot,
+  canPause,
+  forfeitOutcome,
+  hasConnectedHuman,
+  isHostAbandoned,
+  judgeAnswer,
+  overdueForfeiter,
+  resumePlan,
+  step,
+  type Audience,
+  type Effect,
+  type EngineEvent,
+  type Outbound,
+} from "./core";
+import { DuelBotService } from "./duel-bot.service";
+import { GameMeta, LeaderboardEntry, LiveQuestion } from "./game-engine.types";
 import { GameStoreService } from "./game-store.service";
 
-/** Countdown shown on clients between "start game" and the first question. */
-const START_COUNTDOWN_MS = 3_200;
-/** Auto-advance delay after a reveal in hostless (duel) games. */
-const DUEL_REVEAL_MS = 4_000;
 /** How long a disconnected lobby player is kept before removal. */
 const LOBBY_DISCONNECT_GRACE_MS = 60_000;
-/** A classic game whose host has been gone this long is ended by the sweeper. */
-const HOST_ABANDON_MS = 5 * 60_000;
-/** A duel player disconnected this long mid-game forfeits the match. */
-const DUEL_FORFEIT_MS = 30_000;
 const SWEEP_INTERVAL_MS = 15_000;
 
-function averageAnswerMs(answers: Record<string, StoredAnswer>): number | null {
-  const list = Object.values(answers);
-  if (list.length === 0) return null;
-  return Math.round(
-    list.reduce((sum, a) => sum + a.timeTakenMs, 0) / list.length,
-  );
-}
-
 /**
- * Server-authoritative game loop. All timing, question advancement and
- * scoring decisions happen here; the gateway only relays client intent
- * (start-game / host-next / submit-answer) and the engine pushes phase
- * transitions to the room. Live state lives in Redis (GameStoreService) so
- * a process restart or a second instance can pick a game back up.
+ * The shell around the engine's pure core (`./core`). The rules of the game —
+ * phase transitions, answer judging, scoring, what each client is told — are
+ * pure functions there; this service loads their input from Redis, runs the
+ * effects they return in order, and owns everything that needs I/O or
+ * atomicity: first-write-wins answers, the single end-of-game claim, duel
+ * pause/resume claims, timers, recovery and result persistence.
+ *
+ * Still the only place a game advances: the gateway only relays client intent
+ * (start-game / host-next / submit-answer). Live state lives in Redis
+ * (GameStoreService) so a process restart or a second instance can pick a
+ * game back up.
  */
 @Injectable()
 export class GameEngineService
@@ -94,6 +93,149 @@ export class GameEngineService
     for (const t of this.disconnectTimers.values()) clearTimeout(t);
   }
 
+  // -- core plumbing -----------------------------------------------------------
+
+  /**
+   * Loads what the event needs, steps the phase machine, and runs the
+   * effects. `qIndex` pins which question's answers are read (answer events
+   * name their question; everything else reads the current one).
+   */
+  private async dispatch(
+    gameCode: string,
+    event: EngineEvent,
+    qIndex?: number,
+  ): Promise<void> {
+    const state = await this.store.loadState(
+      gameCode,
+      PARTS_FOR[event.type],
+      qIndex,
+    );
+    if (!state) return;
+    const { effects } = step(state, event, Date.now());
+    await this.run(gameCode, effects);
+  }
+
+  /** Executes the core's effects, strictly in the order given. */
+  private async run(gameCode: string, effects: Effect[]): Promise<void> {
+    for (const effect of effects) {
+      switch (effect.kind) {
+        case "set-questions":
+          await this.store.setQuestions(gameCode, effect.questions);
+          break;
+        case "patch-meta":
+          await this.store.patchMeta(gameCode, effect.patch);
+          break;
+        case "set-deadline":
+          await this.store.setDeadline(gameCode, effect.at);
+          break;
+        case "park-deadline":
+          await this.store.parkDeadline(gameCode);
+          break;
+        case "clear-deadline":
+          await this.store.clearDeadline(gameCode);
+          break;
+        case "claim-owner":
+          await this.store.ensureOwner(gameCode, this.instanceId);
+          break;
+        case "arm-timer":
+          this.armTimer(gameCode, effect.at - Date.now());
+          break;
+        case "clear-timer":
+          this.clearTimer(gameCode);
+          break;
+        case "mark-playing":
+          // The one gameplay flag Postgres still carries: join checks and the
+          // player-play context read it to tell a waiting lobby from a live
+          // room. Phase, question index and scores stay in Redis.
+          await this.prisma.db.gameSession.update({
+            where: { gameCode },
+            data: { isPlaying: true },
+          });
+          break;
+        case "emit":
+          this.send(gameCode, effect.to, effect.message);
+          break;
+        case "arm-bot":
+          this.armBot(
+            gameCode,
+            effect.botId,
+            effect.qIndex,
+            effect.answer,
+            effect.at,
+          );
+          break;
+        case "cancel-bot":
+          this.bots.cancel(gameCode);
+          break;
+        case "end-game":
+          await this.endGame(gameCode);
+          break;
+        case "dispatch":
+          await this.dispatch(gameCode, {
+            type: effect.event,
+            qIndex: effect.qIndex,
+          });
+          break;
+        case "log":
+          this.logger[effect.level](`${gameCode}: ${effect.message}`);
+          break;
+        default: {
+          const unhandled: never = effect;
+          throw new Error(
+            `Unhandled engine effect ${JSON.stringify(unhandled)}`,
+          );
+        }
+      }
+    }
+  }
+
+  private send(gameCode: string, to: Audience, message: Outbound): void {
+    if (!this.io) {
+      throw new Error("GameEngineService used before gateway init");
+    }
+    // Per-player rooms work cross-instance via the redis adapter.
+    const target =
+      "player" in to ? this.io.to(`player:${to.player}`) : this.io.to(gameCode);
+    switch (message.event) {
+      case "game-started":
+        target.emit("game-started");
+        break;
+      case "question-start":
+        // What is left of the window once the writes before this broadcast
+        // are done — the clock has been running since the window opened, so
+        // the client is told the truth rather than the full timeOut.
+        target.emit("question-start", {
+          ...message.payload,
+          remainingMs: Math.max(0, message.deadline - Date.now()),
+        });
+        break;
+      case "question-end":
+        target.emit("question-end", message.payload);
+        break;
+      case "answer-result":
+        target.emit("answer-result", message.payload);
+        break;
+      case "answer-count":
+        target.emit("answer-count", message.payload);
+        break;
+      case "leaderboard":
+        target.emit("leaderboard", message.payload);
+        break;
+    }
+  }
+
+  private armBot(
+    gameCode: string,
+    botId: string,
+    qIndex: number,
+    answer: QuestionAnswer,
+    at: number,
+  ): void {
+    this.bots.arm(gameCode, answer, at, (planned) =>
+      this.submitAnswer(gameCode, botId, qIndex, planned),
+    );
+  }
+
   // -- session bootstrap -------------------------------------------------------
 
   /** Create the live session record on first socket contact (idempotent). */
@@ -107,6 +249,7 @@ export class GameEngineService
       quizTitle: "",
       hostId: init.hostId,
       mode: "classic",
+      pacing: "host",
       phase: "lobby",
       rated: false,
       qIndex: 0,
@@ -130,7 +273,7 @@ export class GameEngineService
    *
    * `opts.bot` marks one of the players as server-driven. That entry joins the
    * roster already connected — it has no socket to connect with, and without
-   * it maybeRevealEarly() would close every question the moment the human
+   * it the early close would end every question the moment the human
    * answered, before the bot's timer could fire.
    */
   async startDuel(
@@ -156,6 +299,7 @@ export class GameEngineService
       quizTitle: "1v1 Duel",
       hostId: "",
       mode: "duel",
+      pacing: "auto",
       phase: "starting",
       rated: opts?.rated ?? true,
       botId: opts?.bot?.id,
@@ -192,8 +336,8 @@ export class GameEngineService
   // -- host intents ------------------------------------------------------------
 
   async startGame(gameCode: string): Promise<void> {
-    const meta = await this.store.getMeta(gameCode);
-    if (!meta || meta.phase !== "lobby") return;
+    const state = await this.store.loadState(gameCode, PARTS_FOR.start);
+    if (!state || state.meta.phase !== "lobby") return;
 
     const session = await this.prisma.db.gameSession.findUnique({
       where: { gameCode },
@@ -208,74 +352,39 @@ export class GameEngineService
         },
       },
     });
-    if (!session || session.quiz.questions.length === 0) {
-      this.logger.error(`Cannot start ${gameCode}: no session or questions`);
+    if (!session) {
+      this.logger.error(`Cannot start ${gameCode}: no session`);
       return;
     }
 
-    const questions: LiveQuestion[] = session.quiz.questions.map((q) => ({
-      id: q.id,
-      title: q.title,
-      media: q.media,
-      mediaType: q.mediaType,
-      timeOut: q.timeOut,
-      options: q.options.map((o) => ({
-        id: o.id,
-        title: o.title,
-        isCorrect: o.isCorrect,
-      })),
-    }));
-    await this.store.setQuestions(gameCode, questions);
+    // A row whose type this build doesn't know (or whose content no longer
+    // passes its type's checks) is skipped, not allowed to sink the game.
+    const questions = session.quiz.questions
+      .map((q) => toLiveQuestion(q))
+      .filter((q): q is LiveQuestion => q !== null);
+    const skipped = session.quiz.questions.length - questions.length;
+    if (skipped > 0) {
+      this.logger.warn(
+        `${gameCode}: skipped ${skipped} unplayable question(s)`,
+      );
+    }
 
-    const now = Date.now();
-    const firstQuestionAt = now + START_COUNTDOWN_MS;
-    await this.store.patchMeta(gameCode, {
-      phase: "starting",
-      quizTitle: session.quiz.title,
-      qCount: questions.length,
-      startedAt: now,
-      qDeadline: firstQuestionAt,
-    });
-    await this.store.setDeadline(gameCode, firstQuestionAt);
-    await this.store.ensureOwner(gameCode, this.instanceId);
-
-    // The one gameplay flag Postgres still carries: join checks and the
-    // player-play context read it to tell a waiting lobby from a live room.
-    // Phase, question index and scores stay in Redis.
-    await this.prisma.db.gameSession.update({
-      where: { gameCode },
-      data: { isPlaying: true },
-    });
-
-    this.emitRoom(gameCode).emit("game-started");
-    this.armTimer(gameCode, firstQuestionAt - now);
+    const { effects } = step(
+      state,
+      { type: "start", questions, quizTitle: session.quiz.title },
+      Date.now(),
+    );
+    await this.run(gameCode, effects);
     this.logger.log(`Game ${gameCode} started (${questions.length} questions)`);
   }
 
   /**
-   * Single pacing intent from the host. The server decides what "next" means
-   * from the current phase.
+   * Single pacing intent from the host. The phase machine decides what
+   * "next" means from the current phase — and whether this game's pacing
+   * lets a host advance it at all.
    */
   async hostNext(gameCode: string): Promise<void> {
-    const meta = await this.store.getMeta(gameCode);
-    if (!meta) return;
-    switch (meta.phase) {
-      case "question":
-        await this.enterReveal(gameCode);
-        break;
-      case "reveal":
-        if (meta.qIndex + 1 < meta.qCount) {
-          await this.enterQuestion(gameCode, meta.qIndex + 1, meta);
-        } else {
-          await this.enterFinal(gameCode);
-        }
-        break;
-      case "final":
-        await this.endGame(gameCode);
-        break;
-      default:
-        break;
-    }
+    await this.dispatch(gameCode, { type: "host-next" });
   }
 
   async endGame(
@@ -293,7 +402,11 @@ export class GameEngineService
     const claimed = await this.store.claimEnded(gameCode);
     if (!claimed) return;
 
-    const entries = await this.buildLeaderboard(gameCode);
+    const [scores, roster] = await Promise.all([
+      this.store.leaderboard(gameCode),
+      this.store.roster(gameCode),
+    ]);
+    const entries = buildLeaderboard(scores, roster);
     const { resultId, eloChanges } = await this.persistResult(
       gameCode,
       meta,
@@ -310,8 +423,6 @@ export class GameEngineService
     this.emitRoom(gameCode).emit("game-session-ended");
 
     // Classic games have a lobby record to tear down; duels are Redis-only.
-    // PlayerAnswer is no longer written by the engine (live state lives in Redis,
-    // final state in GameResult); cleanup is a no-op for backward compat.
     if (meta.mode === "classic" && meta.sessionId) {
       await this.prisma.db
         .$transaction([
@@ -332,72 +443,51 @@ export class GameEngineService
 
   // -- player intents -----------------------------------------------------------
 
+  /**
+   * `answer` is whatever the client sent; the open question's type decides
+   * whether it is valid and what it scores (`judgeAnswer`).
+   */
   async submitAnswer(
     gameCode: string,
     playerId: string,
     qIndex: number,
-    optionId: string,
+    answer: unknown,
   ): Promise<SubmitAnswerAck> {
     // Taken before any Redis round trip so store latency isn't billed to the
     // player.
     const receivedAt = Date.now();
-    const meta = await this.store.getMeta(gameCode);
-    if (!meta || meta.phase !== "question") {
+    // The single roster entry rather than the whole roster: this runs once
+    // per answer, and judging only needs to know the player is still in.
+    const [state, rosterEntry] = await Promise.all([
+      this.store.loadState(gameCode, ["questions"]),
+      this.store.getPlayer(gameCode, playerId),
+    ]);
+    if (!state) {
       return { accepted: false, reason: "No question is active" };
     }
-    if (qIndex !== meta.qIndex) {
-      return { accepted: false, reason: "Question already advanced" };
-    }
-    // enterQuestion stamps the window before broadcasting; an unstamped one
-    // can only be meta left behind by an older build.
-    if (!meta.qStartAt) {
-      return { accepted: false, reason: "Question has not started" };
-    }
-    // Server-measured time: never trust the client clock, and never take a
-    // correction the client can influence. Answers are accepted for a short
-    // fixed grace past the deadline so ones sent in time can still arrive.
-    const timing = resolveAnswerTiming({
+    const judgement = judgeAnswer(
+      { ...state, roster: rosterEntry ? [rosterEntry] : [] },
+      { playerId, qIndex, answer },
       receivedAt,
-      qStartAt: meta.qStartAt,
-      qDeadline: meta.qDeadline,
-    });
-    if (!timing.accepted) {
-      return { accepted: false, reason: "Time is up" };
+    );
+    if (!judgement.accepted) {
+      return { accepted: false, reason: judgement.reason };
     }
 
-    // Kicked players are removed from the roster but may still hold a live
-    // socket for a moment — never accept intents from outside the roster.
-    const rosterEntry = await this.store.getPlayer(gameCode, playerId);
-    if (!rosterEntry) {
-      return { accepted: false, reason: "Not in this game" };
-    }
-
-    const questions = await this.store.getQuestions(gameCode);
-    const question = questions?.[qIndex];
-    if (!question) {
-      return { accepted: false, reason: "Question not found" };
-    }
-    const option = question.options.find((o) => o.id === optionId);
-    if (!option) {
-      return { accepted: false, reason: "Invalid option" };
-    }
-
-    const { timeTakenMs } = timing;
-    const score = computeScore(option.isCorrect, timeTakenMs, question.timeOut);
-
-    const stored = await this.store.putAnswer(gameCode, qIndex, playerId, {
-      optionId,
-      answeredAt: receivedAt,
-      timeTakenMs,
-      isCorrect: option.isCorrect,
-      score,
-    });
+    // First write wins: a duplicate (or a resend racing the original) never
+    // re-scores.
+    const stored = await this.store.putAnswer(
+      gameCode,
+      qIndex,
+      playerId,
+      judgement.stored,
+    );
     if (!stored) {
       return { accepted: false, reason: "Already answered" };
     }
-    await this.store.addScore(gameCode, playerId, score);
+    await this.store.addScore(gameCode, playerId, judgement.stored.score);
 
-    await this.maybeRevealEarly(gameCode, qIndex);
+    await this.dispatch(gameCode, { type: "answer-recorded", qIndex }, qIndex);
     return { accepted: true };
   }
 
@@ -468,7 +558,8 @@ export class GameEngineService
 
       // Nobody left to play it: freeze rather than let the match run on
       // without them (see pauseDuel) until the forfeit grace decides it.
-      if (!(await this.hasConnectedHuman(gameCode, meta))) {
+      const roster = await this.store.roster(gameCode);
+      if (!hasConnectedHuman(meta, roster)) {
         await this.pauseDuel(gameCode, meta);
         return;
       }
@@ -487,7 +578,7 @@ export class GameEngineService
 
     // If everyone still connected has answered, don't wait for the deadline.
     if (meta?.phase === "question") {
-      await this.maybeRevealEarly(gameCode, meta.qIndex);
+      await this.dispatch(gameCode, { type: "roster-changed" });
     }
   }
 
@@ -497,19 +588,14 @@ export class GameEngineService
   ): Promise<void> {
     const meta = await this.store.getMeta(gameCode);
     if (!meta || meta.phase === "ended") return;
-    const roster = await this.store.roster(gameCode);
-    const player = roster.find((p) => p.id === playerId);
-    if (!player || player.connected) return;
-    const opponent = roster.find((p) => p.id !== playerId);
-    if (opponent?.connected) {
+    const outcome = forfeitOutcome(await this.store.roster(gameCode), playerId);
+    if (!outcome) return;
+    if ("forfeitLoserId" in outcome) {
       this.logger.log(`Duel ${gameCode}: ${playerId} forfeits (disconnected)`);
-      await this.endGame(gameCode, {
-        forfeitLoserId: player.userId ?? playerId,
-      });
     } else {
       this.logger.log(`Duel ${gameCode}: both players gone — abandoned`);
-      await this.endGame(gameCode, { abandoned: true });
     }
+    await this.endGame(gameCode, outcome);
   }
 
   /**
@@ -527,29 +613,14 @@ export class GameEngineService
     gameCode: string,
     meta: GameMeta,
   ): Promise<void> {
-    const roster = await this.store.roster(gameCode);
-    const now = Date.now();
-    const overdue = roster.find(
-      (p) =>
-        p.id !== meta.botId &&
-        !p.connected &&
-        now - p.lastSeenAt > DUEL_FORFEIT_MS,
+    const overdue = overdueForfeiter(
+      meta,
+      await this.store.roster(gameCode),
+      Date.now(),
     );
     if (!overdue) return;
     this.logger.log(`Duel ${gameCode}: ${overdue.id} gone past the grace`);
     await this.resolveDuelForfeit(gameCode, overdue.id);
-  }
-
-  /**
-   * Bots sit in the roster permanently "connected" (they have no socket), so
-   * they never count as someone the match is still being played for.
-   */
-  private async hasConnectedHuman(
-    gameCode: string,
-    meta: GameMeta,
-  ): Promise<boolean> {
-    const roster = await this.store.roster(gameCode);
-    return roster.some((p) => p.connected && p.id !== meta.botId);
   }
 
   /**
@@ -561,8 +632,7 @@ export class GameEngineService
    * player never returns.
    */
   private async pauseDuel(gameCode: string, meta: GameMeta): Promise<void> {
-    if (meta.pausedAt) return;
-    if (!["starting", "question", "reveal"].includes(meta.phase)) return;
+    if (!canPause(meta)) return;
     // Claim the pause *before* re-checking presence. The two orderings of a
     // reconnect racing this are then both covered: one that committed its
     // roster write earlier is seen by the check below, and one that commits
@@ -574,17 +644,15 @@ export class GameEngineService
     await this.store.parkDeadline(gameCode);
     this.logger.log(`Duel ${gameCode} paused: no player connected`);
 
-    if (await this.hasConnectedHuman(gameCode, meta)) {
+    if (hasConnectedHuman(meta, await this.store.roster(gameCode))) {
       const fresh = await this.store.getMeta(gameCode);
       if (fresh) await this.resumeDuel(gameCode, fresh);
     }
   }
 
   /**
-   * Restarts a paused duel, shifting every stored timestamp by the frozen
-   * span: the returning player keeps the time they had left on the open
-   * question, their score still decays from the same starting point, and the
-   * bot's planned answer keeps its position inside the question.
+   * Restarts a paused duel with every stored timestamp shifted by the frozen
+   * span (`resumePlan`).
    *
    * No broadcast is needed — a paused duel has no other connected player, and
    * the reconnecting one is sent a fresh snapshot by the gateway right after
@@ -593,32 +661,16 @@ export class GameEngineService
   private async resumeDuel(gameCode: string, meta: GameMeta): Promise<void> {
     if (!meta.pausedAt) return;
     const now = Date.now();
-    const pausedFor = Math.max(0, now - meta.pausedAt);
-    const patch: Partial<GameMeta> = {};
-    if (meta.qDeadline > 0) patch.qDeadline = meta.qDeadline + pausedFor;
-    if (meta.phase === "question" && meta.qStartAt) {
-      patch.qStartAt = meta.qStartAt + pausedFor;
-      if (meta.botAnswerAt) patch.botAnswerAt = meta.botAnswerAt + pausedFor;
-    }
+    const { patch, fireAt, pausedFor } = resumePlan(meta, now);
     // Clearing `pausedAt` is the claim: whoever wins it is the only caller
     // that applies the shift and re-arms, so a reconnect racing the sweeper
     // (or another instance) can't move the deadlines twice.
     if (!(await this.store.claimResume(gameCode, patch))) return;
 
-    if (patch.qDeadline) {
-      const fireAt =
-        meta.phase === "question"
-          ? patch.qDeadline + ANSWER_GRACE_MS
-          : patch.qDeadline;
+    if (fireAt !== null) {
       await this.store.setDeadline(gameCode, fireAt);
       await this.store.ensureOwner(gameCode, this.instanceId);
       this.armTimer(gameCode, fireAt - now);
-    } else if (meta.phase === "question") {
-      // Paused before enterQuestion stamped the window: fire now so
-      // handleDeadline re-opens the question.
-      await this.store.setDeadline(gameCode, now);
-      await this.store.ensureOwner(gameCode, this.instanceId);
-      this.armTimer(gameCode, 0);
     }
     // Re-arms the bot from the (now shifted) plan in meta, unless it already
     // answered before the pause.
@@ -653,7 +705,9 @@ export class GameEngineService
       ...(opts?.banned ? { banned: true } : {}),
     });
     this.io?.in(`player:${player.id}`).disconnectSockets(true);
-    await this.afterRosterShrink(gameCode);
+    // The reveal may now be due (the removed player was the last one
+    // everyone was waiting on), and leaderboards need the row gone.
+    await this.dispatch(gameCode, { type: "roster-changed" });
   }
 
   /**
@@ -674,27 +728,6 @@ export class GameEngineService
     return this.store.isBanned(gameCode, playerId);
   }
 
-  /**
-   * Keeps the room consistent after a mid-game removal: the reveal may now be
-   * due (the removed player was the last one everyone was waiting on), and any
-   * screen showing a leaderboard needs the row to disappear.
-   */
-  private async afterRosterShrink(gameCode: string): Promise<void> {
-    const meta = await this.store.getMeta(gameCode);
-    if (!meta) return;
-    if (meta.phase === "question") {
-      await this.maybeRevealEarly(gameCode, meta.qIndex);
-      return;
-    }
-    if (meta.phase === "reveal" || meta.phase === "final") {
-      const entries = await this.buildLeaderboard(gameCode);
-      this.emitRoom(gameCode).emit("leaderboard", {
-        entries,
-        isFinal: meta.phase === "final",
-      });
-    }
-  }
-
   async hostConnected(gameCode: string, connected: boolean): Promise<void> {
     await this.store.patchMeta(gameCode, {
       hostConnected: connected,
@@ -708,240 +741,13 @@ export class GameEngineService
     gameCode: string,
     playerId?: string | null,
   ): Promise<StateSyncPayload | null> {
-    const meta = await this.store.getMeta(gameCode);
-    if (!meta) return null;
-    const now = Date.now();
-    const roster = await this.store.roster(gameCode);
-
-    const payload: StateSyncPayload = {
-      phase: meta.phase,
-      mode: meta.mode,
-      qIndex: meta.qIndex,
-      qCount: meta.qCount,
-      players: roster.map((p) => ({
-        id: p.id,
-        name: p.name,
-        profilePic: p.profilePic,
-        connected: p.connected,
-      })),
-    };
-
-    let revealAnswers: Record<string, StoredAnswer> | undefined;
-    if (meta.phase === "question" || meta.phase === "reveal") {
-      const questions = await this.store.getQuestions(gameCode);
-      const question = questions?.[meta.qIndex];
-      if (question) {
-        if (meta.phase === "question") {
-          payload.question = toPublicQuestion(question);
-          // Unstamped is only possible for meta written by an older build
-          // (the window is now durable before the broadcast); fall back to the
-          // full window rather than showing a dead countdown.
-          payload.remainingMs = meta.qStartAt
-            ? Math.max(0, meta.qDeadline - now)
-            : question.timeOut * 1000;
-          const answers = await this.store.getAnswers(gameCode, meta.qIndex);
-          payload.answeredCount = Object.keys(answers).length;
-        } else {
-          const answers = await this.store.getAnswers(gameCode, meta.qIndex);
-          revealAnswers = answers;
-          payload.reveal = {
-            index: meta.qIndex,
-            counts: question.options.map(
-              (o) =>
-                Object.values(answers).filter((a) => a.optionId === o.id)
-                  .length,
-            ),
-            correctOptionIds: question.options
-              .filter((o) => o.isCorrect)
-              .map((o) => o.id),
-            avgTimeMs: averageAnswerMs(answers),
-          };
-        }
-      }
-    }
-
-    if (
-      meta.phase === "reveal" ||
-      meta.phase === "final" ||
-      meta.phase === "ended"
-    ) {
-      payload.leaderboard = await this.buildLeaderboard(
-        gameCode,
-        revealAnswers,
-      );
-    }
-
-    if (playerId) {
-      payload.you = await this.buildAnswerResult(gameCode, meta, playerId);
-    }
-
-    return payload;
-  }
-
-  // -- transitions -------------------------------------------------------------------
-
-  private async enterQuestion(
-    gameCode: string,
-    index: number,
-    meta: GameMeta,
-  ): Promise<void> {
-    const questions = await this.store.getQuestions(gameCode);
-    const question = questions?.[index];
-    if (!question) {
-      this.logger.error(`Question ${index} missing for ${gameCode}`);
-      return;
-    }
-    const windowMs = question.timeOut * 1000;
-
-    const startAt = Date.now();
-    const deadline = startAt + windowMs;
-    // Answers are taken until the grace runs out; the reveal waits for it.
-    const closeAt = deadline + ANSWER_GRACE_MS;
-
-    // Planned into the same meta write as the window: the answer has to be
-    // durable for recoverTimers to re-arm it after a restart.
-    const plan =
-      meta.botId && meta.botTier ? planBotAnswer(question, meta.botTier) : null;
-    const botAnswerAt = plan ? startAt + plan.delayMs : 0;
-
-    // The whole window is durable *before* the broadcast: submitAnswer reads
-    // it back from Redis, so a player answering the instant `question-start`
-    // lands would otherwise race the write and be turned away as "not
-    // started". The schedule entry goes first so the sweeper never reads the
-    // previous phase's (already due) entry as this question's.
-    await this.store.setDeadline(gameCode, closeAt);
-    await this.store.patchMeta(gameCode, {
-      phase: "question",
-      qIndex: index,
-      qId: question.id,
-      qStartAt: startAt,
-      qDeadline: deadline,
-      ...(plan ? { botOptionId: plan.optionId, botAnswerAt } : {}),
-    });
-
-    // What is left of the window once those writes are done — the clock has
-    // been running since startAt, so the client is told the truth rather than
-    // the full timeOut.
-    this.emitRoom(gameCode).emit("question-start", {
-      index,
-      qCount: questions.length,
-      question: toPublicQuestion(question),
-      remainingMs: Math.max(0, deadline - Date.now()),
-    });
-
-    this.armTimer(gameCode, closeAt - Date.now());
-
-    // Arming here rather than at duel start keeps the bot's timer on whichever
-    // instance currently owns the game's deadlines.
-    const { botId } = meta;
-    if (botId && plan) {
-      this.bots.arm(gameCode, plan.optionId, botAnswerAt, (optionId) =>
-        this.submitAnswer(gameCode, botId, index, optionId),
-      );
-    }
-  }
-
-  private async enterReveal(gameCode: string): Promise<void> {
-    const meta = await this.store.getMeta(gameCode);
-    if (!meta || meta.phase !== "question") return;
-    this.clearTimer(gameCode);
-    this.bots.cancel(gameCode);
-
-    const questions = await this.store.getQuestions(gameCode);
-    const question = questions?.[meta.qIndex];
-    if (!question) return;
-    const [answers, roster] = await Promise.all([
-      this.store.getAnswers(gameCode, meta.qIndex),
-      this.store.roster(gameCode),
+    const state = await this.store.loadState(gameCode, [
+      "questions",
+      "roster",
+      "answers",
+      "scores",
     ]);
-
-    const counts = question.options.map(
-      (o) => Object.values(answers).filter((a) => a.optionId === o.id).length,
-    );
-    const correctOptionIds = question.options
-      .filter((o) => o.isCorrect)
-      .map((o) => o.id);
-
-    const isDuel = meta.mode === "duel";
-    const revealUntil = isDuel ? Date.now() + DUEL_REVEAL_MS : 0;
-    await this.store.patchMeta(gameCode, {
-      phase: "reveal",
-      qDeadline: revealUntil,
-    });
-    if (isDuel) {
-      await this.store.setDeadline(gameCode, revealUntil);
-      this.armTimer(gameCode, DUEL_REVEAL_MS);
-    } else {
-      // Host-paced: no auto-advance, but stay visible to the abandon sweep.
-      await this.store.parkDeadline(gameCode);
-    }
-
-    // Personal outcomes to per-player rooms (cross-instance via redis-adapter),
-    // sent *before* the room broadcast that flips clients into the reveal:
-    // arriving after it, a player's own verdict lands on a screen already
-    // rendering "no answer", which reads as a flash of the timeout state.
-    // Built concurrently (and off the answers already read above) so putting
-    // them first costs the room one round trip, not one per player.
-    const results = await Promise.all(
-      roster.map(
-        async (player) =>
-          [
-            player.id,
-            await this.buildAnswerResult(gameCode, meta, player.id, answers),
-          ] as const,
-      ),
-    );
-    for (const [playerId, result] of results) {
-      this.io?.to(`player:${playerId}`).emit("answer-result", result);
-    }
-
-    this.emitRoom(gameCode).emit("question-end", {
-      index: meta.qIndex,
-      counts,
-      correctOptionIds,
-      avgTimeMs: averageAnswerMs(answers),
-    });
-
-    // Running leaderboard so the host screen needs no REST round-trip.
-    const entries = await this.buildLeaderboard(gameCode, answers);
-    this.emitRoom(gameCode).emit("leaderboard", { entries, isFinal: false });
-  }
-
-  private async enterFinal(gameCode: string): Promise<void> {
-    const meta = await this.store.getMeta(gameCode);
-    if (!meta || meta.phase !== "reveal") return;
-    this.clearTimer(gameCode);
-    // Host-paced until endGame; parked so the abandon sweep still sees it
-    // (duels call endGame below, which clears the entry immediately).
-    await this.store.parkDeadline(gameCode);
-    await this.store.patchMeta(gameCode, { phase: "final", qDeadline: 0 });
-
-    const entries = await this.buildLeaderboard(gameCode);
-    this.emitRoom(gameCode).emit("leaderboard", { entries, isFinal: true });
-
-    if (meta.mode === "duel") {
-      await this.endGame(gameCode);
-    }
-  }
-
-  private async maybeRevealEarly(
-    gameCode: string,
-    qIndex: number,
-  ): Promise<void> {
-    const roster = await this.store.roster(gameCode);
-    const connected = roster.filter((p) => p.connected).length;
-    if (connected === 0) return;
-    const answers = await this.store.getAnswers(gameCode, qIndex);
-    this.emitRoom(gameCode).emit("answer-count", {
-      index: qIndex,
-      answered: Object.keys(answers).length,
-    });
-    const answeredConnected = roster.filter(
-      (p) => p.connected && answers[p.id],
-    ).length;
-    if (answeredConnected >= connected) {
-      await this.enterReveal(gameCode);
-    }
+    return state ? buildSnapshot(state, playerId, Date.now()) : null;
   }
 
   // -- timers / recovery ------------------------------------------------------------
@@ -993,39 +799,17 @@ export class GameEngineService
   }
 
   private async handleDeadline(gameCode: string): Promise<void> {
+    // Only the owner fires a game's transitions, however many instances had
+    // a timer armed for it.
     const owner = await this.store.ensureOwner(gameCode, this.instanceId);
     if (!owner) return;
-    const meta = await this.store.getMeta(gameCode);
-    if (!meta) {
+    const state = await this.store.loadState(gameCode, PARTS_FOR.deadline);
+    if (!state) {
       await this.store.clearDeadline(gameCode);
       return;
     }
-    // A paused duel advances for nobody; resumeDuel re-arms what is due.
-    if (meta.pausedAt) return;
-    switch (meta.phase) {
-      case "starting":
-        await this.enterQuestion(gameCode, 0, meta);
-        break;
-      case "question":
-        if (!meta.qStartAt) {
-          // Legacy meta only — the window and the phase are one write now.
-          await this.enterQuestion(gameCode, meta.qIndex, meta);
-        } else if (Date.now() >= meta.qDeadline + ANSWER_GRACE_MS) {
-          await this.enterReveal(gameCode);
-        }
-        break;
-      case "reveal":
-        // Only hostless (duel) reveals carry a deadline.
-        if (meta.qIndex + 1 < meta.qCount) {
-          await this.enterQuestion(gameCode, meta.qIndex + 1, meta);
-        } else {
-          await this.enterFinal(gameCode);
-        }
-        break;
-      default:
-        await this.store.clearDeadline(gameCode);
-        break;
-    }
+    const { effects } = step(state, { type: "deadline" }, Date.now());
+    await this.run(gameCode, effects);
   }
 
   private async recoverTimers(): Promise<void> {
@@ -1050,16 +834,14 @@ export class GameEngineService
   private async recoverBotAnswer(gameCode: string): Promise<void> {
     const meta = await this.store.getMeta(gameCode);
     if (!meta || meta.phase !== "question" || meta.pausedAt) return;
-    const { botId, botOptionId, botAnswerAt } = meta;
-    if (!botId || !botOptionId || !botAnswerAt) return;
+    const { botId, botAnswerAt } = meta;
+    const answer = botAnswerOf(meta);
+    if (!botId || !answer || !botAnswerAt) return;
     // Already answered before we went down? submitAnswer is first-write-wins,
     // so a duplicate is harmless — but skip the wasted round trip.
     const answers = await this.store.getAnswers(gameCode, meta.qIndex);
     if (answers[botId]) return;
-    const qIndex = meta.qIndex;
-    this.bots.arm(gameCode, botOptionId, botAnswerAt, (optionId) =>
-      this.submitAnswer(gameCode, botId, qIndex, optionId),
-    );
+    this.armBot(gameCode, botId, meta.qIndex, answer, botAnswerAt);
   }
 
   private async sweep(): Promise<void> {
@@ -1078,17 +860,12 @@ export class GameEngineService
       }
     }
     // End games nobody is coming back to. Parked entries keep both host-paced
-    // classic phases and paused duels visible here (see parkDeadline).
+    // phases and paused duels visible here (see parkDeadline).
     for (const { code } of deadlines) {
       try {
         const meta = await this.store.getMeta(code);
         if (!meta || meta.phase === "ended") continue;
-        if (
-          meta.mode === "classic" &&
-          !meta.hostConnected &&
-          meta.phase !== "lobby" &&
-          Date.now() - meta.hostLastSeenAt > HOST_ABANDON_MS
-        ) {
+        if (isHostAbandoned(meta, Date.now())) {
           this.logger.warn(`Ending ${code}: host absent for >5min`);
           await this.endGame(code);
         } else if (meta.mode === "duel") {
@@ -1325,65 +1102,6 @@ export class GameEngineService
   }
 
   // -- helpers ------------------------------------------------------------------------
-
-  private async buildLeaderboard(
-    gameCode: string,
-    revealAnswers?: Record<string, StoredAnswer>,
-  ): Promise<LeaderboardEntry[]> {
-    const [scores, roster] = await Promise.all([
-      this.store.leaderboard(gameCode),
-      this.store.roster(gameCode),
-    ]);
-    const byId = new Map<string, RosterEntry>(roster.map((p) => [p.id, p]));
-    const entries = scores.map((s, i) => ({
-      playerId: s.playerId,
-      name: byId.get(s.playerId)?.name ?? "Unknown",
-      profilePic: byId.get(s.playerId)?.profilePic ?? null,
-      score: s.score,
-      rank: i + 1,
-      ...(revealAnswers
-        ? { delta: revealAnswers[s.playerId]?.score ?? 0 }
-        : {}),
-    }));
-    // Players who never scored still belong on the board.
-    for (const p of roster) {
-      if (!scores.some((s) => s.playerId === p.id)) {
-        entries.push({
-          playerId: p.id,
-          name: p.name,
-          profilePic: p.profilePic,
-          score: 0,
-          rank: entries.length + 1,
-          ...(revealAnswers ? { delta: 0 } : {}),
-        });
-      }
-    }
-    return entries;
-  }
-
-  private async buildAnswerResult(
-    gameCode: string,
-    meta: GameMeta,
-    playerId: string,
-    /** Pre-read answers for this question, when the caller already has them. */
-    prefetched?: Record<string, StoredAnswer>,
-  ): Promise<AnswerResultPayload> {
-    const answers =
-      prefetched ?? (await this.store.getAnswers(gameCode, meta.qIndex));
-    const answer = answers[playerId];
-    const [totalScore, rank] = await Promise.all([
-      this.store.totalScore(gameCode, playerId),
-      this.store.rank(gameCode, playerId),
-    ]);
-    return {
-      answered: Boolean(answer),
-      optionId: answer?.optionId ?? null,
-      isCorrect: answer?.isCorrect ?? false,
-      score: answer?.score ?? 0,
-      totalScore,
-      rank,
-    };
-  }
 
   private cancelDisconnectGrace(gameCode: string, playerId: string): void {
     const key = `${gameCode}:${playerId}`;

@@ -1,0 +1,29 @@
+# Build context for apps/server/Dockerfile and apps/web/Dockerfile (both use
+# the repo root as context). apps/ai builds from its own directory.
+
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/*.tsbuildinfo
+**/coverage
+.git
+.github
+.vscode
+.agents
+docs
+
+# Never bake secrets into an image.
+**/.env
+**/.env.*
+!**/.env.example
+
+# Generated at build time inside the image.
+packages/prisma/generated
+packages/contract/dist
+
+# Local upload storage (STORAGE_DRIVER=local).
+**/uploads
+
+# The Python service has its own image.
+apps/ai

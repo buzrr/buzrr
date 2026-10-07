@@ -1,7 +1,9 @@
 # Current project context
 
 Snapshot of where Buzrr stands. **Last verified against the code:
-2026-09-14**, through the Buzrr Pro billing change. Update this file when the picture changes; keep
+2026-10-06**, through the Phase 0 architecture change (question types, pure
+engine core, shared contract, self-hosting); sections not touched by it were
+last checked 2026-09-14. Update this file when the picture changes; keep
 it about the present, not a changelog.
 
 ## Where the project is
@@ -14,6 +16,25 @@ features shipped: AI quiz generation, question moderation + roles, profile
 stats/history, health endpoint, Vercel Analytics.
 
 ## Recent architectural moves (still fresh, know they exist)
+
+- **Phase 0 — architecture that makes later features cheap** (2026-10):
+  - **Pluggable question types** (ADR-011): `Question.type` + `config`
+    (migration `20261006000001`); one pure server handler + one web renderer
+    per type; the socket contract is type-agnostic (`submit-answer
+{ qIndex, answer }`, `question-end.summary`). Only `multiple_choice`
+    exists.
+  - **Pure engine core** (ADR-012): `step(state, event, now) → { state,
+effects }` in `game-engine/core/`, unit-tested; `GameEngineService` is
+    the I/O shell. **Pacing is a strategy** (`hostPaced`, `autoAdvance`).
+  - **`@buzrr/contract`** (ADR-013): zod schemas both apps import; the
+    hand-kept `socket-events.ts` mirror is gone.
+  - **Self-hosting** (ADR-014): `docker compose up` runs the whole stack
+    offline; media behind `MediaStorage` (local / S3-compatible /
+    Cloudinary), models behind an OpenAI-compatible interface (Nest +
+    `apps/ai`), optional local email + password accounts; `yarn setup` now
+    starts only `postgres redis`. CI boots the stack (`self-host` job).
+  - Fixed on the way: a question-phase `state-sync` no longer reveals whether
+    the player's stored answer was correct.
 
 - **Buzrr Pro (billing & entitlements)** — Dodo Payments subscriptions:
   - **Limits:** Free is 50 players, 10 quizzes, 3 lifetime AI generations.
@@ -45,9 +66,16 @@ stats/history, health endpoint, Vercel Analytics.
 
 1. **vinext/Vite parallel toolchain** — present, non-default, end-state
    unknown (ADR-008).
-2. **Duplicate client socket typings** — `apps/web/src/types/socket-events.ts`
-   is a hand-kept mirror of the server contract; nothing enforces sync.
-3. **Dodo dashboard configuration lives outside the repo.** The Pro product,
+2. **Question types beyond multiple choice** — the plumbing is done, but the
+   question editor (`AddQuesForm`) still authors only 4-option multiple
+   choice (the API already takes `type`/`config`/`options`), and no second
+   type exists yet.
+3. **Self-paced pacing** — planned; needs per-player question state the
+   phase machine doesn't model yet (ADR-012).
+4. **REST validation is half on the contract** — `POST /quizzes/import` uses
+   the zod contract; other endpoints still use class-validator DTOs and
+   hand-mirrored web response types.
+5. **Dodo dashboard configuration lives outside the repo.** The Pro product,
    its ₹399 INR localized price and pricing mode,
    any product-level discount, the Adaptive Currency setting, the webhook endpoint and events, and the
    recovery/portal settings are set by hand (checklist in ADR-010). Live prices and the
@@ -56,13 +84,13 @@ stats/history, health endpoint, Vercel Analytics.
 
 ## Known debt & risks (grounded, ranked by blast radius)
 
-1. **Thin automated test coverage in the Node apps.** `apps/server` has a
-   vitest runner, but it only covers billing/entitlements
-   (`src/modules/billing/__tests__`, run in CI against Postgres). The most
-   intricate logic — the engine phase machine, Lua-scripted races and ELO
-   transactions — is exactly the kind that regresses silently, and it is still
-   untested. `apps/web` has no tests at all (including the Dodo webhook
-   forwarder). `apps/ai` has its own pytest suite and CI job.
+1. **Thin automated test coverage around the engine's edges.** The pure
+   core (phase machine, judging, snapshots, pause/forfeit decisions) and the
+   question-type, storage and LLM adapters now have vitest specs, alongside
+   billing. Still untested: the I/O shell (`GameEngineService`), the
+   Lua-scripted races in `GameStoreService`, ELO persistence, matchmaking and
+   invites — exercised only end to end. `apps/web` has no tests at all
+   (including the Dodo webhook forwarder). `apps/ai` has its own pytest suite.
 2. **Redis is a single point of failure** for all realtime + matchmaking;
    the server won't boot without it. No degraded mode. It now also carries
    Buzrr-AI's ingestion queue, so an outage degrades two subsystems (AI
@@ -76,11 +104,12 @@ stats/history, health endpoint, Vercel Analytics.
    set it (documented in `.env.example`).
 5. **Player row growth**: guest identities are never deleted (by design,
    ADR-005) and there is no cleanup job.
-6. **Gemini parsing is format-fragile**: `parseQuestions` expects an exact
-   text layout from `gemini-3.5-flash`; model drift breaks AI quiz creation
-   (fails safe with 400/502). `apps/ai` uses structured output instead and does
-   not have this problem — `POST /api/quizzes/ai` has **not** been migrated onto
-   it, so the fragile path is still live.
+6. **AI quiz parsing is format-fragile**: `parseQuestions` expects an exact
+   text layout from whatever `TextGenerator` returns; model drift breaks AI
+   quiz creation (fails safe with 400/502), and small local models (now
+   supported) follow the layout less reliably than Gemini. `apps/ai` uses
+   structured output and does not have this problem — `POST /api/quizzes/ai`
+   has **not** been migrated onto it.
 7. **7-day stateless JWTs**: sign-out/demotion doesn't invalidate minted
    tokens; role checks re-read the DB (mitigates authz), identity itself
    remains valid until expiry.
@@ -90,6 +119,19 @@ stats/history, health endpoint, Vercel Analytics.
 9. **Refunds and lost disputes don't revoke Pro automatically.** Access follows
    Dodo's subscription status; `refund.succeeded` / `dispute.lost` are only
    logged for manual review.
+10. **The migration history has no baseline.** It can't build an empty
+    database (the first migration alters `users`); fresh installs rely on
+    `packages/prisma/scripts/deploy.mjs` (`db push` + mark-all-applied).
+    Any future migration must be correct **both** on top of production and
+    as a no-op after a `db push` of the schema it targets.
+11. **The first superadmin is bootstrapped by a migration that hard-codes the
+    maintainer's email** (`20260714000001`). Self-hosted installs (baselined,
+    so that SQL never runs) must promote themselves by hand
+    (docs/self-hosting.md).
+12. **Local accounts have no password reset** (no mail on offline installs).
+13. **Crash recovery waits out the owner lock**: a restarted instance can't
+    fire a game's deadlines until the dead one's 20s lock lapses, so a live
+    question can stall ~20–30s after a crash (measured ≈29s).
 
 ## Active development areas (inferred from recent PR cadence)
 
@@ -98,9 +140,13 @@ and UX polish. There is no public roadmap; planned work lives in GitHub issues.
 
 ## Operational facts worth knowing
 
-- Local dev needs Docker; `yarn setup` is idempotent and self-healing.
+- Local dev needs Docker; `yarn setup` is idempotent and self-healing, and
+  starts only `postgres` + `redis` — `docker compose up` alone is the
+  self-hosted stack (ports 3000/3001, clashes with `yarn dev`).
 - Prod DB changes go through committed migrations (`migrate:deploy` from
   `packages/prisma`); the repo's migrations are the schema history.
 - The duel pool can be legitimately empty (moderation gate) — seed with
   `yarn workspace @buzrr/prisma seed:duel` if duels error with
-  "No duel questions".
+  "No duel questions". The self-host `migrate` container seeds it on start.
+- MinIO no longer publishes pullable Docker images; S3 support was verified
+  against SeaweedFS, and the compose stack defaults to local disk.

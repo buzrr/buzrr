@@ -16,7 +16,7 @@ import {
   resetGame,
   setConnection,
 } from "@/state/game/gameSlice";
-import type { GameSocket } from "@/types/socket-events";
+import type { GameSocket } from "@/types/socket";
 
 export interface UseGameSocketOptions {
   userType: "admin" | "player" | "duel";

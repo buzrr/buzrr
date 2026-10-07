@@ -1,6 +1,6 @@
 "use client";
 import { useAppSelector } from "@/state/hooks";
-import type { ConnectionStatus } from "@/types/socket-events";
+import type { ConnectionStatus } from "@/types/socket";
 
 const STATUS: Record<
   ConnectionStatus,
