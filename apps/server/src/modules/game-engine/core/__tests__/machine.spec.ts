@@ -339,7 +339,20 @@ describe("answer-recorded", () => {
     expect(effects.at(-1)).toEqual({
       kind: "dispatch",
       event: "close-question",
+      qIndex: 0,
     });
+  });
+
+  it("drops a close for a question that has since been replaced", () => {
+    // Question 0 met the early close, but another path revealed it and
+    // opened question 1 before the follow-up ran.
+    const s = questionOpen({}, {}, 1);
+    expect(step(s, { type: "close-question", qIndex: 0 }, T0).effects).toEqual(
+      [],
+    );
+    expect(
+      step(s, { type: "close-question", qIndex: 1 }, T0).state.meta.phase,
+    ).toBe("reveal");
   });
 
   it("ignores an answer to a question that has already moved on", () => {

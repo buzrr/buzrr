@@ -31,7 +31,7 @@ export type EngineEvent =
   /** An answer to question `qIndex` was stored. */
   | { type: "answer-recorded"; qIndex: number }
   /** Close the open question now (everyone connected has answered). */
-  | { type: "close-question" }
+  | { type: "close-question"; qIndex: number }
   /** The roster shrank or a player dropped (kick, ban, leave, disconnect). */
   | { type: "roster-changed" };
 
@@ -97,7 +97,11 @@ export function step(
     case "answer-recorded":
       return onAnswerRecorded(state, event.qIndex);
     case "close-question":
-      return reveal(state, now, pacing);
+      // Only the question that met the early-close condition: if another
+      // path already revealed it and opened the next, this is stale.
+      return event.qIndex === state.meta.qIndex
+        ? reveal(state, now, pacing)
+        : noop(state);
     case "roster-changed":
       return onRosterChanged(state);
   }
@@ -394,7 +398,7 @@ function onAnswerRecorded(state: GameState, qIndex: number): Transition {
   if (connected.every((p) => answers[p.id])) {
     // Closing needs the full state (questions, scores), which the per-answer
     // path doesn't load — so it is a follow-up event with a fresh read.
-    effects.push({ kind: "dispatch", event: "close-question" });
+    effects.push({ kind: "dispatch", event: "close-question", qIndex });
   }
   return { state, effects };
 }

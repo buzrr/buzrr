@@ -85,7 +85,7 @@ export type Effect =
   /** Run the end-of-game claim/persist/cleanup path. */
   | { kind: "end-game" }
   /** Step the machine again with a freshly loaded state. */
-  | { kind: "dispatch"; event: "close-question" }
+  | { kind: "dispatch"; event: "close-question"; qIndex: number }
   | { kind: "log"; level: "warn" | "error"; message: string };
 
 export interface Transition {

@@ -151,6 +151,7 @@ export class S3Storage extends MediaStorage {
       method,
       headers: sendHeaders,
       body: body ? new Uint8Array(body) : undefined,
+      signal: AbortSignal.timeout(30_000),
     });
   }
 

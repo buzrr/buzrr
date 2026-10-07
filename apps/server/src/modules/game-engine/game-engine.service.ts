@@ -171,7 +171,10 @@ export class GameEngineService
           await this.endGame(gameCode);
           break;
         case "dispatch":
-          await this.dispatch(gameCode, { type: effect.event });
+          await this.dispatch(gameCode, {
+            type: effect.event,
+            qIndex: effect.qIndex,
+          });
           break;
         case "log":
           this.logger[effect.level](`${gameCode}: ${effect.message}`);

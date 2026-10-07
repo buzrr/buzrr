@@ -29,7 +29,10 @@ export function createTextGenerator(
 ): TextGenerator {
   if (resolveLlmProvider(env) === "openai") {
     return new OpenAICompatibleGenerator({
-      baseUrl: env("LLM_BASE_URL") || "https://api.openai.com/v1",
+      // No default endpoint: a self-hosted install that forgot its Ollama URL
+      // must stay unconfigured, not send prompts to a third party. (apps/ai
+      // refuses to boot in the same case.)
+      baseUrl: env("LLM_BASE_URL") ?? "",
       model: env("LLM_MODEL") ?? "",
       apiKey: env("LLM_API_KEY"),
     });

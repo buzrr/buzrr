@@ -57,6 +57,14 @@ async def _post(client: httpx.AsyncClient, path: str, body: dict[str, Any], api_
             retry_after=float(retry_after) if retry_after and retry_after.isdigit() else None,
         )
     if response.status_code >= 400:
+        # Not retried and re-raised as-is by the callers, so this is the only
+        # trace of e.g. a wrong model name or API key.
+        log.warning(
+            "model_server_error",
+            path=path,
+            status=response.status_code,
+            body=response.text[:200],
+        )
         raise UpstreamError(f"Model server returned {response.status_code}")
     return response.json()
 
