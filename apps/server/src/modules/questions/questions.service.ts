@@ -191,6 +191,20 @@ export class QuestionsService {
     }
     const { options, config } = definition;
 
+    // Ownership first: the old media we may delete below is the edited
+    // question's own, read from the database.
+    let existing: { media: string | null } | null = null;
+    if (quesId) {
+      const question = await this.prisma.db.question.findUnique({
+        where: { id: quesId },
+        include: { quiz: true },
+      });
+      if (!question || question.quiz.userId !== user.userId) {
+        throw new ForbiddenException("Unauthorized");
+      }
+      existing = question;
+    }
+
     let fileLink = "";
     let mediaType = "";
 
@@ -207,9 +221,6 @@ export class QuestionsService {
         }
         throw err;
       }
-      if (file_link) {
-        await this.storage.remove(file_link);
-      }
       fileLink = uploaded.url;
       mediaType = uploaded.mediaType;
     } else if (file_link) {
@@ -224,14 +235,6 @@ export class QuestionsService {
     const moderationStatus = quiz.isPublic ? "pending" : "draft";
 
     if (quesId) {
-      const question = await this.prisma.db.question.findUnique({
-        where: { id: quesId },
-        include: { quiz: true },
-      });
-      if (!question || question.quiz.userId !== user.userId) {
-        throw new ForbiddenException("Unauthorized");
-      }
-
       await this.prisma.db.$transaction(async (tx) => {
         await tx.question.update({
           where: { id: quesId },
@@ -257,6 +260,11 @@ export class QuestionsService {
         });
         await tx.questionReport.deleteMany({ where: { questionId: quesId } });
       });
+      // Only now, and only the question's own stored media — never a URL
+      // the client sent (`file_link`), which could name anyone's upload.
+      if (existing?.media && existing.media !== fileLink) {
+        await this.storage.remove(existing.media);
+      }
     } else {
       await this.prisma.db.$transaction(async (tx) => {
         const count = await tx.question.count({ where: { quizId } });

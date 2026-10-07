@@ -5,6 +5,14 @@ import {
   type UploadMeta,
 } from "./media-storage";
 
+function isCloudinaryUrl(url: string): boolean {
+  try {
+    return new URL(url).hostname === "res.cloudinary.com";
+  } catch {
+    return false;
+  }
+}
+
 function getPublicIdFromUrl(url: string): string {
   const parts = url.split("/");
   const publicIdWithExtension = parts[parts.length - 1] ?? "";
@@ -31,7 +39,7 @@ export class CloudinaryStorage extends MediaStorage {
   }
 
   async remove(url: string): Promise<void> {
-    if (!url || !url.includes("res.cloudinary.com")) return;
+    if (!isCloudinaryUrl(url)) return;
     const publicId = getPublicIdFromUrl(url);
     if (!publicId) return;
     await new Promise<void>((resolve) => {
