@@ -9,7 +9,7 @@ import ClientImage from "@/components/ClientImage";
 import DuelInviteGuestView from "@/components/Duel/DuelInviteGuestView";
 import DuelInviteHostView from "@/components/Duel/DuelInviteHostView";
 import { useDuelInviteQuery } from "@/lib/modules/duel/hooks";
-import type { DuelMatchedPayload } from "@/types/socket-events";
+import type { DuelMatchedPayload } from "@buzrr/contract";
 
 /**
  * Landing page for a 1v1 friend challenge. One URL serves both sides: the host

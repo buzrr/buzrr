@@ -19,12 +19,14 @@ Kahoot, and generate whole quizzes with AI.
 
 - 🎮 **Live multiplayer quizzes** (the Kahoot half) — host a room, players join with a code, link or QR code (no account needed), everyone answers in real time over WebSockets. Hosts can kick or ban players.
 - ⚔️ **Ranked 1v1 duels** (the QuizUp half) — matchmaking with an **ELO** rating system, backed by difficulty-scaled bot opponents when nobody else is queuing. Challenge a friend with an unrated invite link.
-- 🤖 **AI quiz generation** — describe a topic and let **Gemini** draft the questions (optional).
+- 🤖 **AI quiz generation** — describe a topic and let a model draft the questions: **Gemini**, or anything that speaks the OpenAI API — including a local model via **Ollama** (optional).
 - 📚 **AI Knowledge Spaces** — upload PDF, DOCX, TXT or Markdown documents and generate cited questions from them with RAG (optional Python service).
 - 💳 **Buzrr Pro** — the hosted version's paid plan (bigger rooms, unlimited quizzes, more AI generations) via Dodo Payments. Self-hosted instances run without billing and every account gets Pro limits.
 - 🛡️ **Public question moderation** — community questions feed the duel pool behind an approve/report workflow.
-- 🖼️ **Media questions** — image uploads via **Cloudinary** (optional).
-- 🔐 **Google sign-in** — authentication powered by [Better Auth](https://better-auth.com).
+- 🖼️ **Media questions** — image uploads to local disk, any **S3-compatible** bucket, or **Cloudinary**.
+- 🔐 **Sign-in** — local email + password accounts and/or Google, powered by [Better Auth](https://better-auth.com).
+- 🏠 **Self-host anywhere** — `docker compose up` runs the whole thing, **fully offline** on a school server if you like. No SaaS accounts required.
+- 🧩 **Pluggable question types** — each type is a small server handler plus a web renderer; add one without touching the game engine.
 - ⚡ **Server-authoritative game loop** — live state lives in **Redis**; only finished games are persisted to Postgres.
 
 ## 🏗️ Architecture
@@ -35,22 +37,42 @@ every game rule over Socket.IO, an optional Python service for AI Knowledge
 Spaces (`apps/ai`), and a shared Prisma package. Live game state lives in
 Redis; Postgres keeps the lobby record and the final result.
 
+The socket and REST shapes both apps speak are defined once, as zod schemas,
+in `packages/contract`.
+
 📐 **[Read ARCHITECTURE.md](ARCHITECTURE.md)** for the full picture — the
 server-authoritative game loop, how timer ownership survives crashes and
 multiple instances, and the Redis/Postgres split. Detailed docs live in
 [`docs/`](docs/) — architecture by area, decision records (ADRs) and the
 current project state. Coding agents start at [AGENTS.md](AGENTS.md).
 
-## 🚀 Quick start
+## 🏠 Self-host in one command
+
+All you need is [Docker](https://docs.docker.com/get-docker/):
+
+```sh
+git clone https://github.com/buzrr/buzrr && cd buzrr
+docker compose up -d          # first run builds the images (a few minutes)
+```
+
+Open **http://localhost:3000** and create an account. That's the whole
+install: Postgres, Redis, migrations, the API and the web app, with local
+accounts, images on a Docker volume and an auth secret generated on first
+boot — nothing calls out to the internet. AI is off until you point it at a
+model (`--profile ollama` bundles a local one).
+
+To serve other machines, set `PUBLIC_WEB_URL` / `PUBLIC_API_URL` in a `.env`
+next to `docker-compose.yml` and run `docker compose up -d --build`. Every
+option — LAN installs, closing sign-ups, S3 storage, AI, upgrades, backups —
+is in **[docs/self-hosting.md](docs/self-hosting.md)**.
+
+## 🚀 Develop locally
 
 ### Prerequisites
 
 - [Node.js](https://nodejs.org) **≥ 18** (20 LTS recommended) — Yarn 4 is bundled via Corepack.
 - [Docker](https://docs.docker.com/get-docker/) (for the local Postgres + Redis).
 - [Python](https://www.python.org/) **3.12** — only if you want the AI Knowledge Spaces service.
-- **Google OAuth credentials** — the only thing you _must_ provide, or login won't work.
-  Create them in the [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-  with redirect URI `http://localhost:3000/api/auth/callback/google`.
 
 ### One-command setup
 
@@ -66,14 +88,7 @@ It's **idempotent and safe to re-run**: existing values are never overwritten,
 and if a required key goes missing from a `.env` file it's re-added with the
 local default.
 
-Then add your Google credentials to **`apps/web/.env`**:
-
-```dotenv
-GOOGLE_CLIENT_ID="your-client-id"
-GOOGLE_CLIENT_SECRET="your-client-secret"
-```
-
-…and start everything:
+Then start everything:
 
 ```sh
 yarn dev                 # web → http://localhost:3000   api → http://localhost:3001
@@ -83,19 +98,21 @@ yarn dev                 # web → http://localhost:3000   api → http://localh
 `yarn workspace ai setup` first. If you don't want it, run
 `yarn dev:web` and `yarn dev:server` instead.
 
-That's it. Everything else is optional.
+Open http://localhost:3000 and create a local account (email + password —
+`yarn setup` turns that on for development). Everything else is optional.
 
 ### Optional features
 
-| Feature              | Add to `.env`                                                                  | Where to get it                                                                                         |
-| -------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| AI quiz generation   | `GEMINI_API_KEY`                                                               | [Google AI Studio](https://aistudio.google.com/app/apikey)                                              |
-| Image uploads        | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`         | [Cloudinary](https://cloudinary.com)                                                                    |
-| Landing GitHub stats | `GITHUB_TOKEN` (in `apps/web/.env`)                                            | [GitHub personal access tokens](https://github.com/settings/tokens) — no scopes needed for public repos |
-| Rate limiting        | `RATELIMIT=ON` + `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`          | [Upstash](https://upstash.com)                                                                          |
-| AI Knowledge Spaces  | `NEXT_PUBLIC_AI_API_URL` (web) + `apps/ai/.env`                                | See [apps/ai/README.md](apps/ai/README.md)                                                              |
-| Billing (Buzrr Pro)  | `BILLING=ON` + `DODO_*`, `APP_URL` (server), `DODO_PAYMENTS_WEBHOOK_KEY` (web) | [Dodo Payments](https://dodopayments.com) — hosted version only; leave off when self-hosting            |
-| Landing-page video   | `LANDING_VIDEO_URL` (in `apps/web/.env`) — an MP4 URL                          | Any video host; Cloudinary URLs also get a poster frame                                                 |
+| Feature              | Add to `.env`                                                                                                     | Where to get it                                                                                                                           |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Google sign-in       | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (in `apps/web/.env`)                                                   | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) — redirect URI `http://localhost:3000/api/auth/callback/google` |
+| AI quiz generation   | `GEMINI_API_KEY` — or `LLM_BASE_URL` + `LLM_MODEL` for any OpenAI-compatible server                               | [Google AI Studio](https://aistudio.google.com/app/apikey), or a local [Ollama](https://ollama.com)                                       |
+| Image uploads        | Work out of the box (stored in `apps/server/uploads`). For a CDN: `CLOUDINARY_*`, or `STORAGE_DRIVER=s3` + `S3_*` | [Cloudinary](https://cloudinary.com) / any S3-compatible store                                                                            |
+| Landing GitHub stats | `GITHUB_TOKEN` (in `apps/web/.env`)                                                                               | [GitHub personal access tokens](https://github.com/settings/tokens) — no scopes needed for public repos                                   |
+| Rate limiting        | `RATELIMIT=ON` + `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                             | [Upstash](https://upstash.com)                                                                                                            |
+| AI Knowledge Spaces  | `NEXT_PUBLIC_AI_API_URL` (web) + `apps/ai/.env`                                                                   | See [apps/ai/README.md](apps/ai/README.md)                                                                                                |
+| Billing (Buzrr Pro)  | `BILLING=ON` + `DODO_*`, `APP_URL` (server), `DODO_PAYMENTS_WEBHOOK_KEY` (web)                                    | [Dodo Payments](https://dodopayments.com) — hosted version only; leave off when self-hosting                                              |
+| Landing-page video   | `LANDING_VIDEO_URL` (in `apps/web/.env`) — an MP4 URL                                                             | Any video host; Cloudinary URLs also get a poster frame                                                                                   |
 
 ## 🔧 Environment variables
 
@@ -104,13 +121,14 @@ the [`.env.example`](.env.example) files for the full, commented list.
 
 | Variable                                         | Required | Purpose                                                             |
 | ------------------------------------------------ | :------: | ------------------------------------------------------------------- |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`      |    ✅    | Google sign-in (web). Without them, auth throws.                    |
+| `AUTH_EMAIL_PASSWORD`                            |   ✅¹    | `ON` enables local email + password accounts (web).                 |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`      |   ✅¹    | Google sign-in (web).                                               |
 | `BETTER_AUTH_SECRET`                             |    ✅    | Signs/verifies session JWTs. **Must match** between web and server. |
 | `DATABASE_URL` / `DIRECT_URL`                    |    ✅    | PostgreSQL connection (defaults to the Docker container).           |
 | `REDIS_URL`                                      |    ✅    | Redis for live game state (server won't boot without it).           |
 | `NEXT_PUBLIC_SOCKET_URL` / `NEXT_PUBLIC_API_URL` |    ✅    | Where the browser reaches the API.                                  |
-| `GEMINI_API_KEY`                                 |    ➖    | Enables AI quiz generation.                                         |
-| `CLOUDINARY_*`                                   |    ➖    | Enables image uploads.                                              |
+| `GEMINI_API_KEY` or `LLM_BASE_URL` + `LLM_MODEL` |    ➖    | Enables AI quiz generation (Gemini or an OpenAI-compatible server). |
+| `STORAGE_DRIVER` + `CLOUDINARY_*` / `S3_*`       |    ➖    | Where question images go (default: local disk).                     |
 | `GITHUB_TOKEN`                                   |    ➖    | Raises GitHub API rate limits for landing-page repo stats (web).    |
 | `LANDING_VIDEO_URL`                              |    ➖    | MP4 shown on the landing page (web); unset hides the section.       |
 | `NEXT_PUBLIC_AI_API_URL`                         |    ➖    | Where the browser reaches Buzrr-AI; unset hides AI Spaces.          |
@@ -118,24 +136,27 @@ the [`.env.example`](.env.example) files for the full, commented list.
 | `UPSTASH_REDIS_REST_*` + `RATELIMIT`             |    ➖    | Enables rate limiting.                                              |
 | `DUEL_BOTS`                                      |    ➖    | Set to `OFF` to disable bot opponents in 1v1 matchmaking.           |
 
+¹ At least one sign-in method is required.
+
 ## 📜 Scripts
 
 Run from the repo root:
 
-| Command                               | What it does                                             |
-| ------------------------------------- | -------------------------------------------------------- |
-| `yarn setup`                          | One-command local bootstrap (Docker DBs + env + schema). |
-| `yarn dev`                            | Run web + server with hot reload.                        |
-| `yarn dev:web` / `yarn dev:server`    | Run a single app.                                        |
-| `yarn build`                          | Build all apps (what CI runs).                           |
-| `yarn lint` / `yarn check-types`      | Lint / type-check.                                       |
-| `yarn workspace server test`          | Server tests (billing/entitlements, needs Postgres).     |
-| `yarn format`                         | Prettier over the repo.                                  |
-| `yarn db:push`                        | Sync the Prisma schema to the database.                  |
-| `yarn db:studio`                      | Open Prisma Studio.                                      |
-| `yarn docker:up` / `yarn docker:down` | Start / stop the Postgres + Redis containers.            |
-| `yarn docker:reset`                   | Wipe the databases and re-run setup.                     |
-| `yarn workspace ai setup`             | Create the AI service's Python virtualenv.               |
+| Command                               | What it does                                                                                   |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `yarn setup`                          | One-command local bootstrap (Docker DBs + env + schema).                                       |
+| `yarn dev`                            | Run web + server with hot reload.                                                              |
+| `yarn dev:web` / `yarn dev:server`    | Run a single app.                                                                              |
+| `yarn build`                          | Build all apps (what CI runs).                                                                 |
+| `yarn lint` / `yarn check-types`      | Lint / type-check.                                                                             |
+| `yarn workspace server test`          | Server tests (engine core, question types, storage, AI adapters; billing specs need Postgres). |
+| `yarn format`                         | Prettier over the repo.                                                                        |
+| `yarn db:push`                        | Sync the Prisma schema to the database.                                                        |
+| `yarn db:studio`                      | Open Prisma Studio.                                                                            |
+| `yarn docker:up` / `yarn docker:down` | Start / stop the Postgres + Redis containers.                                                  |
+| `yarn selfhost`                       | Build and run the whole self-hosted stack in Docker.                                           |
+| `yarn docker:reset`                   | Wipe the databases and re-run setup.                                                           |
+| `yarn workspace ai setup`             | Create the AI service's Python virtualenv.                                                     |
 
 ### Troubleshooting
 
@@ -156,11 +177,12 @@ buzrr/
 │   ├── server/     # NestJS API + Socket.IO
 │   └── ai/         # Buzrr-AI: Python FastAPI + worker (optional)
 ├── packages/
+│   ├── contract/   # zod schemas: the socket + REST contract both apps import
 │   ├── prisma/     # schema, migrations, generated client
 │   ├── eslint-config/
 │   └── typescript-config/
 ├── docs/                # architecture, ADRs, current state
-├── docker-compose.yml   # local Postgres (pgvector) + Redis
+├── docker-compose.yml   # the self-hosted stack (dev uses only its Postgres + Redis)
 ├── render.yaml          # Render blueprint for apps/ai
 └── scripts/setup.mjs    # one-command bootstrap
 ```
@@ -169,13 +191,16 @@ buzrr/
 
 Every push and PR runs the [`CI` workflow](.github/workflows/ci.yml): lint,
 type-check, server tests and build against real Postgres + Redis; a check that
-the Docker dev setup boots; and a Buzrr-AI job (ruff, mypy, migrations,
+the Docker dev setup boots; a job that brings up the full self-hosted stack
+with `docker compose up` and signs up a user; and a Buzrr-AI job (ruff, mypy, migrations,
 pytest). To gate production deploys on
 it, open your Vercel project → **Settings → Git → Deployment Checks** and add
 the CI workflow's **"Lint, typecheck & build"** job as a required check —
 deployments then only go live once CI is green, and a failing run leaves the
 current production deployment in place.
 
+Self-hosting? `docker compose up -d` is the supported path — see
+[docs/self-hosting.md](docs/self-hosting.md). For the hosted setup:
 `apps/web` deploys to Vercel; `apps/server` (Socket.IO, long-lived) needs a
 container/VM host such as Render, Railway or Fly. `apps/ai` deploys to Render
 from [`render.yaml`](render.yaml) (a web service plus a cron-driven ingestion

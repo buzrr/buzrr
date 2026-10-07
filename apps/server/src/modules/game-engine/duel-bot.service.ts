@@ -1,3 +1,4 @@
+import type { QuestionAnswer } from "@buzrr/contract";
 import { Injectable, Logger, OnApplicationShutdown } from "@nestjs/common";
 
 /**
@@ -23,15 +24,15 @@ export class DuelBotService implements OnApplicationShutdown {
 
   arm(
     gameCode: string,
-    optionId: string,
+    answer: QuestionAnswer,
     answerAt: number,
-    submit: (optionId: string) => Promise<unknown>,
+    submit: (answer: QuestionAnswer) => Promise<unknown>,
   ): void {
     this.cancel(gameCode);
     const timer = setTimeout(
       () => {
         this.timers.delete(gameCode);
-        void submit(optionId).catch((err) =>
+        void submit(answer).catch((err) =>
           this.logger.error(`Bot answer failed for ${gameCode}`, err),
         );
       },

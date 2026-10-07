@@ -1,21 +1,45 @@
-# Local development databases for Buzrr.
+# Buzrr — the whole stack, one command, no SaaS accounts.
 #
-# Brings up PostgreSQL and Redis in containers so you don't need to install or
-# provision either service on your machine. The app itself runs on the host
-# (`yarn dev`) for fast hot-reload.
+#     docker compose up -d        # → http://localhost:3000
 #
-# Quick start (from the repo root):
+# That builds and starts Postgres, Redis, database migrations, the API (:3001)
+# and the web app (:3000). Sign-in is local email + password, images are kept
+# on a Docker volume, and an auth secret is generated on first boot — nothing
+# here needs the internet once the images are built. Configure it with a `.env`
+# file next to this one (every knob is listed in `.env.example`).
 #
-#     yarn setup      # creates .env files, starts these containers, pushes the schema
-#     yarn dev        # runs web (:3000) + server (:3001) on the host
+# Optional extras:
 #
-# Or manage the containers directly:
+#     docker compose --profile ai up -d       # Knowledge Spaces (apps/ai)
+#     docker compose --profile ollama up -d   # a local model server
 #
-#     docker compose up -d     # start Postgres + Redis in the background
-#     docker compose down      # stop them (data is preserved in named volumes)
-#     docker compose down -v   # stop them and wipe all data
+# Serving other machines (a school LAN): set PUBLIC_WEB_URL / PUBLIC_API_URL
+# to addresses browsers can reach, then `docker compose up -d --build` — the
+# API URL is compiled into the web bundle.
 #
-# Credentials are intentionally simple/local-only — never reuse them in production.
+# Developing Buzrr instead? `yarn setup` + `yarn dev` run the apps on your
+# machine and use only the `postgres` and `redis` services from this file.
+#
+#     docker compose down         # stop (data is kept in named volumes)
+#     docker compose down -v      # stop and wipe everything
+
+x-database-env: &database-env
+  DATABASE_URL: postgresql://buzrr:buzrr@postgres:5432/buzrr
+  DIRECT_URL: postgresql://buzrr:buzrr@postgres:5432/buzrr
+
+# The AI containers take their model settings (GEMINI_API_KEY or LLM_*, plus
+# AI_GENERATION_MODEL / AI_EMBEDDING_MODEL) from env files — `.env` here, then
+# apps/ai/.env — so these are only the values that must point inside Docker.
+x-ai-env-files: &ai-env-files
+  - path: .env
+    required: false
+  - path: apps/ai/.env
+    required: false
+x-ai-env: &ai-env
+  AI_DATABASE_URL: postgresql://buzrr:buzrr@postgres:5432/buzrr
+  REDIS_URL: redis://redis:6379
+  AI_WEB_ORIGIN: ${PUBLIC_WEB_URL:-http://localhost:3000}
+  AI_BUZRR_API_URL: ${AI_BUZRR_API_URL:-http://server:3001}
 
 services:
   postgres:
@@ -53,49 +77,218 @@ services:
       retries: 10
       start_period: 3s
 
-  # The AI service is behind a profile so `docker compose up -d` (and `yarn
-  # setup`) stay exactly as they were for contributors who aren't touching it.
-  #   docker compose --profile ai up -d
-  ai:
+  # Mints the shared BETTER_AUTH_SECRET once, into a volume, unless you set
+  # one in .env. Web, API and AI all read the same file — they must agree.
+  auth-secret:
+    image: redis:7-alpine
+    restart: "no"
+    command:
+      - sh
+      - -c
+      - "[ -s /secrets/auth-secret ] || head -c 32 /dev/urandom | base64 > /secrets/auth-secret; chmod 444 /secrets/auth-secret"
+    volumes:
+      - buzrr-secrets:/secrets
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    image: buzrr-server
+    restart: "no"
+    working_dir: /app/packages/prisma
+    # Applies committed migrations (creating and baselining the schema on a
+    # fresh database — see scripts/deploy.mjs), then makes sure the duel pool
+    # isn't empty (idempotent starter pack).
+    command:
+      - sh
+      - -c
+      - "node scripts/deploy.mjs && node scripts/seed-duel-starter.mjs"
+    environment:
+      <<: *database-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  server:
+    image: buzrr-server
+    restart: unless-stopped
+    # Prefer BETTER_AUTH_SECRET from .env; fall back to the generated one.
+    command:
+      - sh
+      - -c
+      - 'export BETTER_AUTH_SECRET="$${BETTER_AUTH_SECRET:-$$(cat /run/buzrr/auth-secret)}" && exec node /app/apps/server/dist/src/main.js'
+    environment:
+      <<: *database-env
+      REDIS_URL: redis://redis:6379
+      PORT: "3001"
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-}
+      WEB_ORIGIN: ${PUBLIC_WEB_URL:-http://localhost:3000}
+      # Billing is a hosted-service feature; self-hosted means Pro limits.
+      BILLING: "OFF"
+      # Question images: local disk (the volume below) unless you choose
+      # cloudinary or s3 — see .env.example.
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      STORAGE_LOCAL_DIR: /data/uploads
+      STORAGE_PUBLIC_URL: ${PUBLIC_API_URL:-http://localhost:3001}/uploads
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
+      # AI quiz generation: off until a model is configured.
+      LLM_PROVIDER: ${LLM_PROVIDER:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    ports:
+      - "3001:3001"
+    volumes:
+      - buzrr-uploads:/data/uploads
+      - buzrr-secrets:/run/buzrr:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      auth-secret:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:3001}
+        PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
+        PUBLIC_AI_API_URL: ${PUBLIC_AI_API_URL:-}
+    image: buzrr-web
+    restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - 'export BETTER_AUTH_SECRET="$${BETTER_AUTH_SECRET:-$$(cat /run/buzrr/auth-secret)}" && exec node /app/apps/web/server.js'
+    environment:
+      <<: *database-env
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-}
+      BETTER_AUTH_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
+      TRUSTED_ORIGINS: ${PUBLIC_WEB_URL:-http://localhost:3000},${PUBLIC_API_URL:-http://localhost:3001}
+      # Local accounts work offline; Google sign-in is added when its
+      # credentials are set.
+      AUTH_EMAIL_PASSWORD: ${AUTH_EMAIL_PASSWORD:-ON}
+      AUTH_EMAIL_SIGNUP: ${AUTH_EMAIL_SIGNUP:-ON}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      API_INTERNAL_URL: http://server:3001
+      RATELIMIT: "OFF"
+      # The landing-page reel streams from a CDN; empty keeps it offline.
+      LANDING_VIDEO_URL: ${LANDING_VIDEO_URL:-}
+    ports:
+      - "3000:3000"
+    volumes:
+      - buzrr-secrets:/run/buzrr:ro
+    depends_on:
+      server:
+        condition: service_healthy
+
+  # --- profile: ai -----------------------------------------------------------
+  # Knowledge Spaces. Needs a model: GEMINI_API_KEY, or LLM_BASE_URL pointing
+  # at an OpenAI-compatible server (the `ollama` profile below, or your own) —
+  # plus AI_GENERATION_MODEL / AI_EMBEDDING_MODEL for that server. Build the
+  # web image with PUBLIC_AI_API_URL=http://localhost:3002 to show it in the UI.
+  #
+  # Contributors running the Node apps with `yarn dev` can start just these
+  # (apps/ai/.env is used if present) with AI_BUZRR_API_URL pointing at the
+  # host: AI_BUZRR_API_URL=http://host.docker.internal:3001.
+
+  ai-migrate:
     profiles: ["ai"]
     build:
       context: ./apps/ai
+    image: buzrr-ai
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+    env_file: *ai-env-files
+    environment:
+      <<: *ai-env
+      # Settings are validated on every entrypoint; migrations never verify
+      # a token.
+      BETTER_AUTH_SECRET: migrations-do-not-verify-tokens
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ai:
+    profiles: ["ai"]
+    image: buzrr-ai
     container_name: buzrr-ai
     restart: unless-stopped
-    env_file: apps/ai/.env
-    environment:
-      AI_DATABASE_URL: postgresql://buzrr:buzrr@postgres:5432/buzrr
-      REDIS_URL: redis://redis:6379
-      # The Nest API runs on the host (`yarn dev`); generation reserves AI
-      # plan tokens there.
-      AI_BUZRR_API_URL: http://host.docker.internal:3001
+    command:
+      - sh
+      - -c
+      - 'export BETTER_AUTH_SECRET="$${BETTER_AUTH_SECRET:-$$(cat /run/buzrr/auth-secret)}" && exec uvicorn buzrr_ai.main:app --host 0.0.0.0 --port 3002'
+    env_file: *ai-env-files
+    environment: *ai-env
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "3002:3002"
+    volumes:
+      - buzrr-secrets:/run/buzrr:ro
     depends_on:
-      postgres:
-        condition: service_healthy
+      ai-migrate:
+        condition: service_completed_successfully
+      auth-secret:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
 
   ai-worker:
     profiles: ["ai"]
-    build:
-      context: ./apps/ai
+    image: buzrr-ai
     container_name: buzrr-ai-worker
     restart: unless-stopped
-    command: ["arq", "buzrr_ai.worker.WorkerSettings"]
-    env_file: apps/ai/.env
-    environment:
-      AI_DATABASE_URL: postgresql://buzrr:buzrr@postgres:5432/buzrr
-      REDIS_URL: redis://redis:6379
+    command:
+      - sh
+      - -c
+      - 'export BETTER_AUTH_SECRET="$${BETTER_AUTH_SECRET:-$$(cat /run/buzrr/auth-secret)}" && exec arq buzrr_ai.worker.WorkerSettings'
+    env_file: *ai-env-files
+    environment: *ai-env
+    volumes:
+      - buzrr-secrets:/run/buzrr:ro
     depends_on:
-      postgres:
-        condition: service_healthy
+      ai-migrate:
+        condition: service_completed_successfully
+      auth-secret:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
+
+  # --- profile: ollama -------------------------------------------------------
+  # A local, OpenAI-compatible model server. Pull models once (needs the
+  # internet that one time), then everything runs offline:
+  #
+  #     docker compose exec ollama ollama pull llama3.1
+  #     docker compose exec ollama ollama pull nomic-embed-text
+  #
+  # and in .env:  LLM_BASE_URL=http://ollama:11434/v1  LLM_MODEL=llama3.1
+  #               AI_GENERATION_MODEL=llama3.1  AI_EMBEDDING_MODEL=nomic-embed-text
+  ollama:
+    profiles: ["ollama"]
+    image: ollama/ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - buzrr-ollama:/root/.ollama
 
 volumes:
   buzrr-postgres-data:
   buzrr-redis-data:
+  buzrr-uploads:
+  buzrr-secrets:
+  buzrr-ollama:

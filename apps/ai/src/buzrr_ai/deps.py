@@ -11,7 +11,6 @@ from fastapi import Depends
 from buzrr_ai.billing import BillingClient
 from buzrr_ai.config import Settings, get_settings
 from buzrr_ai.providers.base import EmbeddingProvider, LLMProvider
-from buzrr_ai.providers.gemini import GeminiEmbeddings, GeminiLLM
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
@@ -25,14 +24,32 @@ def redis_settings(settings: Settings) -> RedisSettings:
     return RedisSettings.from_dsn(settings.redis_url)
 
 
+# Vendor modules are imported only for the provider in use, so an offline
+# install on an OpenAI-compatible server never loads the Gemini SDK.
+
+
 @lru_cache
 def get_embeddings() -> EmbeddingProvider:
-    return GeminiEmbeddings(get_settings())
+    settings = get_settings()
+    if settings.provider == "openai":
+        from buzrr_ai.providers.openai_compat import OpenAICompatEmbeddings
+
+        return OpenAICompatEmbeddings(settings)
+    from buzrr_ai.providers.gemini import GeminiEmbeddings
+
+    return GeminiEmbeddings(settings)
 
 
 @lru_cache
 def get_llm() -> LLMProvider:
-    return GeminiLLM(get_settings())
+    settings = get_settings()
+    if settings.provider == "openai":
+        from buzrr_ai.providers.openai_compat import OpenAICompatLLM
+
+        return OpenAICompatLLM(settings)
+    from buzrr_ai.providers.gemini import GeminiLLM
+
+    return GeminiLLM(settings)
 
 
 @lru_cache

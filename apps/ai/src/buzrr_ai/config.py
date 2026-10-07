@@ -6,8 +6,9 @@ discovering the gap on the first request.
 """
 
 from functools import lru_cache
+from typing import Literal
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,7 +19,6 @@ class Settings(BaseSettings):
     ai_database_url: str
     redis_url: str
     better_auth_secret: str
-    gemini_api_key: str
 
     # CORS allow-list. Unlike the Nest server's `parse-cors-origin.ts`, an unset
     # value here fails closed — no reason to repeat that known debt in new code.
@@ -28,6 +28,17 @@ class Settings(BaseSettings):
     # (`apps/server/src/modules/billing`), so each generation reserves one there
     # with the caller's own bearer token. Unreachable = generation fails closed.
     ai_buzrr_api_url: str
+
+    # --- model provider -----------------------------------------------------
+    # Which API embeddings and generation go to. Unset: Gemini, unless
+    # LLM_BASE_URL points at an OpenAI-compatible server (Ollama, vLLM, …).
+    llm_provider: Literal["gemini", "openai"] | None = None
+    # Required for Gemini.
+    gemini_api_key: str = ""
+    # OpenAI-compatible base URL, e.g. http://localhost:11434/v1 (Ollama).
+    llm_base_url: str = ""
+    # Optional: most local servers don't check it.
+    llm_api_key: str = ""
 
     # --- optional -----------------------------------------------------------
     ai_port: int = 3002
@@ -66,6 +77,23 @@ class Settings(BaseSettings):
     # Per-user rate limits (sliding windows, backed by the shared Redis).
     ai_rate_uploads_per_hour: int = 40
     ai_rate_generations_per_hour: int = 30
+
+    @property
+    def provider(self) -> Literal["gemini", "openai"]:
+        if self.llm_provider:
+            return self.llm_provider
+        return "openai" if self.llm_base_url else "gemini"
+
+    @model_validator(mode="after")
+    def _provider_is_usable(self) -> "Settings":
+        if self.provider == "gemini" and not self.gemini_api_key:
+            raise ValueError(
+                "GEMINI_API_KEY is required, or set LLM_BASE_URL to an "
+                "OpenAI-compatible server (e.g. Ollama) instead"
+            )
+        if self.provider == "openai" and not self.llm_base_url:
+            raise ValueError("LLM_BASE_URL is required when LLM_PROVIDER=openai")
+        return self
 
     @property
     def cors_origins(self) -> list[str]:

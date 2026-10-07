@@ -3,7 +3,7 @@
 import clsx from "clsx";
 import Image from "next/image";
 import { useState } from "react";
-import { LuBan, LuCheck, LuPlay, LuX } from "react-icons/lu";
+import { LuBan, LuPlay, LuX } from "react-icons/lu";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { DEFAULT_AVATAR } from "@/constants";
@@ -14,15 +14,15 @@ import {
   useBanRoomPlayerMutation,
   useRemoveRoomPlayerMutation,
 } from "@/lib/modules/game-sessions/hooks";
+import { RevealBreakdown, revealStats } from "@/components/QuestionTypes";
 import {
-  OPTION_KEYS,
   StatTile,
   labelClass,
   mutedText,
   panelClass,
   primaryButtonClass,
 } from "@/components/Game/GameUI";
-import type { GameSocket } from "@/types/socket-events";
+import type { GameSocket } from "@/types/socket";
 
 interface QuesResultProps {
   socket: GameSocket;
@@ -65,15 +65,10 @@ export default function QuesResult(props: QuesResultProps) {
   const removePlayerMutation = useRemoveRoomPlayerMutation();
   const banPlayerMutation = useBanRoomPlayerMutation();
 
-  const options = question?.options ?? [];
-  const counts = reveal?.counts ?? [];
-  const correctIds = reveal?.correctOptionIds ?? [];
-  const responses = counts.reduce((sum, c) => sum + c, 0);
-  const maxCount = Math.max(1, ...counts);
-  const correctResponses = options.reduce(
-    (sum, o, i) => sum + (correctIds.includes(o.id) ? (counts[i] ?? 0) : 0),
-    0,
-  );
+  const { responses, correct: correctResponses } =
+    question && reveal
+      ? revealStats(question, reveal.summary)
+      : { responses: 0, correct: 0 };
   const correctPct =
     responses > 0 ? Math.round((correctResponses / responses) * 100) : 0;
   const avgTime =
@@ -138,51 +133,9 @@ export default function QuesResult(props: QuesResultProps) {
           <StatTile value={`${correctPct}%`} label="Got it right" />
           <StatTile value={avgTime} label="Avg. answer time" />
         </div>
-        <div className="flex-1 flex flex-col justify-center gap-3.5">
-          {options.map((opt, i) => {
-            const count = counts[i] ?? 0;
-            const ok = correctIds.includes(opt.id);
-            const pct =
-              responses > 0 ? Math.round((count / responses) * 100) : 0;
-            return (
-              <div key={opt.id} className="flex flex-col gap-[7px]">
-                <div
-                  className={clsx(
-                    "flex items-center gap-2.5 text-[15px] font-semibold",
-                    ok && "text-green-600 dark:text-green-500",
-                  )}
-                >
-                  <span className="flex-1 min-w-0 truncate">
-                    {OPTION_KEYS[i]}. {opt.title}
-                  </span>
-                  {ok && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-green-500 px-2 py-0.5 text-[11.5px] font-bold tracking-[0.04em] uppercase text-white">
-                      <LuCheck size={13} strokeWidth={3} />
-                      Correct
-                    </span>
-                  )}
-                  <span className={clsx("text-sm font-medium", mutedText)}>
-                    {count} {count === 1 ? "vote" : "votes"}
-                  </span>
-                </div>
-                <div className="relative h-[38px] rounded-xl overflow-hidden bg-lprimary/8 dark:bg-white/5">
-                  <div
-                    className={clsx(
-                      "h-full rounded-xl transition-[width] duration-500",
-                      ok
-                        ? "bg-green-500"
-                        : "bg-[#8a8896]/45 dark:bg-[#71717a]/45",
-                    )}
-                    style={{ width: `${(count / maxCount) * 100}%` }}
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[13.5px] font-bold">
-                    {pct}%
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        {question && reveal && (
+          <RevealBreakdown question={question} summary={reveal.summary} />
+        )}
       </section>
 
       <section

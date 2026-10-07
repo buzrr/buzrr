@@ -9,7 +9,7 @@ import { useDuelInvite } from "@/hooks/useDuelInvite";
 import { buildDuelInviteUrl } from "@/lib/join-link";
 import { useCancelDuelInviteMutation } from "@/lib/modules/duel/hooks";
 import type { DuelInvite } from "@/lib/modules/duel/api";
-import type { DuelMatchedPayload } from "@/types/socket-events";
+import type { DuelMatchedPayload } from "@buzrr/contract";
 
 /**
  * What the challenger sees while waiting. The socket opened here is also the

@@ -48,3 +48,4 @@ Format:
   (AGENTS.md, docs/architecture/\*, docs/adr/001–008, CONTEXT.md, this log).
   No application code changed.
 - 2026-10-01 — SEO/GEO layer: `(marketing)` static pages, `lib/seo`, sitemap/robots/OG routes, www canonical, and public routes now server-render past `PersistGate` (frontend.md § SEO).
+- 2026-10-06 — Phase 0 architecture: pluggable question types (ADR-011), pure engine core + pacing strategies (ADR-012), `@buzrr/contract` replacing the hand-kept socket mirror (ADR-013), self-hosting via `docker compose up` with storage/model/sign-in abstractions and baselined migrations (ADR-014, docs/self-hosting.md). Updated ARCHITECTURE, AGENTS, CONTEXT, README, CONTRIBUTING and realtime/data/backend/frontend/auth/ai/infrastructure/duels/overview/invariants (#1, #18, #25 rewritten; #40–45 added). Doc drift fixed on the way: duels.md bot accuracy (easy is 30%, not 45%), overview.md "no test suite".

@@ -1,0 +1,24 @@
+{
+  "name": "@buzrr/contract",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The one source of truth for Buzrr's socket + REST contract: zod schemas and the types inferred from them.",
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "postinstall": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
+    "check-types": "tsc -p tsconfig.json --noEmit"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "typescript": "5.8.2"
+  }
+}

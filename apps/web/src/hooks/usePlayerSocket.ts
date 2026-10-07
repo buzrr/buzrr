@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import type { GameSocket } from "@/types/socket-events";
+import type { GameSocket } from "@/types/socket";
 import { useGameSocket } from "./useGameSocket";
 
 interface UsePlayerSocketOptions {

@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import { setPlayers } from "@/state/admin/playersSlice";
 import type { Option } from "@/types/db";
-import type { PlayerPayload } from "@/types/socket-events";
+import type { PlayerPayload } from "@buzrr/contract";
 import { useAdminSocket } from "@/hooks/useAdminSocket";
 import ConnectionBanner from "@/components/ConnectionBanner";
 import { GameTopBar } from "@/components/Game/GameUI";

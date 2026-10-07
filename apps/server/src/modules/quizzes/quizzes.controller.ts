@@ -1,3 +1,4 @@
+import { importQuizSchema, type ImportQuiz } from "@buzrr/contract";
 import {
   Body,
   Controller,
@@ -14,9 +15,9 @@ import { CurrentAccountUser } from "../../common/decorators/current-user.decorat
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
 import { RateLimitProfile } from "../../common/decorators/rate-limit-profile.decorator";
 import { RateLimitGuard } from "../../common/guards/rate-limit.guard";
+import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { CreateAiQuizDto } from "./dto/create-ai-quiz.dto";
 import { CreateQuizDto } from "./dto/create-quiz.dto";
-import { ImportQuizDto } from "./dto/import-quiz.dto";
 import { UpdateQuizDto } from "./dto/update-quiz.dto";
 import { QuizzesService } from "./quizzes.service";
 
@@ -48,8 +49,11 @@ export class QuizzesController {
 
   @Post("import")
   @UseGuards(RateLimitGuard)
-  importQuiz(@CurrentAccountUser() user: AuthUser, @Body() dto: ImportQuizDto) {
-    return this.quizzes.importQuestions(user, dto);
+  importQuiz(
+    @CurrentAccountUser() user: AuthUser,
+    @Body(new ZodValidationPipe(importQuizSchema)) body: ImportQuiz,
+  ) {
+    return this.quizzes.importQuestions(user, body);
   }
 
   @Patch(":id")

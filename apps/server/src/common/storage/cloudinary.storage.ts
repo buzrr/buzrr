@@ -1,6 +1,9 @@
-import { Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { v2 as cloudinary } from "cloudinary";
+import {
+  MediaStorage,
+  type StoredMedia,
+  type UploadMeta,
+} from "./media-storage";
 
 function getPublicIdFromUrl(url: string): string {
   const parts = url.split("/");
@@ -9,19 +12,26 @@ function getPublicIdFromUrl(url: string): string {
   return publicId ?? "";
 }
 
-@Injectable()
-export class CloudinaryService {
-  constructor(config: ConfigService) {
+/** Cloudinary (the hosted default). Transcodes, so any image format works. */
+export class CloudinaryStorage extends MediaStorage {
+  readonly driver = "cloudinary" as const;
+
+  constructor(config: {
+    cloudName?: string;
+    apiKey?: string;
+    apiSecret?: string;
+  }) {
+    super();
     cloudinary.config({
-      cloud_name: config.get<string>("CLOUDINARY_CLOUD_NAME"),
-      api_key: config.get<string>("CLOUDINARY_API_KEY"),
-      api_secret: config.get<string>("CLOUDINARY_API_SECRET"),
+      cloud_name: config.cloudName,
+      api_key: config.apiKey,
+      api_secret: config.apiSecret,
       secure: true,
     });
   }
 
-  async destroyIfPresent(url: string): Promise<void> {
-    if (!url) return;
+  async remove(url: string): Promise<void> {
+    if (!url || !url.includes("res.cloudinary.com")) return;
     const publicId = getPublicIdFromUrl(url);
     if (!publicId) return;
     await new Promise<void>((resolve) => {
@@ -29,7 +39,7 @@ export class CloudinaryService {
     });
   }
 
-  async uploadBuffer(buffer: Buffer): Promise<{ url: string; mediaType: string }> {
+  async upload(buffer: Buffer, _meta?: UploadMeta): Promise<StoredMedia> {
     return new Promise((resolve, reject) => {
       cloudinary.uploader
         .upload_stream({}, (error, result) => {

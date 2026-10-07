@@ -25,12 +25,14 @@ yarn install
 yarn setup               # Postgres + Redis in Docker, .env files, schema
 ```
 
-Add your Google OAuth credentials to `apps/web/.env` (see the
-[README](README.md#quick-start)), then:
+Then:
 
 ```sh
 yarn dev                 # web :3000, api :3001
 ```
+
+and create a local account at http://localhost:3000 (Google sign-in is
+optional — see the [README](README.md#-develop-locally)).
 
 ## Development workflow
 
@@ -43,6 +45,7 @@ yarn dev                 # web :3000, api :3001
    ```sh
    yarn lint
    yarn check-types
+   yarn workspace server test   # engine core, question types, adapters (+ billing, needs Postgres)
    yarn build          # optional but recommended — this is what CI runs
    yarn format         # apply Prettier
    ```
@@ -76,12 +79,49 @@ Common types: `feat`, `fix`, `refactor`, `docs`, `chore`, `test`, `ci`.
 - **Secrets never get committed.** `.env*` files are gitignored — only update the
   `.env.example` templates.
 
+## Adding a question type
+
+Question types are plugins: the game engine never needs to change
+([ADR-011](docs/adr/011-pluggable-question-types.md)). Using a hypothetical
+`true_false` type as the example:
+
+1. **Contract** — in
+   [`packages/contract/src/question-types.ts`](packages/contract/src/question-types.ts),
+   add a block like `multipleChoice` with four zod schemas: `config` (authored
+   settings), `answer` (what a player sends), `publicQuestion` (what players
+   see — never the answer key) and `summary` (what the reveal shows, with a
+   `type` literal). Add it to `QUESTION_TYPES`, the three unions and
+   `QuestionTypeMap`.
+2. **Server handler** — create
+   `apps/server/src/modules/question-types/types/true-false.ts` implementing
+   `QuestionTypeHandler<"true_false">` (`validateDefinition`, `checkAnswer`,
+   `score`, `toPublic`, `summarize`, `sampleAnswer` for duel bots) and
+   register it in `registry.ts`. Handlers must be pure — no I/O, randomness
+   only through the `random` argument.
+3. **Web renderer** — create
+   `apps/web/src/components/QuestionTypes/TrueFalse.tsx` implementing
+   `QuestionRenderer<"true_false">` (`AnswerInput`, `HostPrompt`,
+   `RevealBreakdown`, `revealStats`, `describeAnswer`, `correctAnswers`) and
+   register it in `index.tsx`.
+4. **Tests** — a spec next to
+   `apps/server/src/modules/question-types/__tests__/multiple-choice.spec.ts`
+   covering validation, answer checking, scoring, `toPublic` (no answer
+   key!) and the summary.
+
+`yarn check-types` tells you when you've missed a step: both registries are
+exhaustive over `QuestionType`, so a type without a handler or a renderer
+doesn't compile. Authoring UI is separate — the question editor posts
+`type`, `config` and an `options` JSON array to
+`POST /api/quizzes/:quizId/questions`.
+
 ## Pull request checklist
 
-- [ ] `yarn lint`, `yarn check-types`, and `yarn build` pass.
+- [ ] `yarn lint`, `yarn check-types`, `yarn workspace server test` and
+      `yarn build` pass.
 - [ ] The change is covered by the PR description (what & why).
 - [ ] Docs/README updated if behavior or setup changed.
 - [ ] No secrets, credentials, or personal data in the diff.
 
-CI (lint, type-check, build) must be green before a PR can be merged. Thanks
+CI (lint, type-check, tests, build, and the `docker compose up` self-host
+check) must be green before a PR can be merged. Thanks
 again for contributing! 💛

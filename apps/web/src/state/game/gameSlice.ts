@@ -2,14 +2,14 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import type {
   AnswerCountPayload,
   AnswerResultPayload,
-  ConnectionStatus,
   GamePhase,
-  LiveLeaderboardEntry,
+  LeaderboardEntry,
   PublicQuestion,
   QuestionEndPayload,
   QuestionStartPayload,
   StateSyncPayload,
-} from "@/types/socket-events";
+} from "@buzrr/contract";
+import type { ConnectionStatus } from "@/types/socket";
 
 /**
  * Mirror of the server-owned live game state. Every field here is pushed by
@@ -30,7 +30,7 @@ export interface GameLiveState {
   /** Answers received for the open question (host meter). */
   answeredCount: number;
   reveal: QuestionEndPayload | null;
-  leaderboard: LiveLeaderboardEntry[];
+  leaderboard: LeaderboardEntry[];
   isFinalLeaderboard: boolean;
   players: {
     id: string;
@@ -117,7 +117,7 @@ const gameSlice = createSlice({
     leaderboardReceived: (
       state,
       action: PayloadAction<{
-        entries: LiveLeaderboardEntry[];
+        entries: LeaderboardEntry[];
         isFinal: boolean;
       }>,
     ) => {
@@ -130,7 +130,7 @@ const gameSlice = createSlice({
     gameOver: (
       state,
       action: PayloadAction<{
-        entries: LiveLeaderboardEntry[];
+        entries: LeaderboardEntry[];
         eloChanges?: Record<string, { before: number; after: number }>;
         rated?: boolean;
       }>,

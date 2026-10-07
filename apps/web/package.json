@@ -15,6 +15,7 @@
     "start:vinext": "vinext start"
   },
   "dependencies": {
+    "@buzrr/contract": "workspace:*",
     "@buzrr/prisma": "workspace:*",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",

@@ -85,8 +85,9 @@ Guest identity is _localStorage_, not Redux: `playerId` + `playerToken`
   slice, maps connection states (including hard-fail on `io server
 disconnect`), emits `request-sync` on connect as a safety net, and exposes a
   `bind` callback for role-specific listeners. New socket events get wired
-  here + typed in `src/types/socket-events.ts` (hand-kept mirror of the
-  server's `realtime.types.ts`).
+  here. Payload types come from `@buzrr/contract` (the same package the
+  server compiles against — ADR-013); `src/types/socket.ts` holds only the
+  client-side `GameSocket` / `ConnectionStatus` types.
 - `useAdminSocket` — wraps it for hosts: fetches the JWT first (cookie
   fallback), maintains the lobby roster slice, surfaces
   kick/game-started/game-over callbacks.
@@ -115,6 +116,16 @@ disconnect`), emits `request-sync` on connect as a safety net, and exposes a
   `Leaderboard`).
 - Duel screen: `Duel/DuelGameClient` (score bar, countdown, reuses
   `GameScreens/Question`/`Result`, ELO delta panel, `DuelAudio`).
+- **Question-type renderers** (`components/QuestionTypes/`): the screens
+  above never draw a question themselves. They call `AnswerInput` (guest
+  input, `Question`/`QuesAndResult`), `HostPrompt` (host `QuestionScreen`),
+  `RevealBreakdown` + `revealStats` (host `QuesResult`) and
+  `describeAnswer` / `correctAnswers` (guest `Result`), which dispatch on
+  `question.type` to one renderer per type (`MultipleChoice.tsx` today). The
+  registry is a mapped type over the contract's `QuestionType`, so a type
+  without a renderer fails `check-types`. Answers are type-shaped values
+  (`QuestionAnswer`), sent as `submit-answer { qIndex, answer }`; the reveal
+  is `reveal.summary`. See [ADR-011](../adr/011-pluggable-question-types.md).
 - Join flows: `Player/Setup/*` (create profile → join by code) and
   `JoinViaLinkClient` for `/join/[gameCode]` links/QR (`lib/join-link.ts`
   builds the URLs from `NEXT_PUBLIC_APP_URL`).
@@ -180,9 +191,18 @@ the Prisma runtime out of the client bundle).
 
 ## Gotchas
 
-- `next.config.ts`: `output: "standalone"`, `serverExternalPackages` for
-  prisma/pg/better-auth, `transpilePackages: ["@buzrr/prisma"]`, remote
-  images allowed from any https host.
+- `next.config.ts`: `output: "standalone"` (the self-host image runs
+  `apps/web/server.js` from it), `serverExternalPackages` for
+  prisma/pg/better-auth, `transpilePackages: ["@buzrr/prisma",
+"@buzrr/contract"]`, remote images allowed from any https host plus the
+  exact http origin of `NEXT_PUBLIC_API_URL` / `MEDIA_ORIGIN` (self-hosted
+  local uploads); `NEXT_IMAGE_UNOPTIMIZED=1` bypasses the optimizer (the
+  Docker build sets it — inside the container the API's public URL isn't
+  reachable).
+- `/auth/login` is `force-dynamic`: it reads the enabled sign-in methods
+  (`lib/auth-methods.ts` — Google when its credentials are set, email +
+  password with `AUTH_EMAIL_PASSWORD=ON`) from runtime env, so one image
+  serves any configuration. Google-only installs still auto-redirect.
 - Two sources of "players in the room" exist for hosts: the REST lobby
   snapshot (React Query) and the live roster (`playersSlice` fed by
   `useAdminSocket`, plus `game.players` from sync). When touching rosters,
@@ -194,7 +214,8 @@ the Prisma runtime out of the client bundle).
 - **New Redux slices are persisted by default** — the redux-persist config
   blacklists only `game`. Anything server-derived or per-session you add must
   be blacklisted too, or it resurrects on reload.
-- **REST payload types are hand-written mirrors**, not imports: each
+- **Most REST payload types are hand-written mirrors**, not imports (only
+  bodies defined in `@buzrr/contract`, like the quiz import, are shared): each
   `lib/modules/<domain>/api.ts` re-declares the server's response shapes
   (e.g. `GameResult`, `AdminLobbyPayload`). Changing a server response means
   updating the mirror by hand — nothing will error until runtime.

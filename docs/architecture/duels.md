@@ -24,12 +24,15 @@ Duels run on the shared engine — read [realtime.md](realtime.md) first.
 `DuelQuestionsService.build()` (`duel-questions.service.ts`) draws
 `DUEL_QUESTION_COUNT = 7` random questions where the quiz `isPublic = true`
 **and** `question.moderationStatus = 'approved'` (raw SQL `ORDER BY random()`,
-then a findMany re-ordered to the raw shuffle). Questions need ≥2 options and
-≥1 correct. Throws if fewer than 3 usable — matchmaking and invites both
+then a findMany re-ordered to the raw shuffle). Each row must pass its
+question type's own checks (`toLiveQuestion` — for multiple choice, 2–6
+options with exactly one correct); the rest are skipped. Throws if fewer than
+3 usable — matchmaking and invites both
 surface that as "no questions". The moderation gate is what feeds this pool —
 see [backend.md](backend.md#moderation).
 `packages/prisma/scripts/seed-duel-starter.mjs` seeds a system-owned "Duel
-Starter Pack" so the pool is never empty.
+Starter Pack" so the pool is never empty (the self-host `migrate` container
+runs it on every start; it is idempotent).
 
 ## Matchmaking (`matchmaking.service.ts`)
 
@@ -61,12 +64,14 @@ userId→{name,image,joinedAt}), `mm:duel:lock`.
   guarantees no `User.id` collision, which is what keeps bots out of user ELO
   lookups), human-like Indian-skewed name pool, ELO = human ±75 (floor 100),
   tier by human ELO: easy <1100, medium <1400, else hard.
-- `planBotAnswer(question, tier)` — accuracy/delay per tier (easy 45%,
-  medium 70%, hard 88%; delays as fractions of the time limit, min 800ms so
-  it never answers inhumanly fast, and 500ms clear of the deadline). A "miss"
-  picks a wrong option rather than staying silent so `maybeRevealEarly` still
-  closes the question.
-- The plan is written into game meta at `enterQuestion` (restart-durable);
+- `planBotAnswer(question, tier, random)` — accuracy/delay per tier (easy
+  30%, medium 70%, hard 88% — `BOT_PROFILES`; delays as fractions of the time limit, min 800ms so it never answers inhumanly
+  fast, and 500ms clear of the deadline). What a right or wrong answer _is_
+  comes from the question type's `sampleAnswer`, so bots play every type the
+  pool serves. A "miss" is a wrong answer rather than silence so the early
+  close still fires once both have answered.
+- The plan is written into game meta when the question opens (`botAnswer`
+  JSON + `botAnswerAt`; restart-durable);
   `DuelBotService` just holds the one-per-game timer and submits through the
   normal validated `submitAnswer` path. Bot duels are **rated** (ELO applied
   to the human only), and `resolveDuelForfeit` / forfeit rules apply

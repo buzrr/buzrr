@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import type { PlayerPayload } from "@/types/socket-events";
+import type { PlayerPayload } from "@buzrr/contract";
 
 /**
  * Host-screen roster. Live gameplay state (phase, question, leaderboard) is

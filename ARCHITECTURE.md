@@ -14,7 +14,7 @@ implementation, the implementation wins — fix the file.
 
 ## Monorepo shape
 
-Buzrr is a [Turborepo](https://turbo.build/repo) monorepo with two apps and a shared Prisma package.
+Buzrr is a [Turborepo](https://turbo.build/repo) monorepo with two apps (plus an optional AI service), a shared Prisma package and a shared contract package.
 
 ```mermaid
 flowchart LR
@@ -25,6 +25,8 @@ flowchart LR
     S -- live game state --> R[("Redis")]
     W -. shared schema .-> P["@buzrr/prisma"]
     S -. shared schema .-> P
+    W -. shared contract .-> C["@buzrr/contract"]
+    S -. shared contract .-> C
 ```
 
 | Package                                          | Description                                                                                     |
@@ -33,9 +35,10 @@ flowchart LR
 | [`apps/server`](apps/server)                     | NestJS 11 API + Socket.IO gateway. Owns the realtime game loop.                                 |
 | [`apps/ai`](apps/ai)                             | Python 3.12 + FastAPI + arq. Knowledge Spaces, document RAG, question generation. Optional.     |
 | [`@buzrr/prisma`](packages/prisma)               | Prisma schema, migrations and the shared generated client.                                      |
+| [`@buzrr/contract`](packages/contract)           | Zod schemas for the socket contract and question shapes — the one definition both apps import.  |
 | `@repo/eslint-config`, `@repo/typescript-config` | Shared lint/tsconfig presets.                                                                   |
 
-**Tech stack:** TypeScript · Next.js · NestJS · Socket.IO · Prisma · PostgreSQL · Redis · Better Auth · Gemini · Cloudinary · Turborepo · Yarn 4 · Python · FastAPI · pgvector.
+**Tech stack:** TypeScript · Next.js · NestJS · Socket.IO · Prisma · PostgreSQL · Redis · Better Auth · zod · Turborepo · Yarn 4 · Docker · Python · FastAPI · pgvector. Pluggable providers: Gemini or any OpenAI-compatible model (Ollama, vLLM, …); Cloudinary, S3-compatible or local-disk storage.
 
 The web app owns authentication and almost nothing else: every domain read and
 write goes through the Nest server, which is the only process that touches
@@ -63,17 +66,33 @@ stateDiagram-v2
 Both game modes run this same machine. Classic rooms are **host-paced**
 (`reveal` waits for the host to advance) and are backed by a `GameSession` lobby
 row; duels are **hostless**, exist only in Redis, and auto-advance after a 4s
-reveal.
+reveal. "How the game moves forward" is a **pacing strategy** the machine
+consults, so a third mode (self-paced, planned) is a new strategy rather than
+branches through the engine.
+
+The machine is a **pure function** — `step(state, event, now) → (newState,
+effects)` in `game-engine/core/` — with no Redis, sockets or timers in it.
+`GameEngineService` is the thin shell that loads state, runs the returned
+effects in order, and owns the atomic bits (first-write answers, the
+single end-of-game claim). The rules of the game are therefore plain unit
+tests.
+
+The engine also doesn't know what a question _is_. Each **question type** is a
+pure handler (check the config, check and score an answer, strip the answer
+key before sending, summarise the reveal) plus a web renderer; the engine only
+calls the handler. Multiple choice is the one type today.
 
 Because the server measures time, answers can't be spoofed by a fast client:
-score comes from the server's own clock (1000 points at _t=0_ decaying to 100 at
-the time limit), correct-option IDs are only broadcast once the question closes,
-and answers are first-write-wins per player per question.
+score comes from the server's own clock (for multiple choice, 1000 points at
+_t=0_ decaying to 100 at the time limit), nothing that gives the answer away is
+sent until the question closes, and answers are first-write-wins per player per
+question.
 
 The socket contract has exactly one version — the server emits and accepts
-precisely what the current client speaks. Compatibility aliases for older
-clients are deliberately not kept; both apps deploy from this repo, so a
-contract change migrates both sides at once.
+precisely what the current client speaks — and exactly one definition, the
+zod schemas in `@buzrr/contract` that both apps compile against.
+Compatibility aliases for older clients are deliberately not kept; both apps
+deploy from this repo, so a contract change migrates both sides at once.
 
 ## Who owns the clock
 
@@ -138,6 +157,7 @@ This file is the orientation layer. The full reference lives in
 | Pages, components, Redux/React-Query state, socket hooks | [frontend.md](docs/architecture/frontend.md)             |
 | Login, JWTs, socket auth, roles, guards                  | [auth.md](docs/architecture/auth.md)                     |
 | Env vars, deployment, CI, Docker, external services      | [infrastructure.md](docs/architecture/infrastructure.md) |
+| Running your own instance (`docker compose up`, offline) | [self-hosting.md](docs/self-hosting.md)                  |
 | Rules you must not break                                 | [invariants.md](docs/architecture/invariants.md)         |
 | Knowledge Spaces, ingestion, RAG, the Python service     | [ai.md](docs/architecture/ai.md)                         |
 | Why it's built this way                                  | [`docs/adr/`](docs/adr/)                                 |

@@ -1,5 +1,6 @@
+import type { QuestionAnswer } from "@buzrr/contract";
 import { nanoid } from "nanoid";
-import type { LiveQuestion } from "../../modules/game-engine/game-engine.types";
+import { sampleAnswer, type LiveQuestion } from "../../modules/question-types";
 import { ELO_FLOOR } from "./elo";
 
 export type BotTier = "easy" | "medium" | "hard";
@@ -99,29 +100,27 @@ export function createBotOpponent(humanElo: number): BotOpponent {
 }
 
 /**
- * The bot always answers — a "miss" is a wrong option rather than silence, so
+ * The bot always answers — a "miss" is a wrong answer rather than silence, so
  * maybeRevealEarly() can still close the question once both players are in.
+ * What a right or wrong answer looks like is the question type's call
+ * (`sampleAnswer`), so bots play every type the duel pool can serve.
  */
 export function planBotAnswer(
   question: LiveQuestion,
   tier: BotTier,
-): { optionId: string; delayMs: number } {
+  random: () => number = Math.random,
+): { answer: QuestionAnswer; delayMs: number } {
   const profile = BOT_PROFILES[tier];
-  const correct = question.options.filter((o) => o.isCorrect);
-  const incorrect = question.options.filter((o) => !o.isCorrect);
-
-  let pool = Math.random() < profile.accuracy ? correct : incorrect;
-  // A question with no wrong option (or no right one) still needs an answer.
-  if (pool.length === 0) pool = question.options;
+  const answer = sampleAnswer(question, random() < profile.accuracy, random);
 
   const limitMs = question.timeOut * 1000;
   const frac =
     profile.minDelayFrac +
-    Math.random() * (profile.maxDelayFrac - profile.minDelayFrac);
+    random() * (profile.maxDelayFrac - profile.minDelayFrac);
   const delayMs = Math.min(
     Math.max(Math.round(limitMs * frac), MIN_ANSWER_DELAY_MS),
     Math.max(limitMs - DEADLINE_MARGIN_MS, 0),
   );
 
-  return { optionId: pick(pool).id, delayMs };
+  return { answer, delayMs };
 }

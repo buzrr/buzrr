@@ -6,15 +6,17 @@ code in the web app.
 
 ## Cast of components
 
-| Component           | File                                                         | Responsibility                                                                                                                               |
-| ------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GameEngineService` | `apps/server/src/modules/game-engine/game-engine.service.ts` | The authoritative loop: phase transitions, timers, scoring, presence, forfeits, result persistence. ~1,250 lines; most invariants live here. |
-| `GameStoreService`  | `.../game-engine/game-store.service.ts`                      | The only Redis access layer for live games (`game:{code}:*` keys, 6h TTL). Contains the atomic Lua scripts.                                  |
-| `DuelBotService`    | `.../game-engine/duel-bot.service.ts`                        | In-process timer that fires the bot's pre-planned answer through the normal `submitAnswer` path.                                             |
-| `RealtimeGateway`   | `apps/server/src/modules/realtime/realtime.gateway.ts`       | Socket.IO entry: validates connections, joins rooms, registers per-role handlers, relays intents to the engine. No game logic.               |
-| `RealtimeService`   | `.../realtime/realtime.service.ts`                           | Connection validation: parses handshake, verifies JWT/cookie, checks the player/host belongs to the room.                                    |
-| `realtime.types.ts` | `.../realtime/realtime.types.ts`                             | The typed socket contract (server side). Mirrored client-side in `apps/web/src/types/socket-events.ts` — **keep both in sync by hand**.      |
-| `RedisIoAdapter`    | `apps/server/src/redis/redis-io.adapter.ts`                  | `@socket.io/redis-adapter` wiring so room broadcasts reach sockets on other instances.                                                       |
+| Component           | File                                                         | Responsibility                                                                                                                                                                                                                                                                                                        |
+| ------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Engine core         | `apps/server/src/modules/game-engine/core/`                  | **Pure** rules of the game: the phase machine `step(state, event, now) → { state, effects }` (`machine.ts`), answer judging (`answers.ts`), snapshot/leaderboard projection (`views.ts`), pause/forfeit/abandon decisions (`lifecycle.ts`), pacing strategies (`pacing.ts`). No I/O; unit-tested in `core/__tests__`. |
+| `GameEngineService` | `apps/server/src/modules/game-engine/game-engine.service.ts` | The shell around the core: loads state from Redis, runs the core's effects in order, and owns everything needing I/O or atomicity — first-write answers, the end claim, pause/resume claims, timers, recovery, result persistence.                                                                                    |
+| Question types      | `apps/server/src/modules/question-types/`                    | One pure handler per type (check config, check + score an answer, strip the answer key, summarise the reveal, sample bot answers). The engine calls only `registry.ts`. See ADR-011.                                                                                                                                  |
+| `GameStoreService`  | `.../game-engine/game-store.service.ts`                      | The only Redis access layer for live games (`game:{code}:*` keys, 6h TTL). Contains the atomic Lua scripts.                                                                                                                                                                                                           |
+| `DuelBotService`    | `.../game-engine/duel-bot.service.ts`                        | In-process timer that fires the bot's pre-planned answer through the normal `submitAnswer` path.                                                                                                                                                                                                                      |
+| `RealtimeGateway`   | `apps/server/src/modules/realtime/realtime.gateway.ts`       | Socket.IO entry: validates connections, joins rooms, registers per-role handlers, relays intents to the engine. No game logic.                                                                                                                                                                                        |
+| `RealtimeService`   | `.../realtime/realtime.service.ts`                           | Connection validation: parses handshake, verifies JWT/cookie, checks the player/host belongs to the room.                                                                                                                                                                                                             |
+| `@buzrr/contract`   | `packages/contract/src/socket.ts`, `question-types.ts`       | The socket contract — zod schemas + inferred types, imported by both apps (ADR-013). `realtime.types.ts` re-exports it and adds server socket plumbing (`SocketData`, `TypedServer`).                                                                                                                                 |
+| `RedisIoAdapter`    | `apps/server/src/redis/redis-io.adapter.ts`                  | `@socket.io/redis-adapter` wiring so room broadcasts reach sockets on other instances.                                                                                                                                                                                                                                |
 
 The gateway holds the `Server` instance and hands it to the engine,
 matchmaking, and invite services in `afterInit` (`setServer(...)`).
@@ -28,15 +30,40 @@ lobby → starting → question ⇄ reveal → final → ended
                    answer grace)
 ```
 
-- Transitions are executed **only** by the engine: `enterQuestion`,
-  `enterReveal`, `enterFinal`, `endGame`.
-- Classic pacing: the host emits a single intent, `host-next`; the server
-  decides what "next" means from the current phase (`hostNext()`).
-- Duel pacing: deadlines drive everything; reveal auto-advances after
-  `DUEL_REVEAL_MS = 4000`.
-- A question closes early when every **connected** rostered player has
-  answered (`maybeRevealEarly`).
-- `enterFinal` in duel mode immediately calls `endGame`.
+- Transitions are decided **only** by the pure core, `step()` in
+  `core/machine.ts`, from events the shell feeds it: `start`, `host-next`,
+  `deadline`, `answer-recorded`, `close-question`, `roster-changed`. It
+  returns the next state plus an ordered list of **effects** (`patch-meta`,
+  `set-deadline`, `park-deadline`, `arm-timer`, `emit`, `arm-bot`, `end-game`,
+  `dispatch`, …) that `GameEngineService.run` executes strictly in order —
+  the orderings below (window before broadcast, personal results before the
+  reveal) are encoded as effect order and asserted in `machine.spec.ts`.
+  `endGame` (the claim + persistence) stays in the shell.
+- Each event loads only the state parts it needs (`PARTS_FOR`, one pipelined
+  round trip after the meta via `store.loadState`). The per-answer
+  `answer-recorded` event loads roster + answers only; the early close is a
+  follow-up `close-question` event (a `dispatch` effect) with a full load.
+
+### Pacing
+
+How a game moves past a reveal is a **strategy** (`core/pacing.ts`), stored
+in meta as `pacing` (games from before the field fall back by mode):
+
+| Strategy             | Used by | `host-next`        | Reveal ends               | Final leaderboard |
+| -------------------- | ------- | ------------------ | ------------------------- | ----------------- |
+| `hostPaced` (host)   | classic | advances the phase | never by itself (parked)  | waits for host    |
+| `autoAdvance` (auto) | duel    | ignored            | after `AUTO_REVEAL_MS` 4s | ends the game     |
+
+- The host emits a single intent, `host-next`; the machine decides what
+  "next" means from the phase (question → reveal → next question/final →
+  end).
+- Shared by every strategy: the server-timed answer window, and the early
+  close once every **connected** rostered player has answered.
+- A host-paced reveal whose parked deadline comes due is re-parked, not
+  advanced.
+- Self-paced play (each player on their own clock) is planned; the strategy
+  is where its advance rules belong, but it also needs per-player question
+  state that `GameState` doesn't model yet (ADR-012).
 
 ## Timing & timer ownership (multi-instance model)
 
@@ -53,6 +80,9 @@ instanceId)` — a `SET NX PX 20000` owner lock with renew-if-held Lua — so
   also ends classic games whose host has been disconnected >5min
   (`HOST_ABANDON_MS`), using `parkDeadline` entries so host-paced phases with
   no natural deadline stay visible to it.
+- A restarted instance can't fire a game's deadlines until the dead
+  instance's 20s owner lock lapses, so recovery after a crash takes up to
+  ~20s plus a sweep tick (observed ≈29s in an end-to-end restart test).
 - On boot, `recoverTimers()` re-arms everything in `games:deadlines` and
   re-arms a mid-flight bot answer from meta (`recoverBotAnswer`) — a process
   restart resumes live games.
@@ -102,7 +132,7 @@ quitter finish on score instead of forfeiting.
 
 ## Answer path (anti-cheat properties)
 
-`submitAnswer(gameCode, playerId, qIndex, optionId)`:
+`submitAnswer(gameCode, playerId, qIndex, answer)`:
 
 1. Rejects unless phase is `question`, `qIndex` matches, and the window is
    stamped (`qStartAt` non-zero).
@@ -117,15 +147,21 @@ quitter finish on score instead of forfeiting.
    and never points. There is deliberately **no per-socket RTT credit**: any
    such measurement is the client's own ack speed, which it can stall to buy
    both time and score. No endpoint accepts a client-supplied time.
-4. Score: `computeScore` (`common/utils/compute-score.ts`) — correct answers
-   decay 1000 → 100 linearly over the question's `timeOut`; wrong = 0.
+4. The question's **type** judges it: `checkAnswer` validates the answer
+   against the question (a malformed answer or unknown option is rejected
+   as `Invalid answer`) and `score` prices it — for multiple choice,
+   `computeScore` (`common/utils/compute-score.ts`): correct answers decay
+   1000 → 100 linearly over the question's `timeOut`; wrong = 0. Steps 1–4
+   are the pure `judgeAnswer` (`core/answers.ts`); the gateway first checks
+   the payload shape against the contract's `submitAnswerSchema`.
 5. First write wins via `HSETNX` (`store.putAnswer`); duplicates rejected.
-6. Score added to the Redis leaderboard zset; `maybeRevealEarly` runs. It
-   first broadcasts `answer-count` (`{ index, answered }`, total answers so
+6. Score added to the Redis leaderboard zset; the shell dispatches
+   `answer-recorded`, whose step first broadcasts `answer-count` (`{ index, answered }`, total answers so
    far) — the host's "answers in" meter; question-phase `state-sync` carries
-   the same number as `answeredCount` for reconnects.
+   the same number as `answeredCount` for reconnects — then, if every
+   connected player has answered, closes the question early.
 
-**Window stamping.** `enterQuestion` writes the `games:deadlines` entry, then
+**Window stamping.** Opening a question (`openQuestion` in the core) writes the `games:deadlines` entry, then
 opens the phase in one meta write carrying `qStartAt = now`,
 `qDeadline = now + timeOut` (the real window, no grace) and the bot plan, and
 only **then** emits `question-start` with whatever is left of the window as
@@ -135,9 +171,12 @@ after-the-fact write and be rejected as "not started". The cost is the Redis
 write, which comes out of the window rather than being billed to the player on
 top of it. The reveal timer fires at `qDeadline + ANSWER_GRACE_MS`.
 
-Questions are sent to clients as `PublicQuestion` — **correctness stripped**
-(`toPublicQuestion` in `game-engine.types.ts`). Never leak `isCorrect` before
-reveal.
+Questions are sent to clients as `PublicQuestion` — **the answer key
+stripped** by the question type's handler (`toPublicQuestion` in
+`question-types/registry.ts`). Never leak correctness before the reveal —
+including the player's own: a question-phase `state-sync` tells a player
+_that_ (and what) they answered, but `you.isCorrect`/`score`/`rank` stay
+masked until the reveal (`buildSnapshot`).
 
 ## Client synchronization contract
 
@@ -153,7 +192,7 @@ reveal.
   re-sending the pick if the server never got it and the question is still
   open, unlocking the options if not. Anything less leaves a player locked on
   an answer that was never recorded, then shown "timed out".
-- `enterReveal` emits each player's `answer-result` **before** the room's
+- The reveal emits each player's `answer-result` **before** the room's
   `question-end`. The other order flashes the timeout state: clients switch to
   the reveal screen with no personal result yet, and "no answer" is the only
   thing that screen can render.
@@ -164,10 +203,14 @@ reveal.
 - Per-player personal results go to the room `player:{playerId}`
   (`answer-result` events), which also works cross-instance via the Redis
   adapter.
-- `question-end` (and reveal-phase `state-sync.reveal`) carries `avgTimeMs`,
-  the mean answer time of everyone who answered (`null` if nobody did).
-  Reveal-time `leaderboard` entries (the `enterReveal` broadcast and
-  reveal-phase `state-sync`) carry `delta` — points earned on that question;
+- `question-end` (and reveal-phase `state-sync.reveal`) carries `summary` —
+  whatever the question's type reveals (multiple choice: `counts` aligned
+  with the options + `correctOptionIds`) — and `avgTimeMs`, the mean answer
+  time of everyone who answered (`null` if nobody did). A reveal-phase
+  snapshot also includes the public `question`, so a client reconnecting
+  mid-reveal can render it.
+  Reveal-time `leaderboard` entries (the reveal broadcast, a roster change
+  during the reveal, and reveal-phase `state-sync`) carry `delta` — points earned on that question;
   final/ended leaderboards omit it.
 - Event names: `question-start`, `question-end`, `answer-result`,
   `answer-count`, `leaderboard`, `game-over`, `state-sync`, `player-connection`,
@@ -183,25 +226,30 @@ reveal.
 
 ## Changing the socket contract — touch list
 
-There is no codegen; a new/changed event means editing all of these by hand:
+The contract is defined once, in `@buzrr/contract`; both apps compile against
+it, so a change shows you every place that must follow:
 
-1. `apps/server/src/modules/realtime/realtime.types.ts` — payload +
-   `ServerToClientEvents`/`ClientToServerEvents`.
-2. Emitter: usually the engine (`emitRoom(...)` / `io.to("player:{id}")`), or
-   the gateway/matchmaking/invites for `duel:*`.
+1. `packages/contract/src/socket.ts` — the zod schema for the payload and
+   `ServerToClientEvents`/`ClientToServerEvents`. (Question-type shapes live
+   in `question-types.ts`; adding a whole type is CONTRIBUTING.md § Adding a
+   question type.)
+2. Emitter: usually the core (`Outbound` in `core/state.ts` + the `send`
+   switch in `GameEngineService`), or the gateway/matchmaking/invites for
+   `duel:*`.
 3. Client→server events: handler registration in `realtime.gateway.ts`
-   (`registerHostHandlers` / `registerPlayerHandlers` / duel branches). Use an
-   **ack callback** for anything the client must confirm (pattern:
-   `submit-answer`, `duel:invite-accept`).
-4. `apps/web/src/types/socket-events.ts` — the hand-kept mirror.
-5. `apps/web/src/hooks/useGameSocket.ts` — wire server events into Redux (or
+   (`registerHostHandlers` / `registerPlayerHandlers` / duel branches);
+   validate the payload with the contract schema. Use an **ack callback** for
+   anything the client must confirm (pattern: `submit-answer`,
+   `duel:invite-accept`).
+4. `apps/web/src/hooks/useGameSocket.ts` — wire server events into Redux (or
    the `bind` callback for role-specific ones in
    `useAdminSocket`/`usePlayerSocket`).
-6. `apps/web/src/state/game/gameSlice.ts` — reducer, if the event carries
+5. `apps/web/src/state/game/gameSlice.ts` — reducer, if the event carries
    live-game state.
 
 Also decide whether the event must appear in the `state-sync` snapshot
-(`getSnapshot`) — if a reconnecting client needs the information, it does.
+(`buildSnapshot` in `core/views.ts`) — if a reconnecting client needs the
+information, it does.
 
 ## Connection lifecycle (gateway)
 
@@ -271,9 +319,13 @@ Games that never left the lobby (`startedAt` 0 / `qCount` 0) produce **no**
 - `emitRoom` throws if the gateway hasn't called `setServer` yet — engine
   methods that can run at boot (sweeper/recovery) must tolerate `io` being
   used only through `emitRoom`'s guarded path.
-- Bot answers are planned at `enterQuestion` and stored in meta
-  (`botOptionId`, `botAnswerAt`) precisely so restarts can re-arm them. If you
-  change bot planning, keep it restart-durable.
-- `maybeRevealEarly` counts only **connected** players; bots are seeded
+- Bot answers are planned when a question opens (via the question type's
+  `sampleAnswer`) and stored in meta (`botAnswer` as JSON — older games:
+  `botOptionId` — plus `botAnswerAt`) precisely so restarts can re-arm them.
+  If you change bot planning, keep it restart-durable.
+- The core never performs I/O and must stay deterministic: randomness comes
+  in through `StepContext.random`, time through `now`. Effects run in the
+  order returned — reordering effects reorders writes and broadcasts.
+- The early close counts only **connected** players; bots are seeded
   `connected: true` (they have no socket) — see `startDuel` comment. Don't
   "fix" that.

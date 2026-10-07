@@ -1,14 +1,19 @@
+import type {
+  GameMode,
+  GamePhase,
+  LeaderboardEntry,
+  QuestionAnswer,
+} from "@buzrr/contract";
 import type { BotTier } from "../../common/utils/duel-bot";
 
-export type GamePhase =
-  | "lobby"
-  | "starting"
-  | "question"
-  | "reveal"
-  | "final"
-  | "ended";
+export type { GameMode, GamePhase, LeaderboardEntry };
+export type { LiveOption, LiveQuestion } from "../question-types";
 
-export type GameMode = "classic" | "duel";
+/**
+ * How a game moves forward — see `core/pacing.ts`. Stored in meta so a game
+ * keeps the pacing it started with.
+ */
+export type PacingMode = "host" | "auto";
 
 export interface GameMeta {
   sessionId: string;
@@ -16,6 +21,8 @@ export interface GameMeta {
   quizTitle: string;
   hostId: string;
   mode: GameMode;
+  /** Absent on games created before pacing was explicit; see `pacingFor`. */
+  pacing?: PacingMode;
   phase: GamePhase;
   /** Duels only: friend-invite duels are unrated so ratings can't be farmed. */
   rated: boolean;
@@ -23,7 +30,11 @@ export interface GameMeta {
   botId?: string;
   botTier?: BotTier;
   botElo?: number;
-  /** The bot's answer to the open question, so a restart can re-arm it. */
+  /**
+   * The bot's answer to the open question (JSON), so a restart can re-arm it.
+   * Older games stored a bare `botOptionId` instead; `botAnswerOf` reads both.
+   */
+  botAnswer?: string;
   botOptionId?: string;
   botAnswerAt?: number;
   /**
@@ -42,31 +53,6 @@ export interface GameMeta {
   hostLastSeenAt: number;
 }
 
-export interface LiveOption {
-  id: string;
-  title: string;
-  isCorrect: boolean;
-}
-
-export interface LiveQuestion {
-  id: string;
-  title: string;
-  media: string | null;
-  mediaType: string | null;
-  timeOut: number;
-  options: LiveOption[];
-}
-
-/** Question as sent to clients — correctness stripped. */
-export interface PublicQuestion {
-  id: string;
-  title: string;
-  media: string | null;
-  mediaType: string | null;
-  timeOut: number;
-  options: { id: string; title: string }[];
-}
-
 export interface RosterEntry {
   id: string;
   name: string;
@@ -77,30 +63,15 @@ export interface RosterEntry {
 }
 
 export interface StoredAnswer {
-  optionId: string;
+  /** The answer as the question's type defines it (checked before storing). */
+  answer: QuestionAnswer;
   answeredAt: number;
   timeTakenMs: number;
   isCorrect: boolean;
   score: number;
 }
 
-export interface LeaderboardEntry {
+export interface ScoreEntry {
   playerId: string;
-  name: string;
-  profilePic: string | null;
   score: number;
-  rank: number;
-  /** Points earned on the question just revealed; absent outside a reveal. */
-  delta?: number;
-}
-
-export function toPublicQuestion(q: LiveQuestion): PublicQuestion {
-  return {
-    id: q.id,
-    title: q.title,
-    media: q.media,
-    mediaType: q.mediaType,
-    timeOut: q.timeOut,
-    options: q.options.map((o) => ({ id: o.id, title: o.title })),
-  };
 }

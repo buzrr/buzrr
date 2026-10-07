@@ -17,8 +17,12 @@ Open-source "QuizUp + Kahoot in one app":
   WebSockets.
 - **Duel mode (QuizUp-style)** — signed-in users fight ranked 1v1 battles via
   ELO matchmaking (with bot fallback) or unrated friend-invite links.
-- Extras: AI quiz generation (Gemini), image questions (Cloudinary), community
-  question moderation, roles (user/admin/superadmin).
+- Extras: AI quiz generation (Gemini or any OpenAI-compatible model), image
+  questions (local disk / S3-compatible / Cloudinary), pluggable question
+  types, community question moderation, roles (user/admin/superadmin).
+- Self-hostable with one `docker compose up`, fully offline (local accounts,
+  local storage, optional local model) — see
+  [docs/self-hosting.md](docs/self-hosting.md).
 
 ## Repository shape
 
@@ -29,12 +33,15 @@ Turborepo + Yarn 4 workspaces:
 | `apps/web`                                             | Next.js 15 frontend (React 19, App Router). Also hosts **Better Auth** (`/api/auth/*`) and the Dodo webhook forwarder (`/api/webhooks/dodo`) — the only web-owned API routes. |
 | `apps/server`                                          | NestJS 11 — REST API (`/api/*`) + Socket.IO gateway + the server-authoritative game engine.                                                                                   |
 | `apps/ai`                                              | **Buzrr-AI** — Python 3.12 + FastAPI + arq worker. Knowledge Spaces, document ingestion, RAG quiz generation. Optional.                                                       |
-| `packages/prisma`                                      | `@buzrr/prisma`: Prisma schema, migrations, generated client, shared by both apps.                                                                                            |
+| `packages/prisma`                                      | `@buzrr/prisma`: Prisma schema, migrations, generated client, shared by both apps. `scripts/deploy.mjs` migrates (and baselines fresh databases).                             |
+| `packages/contract`                                    | `@buzrr/contract`: zod schemas for the socket contract, question-type shapes and question REST bodies — the one definition both apps import.                                  |
 | `packages/eslint-config`, `packages/typescript-config` | Shared lint/tsconfig presets.                                                                                                                                                 |
 | `scripts/setup.mjs`                                    | One-command local bootstrap (Docker Postgres+Redis, .env files, schema push).                                                                                                 |
+| `docker-compose.yml`, `apps/{server,web}/Dockerfile`   | The self-hosted stack (`docker compose up -d`); dev uses only its `postgres` + `redis`.                                                                                       |
 | `docs/`                                                | Architecture docs, ADRs, current-state context (see below).                                                                                                                   |
 
-Local dev: `yarn setup` then `yarn dev` (web :3000, api :3001). The AI service
+Local dev: `yarn setup` then `yarn dev` (web :3000, api :3001); sign in with a
+local email + password account (Google is optional). The AI service
 is opt-in — `yarn workspace ai setup` then `yarn workspace ai dev` (:3002); with
 `NEXT_PUBLIC_AI_API_URL` unset it is invisible to the rest of the app. Details:
 [docs/architecture/infrastructure.md](docs/architecture/infrastructure.md).
@@ -49,19 +56,22 @@ is opt-in — `yarn workspace ai setup` then `yarn workspace ai dev` (:3002); wi
 
 ## Task → reading map
 
-| If your task touches…                                                           | Read                                                                                                                                               |
-| ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Anything (orientation)                                                          | [ARCHITECTURE.md](ARCHITECTURE.md) then [docs/architecture/overview.md](docs/architecture/overview.md)                                             |
-| Live gameplay, phases, timers, scoring, reconnect, kick/ban                     | [docs/architecture/realtime.md](docs/architecture/realtime.md)                                                                                     |
-| Matchmaking, duel invites, bots, ELO                                            | [docs/architecture/duels.md](docs/architecture/duels.md) + realtime.md                                                                             |
-| Database schema, Redis keys, what's stored where                                | [docs/architecture/data.md](docs/architecture/data.md)                                                                                             |
-| Login, JWTs, socket auth, roles, guards                                         | [docs/architecture/auth.md](docs/architecture/auth.md)                                                                                             |
-| REST endpoints, Nest modules, validation, rate limiting, moderation             | [docs/architecture/backend.md](docs/architecture/backend.md)                                                                                       |
-| React pages, components, Redux/React-Query state, socket hooks                  | [docs/architecture/frontend.md](docs/architecture/frontend.md)                                                                                     |
-| Knowledge Spaces, document ingestion, embeddings, RAG, the Python service       | [docs/architecture/ai.md](docs/architecture/ai.md)                                                                                                 |
-| Env vars, deployment, CI, Docker, external services (Gemini/Cloudinary/Upstash) | [docs/architecture/infrastructure.md](docs/architecture/infrastructure.md)                                                                         |
-| Plans, Buzrr Pro billing, Dodo webhooks, AI token limits                        | [backend.md § Billing](docs/architecture/backend.md#billing--entitlements-srcmodulesbilling) + [ADR-010](docs/adr/010-billing-and-entitlements.md) |
-| "Why is it built this way?"                                                     | [docs/adr/](docs/adr/)                                                                                                                             |
+| If your task touches…                                                        | Read                                                                                                                                                           |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Anything (orientation)                                                       | [ARCHITECTURE.md](ARCHITECTURE.md) then [docs/architecture/overview.md](docs/architecture/overview.md)                                                         |
+| Live gameplay, phases, timers, scoring, reconnect, kick/ban, pacing          | [docs/architecture/realtime.md](docs/architecture/realtime.md) + [ADR-012](docs/adr/012-pure-engine-core-and-pacing.md)                                        |
+| Question types (new type, answer/score/reveal rules)                         | [CONTRIBUTING.md § Adding a question type](CONTRIBUTING.md#adding-a-question-type) + [ADR-011](docs/adr/011-pluggable-question-types.md)                       |
+| Socket/REST payload shapes                                                   | `packages/contract` + [ADR-013](docs/adr/013-shared-contract-package.md)                                                                                       |
+| Self-hosting, Docker images, storage/model providers, local accounts         | [docs/self-hosting.md](docs/self-hosting.md) + [infrastructure.md](docs/architecture/infrastructure.md) + [ADR-014](docs/adr/014-self-hosting-without-saas.md) |
+| Matchmaking, duel invites, bots, ELO                                         | [docs/architecture/duels.md](docs/architecture/duels.md) + realtime.md                                                                                         |
+| Database schema, Redis keys, what's stored where                             | [docs/architecture/data.md](docs/architecture/data.md)                                                                                                         |
+| Login, JWTs, socket auth, roles, guards                                      | [docs/architecture/auth.md](docs/architecture/auth.md)                                                                                                         |
+| REST endpoints, Nest modules, validation, rate limiting, moderation          | [docs/architecture/backend.md](docs/architecture/backend.md)                                                                                                   |
+| React pages, components, Redux/React-Query state, socket hooks               | [docs/architecture/frontend.md](docs/architecture/frontend.md)                                                                                                 |
+| Knowledge Spaces, document ingestion, embeddings, RAG, the Python service    | [docs/architecture/ai.md](docs/architecture/ai.md)                                                                                                             |
+| Env vars, deployment, CI, Docker, external services (models/storage/Upstash) | [docs/architecture/infrastructure.md](docs/architecture/infrastructure.md)                                                                                     |
+| Plans, Buzrr Pro billing, Dodo webhooks, AI token limits                     | [backend.md § Billing](docs/architecture/backend.md#billing--entitlements-srcmodulesbilling) + [ADR-010](docs/adr/010-billing-and-entitlements.md)             |
+| "Why is it built this way?"                                                  | [docs/adr/](docs/adr/)                                                                                                                                         |
 
 **Step-by-step playbooks for the four most common multi-file changes** —
 schema/migration: [data.md § Changing the schema](docs/architecture/data.md#changing-the-schema-the-workflow-this-repo-actually-uses) ·
@@ -75,9 +85,10 @@ Local run/test/debug recipes: [infrastructure.md § Exercising each mode](docs/a
 (Full list with evidence: [docs/architecture/invariants.md](docs/architecture/invariants.md))
 
 1. **The server owns the game loop.** All timing, phase transitions and
-   scoring happen in `apps/server/src/modules/game-engine/`. Clients only send
-   intent (`start-game`, `host-next`, `submit-answer`) and render pushed state.
-   Never add client-side authority.
+   scoring happen in `apps/server/src/modules/game-engine/` — decided by the
+   pure core (`core/`, no I/O), executed by `GameEngineService`. Clients only
+   send intent (`start-game`, `host-next`, `submit-answer`) and render pushed
+   state. Never add client-side authority, and never put I/O in the core.
 2. **Live game state lives in Redis; Postgres only sees the lobby record and
    the final `GameResult`.** Do not write per-answer or mid-game state to
    Postgres.
@@ -121,10 +132,17 @@ keep `docs/CONTEXT.md` about the present, not history.
 
 - Conventional Commits (`feat:`, `fix:`, `refactor:`…) — see CONTRIBUTING.md.
 - Husky pre-commit runs `lint-staged` + `yarn lint` + `yarn check-types`.
-- CI = lint, typecheck, `yarn workspace server test` (vitest billing specs
-  against Postgres), build; `apps/ai` has its own pytest job. The web app and
-  the game engine have no tests — don't claim those pass.
+- CI = lint, typecheck, `yarn workspace server test` (vitest: billing specs
+  against Postgres, plus the engine core, question types, storage and LLM
+  adapters), build, a `docker compose up` self-host smoke test; `apps/ai` has
+  its own pytest job. The web app and the engine's I/O shell
+  (`GameEngineService`, Lua scripts) have no tests — don't claim those pass.
+- Socket/REST shapes change in `packages/contract` only; never re-declare a
+  payload type in an app.
 - DB changes go through `packages/prisma/schema.prisma` **plus** a migration in
   `packages/prisma/migrations/` for anything headed to production (local dev
-  uses `db push`).
+  uses `db push`; fresh self-hosted databases are baselined by
+  `scripts/deploy.mjs`).
+- No feature may require a SaaS account: anything external goes behind an
+  interface with a self-hostable implementation (invariant #44).
 - TypeScript strict; no new `any`. Match surrounding code style.

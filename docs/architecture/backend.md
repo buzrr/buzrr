@@ -13,31 +13,37 @@ CORS (`WEB_ORIGIN` via `parseCorsOrigin`, credentials on) → global prefix
 `api` (excluding `health`) → global `ValidationPipe({ transform: true,
 whitelist: true, forbidNonWhitelisted: false })` → global
 `AllExceptionsFilter` (HttpExceptions pass through with status; everything
-else becomes a logged 500). Port: `API_PORT` ?? `PORT` ?? 3001.
+else becomes a logged 500) → with `STORAGE_DRIVER=local`, static serving of
+`/uploads/*` from the upload directory (`nosniff`, immutable caching). Port:
+`API_PORT` ?? `PORT` ?? 3001.
 
 ## Module map (`src/app.module.ts`)
 
 Global modules: `ConfigModule`, `RedisModule` (3 ioredis clients),
 `CommonModule` (guards/services), `PrismaModule`. Feature modules:
 
-| Module          | Controller routes (all under `/api`)                                                                                                                                                                                                                                                                                                | Depends on                        |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| `health`        | `GET /health` (no prefix) — pings Postgres + Redis with 2s timeouts; 503 if either is down                                                                                                                                                                                                                                          | Prisma, REDIS                     |
-| `players`       | `POST /players` (mint guest + player JWT), `PATCH /players/name`, `GET /players/:id`, `PATCH /players/:id/clear-game` — all `@Public()` + rate-limited                                                                                                                                                                              | own JwtModule                     |
-| `game-sessions` | `POST /game-sessions` (create room), `POST /join`, `GET /player-play/:playerId` (public), `GET /history`, `GET /results/:resultId`, `GET /:roomId/lobby`, `POST /:roomId/end`, `DELETE /:roomId/players/:playerId` (kick), `POST /:roomId/players/:playerId/ban`                                                                    | GameEngine, Billing               |
-| `quizzes`       | CRUD `/quizzes`, `POST /quizzes/ai` (Gemini; `ai` rate profile; spends an AI token), `POST /quizzes/import` (batch import from Buzrr-AI)                                                                                                                                                                                            | Gemini via ConfigService, Billing |
-| `questions`     | `PATCH /questions/reorder`, `DELETE /questions/:id`, `POST /questions/:id/report`; plus `QuizQuestionsController`: `GET/POST /quizzes/:quizId/questions` (multipart upsert w/ Cloudinary)                                                                                                                                           | Cloudinary, Moderation            |
-| `moderation`    | `GET /moderation/questions`, `PATCH .../:id/approve`, `PATCH .../:id/unapprove` — `@Roles("admin","superadmin")`                                                                                                                                                                                                                    | —                                 |
-| `admin-users`   | `GET /superadmin/users`, `PATCH /superadmin/users/:id/role` — `@Roles("superadmin")`                                                                                                                                                                                                                                                | —                                 |
-| `users`         | `GET /users/me/stats` (aggregates over GameResultEntry)                                                                                                                                                                                                                                                                             | —                                 |
-| `billing`       | `GET /billing/me`, `POST /billing/checkout`, `POST /billing/portal`, `POST /billing/sync` (`report` rate profile), `POST /billing/ai-tokens/reserve` + `/release` (called by Buzrr-AI with the caller's JWT), `POST /billing/webhooks/dodo` (`@Public()`, Dodo signature) — see [Billing](#billing--entitlements-srcmodulesbilling) | Dodo SDK                          |
-| `duel`          | see [duels.md](duels.md)                                                                                                                                                                                                                                                                                                            | GameEngine                        |
-| `realtime`      | (gateway, no HTTP)                                                                                                                                                                                                                                                                                                                  | GameEngine, Duel                  |
-| `game-engine`   | (no HTTP)                                                                                                                                                                                                                                                                                                                           | Redis store, Prisma               |
+| Module           | Controller routes (all under `/api`)                                                                                                                                                                                                                                                                                                | Depends on                               |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `health`         | `GET /health` (no prefix) — pings Postgres + Redis with 2s timeouts; 503 if either is down                                                                                                                                                                                                                                          | Prisma, REDIS                            |
+| `players`        | `POST /players` (mint guest + player JWT), `PATCH /players/name`, `GET /players/:id`, `PATCH /players/:id/clear-game` — all `@Public()` + rate-limited                                                                                                                                                                              | own JwtModule                            |
+| `game-sessions`  | `POST /game-sessions` (create room), `POST /join`, `GET /player-play/:playerId` (public), `GET /history`, `GET /results/:resultId`, `GET /:roomId/lobby`, `POST /:roomId/end`, `DELETE /:roomId/players/:playerId` (kick), `POST /:roomId/players/:playerId/ban`                                                                    | GameEngine, Billing                      |
+| `quizzes`        | CRUD `/quizzes`, `POST /quizzes/ai` (`TextGenerator`; `ai` rate profile; spends an AI token), `POST /quizzes/import` (batch import from Buzrr-AI; body = contract `importQuizSchema`)                                                                                                                                               | TextGenerator, question types, Billing   |
+| `questions`      | `PATCH /questions/reorder`, `DELETE /questions/:id`, `POST /questions/:id/report`; plus `QuizQuestionsController`: `GET/POST /quizzes/:quizId/questions` (multipart upsert; media via `MediaStorage`)                                                                                                                               | MediaStorage, question types, Moderation |
+| `moderation`     | `GET /moderation/questions`, `PATCH .../:id/approve`, `PATCH .../:id/unapprove` — `@Roles("admin","superadmin")`                                                                                                                                                                                                                    | —                                        |
+| `admin-users`    | `GET /superadmin/users`, `PATCH /superadmin/users/:id/role` — `@Roles("superadmin")`                                                                                                                                                                                                                                                | —                                        |
+| `users`          | `GET /users/me/stats` (aggregates over GameResultEntry)                                                                                                                                                                                                                                                                             | —                                        |
+| `billing`        | `GET /billing/me`, `POST /billing/checkout`, `POST /billing/portal`, `POST /billing/sync` (`report` rate profile), `POST /billing/ai-tokens/reserve` + `/release` (called by Buzrr-AI with the caller's JWT), `POST /billing/webhooks/dodo` (`@Public()`, Dodo signature) — see [Billing](#billing--entitlements-srcmodulesbilling) | Dodo SDK                                 |
+| `duel`           | see [duels.md](duels.md)                                                                                                                                                                                                                                                                                                            | GameEngine                               |
+| `realtime`       | (gateway, no HTTP)                                                                                                                                                                                                                                                                                                                  | GameEngine, Duel                         |
+| `game-engine`    | (no HTTP) — pure core in `core/`, shell in `game-engine.service.ts` ([realtime.md](realtime.md))                                                                                                                                                                                                                                    | Redis store, Prisma                      |
+| `question-types` | (no HTTP, no Nest module) — pure handler per type + `registry.ts`; used by the engine, `questions`, `quizzes`, the duel pool ([ADR-011](../adr/011-pluggable-question-types.md))                                                                                                                                                    | `@buzrr/contract`                        |
 
 Conventions: controllers are thin; ownership/authz and business rules live in
-services; DTO validation via class-validator (`dto/` folders). Errors are
-thrown as Nest `HttpException`s from services.
+services; DTO validation via class-validator (`dto/` folders), or — for
+bodies defined in `@buzrr/contract` — `@Body(new ZodValidationPipe(schema))`
+(`common/pipes/zod-validation.pipe.ts`; the global `ValidationPipe` skips
+such plain-typed params). Errors are thrown as Nest `HttpException`s from
+services.
 
 ## Quiz & question authoring
 
@@ -48,17 +54,26 @@ thrown as Nest `HttpException`s from services.
   `draft` question to `pending` (submits them for moderation; already-decided
   ones untouched).
 - `questions.service.ts` — the multipart upsert (`upsertFromMultipart`) is the
-  single write path for questions from the UI (create and edit, fields
-  `option1..4` + `choose_option` a–d, optional file → Cloudinary upload,
-  replacing media destroys the old asset). Order maintenance: `reorder` is
+  single write path for questions from the UI (create and edit). Fields:
+  `type` (default `multiple_choice`), optional `config` (JSON), and options
+  as either an `options` JSON array of `{ title, isCorrect }` or the original
+  `option1..4` + `choose_option` a–d the editor sends. Options + config go
+  through the type's `validateDefinition` (its `QuestionDefinitionError`
+  becomes a 400). Optional file → `MediaStorage.upload`; replacing media
+  removes the old object (drivers ignore URLs they didn't issue). Order maintenance: `reorder` is
   insert-at-position with shift-by-one `updateMany`s; `delete` closes the gap.
   **Any edit resets `moderationStatus` (public → `pending`), zeroes
   `reportCount`, and deletes existing reports** — approval never survives a
   content change.
-- `POST /quizzes/ai` (`createWithAi`): prompt → `gemini-3.5-flash` → strict
-  text format parsed by `parseQuestions` (4 options, first is correct, then
-  shuffled). Timeouts → 503, other API failures → 502, under-generation → 400. Whole quiz insert is one transaction. Requires `GEMINI_API_KEY`. Reserves one
-  AI token before calling Gemini; any failure refunds it.
+- `POST /quizzes/import` (`importQuestions`): the contract's `importQuizSchema`
+  fixes the envelope; each question (no `type` → multiple choice) is checked
+  by its type's handler, and a failure names the question (`Question 3: …`).
+- `POST /quizzes/ai` (`createWithAi`): prompt → the configured
+  `TextGenerator` (Gemini, or any OpenAI-compatible server) → strict text
+  format parsed by `parseQuestions` (4 options, first is correct, then
+  shuffled). Timeouts → 503, other failures → 502, under-generation → 400,
+  no model configured → 400. Whole quiz insert is one transaction. Reserves
+  one AI token before generating; any failure refunds it.
 
 ## Moderation
 
@@ -152,21 +167,31 @@ max, resetsAt? }`; the web client's upgrade prompt keys on that body.
 
 ## Cross-cutting services (`src/common/`)
 
-- `CloudinaryService` — `uploadBuffer` / `destroyIfPresent`; config from env;
-  optional feature (no creds → uploads fail, nothing else breaks).
+- `MediaStorage` (`storage/`) — where question images go: `cloudinary`, `s3`
+  (any S3-compatible store; built-in SigV4 signer) or `local` (API disk,
+  served at `/uploads`). Chosen by `STORAGE_DRIVER`; unset = Cloudinary if
+  `CLOUDINARY_CLOUD_NAME` is set, else local. `s3`/`local` accept only
+  magic-byte-sniffed PNG/JPEG/GIF/WebP/AVIF (no SVG — they serve bytes as-is).
+  A misconfigured driver fails at boot.
+- `TextGenerator` (`llm/`) — prompt in, text out: `GeminiGenerator` or
+  `OpenAICompatibleGenerator` (plain `fetch` to `/chat/completions`). Chosen
+  by `LLM_PROVIDER` / `LLM_BASE_URL`; `configured` is false with nothing set,
+  and AI generation then answers 400 instead of failing at boot.
 - `RateLimitService`/Guard — see [auth.md](auth.md#rate-limiting-adjacent-concern).
 - Utils: `compute-score.ts` (1000→100 decay), `elo.ts`, `duel-bot.ts`,
   `parse-cors-origin.ts`.
 
 ## Adding an endpoint (the house pattern)
 
-1. DTO with class-validator in the module's `dto/`.
+1. Body validation: a schema in `@buzrr/contract` + `ZodValidationPipe` when
+   the web client also needs the shape, otherwise a class-validator DTO in the
+   module's `dto/`.
 2. Controller method — pick identity decorator (`@CurrentAccountUser()` /
    `@CurrentPlayerUser()`), add `@Public()`/`@Roles()`/`@UseGuards(RateLimitGuard)`
    as needed.
 3. Service does ownership checks + Prisma work; throw Nest HttpExceptions.
 4. Mirror it in the web client: `apps/web/src/lib/modules/<domain>/api.ts` +
-   `hooks.ts`, key in `query-keys.ts` ([frontend.md](frontend.md)). Response
-   types there are **hand-written mirrors** (no codegen, no shared types
-   package for REST payloads) — when you change a response shape, update the
+   `hooks.ts`, key in `query-keys.ts` ([frontend.md](frontend.md)). Only the
+   bodies defined in `@buzrr/contract` are shared; other response types there
+   are **hand-written mirrors** — when you change one of those, update the
    mirror or nothing fails until runtime.
