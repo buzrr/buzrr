@@ -59,8 +59,11 @@ Classic-mode navigation sequences (duel flow: [duels.md](duels.md#client-side-fl
    `pageThemeSlice`, `hideQuestionsSlice`) — persisted via redux-persist
    (`state/store.ts`, version 2 with a legacy-key migration).
 
-Guest identity is _localStorage_, not Redux: `playerId` + `playerToken`
-(cleared by `lib/player-session.ts` and on `game-session-ended`).
+Guest identity is _localStorage_, not Redux: `playerId` + `playerToken`,
+tied to the device and kept across games — game end, kick/ban and leave all
+send the player back to `/player/joinRoom/[playerId]` (only `gameId` is nulled
+server-side). It is cleared only by `lib/player-session.ts` when the identity
+is invalid (missing token, mismatched id, profile gone).
 
 ## API access layer (`src/lib/api/`)
 
