@@ -61,7 +61,8 @@ const GamePage = (params: {
       );
       router.replace(`/player/joinRoom/${params.player.id}`);
     },
-    onSessionEnded: () => router.push("/player"),
+    onSessionEnded: () =>
+      router.replace(`/player/joinRoom/${params.player.id}`),
   });
 
   // Guard the browser/hardware back button: leaving the game is confirmed via
@@ -131,6 +132,7 @@ const GamePage = (params: {
         />
       ) : phase === "final" || phase === "ended" ? (
         <LeaderBoard
+          playerId={params.player.id}
           position={you?.rank ?? null}
           score={you?.totalScore ?? 0}
         />

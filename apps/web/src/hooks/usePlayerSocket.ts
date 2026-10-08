@@ -12,7 +12,11 @@ interface UsePlayerSocketOptions {
    * screen rather than making them create a profile again.
    */
   onRemoved?: (info: { banned: boolean }) => void;
-  /** Called when the room itself is gone (host ended the session). */
+  /**
+   * Called when the room itself is gone (host ended the session). The saved
+   * player identity is kept here too — the server only nulls `gameId` — so
+   * the player goes back to the room-code screen with the same profile.
+   */
   onSessionEnded?: () => void;
 }
 
@@ -37,11 +41,6 @@ export function usePlayerSocket({
     gameCode,
     token: token ?? undefined,
     bind: (socket: GameSocket) => {
-      const clearLocalPlayerSession = () => {
-        window.localStorage.removeItem("playerToken");
-        window.localStorage.removeItem("playerId");
-      };
-
       // A kick/ban only ends this room's membership — the player keeps their
       // profile and can enter another room code straight away.
       socket.on("player-removed", (player) => {
@@ -50,13 +49,11 @@ export function usePlayerSocket({
         }
       });
 
-      // The room is deleted server-side once the host ends the session; drop
-      // the local player session so a refresh doesn't point at a dead room.
-      socket.on("game-over", () => {
-        clearLocalPlayerSession();
-      });
+      // The room is deleted server-side once the host ends the session and
+      // the player is detached (gameId -> null), but the profile is tied to
+      // this device and survives — a refresh of the play page redirects to
+      // the room-code screen on its own.
       socket.on("game-session-ended", () => {
-        clearLocalPlayerSession();
         callbacks.current.onSessionEnded?.();
       });
     },

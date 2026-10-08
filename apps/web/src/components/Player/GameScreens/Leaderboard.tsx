@@ -12,6 +12,7 @@ import {
 } from "@/components/Game/GameUI";
 
 interface Stats {
+  playerId: string;
   position: number | null;
   score: number;
 }
@@ -64,7 +65,7 @@ const Leaderboard = (params: Stats) => {
 
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
             <Link
-              href="/player"
+              href={`/player/joinRoom/${params.playerId}`}
               className={clsx(primaryButtonClass, "w-full px-5")}
             >
               Join another game
