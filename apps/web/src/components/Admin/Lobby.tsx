@@ -170,7 +170,7 @@ const Lobby = (params: {
           <h1 className="text-[22px] md:text-2xl font-bold tracking-[-0.01em] truncate">
             {params?.quizTitle}
           </h1>
-          <span className="text-sm text-off-dark dark:text-[#a1a1aa] whitespace-nowrap">
+          <span className="text-sm text-off-dark dark:text-muted-dark whitespace-nowrap">
             Waiting for players
           </span>
         </div>
@@ -184,7 +184,7 @@ const Lobby = (params: {
 
       <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3.5 md:gap-5 pb-0 md:pb-[18px]">
         <section className="rounded-3xl border bg-white dark:bg-dark border-lprimary/15 dark:border-white/5 flex flex-col gap-4 md:gap-3.5 [@media(min-height:900px)]:md:gap-5 p-[18px] md:p-[22px] [@media(min-height:900px)]:md:p-[26px] md:min-h-0 md:overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <span className="text-xs font-semibold tracking-[0.12em] uppercase text-[#8a8896] dark:text-[#71717a]">
+          <span className="text-xs font-semibold tracking-[0.12em] uppercase text-[#8a8896] dark:text-muted-dark">
             Room code
           </span>
           <button
@@ -200,7 +200,7 @@ const Lobby = (params: {
                 "flex items-center gap-1.5 text-[13px]",
                 copied === "code"
                   ? "text-green-500"
-                  : "text-off-dark dark:text-[#a1a1aa]",
+                  : "text-off-dark dark:text-muted-dark",
               )}
             >
               {copied === "code" ? (
@@ -227,10 +227,10 @@ const Lobby = (params: {
               />
             </div>
             <div className="flex flex-col gap-1.5 min-w-0">
-              <span className="text-xs font-semibold tracking-[0.12em] uppercase text-[#8a8896] dark:text-[#71717a]">
+              <span className="text-xs font-semibold tracking-[0.12em] uppercase text-[#8a8896] dark:text-muted-dark">
                 Scan to join
               </span>
-              <p className="text-[13.5px] leading-normal text-off-dark dark:text-[#a1a1aa]">
+              <p className="text-[13.5px] leading-normal text-off-dark dark:text-muted-dark">
                 Players can scan this with their phone camera, or open the link
                 below.
               </p>
@@ -238,7 +238,7 @@ const Lobby = (params: {
           </div>
 
           <div className="rounded-xl border bg-lprimary/8 dark:bg-white/5 border-lprimary/15 dark:border-white/5 px-3.5 py-2.5">
-            <p className="truncate text-[13.5px] text-off-dark dark:text-[#a1a1aa]">
+            <p className="truncate text-[13.5px] text-off-dark dark:text-muted-dark">
               {joinUrl}
             </p>
           </div>
@@ -276,7 +276,7 @@ const Lobby = (params: {
           </div>
 
           <div className="md:mt-auto pt-[18px] md:pt-3.5 [@media(min-height:900px)]:md:pt-[18px] border-t border-lprimary/15 dark:border-white/10 flex flex-col gap-[9px]">
-            <div className="flex justify-between items-baseline text-[13.5px] text-off-dark dark:text-[#a1a1aa]">
+            <div className="flex justify-between items-baseline text-[13.5px] text-off-dark dark:text-muted-dark">
               <span>Participants</span>
               <span>
                 <b
@@ -298,12 +298,12 @@ const Lobby = (params: {
                   "h-full rounded-lg transition-[width] duration-300",
                   isFull
                     ? "bg-red-light dark:bg-red-dark"
-                    : "bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb]",
+                    : "bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep",
                 )}
                 style={{ width: `${fillPct}%` }}
               />
             </div>
-            <p className="text-[12.5px] text-off-dark dark:text-[#a1a1aa]">
+            <p className="text-[12.5px] text-off-dark dark:text-muted-dark">
               This room can hold up to {maxPlayers} players.
               {params.plan === "free" && (
                 <>
@@ -325,11 +325,11 @@ const Lobby = (params: {
           <div className="flex flex-wrap items-center gap-3.5 p-4 md:px-[22px] md:pt-5 md:pb-4 border-b border-lprimary/15 dark:border-white/10">
             <h2 className="flex items-center gap-[7px] text-sm font-semibold">
               Players
-              <span className="rounded-full px-2 py-px text-xs bg-lprimary/8 dark:bg-white/5 text-off-dark dark:text-[#a1a1aa]">
+              <span className="rounded-full px-2 py-px text-xs bg-lprimary/8 dark:bg-white/5 text-off-dark dark:text-muted-dark">
                 {players.length}
               </span>
             </h2>
-            <label className="flex-1 min-w-40 flex items-center gap-2 rounded-xl border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 focus-within:border-dprimary px-3 text-[#8a8896] dark:text-[#71717a]">
+            <label className="flex-1 min-w-40 flex items-center gap-2 rounded-xl border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 focus-within:border-dprimary px-3 text-[#8a8896] dark:text-muted-dark">
               <LuSearch size={17} />
               <input
                 type="search"
@@ -367,7 +367,7 @@ const Lobby = (params: {
                     aria-label={`Ban ${player.name} from this room`}
                     title="Ban (can't rejoin)"
                     onClick={() => setPlayerToBan(player)}
-                    className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-[#a1a1aa] hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
+                    className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
                   >
                     <LuBan size={17} />
                   </button>
@@ -376,7 +376,7 @@ const Lobby = (params: {
                     aria-label={`Remove ${player.name}`}
                     title="Kick (can rejoin)"
                     onClick={() => handlePlayerRemove(player)}
-                    className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-[#a1a1aa] hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
+                    className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
                   >
                     <LuX size={17} />
                   </button>
@@ -384,7 +384,7 @@ const Lobby = (params: {
               </div>
             ))}
             {visiblePlayers.length === 0 && (
-              <div className="col-span-full text-center text-sm py-10 text-[#8a8896] dark:text-[#71717a]">
+              <div className="col-span-full text-center text-sm py-10 text-[#8a8896] dark:text-muted-dark">
                 {query.trim()
                   ? "No players match your search."
                   : "Waiting for players to join…"}
@@ -393,7 +393,7 @@ const Lobby = (params: {
           </div>
 
           <div className="sticky bottom-12 md:static flex flex-col md:flex-row items-stretch md:items-center gap-2.5 md:gap-4 px-4 py-3.5 md:px-[22px] md:py-4 border-t border-lprimary/15 dark:border-white/10 bg-white dark:bg-dark rounded-b-3xl">
-            <p className="flex-1 text-[13.5px] text-off-dark dark:text-[#a1a1aa]">
+            <p className="flex-1 text-[13.5px] text-off-dark dark:text-muted-dark">
               {players.length}{" "}
               {players.length === 1 ? "player is" : "players are"} ready. More
               can join until you start.
@@ -402,7 +402,7 @@ const Lobby = (params: {
               type="button"
               disabled={startDisabled}
               onClick={handleGameStart}
-              className="flex items-center justify-center gap-2.5 whitespace-nowrap rounded-[14px] px-[30px] py-3.5 text-base font-bold text-white bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] shadow-[0_10px_24px_-10px_#7c4ddb] transition-[filter,transform] hover:brightness-108 active:translate-y-px cursor-pointer disabled:opacity-50 disabled:cursor-default disabled:hover:brightness-100"
+              className="flex items-center justify-center gap-2.5 whitespace-nowrap rounded-[14px] px-[30px] py-3.5 text-base font-bold text-white bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep shadow-[0_10px_24px_-10px_#7c4ddb] transition-[filter,transform] hover:brightness-108 active:translate-y-px cursor-pointer disabled:opacity-50 disabled:cursor-default disabled:hover:brightness-100"
             >
               <LuPlay size={17} className="fill-current" />
               {load ? "Loading..." : "Start Game"}

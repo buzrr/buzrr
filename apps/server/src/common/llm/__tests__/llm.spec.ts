@@ -1,9 +1,14 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
+import { toGeminiSchema } from "../gemini.generator";
 import { createTextGenerator, resolveLlmProvider } from "../llm.provider";
 import { OpenAICompatibleGenerator } from "../openai-compatible.generator";
-import { LlmTimeoutError, LlmUpstreamError } from "../text-generator";
+import {
+  LlmTimeoutError,
+  LlmUpstreamError,
+  parseJsonReply,
+} from "../text-generator";
 
 const env = (vars: Record<string, string>) => (key: string) => vars[key];
 
@@ -115,6 +120,28 @@ describe("OpenAICompatibleGenerator", () => {
     ).rejects.toBeInstanceOf(LlmUpstreamError);
   });
 
+  it("requests structured output and parses the JSON reply", async () => {
+    let seen: Record<string, unknown> = {};
+    const baseUrl = await fakeServer((body) => {
+      seen = body;
+      return {
+        status: 200,
+        json: { choices: [{ message: { content: '{"ok":true}' } }] },
+      };
+    });
+    const schema = { type: "object", properties: { ok: { type: "boolean" } } };
+    await expect(
+      new OpenAICompatibleGenerator({ baseUrl, model: "m" }).generateJson("p", {
+        name: "out",
+        schema,
+      }),
+    ).resolves.toEqual({ ok: true });
+    expect(seen.response_format).toEqual({
+      type: "json_schema",
+      json_schema: { name: "out", schema, strict: true },
+    });
+  });
+
   it("times out slow models", async () => {
     const slow = await fakeServer(() => ({ status: 200, delayMs: 500 }));
     await expect(
@@ -124,5 +151,35 @@ describe("OpenAICompatibleGenerator", () => {
         timeoutMs: 50,
       }).generate("p"),
     ).rejects.toBeInstanceOf(LlmTimeoutError);
+  });
+});
+
+describe("structured output helpers", () => {
+  it("parses JSON, tolerating a markdown fence", () => {
+    expect(parseJsonReply('{"a":1}')).toEqual({ a: 1 });
+    expect(parseJsonReply('```json\n{"a":1}\n```')).toEqual({ a: 1 });
+    expect(() => parseJsonReply("Question: 2+2?")).toThrow(LlmUpstreamError);
+  });
+
+  it("strips JSON Schema keys Gemini rejects, at every level", () => {
+    expect(
+      toGeminiSchema({
+        $schema: "x",
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          q: {
+            type: "array",
+            minItems: 3,
+            items: { type: "object", additionalProperties: false },
+          },
+        },
+      }),
+    ).toEqual({
+      type: "object",
+      properties: {
+        q: { type: "array", minItems: 3, items: { type: "object" } },
+      },
+    });
   });
 });

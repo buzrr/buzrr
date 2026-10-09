@@ -48,14 +48,14 @@ export default function CreateQuiz() {
           <span className={labelClass}>What it looks like in the lobby</span>
           <div className={previewCardClass}>
             <div className="flex items-center gap-3.5">
-              <div className="size-[52px] shrink-0 rounded-[14px] bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] text-white flex items-center justify-center text-2xl font-extrabold">
+              <div className="size-[52px] shrink-0 rounded-[14px] bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep text-white flex items-center justify-center text-2xl font-extrabold">
                 {(title[0] ?? "Q").toUpperCase()}
               </div>
               <div className="min-w-0">
                 <h3
                   className={clsx(
                     "text-2xl font-bold tracking-[-0.01em] leading-[1.2] wrap-break-word",
-                    !title && "text-[#8a8896] dark:text-[#71717a]",
+                    !title && "text-[#8a8896] dark:text-muted-dark",
                   )}
                 >
                   {title || "Quiz Title"}

@@ -215,7 +215,8 @@ export interface ServerToClientEvents {
   "player-removed": (player: PlayerRemovedPayload) => void;
   /** A player left on their own (distinct from a host kick / player-removed). */
   "player-left": (player: PlayerPayload) => void;
-  "game-started": () => void;
+  /** `remainingMs`: time until the first question opens (display only). */
+  "game-started": (payload: { remainingMs: number }) => void;
   /** Terminal signal for players: the room is gone, stop rendering it. */
   "game-session-ended": () => void;
 }

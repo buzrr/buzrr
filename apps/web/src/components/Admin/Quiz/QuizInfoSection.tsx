@@ -34,7 +34,7 @@ export function QuizInfoContent(props: {
       <div className="flex flex-col w-[90%] mx-auto text-dark dark:text-white">
         <nav
           aria-label="Breadcrumb"
-          className="flex items-center gap-2 text-[13.5px] font-medium text-off-dark dark:text-[#9a9aa2]"
+          className="flex items-center gap-2 text-[13.5px] font-medium text-off-dark dark:text-muted-dark"
         >
           <Link
             href={"/admin"}
@@ -50,7 +50,7 @@ export function QuizInfoContent(props: {
         <h2 className="text-[26px] md:text-[32px] font-bold tracking-[-0.02em] leading-[1.05] mt-3 mb-1 wrap-break-word">
           {props.quiz.title}
         </h2>
-        <p className="capitalize mb-4 text-[15px] text-off-dark dark:text-[#9a9aa2]">
+        <p className="capitalize mb-4 text-[15px] text-off-dark dark:text-muted-dark">
           {props.quiz.description}
         </p>
         <p className="w-fit my-1 inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-[7px] text-[13px] font-semibold bg-[#c4ee4f] text-[#2c3a08] dark:bg-[#b8e94a] dark:text-[#15200a]">
@@ -88,10 +88,10 @@ export function QuizInfoContent(props: {
       </div>
       <div className="flex-1 flex flex-col min-h-0 w-[90%] mx-auto text-dark dark:text-white">
         <div className="flex items-center justify-between mt-6 mb-3">
-          <h4 className="text-sm font-bold tracking-[0.04em] uppercase text-[#8a8896] dark:text-[#9a9aa2]">
+          <h4 className="text-sm font-bold tracking-[0.04em] uppercase text-[#8a8896] dark:text-muted-dark">
             Previously used
           </h4>
-          <span className="rounded-full px-2.5 py-0.5 text-xs bg-lprimary/10 dark:bg-white/5 text-off-dark dark:text-[#9a9aa2]">
+          <span className="rounded-full px-2.5 py-0.5 text-xs bg-lprimary/10 dark:bg-white/5 text-off-dark dark:text-muted-dark">
             {pastGames.length}
           </span>
         </div>
@@ -106,14 +106,14 @@ export function QuizInfoContent(props: {
                   className="rounded-[14px] p-3.5 border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 transition-[border-color,transform] hover:border-lprimary dark:hover:border-dprimary hover:-translate-y-px"
                 >
                   <div className="flex items-center justify-between gap-2.5">
-                    <span className="text-[12.5px] font-medium text-off-dark dark:text-[#9a9aa2]">
+                    <span className="text-[12.5px] font-medium text-off-dark dark:text-muted-dark">
                       {formatSessionDate(result.endedAt)}
                     </span>
                     <span className="text-[13px] font-extrabold tracking-[0.06em] rounded-[7px] px-2 py-0.5 text-lprimary dark:text-dprimary bg-lprimary/10 dark:bg-white/5">
                       {result.gameCode}
                     </span>
                   </div>
-                  <div className="text-xs mt-2 mb-[11px] text-off-dark dark:text-[#9a9aa2]">
+                  <div className="text-xs mt-2 mb-[11px] text-off-dark dark:text-muted-dark">
                     {result.playerCount} player
                     {result.playerCount === 1 ? "" : "s"} ·{" "}
                     {result.questionCount} question

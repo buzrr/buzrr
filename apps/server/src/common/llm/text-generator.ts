@@ -26,6 +26,36 @@ export abstract class TextGenerator {
    * string.
    */
   abstract generate(prompt: string): Promise<string>;
+
+  /**
+   * Structured output: the provider is constrained to emit JSON matching
+   * `schema`. Returns the parsed (not yet validated) value — callers should
+   * still validate it, since local OpenAI-compatible servers vary in how
+   * strictly they honour the schema. Throws like `generate`.
+   */
+  abstract generateJson(
+    prompt: string,
+    schema: JsonOutputSchema,
+  ): Promise<unknown>;
+}
+
+/** A JSON Schema plus the name some providers require for it. */
+export interface JsonOutputSchema {
+  name: string;
+  schema: Record<string, unknown>;
+}
+
+/** Parses a model's JSON reply, tolerating a stray markdown code fence. */
+export function parseJsonReply(text: string): unknown {
+  const body = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "");
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new LlmUpstreamError("Model did not return valid JSON");
+  }
 }
 
 /** Shared by implementations that only see an SDK's generic errors. */

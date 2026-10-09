@@ -57,7 +57,7 @@ export default function HostQuizForm(props: {
       <button
         type="submit"
         disabled={props.disabled || mutation.isPending}
-        className="w-full flex items-center justify-center gap-2.5 rounded-[15px] p-4 text-[17px] font-bold text-white bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] shadow-[0_10px_26px_-10px_#8b5cf6] transition-[filter,transform] hover:brightness-107 active:translate-y-px cursor-pointer disabled:cursor-default disabled:bg-none disabled:bg-gray disabled:shadow-none disabled:hover:brightness-100"
+        className="w-full flex items-center justify-center gap-2.5 rounded-[15px] p-4 text-[17px] font-bold text-white bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep shadow-[0_10px_26px_-10px_#8b5cf6] transition-[filter,transform] hover:brightness-107 active:translate-y-px cursor-pointer disabled:cursor-default disabled:bg-none disabled:bg-gray disabled:shadow-none disabled:hover:brightness-100"
       >
         <LuPlay size={18} className="fill-current" />
         {mutation.isPending ? "Loading..." : "Host quiz"}

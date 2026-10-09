@@ -55,12 +55,16 @@ export function InputField(props: InputFieldProps) {
   const [uncontrolledValue, setUncontrolledValue] = useState("");
   const inputId = useId();
   const variant: InputFieldVariant =
-    props.variant ?? (props.style as InputFieldVariant | undefined) ?? "default";
+    props.variant ??
+    (props.style as InputFieldVariant | undefined) ??
+    "default";
   const size = props.size ?? "md";
 
   /** When `fieldValue` is passed (including ""), the parent owns the value — avoids desync with react-hook-form and prevents useFormStatus `pending` from clearing the visible value on submit. */
   const controlled = props.fieldValue !== undefined;
-  const displayValue = controlled ? (props.fieldValue ?? "") : uncontrolledValue;
+  const displayValue = controlled
+    ? (props.fieldValue ?? "")
+    : uncontrolledValue;
 
   useEffect(() => {
     if (pending && !controlled) {
@@ -85,7 +89,7 @@ export function InputField(props: InputFieldProps) {
   }
 
   const baseInputClasses =
-    "text-slate-900 my-2 focus:bg-[#EEEEF0] focus:outline-none focus:dark:bg-[#27272A]";
+    "text-slate-900 my-2 focus:bg-[#EEEEF0] focus:outline-none focus:dark:bg-card-dark";
   const variantClasses = variantInputClasses[variant];
   const sizeClassesStr = sizeClasses[size];
 
@@ -96,7 +100,7 @@ export function InputField(props: InputFieldProps) {
     props.error && "border-2 border-red-500 dark:border-red-400",
     props.disabled && "opacity-60 cursor-not-allowed",
     props.accept && "text-white",
-    props.className
+    props.className,
   );
 
   const textareaClassName = clsx(
@@ -105,14 +109,17 @@ export function InputField(props: InputFieldProps) {
     "rounded-lg max-h-40 min-h-20",
     props.error && "border-2 border-red-500 dark:border-red-400",
     props.disabled && "opacity-60 cursor-not-allowed",
-    props.className
+    props.className,
   );
 
   return (
     <div className="flex flex-col mb-3">
       {props.label && (
         <label
-          className={clsx("text-sm text-dark dark:text-white mb-0", props.labelClass)}
+          className={clsx(
+            "text-sm text-dark dark:text-white mb-0",
+            props.labelClass,
+          )}
           htmlFor={inputId}
         >
           {props.label}
@@ -132,7 +139,11 @@ export function InputField(props: InputFieldProps) {
           maxLength={props.maxLength ?? 100}
           disabled={props.disabled}
           aria-invalid={props.error}
-          aria-describedby={props.error && props.errorMessage ? `${props.name}-error` : undefined}
+          aria-describedby={
+            props.error && props.errorMessage
+              ? `${props.name}-error`
+              : undefined
+          }
         />
       ) : (
         <input
@@ -152,7 +163,11 @@ export function InputField(props: InputFieldProps) {
           maxLength={props.maxLength ?? 50}
           disabled={props.disabled}
           aria-invalid={props.error}
-          aria-describedby={props.error && props.errorMessage ? `${props.name}-error` : undefined}
+          aria-describedby={
+            props.error && props.errorMessage
+              ? `${props.name}-error`
+              : undefined
+          }
         />
       )}
       {props.error && props.errorMessage && (

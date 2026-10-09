@@ -60,7 +60,7 @@ export default function DeleteProfileButton() {
       >
         <Box
           sx={style}
-          className="bg-light-bg dark:bg-[#27272A] rounded-xl w-4/5 sm:w-3/5 md:w-2/5 max-w-[600px]"
+          className="bg-light-bg dark:bg-card-dark rounded-xl w-4/5 sm:w-3/5 md:w-2/5 max-w-[600px]"
         >
           <ModalCloseButton onClose={handleClose} />
           <div className="p-6 flex flex-col">

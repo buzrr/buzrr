@@ -103,12 +103,13 @@ export default function ModerationQueueClient() {
           return (
             <div
               key={item.id}
+              data-index={virtualRow.index}
+              ref={virtualizer.measureElement}
               style={{
                 position: "absolute",
                 top: 0,
                 left: 0,
                 width: "100%",
-                height: `${virtualRow.size}px`,
                 transform: `translateY(${virtualRow.start}px)`,
               }}
               className="border-b border-gray p-4"
@@ -142,31 +143,31 @@ function QueueRow({
   pending: boolean;
 }) {
   return (
-    <div className="flex h-full flex-col justify-between gap-2">
-      <div>
-        <div className="flex items-center gap-2">
+    <div className="flex flex-col gap-3">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
           <StatusPill status={item.moderationStatus} />
           {item.reportCount > 0 && (
             <span className="rounded-full bg-red-light/20 dark:bg-red-dark/20 px-2 py-0.5 text-xs font-bold text-red-light dark:text-red-dark">
               {item.reportCount} report{item.reportCount === 1 ? "" : "s"}
             </span>
           )}
-          <span className="text-xs text-off-dark dark:text-off-white">
+          <span className="min-w-0 break-words text-xs text-off-dark dark:text-off-white">
             {item.quiz.title} · {item.quiz.user.name ?? item.quiz.user.email}
           </span>
         </div>
-        <p className="mt-1 font-bold text-dark dark:text-white">
+        <p className="mt-1 break-words font-bold text-dark dark:text-white">
           {item.title}
         </p>
-        <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+        <div className="mt-1 grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
           {item.options.map((option) => (
             <p
               key={option.id}
-              className={
+              className={`min-w-0 break-words ${
                 option.isCorrect
                   ? "font-bold text-[#20A97C]"
                   : "text-dark dark:text-white"
-              }
+              }`}
             >
               {option.title}
             </p>
@@ -193,7 +194,8 @@ function QueueRow({
 function StatusPill({ status }: { status: string }) {
   const styles: Record<string, string> = {
     pending: "bg-[#F2AB53]/20 text-[#F2AB53]",
-    unapproved: "bg-red-light/20 dark:bg-red-dark/20 text-red-light dark:text-red-dark",
+    unapproved:
+      "bg-red-light/20 dark:bg-red-dark/20 text-red-light dark:text-red-dark",
     approved: "bg-[#20A97C]/20 text-[#20A97C]",
     draft: "bg-gray/20 text-off-dark dark:text-off-white",
   };

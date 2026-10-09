@@ -129,7 +129,7 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
             className="w-full md:max-w-[600px] max-h-[92dvh] overflow-y-auto flex flex-col rounded-t-[26px] md:rounded-[26px] border bg-white dark:bg-dark border-lprimary/15 dark:border-white/5 shadow-[0_40px_80px_-30px_rgba(0,0,0,0.6)] text-dark dark:text-white"
           >
             <div className="flex items-start gap-4 px-5 pt-[22px] md:px-7 md:pt-[26px]">
-              <span className="size-12 shrink-0 rounded-[14px] bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] text-white flex items-center justify-center shadow-[0_10px_24px_-10px_#7c4ddb]">
+              <span className="size-12 shrink-0 rounded-[14px] bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep text-white flex items-center justify-center shadow-[0_10px_24px_-10px_#7c4ddb]">
                 <LuSparkles size={24} />
               </span>
               <div className="min-w-0">

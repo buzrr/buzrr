@@ -18,7 +18,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 // App purple palette (see globals.css --color-lprimary / --color-dprimary).
 const BUBBLE_COLORS = [
   "#7d49f8", // lprimary
-  "#a589fc", // dprimary
+  "#a78bfa", // dprimary
   "#c4b5fd",
   "#9d7bfd",
   "#b8a4fc",

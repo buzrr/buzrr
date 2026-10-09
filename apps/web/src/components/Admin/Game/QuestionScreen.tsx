@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { LuCheck, LuCopy, LuPlay, LuShare2 } from "react-icons/lu";
 import { toast } from "react-toastify";
@@ -41,6 +41,26 @@ export default function QuestionScreen(props: QuestionScreenProps) {
   const remaining = useServerCountdown(deadline);
   const [copied, setCopied] = useState(false);
   const [canShare, setCanShare] = useState(false);
+  const promptRef = useRef<HTMLElement>(null);
+  // Per-question: once the prompt panel overflows, drop to a smaller title so
+  // less scrolling is needed. One-way so it can't flip back and forth.
+  const [compact, setCompact] = useState<{ id: string; on: boolean }>();
+  const questionId = question?.id;
+  const isCompact = compact?.id === questionId && compact?.on;
+
+  useLayoutEffect(() => {
+    const el = promptRef.current;
+    if (!el || !questionId || isCompact) return;
+    const check = () => {
+      if (el.scrollHeight > el.clientHeight + 1)
+        setCompact({ id: questionId, on: true });
+    };
+    check();
+    const observer = new ResizeObserver(check);
+    observer.observe(el);
+    for (const child of el.children) observer.observe(child);
+    return () => observer.disconnect();
+  }, [questionId, isCompact]);
 
   useEffect(() => {
     setCanShare(typeof navigator.share === "function");
@@ -85,7 +105,7 @@ export default function QuestionScreen(props: QuestionScreenProps) {
             </span>
             <div className="h-2 rounded-lg overflow-hidden bg-lprimary/8 dark:bg-white/5">
               <div
-                className="h-full rounded-lg bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] transition-[width] duration-300"
+                className="h-full rounded-lg bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep transition-[width] duration-300"
                 style={{ width: `${answeredPct}%` }}
               />
             </div>
@@ -155,6 +175,7 @@ export default function QuestionScreen(props: QuestionScreenProps) {
       </section>
 
       <section
+        ref={promptRef}
         className={clsx(
           panelClass,
           "flex flex-col p-5 md:px-[34px] md:py-8 md:min-h-0 md:overflow-y-auto",
@@ -177,7 +198,12 @@ export default function QuestionScreen(props: QuestionScreenProps) {
             width={500}
           />
         )}
-        <h2 className="mt-[18px] text-2xl md:text-[34px] font-bold tracking-[-0.02em] leading-[1.22] text-pretty wrap-break-word">
+        <h2
+          className={clsx(
+            "mt-[18px] font-bold tracking-[-0.02em] leading-[1.22] text-pretty wrap-break-word",
+            isCompact ? "text-xl md:text-[26px]" : "text-2xl md:text-[34px]",
+          )}
+        >
           {question.title}
         </h2>
         <HostPrompt question={question} />

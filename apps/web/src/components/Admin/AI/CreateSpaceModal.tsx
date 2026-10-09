@@ -50,7 +50,7 @@ export default function CreateSpaceModal({
     <Modal open={open} onClose={onClose} aria-labelledby="create-space-title">
       <Box
         sx={style}
-        className="bg-light-bg dark:bg-[#27272A] rounded-xl w-4/5 md:w-1/2 max-w-[600px]"
+        className="bg-light-bg dark:bg-card-dark rounded-xl w-4/5 md:w-1/2 max-w-[600px]"
       >
         <ModalCloseButton onClose={onClose} />
         <div className="p-6">

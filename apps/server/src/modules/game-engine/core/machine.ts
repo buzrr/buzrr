@@ -14,7 +14,7 @@ import {
 import { buildAnswerResult, buildLeaderboard, buildReveal } from "./views";
 
 /** Countdown shown on clients between "start game" and the first question. */
-export const START_COUNTDOWN_MS = 3_200;
+export const START_COUNTDOWN_MS = 5_000;
 
 /**
  * Inputs to the phase machine. Clients never produce these directly: the
@@ -136,7 +136,11 @@ function start(
       { kind: "set-deadline", at: firstQuestionAt },
       { kind: "claim-owner" },
       { kind: "mark-playing" },
-      { kind: "emit", to: ROOM, message: { event: "game-started" } },
+      {
+        kind: "emit",
+        to: ROOM,
+        message: { event: "game-started", deadline: firstQuestionAt },
+      },
       { kind: "arm-timer", at: firstQuestionAt },
     ],
   };

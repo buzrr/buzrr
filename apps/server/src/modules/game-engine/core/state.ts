@@ -36,7 +36,11 @@ export type Audience = { room: true } | { player: string };
 
 /** Messages the core asks the shell to send — a subset of the socket contract. */
 export type Outbound =
-  | { event: "game-started" }
+  | {
+      event: "game-started";
+      /** When question 1 opens; sent to clients as `remainingMs`. */
+      deadline: number;
+    }
   | {
       event: "question-start";
       payload: QuestionStartPayload;

@@ -246,7 +246,7 @@ const AddQuesForm = (props: {
                 type="button"
                 aria-label="Remove image"
                 onClick={deleteFile}
-                className="size-9 shrink-0 rounded-[10px] flex items-center justify-center text-off-dark dark:text-[#a1a1aa] hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
+                className="size-9 shrink-0 rounded-[10px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
               >
                 <LuTrash2 size={17} />
               </button>
@@ -340,7 +340,7 @@ const AddQuesForm = (props: {
                             autoComplete="off"
                             placeholder={`Option ${OPTION_KEYS[i]}`}
                             aria-label={`Option ${OPTION_KEYS[i]}`}
-                            className="flex-1 min-w-0 bg-transparent outline-none py-2 text-[15px] font-medium placeholder:text-[#8a8896] dark:placeholder:text-[#71717a]"
+                            className="flex-1 min-w-0 bg-transparent outline-none py-2 text-[15px] font-medium placeholder:text-[#8a8896] dark:placeholder:text-muted-dark"
                           />
                         </div>
                       )}

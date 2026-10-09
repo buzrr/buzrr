@@ -99,7 +99,7 @@ function QuizMenu({
           "size-[34px] rounded-[10px] border flex items-center justify-center cursor-pointer transition-colors",
           open
             ? "bg-lprimary/10 dark:bg-white/5 text-dark dark:text-white border-lprimary/15 dark:border-white/5"
-            : "border-transparent text-off-dark dark:text-[#9a9aa2] hover:bg-lprimary/10 dark:hover:bg-white/5 hover:text-dark dark:hover:text-white",
+            : "border-transparent text-off-dark dark:text-muted-dark hover:bg-lprimary/10 dark:hover:bg-white/5 hover:text-dark dark:hover:text-white",
         )}
       >
         <LuEllipsisVertical size={18} />
@@ -107,7 +107,7 @@ function QuizMenu({
       {open && (
         <div
           role="menu"
-          className="absolute top-10 right-0 min-w-[168px] p-1.5 rounded-[13px] flex flex-col gap-0.5 bg-white dark:bg-[#4a494c] border border-lprimary/15 dark:border-white/5 shadow-[0_18px_40px_-14px_rgba(60,30,140,0.28)] dark:shadow-[0_18px_40px_-12px_rgba(0,0,0,0.45)]"
+          className="absolute top-10 right-0 min-w-[168px] p-1.5 rounded-[13px] flex flex-col gap-0.5 bg-white dark:bg-cardhover-dark border border-lprimary/15 dark:border-white/5 shadow-[0_18px_40px_-14px_rgba(60,30,140,0.28)] dark:shadow-[0_18px_40px_-12px_rgba(0,0,0,0.45)]"
         >
           <Link
             role="menuitem"
@@ -177,7 +177,7 @@ export default function QuizCard({
   const meta = (
     <div
       className={clsx(
-        "flex flex-wrap items-center gap-x-4 gap-y-1 text-xs md:text-[12.5px] font-medium text-[#8a8896] dark:text-[#9a9aa2] [&>span]:flex [&>span]:items-center [&>span]:gap-1.5",
+        "flex flex-wrap items-center gap-x-4 gap-y-1 text-xs md:text-[12.5px] font-medium text-[#8a8896] dark:text-muted-dark [&>span]:flex [&>span]:items-center [&>span]:gap-1.5",
         view === "grid"
           ? "mt-auto pt-3 border-t border-lprimary/15 dark:border-white/10"
           : "hidden sm:flex shrink-0",
@@ -221,7 +221,7 @@ export default function QuizCard({
               {quiz.title}
             </h3>
             {quiz.description && (
-              <p className="text-xs md:text-[13.5px] text-off-dark dark:text-[#9a9aa2] truncate">
+              <p className="text-xs md:text-[13.5px] text-off-dark dark:text-muted-dark truncate">
                 {quiz.description}
               </p>
             )}
@@ -233,7 +233,7 @@ export default function QuizCard({
         )}
       </div>
       {view === "grid" && (
-        <p className="text-xs md:text-[13.5px] text-off-dark dark:text-[#9a9aa2] line-clamp-2">
+        <p className="text-xs md:text-[13.5px] text-off-dark dark:text-muted-dark line-clamp-2">
           {quiz.description || "No description"}
         </p>
       )}

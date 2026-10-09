@@ -46,7 +46,9 @@ describe("start", () => {
       qDeadline: T0 + START_COUNTDOWN_MS,
     });
     expect(effectOf(effects, "set-deadline")?.at).toBe(T0 + START_COUNTDOWN_MS);
-    expect(emitted(effects).map((e) => e.event)).toEqual(["game-started"]);
+    expect(emitted(effects).map((e) => e.message)).toEqual([
+      { event: "game-started", deadline: T0 + START_COUNTDOWN_MS },
+    ]);
   });
 
   it("only starts a lobby", () => {

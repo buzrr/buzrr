@@ -31,7 +31,7 @@ export default function RangeSlider({
         }}
       />
       <div
-        className="-mt-1 flex justify-between text-[11.5px] font-medium text-[#8a8896] dark:text-[#71717a]"
+        className="-mt-1 flex justify-between text-[11.5px] font-medium text-[#8a8896] dark:text-muted-dark"
         aria-hidden="true"
       >
         {ticks.map((t) => (
