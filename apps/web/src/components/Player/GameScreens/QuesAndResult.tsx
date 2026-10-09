@@ -61,7 +61,7 @@ function AnswerRow({
 }) {
   return (
     <div className="flex flex-col gap-1.5 md:gap-2 w-full">
-      <span className="text-xs font-semibold tracking-[0.1em] uppercase text-[#8a8896] dark:text-[#71717a]">
+      <span className="text-xs font-semibold tracking-[0.1em] uppercase text-[#8a8896] dark:text-muted-dark">
         {label}
       </span>
       <div
@@ -113,6 +113,12 @@ const QuestionAndResult = (params: {
   const isQuestion = params.screen === "question";
   const status = STATUS[params.status ?? "timesout"];
   const isLast = qCount > 0 && qIndex >= qCount - 1;
+  // The player page scrolls as a whole, so size the title by length rather
+  // than overflow: a long title, or long options below it, gets a smaller one.
+  const longTitle =
+    (params.question?.title.length ?? 0) > 120 ||
+    (params.question?.type === "multiple_choice" &&
+      params.question.options.some((o) => o.title.length > 80));
 
   function handleSubmit(answer: QuestionAnswer) {
     if (params.locked || offline) return;
@@ -243,7 +249,14 @@ const QuestionAndResult = (params: {
               Question {qIndex + 1}
               {qCount > 0 && ` of ${qCount}`}
             </span>
-            <h2 className="md:mt-[18px] text-[22px] md:text-[34px] font-bold tracking-[-0.02em] leading-[1.22] text-pretty wrap-break-word animate-fade-up">
+            <h2
+              className={clsx(
+                "md:mt-[18px] font-bold tracking-[-0.02em] leading-[1.22] text-pretty wrap-break-word animate-fade-up",
+                longTitle
+                  ? "text-lg md:text-[26px]"
+                  : "text-[22px] md:text-[34px]",
+              )}
+            >
               {params.question?.title ?? ""}
             </h2>
             {params.question && (

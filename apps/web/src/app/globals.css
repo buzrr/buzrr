@@ -10,20 +10,29 @@
 @theme default {
   --text-2xs: 0.625rem;
   --color-light-bg: #f5f3ff;
-  --color-dark-bg: #1e1e1e;
+  /* Dark mode: obsidian canvas → slate-navy surface → raised card. */
+  --color-dark-bg: #0b0d12;
   --color-white: #ffffff;
   --color-off-white: #f5f3ff;
-  --color-off-dark: #434349;
-  --color-dark: #2c2c2c;
-  --color-gray: #c4c6c9;
+  --color-off-dark: #334155;
+  --color-dark: #161b28;
+  --color-gray: #cbd5e1;
   --color-lprimary: #7d49f8;
-  --color-dprimary: #a589fc;
+  --color-dprimary: #a78bfa;
+  /* Text-safe violet fills: white text is 5.7:1 / 7.1:1 (WCAG AA+). */
+  --color-accent: #7c3aed;
+  --color-accent-deep: #6d28d9;
+  /* Muted text in dark mode: 7:1 on the surface. */
+  --color-muted-dark: #94a3b8;
   --color-red-dark: #e84b4b;
   --color-red-light: #c92929;
   --color-card-light: #ede9fe;
   --color-cardhover-light: #ddd5ff;
-  --color-card-dark: #3d3c3e;
-  --color-cardhover-dark: #4c4c4c;
+  --color-card-dark: #1e2433;
+  --color-cardhover-dark: #252c3d;
+  /* Unpicked/wrong answer bars on the reveal screen (used at 45% opacity). */
+  --color-bar-muted: #8a8896;
+  --color-bar-muted-dark: #71717a;
   --breakpoint-medium: 860px;
 
   --animate-float: float 5s ease-in-out infinite;
@@ -123,6 +132,12 @@ html.theme-anim *::after {
   }
 }
 
+/* Not utilities, so plain custom properties rather than @theme tokens. */
+:root {
+  --scrollbar-thumb: #475569;
+  --scrollbar-thumb-hover: #64748b;
+}
+
 @layer base {
   ::-webkit-scrollbar {
     width: 6px;
@@ -134,12 +149,12 @@ html.theme-anim *::after {
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #535252;
+    background: var(--scrollbar-thumb);
     border-radius: 5px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #646464;
+    background: var(--scrollbar-thumb-hover);
   }
 
   * {
@@ -197,7 +212,7 @@ html.theme-anim *::after {
    Dark pill base with a colored border + accent per toast type. */
 .buzrr-toast-container .buzrr-toast {
   color: #f5f3ff;
-  background: #2c2c2c;
+  background: var(--color-dark);
   border: 1px solid transparent;
 }
 
@@ -232,13 +247,13 @@ html.theme-anim *::after {
 }
 
 .buzrr-toast-container .buzrr-toast.Toastify__toast--info {
-  border-color: #a589fc;
+  border-color: var(--color-dprimary);
 }
 .buzrr-toast-container
   .buzrr-toast.Toastify__toast--info
   .Toastify__toast-icon
   svg {
-  fill: #a589fc;
+  fill: var(--color-dprimary);
 }
 
 .buzrr-toast-container .buzrr-toast.Toastify__toast--default {

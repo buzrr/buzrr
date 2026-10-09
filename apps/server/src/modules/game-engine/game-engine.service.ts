@@ -198,7 +198,9 @@ export class GameEngineService
       "player" in to ? this.io.to(`player:${to.player}`) : this.io.to(gameCode);
     switch (message.event) {
       case "game-started":
-        target.emit("game-started");
+        target.emit("game-started", {
+          remainingMs: Math.max(0, message.deadline - Date.now()),
+        });
         break;
       case "question-start":
         // What is left of the window once the writes before this broadcast

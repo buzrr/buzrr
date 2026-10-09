@@ -47,6 +47,17 @@ describe("averageAnswerMs", () => {
 });
 
 describe("buildSnapshot", () => {
+  it("carries the time left on the start countdown", () => {
+    const s = state({
+      meta: meta({ phase: "starting", qDeadline: T0 + 3200 }),
+    });
+    expect(buildSnapshot(s, "p1", T0 + 1000)).toMatchObject({
+      phase: "starting",
+      remainingMs: 2200,
+    });
+    expect(buildSnapshot(s, "p1", T0 + 9999).remainingMs).toBe(0);
+  });
+
   it("never carries the answer key while the question is open", () => {
     const s = questionOpen({ answers: { p2: answer("q1-b") } });
     const snapshot = buildSnapshot(s, "p1", T0 + 4000);

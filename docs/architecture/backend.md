@@ -69,9 +69,13 @@ services.
   fixes the envelope; each question (no `type` → multiple choice) is checked
   by its type's handler, and a failure names the question (`Question 3: …`).
 - `POST /quizzes/ai` (`createWithAi`): prompt → the configured
-  `TextGenerator` (Gemini, or any OpenAI-compatible server) → strict text
-  format parsed by `parseQuestions` (4 options, first is correct, then
-  shuffled). Timeouts → 503, other failures → 502, under-generation → 400,
+  `TextGenerator.generateJson` (Gemini `responseSchema`, or OpenAI-compatible
+  `response_format: json_schema`) with a JSON Schema derived from the zod
+  `aiQuizOutputSchema` (`question`, `correctAnswer`, three `wrongAnswers`);
+  the reply is re-validated with the same schema, blank/duplicate-option
+  questions are dropped, options shuffled. The prompt asks for short options
+  (≈1–5 words, ≤60 chars) so players can read them in time. Timeouts → 503,
+  other failures or off-schema output → 502, under-generation → 400,
   no model configured → 400. Whole quiz insert is one transaction. Reserves
   one AI token before generating; any failure refunds it.
 

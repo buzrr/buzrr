@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { LuBan, LuPlay, LuX } from "react-icons/lu";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -22,7 +22,27 @@ import {
   panelClass,
   primaryButtonClass,
 } from "@/components/Game/GameUI";
+import { AnimatedNumber, useFlipReorder } from "@/components/Game/motion";
+import type { LeaderboardEntry } from "@buzrr/contract";
 import type { GameSocket } from "@/types/socket";
+
+/** Hold the old standings until the answer bars have mostly filled. */
+const SETTLE_DELAY_MS = 1100;
+
+/**
+ * The standings as they were before this question: each score minus its
+ * `delta`, re-ranked (ties share a rank). The server only sends the new ones.
+ */
+function previousStandings(entries: LeaderboardEntry[]) {
+  const sorted = entries
+    .map((entry, i) => ({ entry, i, prev: entry.score - (entry.delta ?? 0) }))
+    .sort((a, b) => b.prev - a.prev || a.i - b.i);
+  return sorted.map(({ entry, prev }) => ({
+    ...entry,
+    shownScore: prev,
+    shownRank: sorted.findIndex((s) => s.prev === prev) + 1,
+  }));
+}
 
 interface QuesResultProps {
   socket: GameSocket;
@@ -36,7 +56,7 @@ export const rankBadgeClass = (rank: number) =>
       ? "bg-[#cfd3dc] text-[#2a2d33]"
       : rank === 3
         ? "bg-[#e0a173] text-[#3a1d06]"
-        : "bg-lprimary/8 dark:bg-white/5 text-off-dark dark:text-[#a1a1aa]";
+        : "bg-lprimary/8 dark:bg-white/5 text-off-dark dark:text-muted-dark";
 
 /**
  * Per-question results. All data (answer counts, running leaderboard,
@@ -76,6 +96,27 @@ export default function QuesResult(props: QuesResultProps) {
       ? `${(reveal.avgTimeMs / 1000).toFixed(1)}s`
       : "—";
   const isLastQuestion = qIndex === qCount - 1;
+
+  // Start on the pre-question standings, then count scores up and let rows
+  // glide into their new ranks.
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setSettled(true), SETTLE_DELAY_MS);
+    return () => clearTimeout(t);
+  }, []);
+  const rows = useMemo(
+    () =>
+      settled
+        ? leaderboard.map((e) => ({
+            ...e,
+            shownScore: e.score,
+            shownRank: e.rank,
+          }))
+        : previousStandings(leaderboard),
+    [leaderboard, settled],
+  );
+  const listRef = useRef<HTMLDivElement>(null);
+  useFlipReorder(listRef, rows.map((r) => r.playerId).join());
   const connectedById = new Map(players.map((p) => [p.id, p.connected]));
 
   // Kick and ban go over HTTP so they work even while the host socket is down;
@@ -150,21 +191,25 @@ export default function QuesResult(props: QuesResultProps) {
             {leaderboard.length} player{leaderboard.length === 1 ? "" : "s"}
           </span>
         </div>
-        <div className="md:flex-1 md:min-h-0 md:overflow-y-auto px-3 md:px-[18px] pb-2.5 flex flex-col gap-1.5">
-          {leaderboard.map((lead) => {
+        <div
+          ref={listRef}
+          className="md:flex-1 md:min-h-0 md:overflow-y-auto px-3 md:px-[18px] pb-2.5 flex flex-col gap-1.5"
+        >
+          {rows.map((lead) => {
             const connected = connectedById.get(lead.playerId);
             return (
               <div
                 key={lead.playerId}
-                className="group flex items-center gap-3 md:gap-[13px] rounded-[14px] border border-transparent px-2.5 py-[9px] transition-colors hover:bg-light-bg dark:hover:bg-card-dark hover:border-lprimary/15 dark:hover:border-white/5"
+                data-flip-id={lead.playerId}
+                className="group relative bg-white dark:bg-dark flex items-center gap-3 md:gap-[13px] rounded-[14px] border border-transparent px-2.5 py-[9px] transition-colors hover:bg-light-bg dark:hover:bg-card-dark hover:border-lprimary/15 dark:hover:border-white/5"
               >
                 <span
                   className={clsx(
-                    "size-[30px] shrink-0 rounded-[9px] flex items-center justify-center text-sm font-bold",
-                    rankBadgeClass(lead.rank),
+                    "size-[30px] shrink-0 rounded-[9px] flex items-center justify-center text-sm font-bold transition-colors duration-500",
+                    rankBadgeClass(lead.shownRank),
                   )}
                 >
-                  {lead.rank}
+                  {lead.shownRank}
                 </span>
                 <span className="relative shrink-0">
                   <Image
@@ -191,14 +236,15 @@ export default function QuesResult(props: QuesResultProps) {
                       "min-w-11 text-right text-[12.5px]",
                       lead.delta > 0
                         ? "font-bold text-green-600 dark:text-green-500"
-                        : "font-medium text-[#8a8896] dark:text-[#71717a]",
+                        : "font-medium text-[#8a8896] dark:text-muted-dark",
+                      settled && lead.delta > 0 && "animate-pop",
                     )}
                   >
                     +{lead.delta}
                   </span>
                 )}
                 <span className="min-w-[52px] text-right text-base font-bold tabular-nums">
-                  {lead.score}
+                  <AnimatedNumber value={lead.shownScore} />
                 </span>
                 <span className="flex gap-0.5 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
                   <button
@@ -207,7 +253,7 @@ export default function QuesResult(props: QuesResultProps) {
                     title="Kick — can rejoin with the room code"
                     disabled={removePlayerMutation.isPending}
                     onClick={() => handleKick(lead.playerId, lead.name)}
-                    className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-[#a1a1aa] hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
+                    className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
                   >
                     <LuX size={17} />
                   </button>
@@ -221,7 +267,7 @@ export default function QuesResult(props: QuesResultProps) {
                         name: lead.name,
                       })
                     }
-                    className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-[#a1a1aa] hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
+                    className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
                   >
                     <LuBan size={17} />
                   </button>

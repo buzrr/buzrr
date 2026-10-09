@@ -86,7 +86,7 @@ const JoinRoomProfileCard = (params: {
         <button
           type="submit"
           disabled={mutation.isPending}
-          className="flex-1 rounded-xl bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] px-4 py-2.5 font-bold text-white cursor-pointer disabled:opacity-60"
+          className="flex-1 rounded-xl bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep px-4 py-2.5 font-bold text-white cursor-pointer disabled:opacity-60"
         >
           {mutation.isPending ? "Saving…" : "Save"}
         </button>

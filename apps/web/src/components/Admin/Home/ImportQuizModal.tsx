@@ -109,7 +109,7 @@ export default function ImportQuizModal({ className }: { className?: string }) {
           if (hasDataIntegrityIssues) {
             toast.warning(
               "Quiz imported, but some questions had missing or multiple correct answers and were adjusted. Please cross-verify.",
-              { autoClose: 6000 }
+              { autoClose: 6000 },
             );
           } else {
             toast.success("Quiz imported successfully!");
@@ -147,8 +147,10 @@ export default function ImportQuizModal({ className }: { className?: string }) {
               const firstErrorRow = results.errors[0].row;
               toast.error(
                 `Error parsing CSV: ${results.errors[0].message}${
-                  firstErrorRow !== undefined ? ` at row ${firstErrorRow + 1}` : ""
-                }`
+                  firstErrorRow !== undefined
+                    ? ` at row ${firstErrorRow + 1}`
+                    : ""
+                }`,
               );
               setIsParsing(false);
               return;
@@ -272,7 +274,7 @@ export default function ImportQuizModal({ className }: { className?: string }) {
                   className={clsx(
                     "flex-1 py-2 text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2",
                     tab === "excel"
-                      ? "bg-white dark:bg-[#2a2a2a] shadow-sm text-lprimary dark:text-dprimary"
+                      ? "bg-white dark:bg-card-dark shadow-sm text-lprimary dark:text-dprimary"
                       : "text-dark/60 dark:text-white/60 hover:text-dark dark:hover:text-white",
                   )}
                 >
@@ -288,7 +290,7 @@ export default function ImportQuizModal({ className }: { className?: string }) {
                   className={clsx(
                     "flex-1 py-2 text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2",
                     tab === "csv"
-                      ? "bg-white dark:bg-[#2a2a2a] shadow-sm text-lprimary dark:text-dprimary"
+                      ? "bg-white dark:bg-card-dark shadow-sm text-lprimary dark:text-dprimary"
                       : "text-dark/60 dark:text-white/60 hover:text-dark dark:hover:text-white",
                   )}
                 >

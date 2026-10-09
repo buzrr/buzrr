@@ -43,7 +43,7 @@ export function Steps({ step, total = 2 }: { step: number; total?: number }) {
           className={clsx(
             "h-1.5 w-[26px] rounded",
             i < step
-              ? "bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb]"
+              ? "bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep"
               : "bg-lprimary/10 dark:bg-white/10",
           )}
         />
@@ -67,7 +67,7 @@ export function MeCard({
 }) {
   return (
     <div className="flex flex-col items-center gap-3.5">
-      <span className="rounded-full p-1.5 bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] shadow-[0_24px_50px_-20px_#7c4ddb]">
+      <span className="rounded-full p-1.5 bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep shadow-[0_24px_50px_-20px_#7c4ddb]">
         <span className="block rounded-full border-[5px] border-light-bg dark:border-card-dark">
           <Image
             src={image || DEFAULT_AVATAR}
@@ -85,7 +85,7 @@ export function MeCard({
         <span
           className={clsx(
             "flex items-center gap-3 text-[26px] font-bold tracking-[-0.01em] max-w-full",
-            !name && "text-[#8a8896] dark:text-[#71717a]",
+            !name && "text-[#8a8896] dark:text-muted-dark",
           )}
         >
           <span className="truncate">{name || "Your Name"}</span>

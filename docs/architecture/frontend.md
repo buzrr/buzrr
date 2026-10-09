@@ -138,7 +138,11 @@ disconnect`), emits `request-sync` on connect as a safety net, and exposes a
 - **Design tokens live in `src/app/globals.css`** (Tailwind v4 `@theme`
   block): the named palette used everywhere — `light-bg`/`dark-bg`,
   `lprimary`/`dprimary` (the brand purples), `card-light`/`card-dark` (+
-  hover), `off-white`/`off-dark`, `red-light`/`red-dark`, `gray` — plus a
+  hover), `off-white`/`off-dark`, `red-light`/`red-dark`, `gray`,
+  `accent`/`accent-deep` (violet fills that carry white text at AA) and
+  `muted-dark` (secondary text in dark mode). Dark mode layers obsidian
+  canvas (`dark-bg`) → slate-navy surface (`dark`) → raised card
+  (`card-dark`); `dprimary` is the text-safe violet for that canvas — plus a
   `medium` (860px) breakpoint and custom animation utilities
   (`animate-pop`, `animate-pop-in`, `animate-fade-up`, `animate-float`,
   `animate-shake`; all disabled under `prefers-reduced-motion`). Use these

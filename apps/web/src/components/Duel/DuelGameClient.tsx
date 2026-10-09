@@ -12,7 +12,8 @@ import { fetchApiAccessToken } from "@/lib/api/get-access-token";
 import ConfettiBurst from "@/components/ConfettiBurst";
 import ConnectionBanner from "@/components/ConnectionBanner";
 import { Button } from "@/components/ui/Button";
-import { Question, Result, Loader } from "@/components/Player/GameScreens";
+import { Question, Result } from "@/components/Player/GameScreens";
+import GetReady from "@/components/Game/GetReady";
 import ReportQuestionButton from "./ReportQuestionButton";
 import DuelAudio, { type DuelOutcome } from "./DuelAudio";
 
@@ -64,7 +65,7 @@ export default function DuelGameClient({ gameCode }: { gameCode: string }) {
     );
   }
 
-  if (!token || !socket) return <Loader />;
+  if (!token || !socket) return <GetReady title="1v1 Duel" />;
 
   return (
     <>
@@ -86,7 +87,7 @@ export default function DuelGameClient({ gameCode }: { gameCode: string }) {
             />
           </>
         ) : (
-          <Loader />
+          <GetReady title="1v1 Duel" />
         )
       ) : phase === "reveal" ? (
         <Result

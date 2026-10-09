@@ -25,7 +25,7 @@ matchmaking, and invite services in `afterInit` (`setServer(...)`).
 
 ```text
 lobby → starting → question ⇄ reveal → final → ended
-        (3.2s)     (timeOut    (duel: 4s auto;
+        (5s)       (timeOut    (duel: 4s auto;
                    +300ms       classic: host-paced)
                    answer grace)
 ```
@@ -216,6 +216,10 @@ masked until the reveal (`buildSnapshot`).
   `answer-count`, `leaderboard`, `game-over`, `state-sync`, `player-connection`,
   `player-joined/removed/left`, `game-started`, `game-session-ended`, plus the
   `duel:*` family.
+- `game-started` carries `remainingMs` until question 1 opens (the server's
+  `START_COUNTDOWN_MS`, minus send latency); a `starting`-phase `state-sync`
+  carries it too, so a mid-countdown (re)connect shows the real time left.
+  Display only — the server opens the question on its own timer.
 - The contract has **one version**. The old v1 events (`get-question-index`,
   `question-changed`, `displaying-result`, `displaying-final-leaderboard`,
   `timer-starts`) and the v1 host-intent aliases (`set-question-index`,

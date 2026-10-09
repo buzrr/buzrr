@@ -11,7 +11,6 @@ const style = {
   left: "50%",
   transform: "translate(-50%, -50%)",
   width: 400,
-  bgcolor: "#202020",
   border: "2px solid #eee",
   borderRadius: "10px",
   boxShadow: 24,
@@ -49,10 +48,10 @@ export default function ShowMedia(props: { media: string; mediaType: string }) {
         aria-labelledby="modal-modal-title"
         aria-describedby="modal-modal-description"
       >
-        <Box sx={style} className="max-w-[600px]">
+        <Box sx={style} className="max-w-[600px] bg-light-bg dark:bg-dark">
           <ModalCloseButton
             onClose={handleClose}
-            className="text-white hover:bg-white/10"
+            className="text-dark dark:text-white hover:bg-black/5 dark:hover:bg-white/10"
           />
           {mediaType === "image" && (
             <Image

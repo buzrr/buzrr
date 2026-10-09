@@ -19,7 +19,7 @@ export default function GridListToggle() {
     <div
       role="group"
       aria-label="View mode"
-      className="flex gap-1 p-1 md:p-[5px] h-fit shrink-0 rounded-[13px] bg-white dark:bg-[#232328] border border-lprimary/15 dark:border-white/10"
+      className="flex gap-1 p-1 md:p-[5px] h-fit shrink-0 rounded-[13px] bg-white dark:bg-card-dark border border-lprimary/15 dark:border-white/10"
     >
       {options.map((opt) => (
         <button
@@ -32,7 +32,7 @@ export default function GridListToggle() {
             "flex items-center gap-[7px] rounded-[9px] px-2.5 md:px-4 py-2 md:py-[9px] text-sm md:text-[14.5px] font-semibold cursor-pointer transition-colors",
             view === opt.value
               ? "bg-lprimary text-white dark:bg-dprimary dark:text-[#1e1530]"
-              : "text-off-dark dark:text-[#9a9aa2] hover:text-dark dark:hover:text-white",
+              : "text-off-dark dark:text-muted-dark hover:text-dark dark:hover:text-white",
           )}
         >
           {opt.icon}

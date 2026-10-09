@@ -138,7 +138,7 @@ export default function AllQues(props: { quizId: string }) {
                       >
                         <div className="relative rounded-[18px] overflow-hidden border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 transition-[border-color,box-shadow] hover:border-lprimary dark:hover:border-dprimary hover:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.5)]">
                           <div className="flex gap-3.5 px-4 md:px-[22px] pt-4 md:pt-5 pb-4">
-                            <span className="hidden md:flex shrink-0 pt-[3px] cursor-grab text-[#8a8896] dark:text-[#6f6f78]">
+                            <span className="hidden md:flex shrink-0 pt-[3px] cursor-grab text-[#8a8896] dark:text-muted-dark">
                               <LuGripVertical size={18} />
                             </span>
                             <div className="flex-1 min-w-0">
@@ -175,7 +175,7 @@ export default function AllQues(props: { quizId: string }) {
                                           "relative size-5 shrink-0 rounded-full border-2",
                                           op.isCorrect
                                             ? "border-lprimary dark:border-dprimary after:absolute after:inset-[3px] after:rounded-full after:bg-lprimary dark:after:bg-dprimary"
-                                            : "border-[#8a8896] dark:border-[#6f6f78]",
+                                            : "border-[#8a8896] dark:border-off-dark",
                                         )}
                                       />
                                       <span className="min-w-0">

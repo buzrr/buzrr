@@ -104,12 +104,11 @@ effects }` in `game-engine/core/`, unit-tested; `GameEngineService` is
    set it (documented in `.env.example`).
 5. **Player row growth**: guest identities are never deleted (by design,
    ADR-005) and there is no cleanup job.
-6. **AI quiz parsing is format-fragile**: `parseQuestions` expects an exact
-   text layout from whatever `TextGenerator` returns; model drift breaks AI
-   quiz creation (fails safe with 400/502), and small local models (now
-   supported) follow the layout less reliably than Gemini. `apps/ai` uses
-   structured output and does not have this problem — `POST /api/quizzes/ai`
-   has **not** been migrated onto it.
+6. **AI quiz output relies on provider schema support**: `POST
+/api/quizzes/ai` uses structured output (`TextGenerator.generateJson`,
+   JSON Schema from a zod schema) and re-validates the reply. Local
+   OpenAI-compatible servers that ignore `response_format: json_schema`
+   still fail safe (502), but less often than the old text parser did.
 7. **7-day stateless JWTs**: sign-out/demotion doesn't invalidate minted
    tokens; role checks re-read the DB (mitigates authz), identity itself
    remains valid until expiry.

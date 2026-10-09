@@ -2,9 +2,18 @@ import {
   LlmUpstreamError,
   TextGenerator,
   classifyLlmError,
+  omitSchemaKeys,
+  parseJsonReply,
+  type JsonOutputSchema,
 } from "./text-generator";
 
 const REQUEST_TIMEOUT_MS = 120_000;
+
+/**
+ * Keywords OpenAI's strict mode rejects for fine-tuned models. Dropping them
+ * only loosens the constraint sent upstream — callers re-validate the reply.
+ */
+const STRICT_UNSUPPORTED_KEYS = new Set(["minItems", "maxItems"]);
 
 interface ChatCompletion {
   choices?: { message?: { content?: string | null } }[];
@@ -39,7 +48,31 @@ export class OpenAICompatibleGenerator extends TextGenerator {
     return this.config.model;
   }
 
-  async generate(prompt: string): Promise<string> {
+  generate(prompt: string): Promise<string> {
+    return this.complete(prompt);
+  }
+
+  async generateJson(
+    prompt: string,
+    { name, schema }: JsonOutputSchema,
+  ): Promise<unknown> {
+    const text = await this.complete(prompt, {
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name,
+          schema: omitSchemaKeys(schema, STRICT_UNSUPPORTED_KEYS),
+          strict: true,
+        },
+      },
+    });
+    return parseJsonReply(text);
+  }
+
+  private async complete(
+    prompt: string,
+    extra: Record<string, unknown> = {},
+  ): Promise<string> {
     let res: Response;
     try {
       res = await fetch(this.endpoint, {
@@ -54,6 +87,7 @@ export class OpenAICompatibleGenerator extends TextGenerator {
           model: this.config.model,
           messages: [{ role: "user", content: prompt }],
           temperature: 0.7,
+          ...extra,
         }),
         signal: AbortSignal.timeout(
           this.config.timeoutMs ?? REQUEST_TIMEOUT_MS,

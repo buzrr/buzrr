@@ -45,7 +45,7 @@ export default function UpgradePrompt({
     >
       <Box
         sx={style}
-        className="bg-light-bg dark:bg-[#27272A] rounded-xl w-4/5 sm:w-3/5 md:w-2/5 max-w-[520px]"
+        className="bg-light-bg dark:bg-card-dark rounded-xl w-4/5 sm:w-3/5 md:w-2/5 max-w-[520px]"
       >
         <ModalCloseButton onClose={onClose} />
         <div className="p-6 flex flex-col">
@@ -144,7 +144,7 @@ export function AiQuotaBar({ className }: { className?: string }) {
         "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[13px] bg-lprimary/8 dark:bg-white/5",
         empty
           ? "text-red-light dark:text-red-dark"
-          : "text-off-dark dark:text-[#a1a1aa]",
+          : "text-off-dark dark:text-muted-dark",
         className,
       )}
     >
@@ -156,7 +156,7 @@ export function AiQuotaBar({ className }: { className?: string }) {
       </span>
       <span className="flex-1 min-w-12 h-1.5 rounded-md overflow-hidden bg-lprimary/15 dark:bg-white/10">
         <i
-          className="block h-full bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb]"
+          className="block h-full bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep"
           style={{ width: `${pct}%` }}
         />
       </span>

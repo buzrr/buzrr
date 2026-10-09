@@ -19,19 +19,19 @@ export const panelClass =
 export const subtleCardClass =
   "border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5";
 export const labelClass =
-  "text-xs font-semibold tracking-[0.12em] uppercase text-[#8a8896] dark:text-[#71717a]";
-export const mutedText = "text-off-dark dark:text-[#a1a1aa]";
+  "text-xs font-semibold tracking-[0.12em] uppercase text-[#8a8896] dark:text-muted-dark";
+export const mutedText = "text-off-dark dark:text-muted-dark";
 export const inputClass =
-  "w-full rounded-[14px] border-[1.5px] bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/10 px-4 py-[15px] text-base text-dark dark:text-white placeholder:text-[#8a8896] dark:placeholder:text-[#71717a] outline-none transition-[border-color,box-shadow] focus:border-dprimary focus:shadow-[0_0_0_4px_rgba(139,92,246,0.15)]";
+  "w-full rounded-[14px] border-[1.5px] bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/10 px-4 py-[15px] text-base text-dark dark:text-white placeholder:text-[#8a8896] dark:placeholder:text-muted-dark outline-none transition-[border-color,box-shadow] focus:border-dprimary focus:shadow-[0_0_0_4px_rgba(139,92,246,0.15)]";
 
 export const fieldLabelClass =
   "flex items-center justify-between text-sm font-semibold";
 
 export const counterClass =
-  "text-[12.5px] font-medium text-[#8a8896] dark:text-[#71717a]";
+  "text-[12.5px] font-medium text-[#8a8896] dark:text-muted-dark";
 
 export const primaryButtonClass =
-  "flex items-center justify-center gap-2.5 whitespace-nowrap rounded-[14px] px-[30px] py-3.5 text-base font-bold text-white bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] shadow-[0_10px_24px_-10px_#7c4ddb] transition-[filter,transform] hover:brightness-108 active:translate-y-px cursor-pointer disabled:opacity-50 disabled:cursor-default disabled:hover:brightness-100";
+  "flex items-center justify-center gap-2.5 whitespace-nowrap rounded-[14px] px-[30px] py-3.5 text-base font-bold text-white bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep shadow-[0_10px_24px_-10px_#7c4ddb] transition-[filter,transform] hover:brightness-108 active:translate-y-px cursor-pointer disabled:opacity-50 disabled:cursor-default disabled:hover:brightness-100";
 
 export function OptionKey({
   index,
@@ -95,7 +95,7 @@ function Progress({
                 final || i + 1 < current
                   ? "w-3 md:w-[18px] bg-dprimary/55"
                   : i + 1 === current
-                    ? "w-5 md:w-7 bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb]"
+                    ? "w-5 md:w-7 bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep"
                     : "w-3 md:w-[18px] bg-lprimary/10 dark:bg-white/10",
               )}
             />
@@ -111,7 +111,7 @@ function Progress({
         aria-hidden="true"
       >
         <i
-          className="block h-full rounded bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb]"
+          className="block h-full rounded bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep"
           style={{ width: `${final ? 100 : (current / qCount) * 100}%` }}
         />
       </span>
@@ -133,16 +133,32 @@ export function GameTopBar({
   qCount,
   final,
   right,
+  gameCode,
 }: {
   title: string;
   qIndex: number;
   qCount: number;
   final?: boolean;
   right?: ReactNode;
+  /** Shown as a small chip beside the connection pill, for late joiners. */
+  gameCode?: string;
 }) {
   return (
     <div className="flex items-center gap-2.5 md:gap-[18px] py-2 md:py-[18px] shrink-0">
-      <ConnectionStatusPill className="!shadow-none !text-[13px] !font-semibold !px-3 !py-1.5 !border-lprimary/15 dark:!border-white/10 !bg-white dark:!bg-white/5" />
+      <div className="flex items-center gap-2 shrink-0">
+        <ConnectionStatusPill className="!shadow-none !text-[13px] !font-semibold !px-3 !py-1.5 !border-lprimary/15 dark:!border-white/10 !bg-white dark:!bg-white/5" />
+        {gameCode && (
+          <span
+            title="Game code"
+            className="rounded-full border border-lprimary/15 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-1.5 text-[13px] font-semibold"
+          >
+            <span className={clsx("mr-1.5 font-medium", mutedText)}>Code</span>
+            <b className="font-extrabold tracking-[0.1em] text-lprimary dark:text-dprimary">
+              {gameCode}
+            </b>
+          </span>
+        )}
+      </div>
       <h1 className="hidden md:block flex-1 min-w-0 text-2xl font-bold tracking-[-0.01em] truncate">
         {title}
       </h1>

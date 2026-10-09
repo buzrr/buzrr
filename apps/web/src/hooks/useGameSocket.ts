@@ -93,7 +93,7 @@ export function useGameSocket({
     });
 
     conn.on("state-sync", (payload) => dispatch(applySync(payload)));
-    conn.on("game-started", () => dispatch(gameStarted()));
+    conn.on("game-started", (payload) => dispatch(gameStarted(payload)));
     conn.on("question-start", (payload) => dispatch(questionStart(payload)));
     conn.on("question-end", (payload) => dispatch(questionEnd(payload)));
     conn.on("answer-result", (payload) => dispatch(answerResult(payload)));

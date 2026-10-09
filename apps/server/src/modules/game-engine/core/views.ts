@@ -117,6 +117,10 @@ export function buildSnapshot(
     })),
   };
 
+  if (meta.phase === "starting") {
+    // Lets a client that (re)connects mid-countdown show the real time left.
+    payload.remainingMs = Math.max(0, meta.qDeadline - now);
+  }
   const question = state.questions[meta.qIndex];
   const inReveal = meta.phase === "reveal";
   if (question && (meta.phase === "question" || inReveal)) {

@@ -40,7 +40,7 @@ export default function ConfirmationModal({
     >
       <Box
         sx={style}
-        className="bg-light-bg dark:bg-[#27272A] rounded-xl w-4/5 sm:w-3/5 md:w-2/5 max-w-[600px]"
+        className="bg-light-bg dark:bg-card-dark rounded-xl w-4/5 sm:w-3/5 md:w-2/5 max-w-[600px]"
       >
         {!confirming && <ModalCloseButton onClose={() => setOpen(false)} />}
         <div className="p-6 flex flex-col justify-center items-center">
@@ -72,7 +72,7 @@ export default function ConfirmationModal({
             <button
               onClick={onClick}
               disabled={confirming}
-              className="flex items-center justify-center gap-2 bg-white text-red-light dark:text-red-dark dark:border-red-dark border-2 font-semibold py-2 border-red-light rounded-lg dark:bg-[#27272A] cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-2 bg-white text-red-light dark:text-red-dark dark:border-red-dark border-2 font-semibold py-2 border-red-light rounded-lg dark:bg-card-dark cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {confirming && (
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-red-light dark:border-red-dark border-t-transparent dark:border-t-transparent" />

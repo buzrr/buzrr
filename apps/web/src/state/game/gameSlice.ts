@@ -27,6 +27,8 @@ export interface GameLiveState {
    * `remainingMs` on receipt. Display only; 0 when no question is open.
    */
   deadline: number;
+  /** Length of the current start countdown (for the progress ring). */
+  countdownMs: number;
   /** Answers received for the open question (host meter). */
   answeredCount: number;
   reveal: QuestionEndPayload | null;
@@ -54,6 +56,7 @@ const initialState: GameLiveState = {
   qCount: 0,
   question: null,
   deadline: 0,
+  countdownMs: 0,
   answeredCount: 0,
   reveal: null,
   leaderboard: [],
@@ -79,6 +82,7 @@ const gameSlice = createSlice({
       state.question = s.question ?? null;
       state.deadline =
         s.remainingMs === undefined ? 0 : Date.now() + s.remainingMs;
+      state.countdownMs = s.phase === "starting" ? (s.remainingMs ?? 0) : 0;
       state.answeredCount = s.answeredCount ?? 0;
       state.reveal = s.reveal ?? null;
       state.leaderboard = s.leaderboard ?? [];
@@ -86,8 +90,11 @@ const gameSlice = createSlice({
       state.players = s.players;
       state.you = s.you ?? null;
     },
-    gameStarted: (state) => {
+    gameStarted: (state, action: PayloadAction<{ remainingMs: number }>) => {
       state.phase = "starting";
+      // Display-only: the server opens question 1 on its own timer.
+      state.deadline = Date.now() + action.payload.remainingMs;
+      state.countdownMs = action.payload.remainingMs;
       state.gameOver = false;
     },
     questionStart: (state, action: PayloadAction<QuestionStartPayload>) => {

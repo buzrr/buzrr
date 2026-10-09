@@ -8,7 +8,7 @@ import { useAdminSocket } from "@/hooks/useAdminSocket";
 import ConnectionBanner from "@/components/ConnectionBanner";
 import { GameTopBar } from "@/components/Game/GameUI";
 import EndQuizButton from "@/components/Admin/EndQuizButton";
-import WaitScreen from "./WaitScreen";
+import GetReady from "@/components/Game/GetReady";
 import QuestionScreen from "./QuestionScreen";
 import QuesResult from "./QuesResult";
 import LeaderBoard from "./Leaderboard";
@@ -62,11 +62,11 @@ const GameLobby = (params: {
   if (!socket) return null;
 
   if (!inGame) {
-    // idle / lobby / starting — the full-screen pre-question countdown
+    // idle / lobby / starting — the pre-question countdown
     return (
       <>
         <ConnectionBanner />
-        <WaitScreen />
+        <GetReady title={title} />
       </>
     );
   }
@@ -79,6 +79,7 @@ const GameLobby = (params: {
         qIndex={qIndex}
         qCount={qCount}
         final={showLeaderboard}
+        gameCode={phase === "reveal" ? params.gameCode : undefined}
         right={
           <EndQuizButton
             inline

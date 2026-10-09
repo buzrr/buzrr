@@ -5,14 +5,9 @@ import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import type { GameSession } from "@/types/db";
-import {
-  WaitGameStart,
-  Question,
-  Loader,
-  Result,
-  LeaderBoard,
-} from "./GameScreens";
+import { WaitGameStart, Question, Result, LeaderBoard } from "./GameScreens";
 import ConnectionBanner from "@/components/ConnectionBanner";
+import GetReady from "@/components/Game/GetReady";
 import ConnectionStatusPill from "@/components/ConnectionStatusPill";
 import ConfirmationModal from "@/components/Admin/ConfirmationModal";
 import { usePlayerSocket } from "@/hooks/usePlayerSocket";
@@ -120,7 +115,7 @@ const GamePage = (params: {
             hostImage={game.creator?.image}
           />
         ) : (
-          <Loader />
+          <GetReady title={game.quiz.title ?? undefined} />
         )
       ) : phase === "reveal" ? (
         <Result
@@ -138,7 +133,7 @@ const GamePage = (params: {
         />
       ) : (
         // "starting" — the pre-question countdown
-        <Loader />
+        <GetReady title={game.quiz.title ?? undefined} />
       )}
     </>
   );

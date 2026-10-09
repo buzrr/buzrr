@@ -32,7 +32,7 @@ const ThemeToggle = () => {
         <span>DARK</span>
         <span>MODE</span>
       </div>
-      <div className="p-[6px] shadow-[0px_2px_4px_0px_rgba(0,0,0,0.15)] rounded-full bg-white dark:bg-[#27272a]">
+      <div className="p-[6px] shadow-[0px_2px_4px_0px_rgba(0,0,0,0.15)] rounded-full bg-white dark:bg-card-dark">
         <Switch
           checked={theme === PageTheme.dark}
           aria-label="Toggle dark mode"
