@@ -29,7 +29,7 @@ export default function GetReady({ title }: { title?: string }) {
       >
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,rgba(139,92,246,0.16),transparent_60%)]"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,color-mix(in_srgb,var(--color-dprimary)_16%,transparent),transparent_60%)]"
         />
 
         <span className="relative text-[12.5px] font-bold tracking-[0.08em] uppercase rounded-full px-3 py-1.5 text-lprimary dark:text-dprimary bg-lprimary/8 dark:bg-white/5">
@@ -83,8 +83,8 @@ function Countdown({
       <svg viewBox="0 0 100 100" className="block size-full -rotate-90">
         <defs>
           <linearGradient id="get-ready-ring" x1="0" x2="1">
-            <stop offset="0" stopColor="#a78bfa" />
-            <stop offset="1" stopColor="#7c3aed" />
+            <stop offset="0" style={{ stopColor: "var(--color-dprimary)" }} />
+            <stop offset="1" style={{ stopColor: "var(--color-accent)" }} />
           </linearGradient>
         </defs>
         <circle

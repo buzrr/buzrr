@@ -29,12 +29,22 @@ export function Tooltip({
   const tipRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number }>();
+  const [truncated, setTruncated] = useState(false);
+  // Without `onlyWhenTruncated` the tooltip always has something to add.
+  const active = !onlyWhenTruncated || truncated;
+
+  useLayoutEffect(() => {
+    const el = triggerRef.current;
+    if (!onlyWhenTruncated || !el) return;
+    const measure = () => setTruncated(el.scrollWidth > el.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [onlyWhenTruncated, children]);
 
   function show() {
-    const el = triggerRef.current;
-    if (!el) return;
-    if (onlyWhenTruncated && el.scrollWidth <= el.clientWidth) return;
-    setOpen(true);
+    if (active) setOpen(true);
   }
 
   function hide() {
@@ -72,6 +82,8 @@ export function Tooltip({
       <span
         ref={triggerRef}
         className={className}
+        // A tab stop only when there's hidden text to reveal.
+        tabIndex={active ? 0 : undefined}
         aria-describedby={open ? id : undefined}
         onMouseEnter={show}
         onMouseLeave={hide}

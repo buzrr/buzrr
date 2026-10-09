@@ -7,6 +7,7 @@ import {
   LlmUpstreamError,
   TextGenerator,
   classifyLlmError,
+  omitSchemaKeys,
   parseJsonReply,
   type JsonOutputSchema,
 } from "./text-generator";
@@ -21,13 +22,7 @@ const UNSUPPORTED_KEYS = new Set(["$schema", "additionalProperties"]);
  * lowercase type names, so translating is just dropping what it rejects.
  */
 export function toGeminiSchema(schema: unknown): unknown {
-  if (Array.isArray(schema)) return schema.map(toGeminiSchema);
-  if (!schema || typeof schema !== "object") return schema;
-  return Object.fromEntries(
-    Object.entries(schema)
-      .filter(([key]) => !UNSUPPORTED_KEYS.has(key))
-      .map(([key, value]) => [key, toGeminiSchema(value)]),
-  );
+  return omitSchemaKeys(schema, UNSUPPORTED_KEYS);
 }
 
 /** Google Gemini through its own SDK (the hosted default). */

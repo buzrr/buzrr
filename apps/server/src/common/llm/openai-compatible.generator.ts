@@ -2,11 +2,18 @@ import {
   LlmUpstreamError,
   TextGenerator,
   classifyLlmError,
+  omitSchemaKeys,
   parseJsonReply,
   type JsonOutputSchema,
 } from "./text-generator";
 
 const REQUEST_TIMEOUT_MS = 120_000;
+
+/**
+ * Keywords OpenAI's strict mode rejects for fine-tuned models. Dropping them
+ * only loosens the constraint sent upstream — callers re-validate the reply.
+ */
+const STRICT_UNSUPPORTED_KEYS = new Set(["minItems", "maxItems"]);
 
 interface ChatCompletion {
   choices?: { message?: { content?: string | null } }[];
@@ -52,7 +59,11 @@ export class OpenAICompatibleGenerator extends TextGenerator {
     const text = await this.complete(prompt, {
       response_format: {
         type: "json_schema",
-        json_schema: { name, schema, strict: true },
+        json_schema: {
+          name,
+          schema: omitSchemaKeys(schema, STRICT_UNSUPPORTED_KEYS),
+          strict: true,
+        },
       },
     });
     return parseJsonReply(text);

@@ -42,7 +42,9 @@ function ResultBar({
       <div
         className={clsx(
           "h-full rounded-xl transition-[width] ease-out motion-reduce:transition-none",
-          correct ? "bg-green-500" : "bg-[#8a8896]/45 dark:bg-[#71717a]/45",
+          correct
+            ? "bg-green-500"
+            : "bg-bar-muted/45 dark:bg-bar-muted-dark/45",
         )}
         style={{
           width: `${entered ? fill * 100 : 0}%`,

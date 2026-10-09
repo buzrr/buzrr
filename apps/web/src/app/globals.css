@@ -30,6 +30,9 @@
   --color-cardhover-light: #ddd5ff;
   --color-card-dark: #1e2433;
   --color-cardhover-dark: #252c3d;
+  /* Unpicked/wrong answer bars on the reveal screen (used at 45% opacity). */
+  --color-bar-muted: #8a8896;
+  --color-bar-muted-dark: #71717a;
   --breakpoint-medium: 860px;
 
   --animate-float: float 5s ease-in-out infinite;
@@ -129,6 +132,12 @@ html.theme-anim *::after {
   }
 }
 
+/* Not utilities, so plain custom properties rather than @theme tokens. */
+:root {
+  --scrollbar-thumb: #475569;
+  --scrollbar-thumb-hover: #64748b;
+}
+
 @layer base {
   ::-webkit-scrollbar {
     width: 6px;
@@ -140,12 +149,12 @@ html.theme-anim *::after {
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #475569;
+    background: var(--scrollbar-thumb);
     border-radius: 5px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #64748b;
+    background: var(--scrollbar-thumb-hover);
   }
 
   * {
@@ -203,7 +212,7 @@ html.theme-anim *::after {
    Dark pill base with a colored border + accent per toast type. */
 .buzrr-toast-container .buzrr-toast {
   color: #f5f3ff;
-  background: #161b28;
+  background: var(--color-dark);
   border: 1px solid transparent;
 }
 
@@ -238,13 +247,13 @@ html.theme-anim *::after {
 }
 
 .buzrr-toast-container .buzrr-toast.Toastify__toast--info {
-  border-color: #a78bfa;
+  border-color: var(--color-dprimary);
 }
 .buzrr-toast-container
   .buzrr-toast.Toastify__toast--info
   .Toastify__toast-icon
   svg {
-  fill: #a78bfa;
+  fill: var(--color-dprimary);
 }
 
 .buzrr-toast-container .buzrr-toast.Toastify__toast--default {

@@ -45,6 +45,17 @@ export interface JsonOutputSchema {
   schema: Record<string, unknown>;
 }
 
+/** Returns `schema` with the given keywords removed at every level. */
+export function omitSchemaKeys(schema: unknown, keys: Set<string>): unknown {
+  if (Array.isArray(schema)) return schema.map((s) => omitSchemaKeys(s, keys));
+  if (!schema || typeof schema !== "object") return schema;
+  return Object.fromEntries(
+    Object.entries(schema)
+      .filter(([key]) => !keys.has(key))
+      .map(([key, value]) => [key, omitSchemaKeys(value, keys)]),
+  );
+}
+
 /** Parses a model's JSON reply, tolerating a stray markdown code fence. */
 export function parseJsonReply(text: string): unknown {
   const body = text

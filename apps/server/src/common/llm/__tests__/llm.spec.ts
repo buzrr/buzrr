@@ -129,7 +129,18 @@ describe("OpenAICompatibleGenerator", () => {
         json: { choices: [{ message: { content: '{"ok":true}' } }] },
       };
     });
-    const schema = { type: "object", properties: { ok: { type: "boolean" } } };
+    const schema = {
+      type: "object",
+      properties: {
+        ok: { type: "boolean" },
+        tags: {
+          type: "array",
+          minItems: 3,
+          maxItems: 3,
+          items: { type: "string" },
+        },
+      },
+    };
     await expect(
       new OpenAICompatibleGenerator({ baseUrl, model: "m" }).generateJson("p", {
         name: "out",
@@ -138,7 +149,17 @@ describe("OpenAICompatibleGenerator", () => {
     ).resolves.toEqual({ ok: true });
     expect(seen.response_format).toEqual({
       type: "json_schema",
-      json_schema: { name: "out", schema, strict: true },
+      json_schema: {
+        name: "out",
+        schema: {
+          type: "object",
+          properties: {
+            ok: { type: "boolean" },
+            tags: { type: "array", items: { type: "string" } },
+          },
+        },
+        strict: true,
+      },
     });
   });
 
