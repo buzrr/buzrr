@@ -32,7 +32,7 @@ export default function TermsPage() {
         <p>
           Buzrr&apos;s source code is licensed separately under{" "}
           <a href={LICENSE_LINK} target="_blank" rel="noreferrer">
-            GPL-3.0
+            AGPL-3.0
           </a>
           . These terms cover the hosted Service only. They do not restrict what
           the license lets you do with the code.

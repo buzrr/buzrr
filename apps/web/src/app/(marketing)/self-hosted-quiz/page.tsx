@@ -103,7 +103,7 @@ export default function SelfHostedQuizPage() {
 
       <Answer question="Can Buzrr be self-hosted?">
         <p>
-          Yes. Buzrr is GPL-3.0 open source and the repository includes
+          Yes. Buzrr is AGPL-3.0 open source and the repository includes
           everything needed to run it: a Next.js web app, a NestJS game server,
           a PostgreSQL schema with migrations, and an optional Python AI
           service. It needs PostgreSQL, Redis and Google OAuth credentials.
@@ -121,7 +121,7 @@ export default function SelfHostedQuizPage() {
           items={[
             "Uploaded documents, quizzes and results stay in a database you control.",
             "You can put it on a school, university or company network and review the code before you do.",
-            "You can change it — a different scoring curve, a new question type, your own branding — under the GPL-3.0 terms.",
+            "You can change it — a different scoring curve, a new question type, your own branding — under the AGPL-3.0 terms.",
           ]}
         />
       </Section>

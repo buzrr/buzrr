@@ -25,7 +25,7 @@ import { PLAN_COPY } from "@/lib/pricing";
 
 /** Standalone "What is Buzrr?" answer — must make sense with no context. */
 export const WHAT_IS_BUZRR =
-  "Buzrr is an open-source quiz platform that runs in the browser. A host builds a multiple-choice quiz — by hand or with AI — and opens a live room; players join from their own phones or laptops with a 6-character code, a link or a QR code, without creating an account. Signed-in users can also play ranked 1v1 quiz battles. Buzrr is licensed under GPL-3.0, so anyone can read the code or run their own instance.";
+  "Buzrr is an open-source quiz platform that runs in the browser. A host builds a multiple-choice quiz — by hand or with AI — and opens a live room; players join from their own phones or laptops with a 6-character code, a link or a QR code, without creating an account. Signed-in users can also play ranked 1v1 quiz battles. Buzrr is licensed under AGPL-3.0, so anyone can read the code or run their own instance.";
 
 export const FEATURES = {
   // game-sessions + realtime modules; ShareRoom.tsx (link + QR)
@@ -97,7 +97,7 @@ export const FEATURES = {
   // LICENSE, README
   openSource: {
     icon: LuGithub,
-    title: "Open source (GPL-3.0)",
+    title: "Open source (AGPL-3.0)",
     text: "The full source — web app, game server and AI service — is public on GitHub.",
   },
   // README quick start; billing.config.ts (self-hosted = Pro limits)

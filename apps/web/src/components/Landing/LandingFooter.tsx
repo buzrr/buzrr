@@ -56,7 +56,7 @@ const columns = [
     title: "Resources",
     links: [
       { name: "Contributing", href: CONTRIBUTING_LINK, external: true },
-      { name: "License (GPL-3.0)", href: LICENSE_LINK, external: true },
+      { name: "License (AGPL-3.0)", href: LICENSE_LINK, external: true },
       ...LEGAL_PAGES.map((page) => ({ name: page.name, href: page.path })),
     ],
   },
@@ -179,7 +179,7 @@ const LandingFooter = () => {
             </a>
           </div>
           <p className="text-sm text-dark/70 dark:text-gray">
-            © {new Date().getFullYear()} Buzrr. GPL-3.0 License.
+            © {new Date().getFullYear()} Buzrr. AGPL-3.0 License.
           </p>
         </div>
       </div>

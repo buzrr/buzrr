@@ -118,7 +118,7 @@ export default function AlternativesHubPage() {
                   Live hosted quiz rooms, ranked 1v1 quiz battles and AI
                   question generation, in the browser.
                 </td>
-                <td className="p-4">Yes (GPL-3.0)</td>
+                <td className="p-4">Yes (AGPL-3.0)</td>
               </tr>
               {COMPETITOR_SLUGS.map((slug) => {
                 const c = COMPETITORS[slug];
@@ -207,8 +207,8 @@ export default function AlternativesHubPage() {
           </Answer>
           <Answer question="Is Buzrr open source?">
             <p>
-              Yes. The whole application is on GitHub under the GPL-3.0 license,
-              and you can run your own instance.
+              Yes. The whole application is on GitHub under the AGPL-3.0
+              license, and you can run your own instance.
             </p>
           </Answer>
         </div>

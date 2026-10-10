@@ -25,7 +25,7 @@ export interface MarketingPage {
 export const OPEN_SOURCE_PAGE: MarketingPage = {
   path: "/open-source-quiz-platform",
   ogKey: "open-source-quiz-platform",
-  ogEyebrow: "Open source · GPL-3.0",
+  ogEyebrow: "Open source · AGPL-3.0",
   ogTitle: "An open-source quiz platform you can read, run and change",
   ogAlt: "Buzrr: an open-source quiz platform",
 };
