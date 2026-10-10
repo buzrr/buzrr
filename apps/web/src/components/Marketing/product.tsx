@@ -304,7 +304,7 @@ export function cardsForUseCases(slugs: UseCaseSlug[]): LinkCardItem[] {
 export const OPEN_SOURCE_CARD: LinkCardItem = {
   href: "/open-source-quiz-platform",
   title: "Buzrr as an open-source quiz platform",
-  text: "What's in the GPL-3.0 codebase, how it's built, and how to contribute.",
+  text: "What's in the AGPL-3.0 codebase, how it's built, and how to contribute.",
 };
 
 export const SELF_HOST_CARD: LinkCardItem = {

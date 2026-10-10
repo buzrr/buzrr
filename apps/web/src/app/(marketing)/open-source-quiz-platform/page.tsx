@@ -23,9 +23,9 @@ import { siteGraph, sourceCodeSchema, webPageSchema } from "@/lib/seo/json-ld";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 import { LICENSE_URL, REPO_URL } from "@/lib/seo/site";
 
-const TITLE = "Open-Source Quiz Platform (GPL-3.0)";
+const TITLE = "Open-Source Quiz Platform (AGPL-3.0)";
 const DESCRIPTION =
-  "Buzrr is a GPL-3.0 open-source quiz platform — live quiz rooms, ranked 1v1 battles, AI questions — built on Next.js, NestJS, Socket.IO, Postgres and Redis.";
+  "Buzrr is an AGPL-3.0 open-source quiz platform — live quiz rooms, ranked 1v1 battles, AI questions — built on Next.js, NestJS, Socket.IO, Postgres and Redis.";
 
 export const metadata = buildPageMetadata({
   title: TITLE,
@@ -98,7 +98,7 @@ export default function OpenSourcePage() {
       />
       <PageHero
         crumbs={crumbs}
-        eyebrow="Open source · GPL-3.0"
+        eyebrow="Open source · AGPL-3.0"
         title="An open-source quiz platform you can read, run and change"
         lead="Every part of Buzrr — the website, the real-time game server and the AI service — is public on GitHub. Use the hosted version at buzrr.in, or take the code and run it yourself."
         primary={{ label: "View the code on GitHub", href: REPO_URL }}
@@ -107,8 +107,8 @@ export default function OpenSourcePage() {
 
       <Answer question="Is Buzrr open source?">
         <p>
-          Yes. Buzrr is licensed under the GNU General Public License v3.0
-          (GPL-3.0). The complete source is at{" "}
+          Yes. Buzrr is licensed under the GNU Affero General Public License
+          v3.0 (AGPL-3.0). The complete source is at{" "}
           <a
             href={REPO_URL}
             className="underline underline-offset-4"
@@ -118,8 +118,8 @@ export default function OpenSourcePage() {
             github.com/buzrr/buzrr
           </a>
           . You can use, study, modify and share it; if you distribute a
-          modified version, you must release its source under the same license.
-          The{" "}
+          modified version, or run one as a network service that others use, you
+          must make its source available under the same license. The{" "}
           <a
             href={LICENSE_URL}
             className="underline underline-offset-4"

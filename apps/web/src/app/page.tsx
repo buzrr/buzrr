@@ -43,7 +43,7 @@ export const metadata = buildPageMetadata({
 
 const heroBadges = [
   { icon: <LuUsers size={13} />, label: "Contributors Welcome" },
-  { icon: <LuScale size={13} />, label: "GPL-3.0 License" },
+  { icon: <LuScale size={13} />, label: "AGPL-3.0 License" },
   { icon: null, label: "TypeScript" },
   { icon: null, label: "Next.js" },
   { icon: null, label: "NestJS" },
@@ -73,7 +73,7 @@ const features = [
   {
     icon: LuServer,
     title: "Self Host",
-    text: "Deploy your own instance, GPL-3.0 licensed.",
+    text: "Deploy your own instance, AGPL-3.0 licensed.",
   },
   {
     icon: LuSmartphone,
@@ -285,7 +285,7 @@ export default async function Home() {
                 Buzrr is open source and contributor friendly.
               </p>
               <p className="text-sm text-dark/60 dark:text-gray">
-                Free software under GPL-3.0 — we welcome contributions from
+                Free software under AGPL-3.0 — we welcome contributions from
                 everyone. Check out our repo!
               </p>
             </div>

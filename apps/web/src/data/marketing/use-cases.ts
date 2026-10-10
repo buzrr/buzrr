@@ -139,7 +139,7 @@ export const USE_CASES: Record<UseCaseSlug, UseCase> = {
         },
         {
           title: "A codebase your club can hack on",
-          text: "Buzrr is open source (GPL-3.0) and written in TypeScript with Next.js and NestJS. Coding clubs can self-host it for their fest or contribute features back.",
+          text: "Buzrr is open source (AGPL-3.0) and written in TypeScript with Next.js and NestJS. Coding clubs can self-host it for their fest or contribute features back.",
         },
       ],
     },
@@ -204,7 +204,7 @@ export const USE_CASES: Record<UseCaseSlug, UseCase> = {
         },
         {
           title: "Self-host when data can't leave",
-          text: "Buzrr is GPL-3.0 open source. You can deploy it on your own infrastructure with your own database, Redis and AI key, and inspect exactly what it does with uploaded documents.",
+          text: "Buzrr is AGPL-3.0 open source. You can deploy it on your own infrastructure with your own database, Redis and AI key, and inspect exactly what it does with uploaded documents.",
         },
       ],
     },

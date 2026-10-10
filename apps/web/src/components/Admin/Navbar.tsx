@@ -170,7 +170,7 @@ export default function Navbar() {
                 rel="noreferrer"
                 className="underline underline-offset-1"
               >
-                GPL-3.0
+                AGPL-3.0
               </a>
               <br />
               <br />

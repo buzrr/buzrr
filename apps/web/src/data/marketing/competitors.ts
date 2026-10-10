@@ -64,7 +64,7 @@ export const ROW_LABELS: Record<RowId, string> = {
 
 /** Buzrr's column — verified against this repository. */
 export const BUZRR_CELLS: Record<RowId, Cell> = {
-  openSource: { status: "yes", text: "Yes — GPL-3.0, full source on GitHub" },
+  openSource: { status: "yes", text: "Yes — AGPL-3.0, full source on GitHub" },
   selfHost: {
     status: "yes",
     text: "Yes — Next.js, NestJS, PostgreSQL and Redis",
@@ -239,7 +239,7 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
         points: [
           {
             title: "Open source and self-hostable",
-            text: "Buzrr's web app, game server and AI service are on GitHub under GPL-3.0. Self-hosted instances run with billing off and Pro limits.",
+            text: "Buzrr's web app, game server and AI service are on GitHub under AGPL-3.0. Self-hosted instances run with billing off and Pro limits.",
           },
           {
             title: "Ranked 1v1 quiz battles",
@@ -282,7 +282,7 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
       related: ["quizizz", "slido", "mentimeter", "quizup"],
       answer: {
         question: "Is Buzrr a Kahoot alternative?",
-        text: "Yes, for live hosted quizzes. Like Kahoot!, a host shows questions on a big screen while players answer on their own devices, joining with a code, and faster correct answers score more. Unlike Kahoot!, Buzrr is open source (GPL-3.0), can be self-hosted, and adds ranked 1v1 quiz battles. It does not have a self-paced mode or question types beyond multiple choice.",
+        text: "Yes, for live hosted quizzes. Like Kahoot!, a host shows questions on a big screen while players answer on their own devices, joining with a code, and faster correct answers score more. Unlike Kahoot!, Buzrr is open source (AGPL-3.0), can be self-hosted, and adds ranked 1v1 quiz battles. It does not have a self-paced mode or question types beyond multiple choice.",
       },
     },
     compare: {
@@ -416,7 +416,7 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
           },
           {
             title: "Open source",
-            text: "GPL-3.0 on GitHub, with a self-hosting path for teams that can't use a third-party cloud.",
+            text: "AGPL-3.0 on GitHub, with a self-hosting path for teams that can't use a third-party cloud.",
           },
         ],
       },
@@ -576,7 +576,7 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
           },
           {
             title: "You want to self-host",
-            text: "Mentimeter is a cloud service. Buzrr is GPL-3.0 open source.",
+            text: "Mentimeter is a cloud service. Buzrr is AGPL-3.0 open source.",
           },
         ],
       },
@@ -752,7 +752,7 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
           },
           {
             title: "Open source matters",
-            text: "Wayground is a proprietary cloud platform. Buzrr's code is public, GPL-3.0, and can be self-hosted.",
+            text: "Wayground is a proprietary cloud platform. Buzrr's code is public, AGPL-3.0, and can be self-hosted.",
           },
         ],
       },
@@ -773,7 +773,7 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
           },
           {
             title: "Self-hosting",
-            text: "Schools or clubs can run their own Buzrr instance under GPL-3.0.",
+            text: "Schools or clubs can run their own Buzrr instance under AGPL-3.0.",
           },
         ],
       },
@@ -970,7 +970,7 @@ export const QUIZUP_ROWS: { label: string; quizup: string; buzrr: string }[] = [
   {
     label: "Status",
     quizup: "Servers taken offline on 24 March 2021",
-    buzrr: "Active and open source (GPL-3.0)",
+    buzrr: "Active and open source (AGPL-3.0)",
   },
 ];
 

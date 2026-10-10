@@ -72,7 +72,7 @@ export function softwareApplicationSchema(): JsonLdNode {
       "Ranked 1v1 quiz battles with ELO matchmaking",
       "AI quiz generation from a topic description",
       "AI question generation from uploaded PDF, DOCX, TXT and Markdown documents",
-      "Open source under GPL-3.0 and self-hostable",
+      "Open source under AGPL-3.0 and self-hostable",
     ],
     publisher: { "@id": ORG_ID },
   };
