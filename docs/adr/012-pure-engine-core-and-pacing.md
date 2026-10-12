@@ -25,7 +25,7 @@ had no clean place to go.
 2. **`GameEngineService` is the shell.** It loads the state each event needs
    (`PARTS_FOR`, one pipelined Redis round trip after the meta), runs the
    effects, and keeps everything that needs I/O or atomicity: first-write
-   answers (`HSETNX`), the end-of-game claim, pause/resume claims, owner
+   answers (`HSETNX`, in `recordAnswer`), the end-of-game claim, pause/resume claims, owner
    lock, timers, recovery and result persistence.
 3. **Pacing is a strategy** (`core/pacing.ts`): `hostControlled`,
    `revealEndsAt(now)`, `endsOnFinal`. `hostPaced` (classic) and

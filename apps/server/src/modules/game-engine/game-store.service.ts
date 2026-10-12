@@ -153,6 +153,19 @@ return 1
 `;
 
 // Claims the ended-game transition so only one caller persists the result.
+// First answer wins: the score is added only if the answer was stored, in the
+// same atomic step. Returns who has answered so far (the early-close check
+// needs it) or nil for a duplicate.
+const RECORD_ANSWER_SCRIPT = `
+if redis.call('HSETNX', KEYS[1], ARGV[1], ARGV[2]) == 0 then
+  return false
+end
+redis.call('EXPIRE', KEYS[1], ARGV[4])
+redis.call('ZINCRBY', KEYS[2], ARGV[3], ARGV[1])
+redis.call('EXPIRE', KEYS[2], ARGV[4])
+return redis.call('HKEYS', KEYS[1])
+`;
+
 const CLAIM_ENDED_SCRIPT = `
 local phase = redis.call('HGET', KEYS[1], 'phase')
 if phase == 'ended' or phase == false then
@@ -179,17 +192,42 @@ export class GameStoreService {
   }
 
   /**
-   * Everything the engine's phase machine reads, in two round trips: the meta
-   * (which says which question's answers to read), then the requested parts
-   * pipelined. Parts not requested come back empty. Pass `qIndex` to read a
-   * specific question's answers instead of the current one's.
+   * Everything the engine's phase machine reads. The meta says which
+   * question's answers to read, so reading the current answers takes two
+   * round trips (meta, then the parts pipelined); otherwise — no answers, or
+   * `qIndex` given — the meta rides the same pipeline. Parts not requested
+   * come back empty. Pass `qIndex` to read a specific question's answers
+   * instead of the current one's.
    */
   async loadState(
     code: string,
     parts: readonly StatePart[],
     qIndex?: number,
   ): Promise<GameState | null> {
-    const meta = await this.getMeta(code);
+    const metaFirst = parts.includes("answers") && qIndex === undefined;
+    const pipe = this.redis.pipeline();
+    let meta: GameMeta | null = null;
+    if (metaFirst) {
+      meta = await this.getMeta(code);
+      if (!meta) return null;
+    } else {
+      pipe.hgetall(keys.meta(code));
+    }
+    // Known whenever answers are requested: given, or read above.
+    const answersOf = qIndex ?? meta?.qIndex ?? 0;
+    for (const part of parts) {
+      if (part === "questions") pipe.get(keys.questions(code));
+      if (part === "roster") pipe.hgetall(keys.players(code));
+      if (part === "answers") pipe.hgetall(keys.answers(code, answersOf));
+      if (part === "scores") {
+        pipe.zrevrange(keys.lb(code), 0, -1, "WITHSCORES");
+      }
+    }
+    const results = (await pipe.exec()) ?? [];
+    for (const [err] of results) if (err) throw err;
+    if (!metaFirst) {
+      meta = parseMeta(results.shift()?.[1] as Record<string, string>);
+    }
     if (!meta) return null;
     const state: GameState = {
       meta,
@@ -198,23 +236,8 @@ export class GameStoreService {
       answers: {},
       scores: [],
     };
-    if (parts.length === 0) return state;
-
-    const pipe = this.redis.pipeline();
-    for (const part of parts) {
-      if (part === "questions") pipe.get(keys.questions(code));
-      if (part === "roster") pipe.hgetall(keys.players(code));
-      if (part === "answers") {
-        pipe.hgetall(keys.answers(code, qIndex ?? meta.qIndex));
-      }
-      if (part === "scores") {
-        pipe.zrevrange(keys.lb(code), 0, -1, "WITHSCORES");
-      }
-    }
-    const results = (await pipe.exec()) ?? [];
     parts.forEach((part, i) => {
-      const [err, value] = results[i] ?? [null, null];
-      if (err) throw err;
+      const value = results[i]?.[1] ?? null;
       if (part === "questions") {
         state.questions = parseQuestions(value as string | null) ?? [];
       } else if (part === "roster") {
@@ -335,20 +358,28 @@ export class GameStoreService {
 
   // -- answers -------------------------------------------------------------
 
-  /** First answer wins. Returns false if the player already answered. */
-  async putAnswer(
+  /**
+   * Stores a player's answer and adds its score — one command on the hot
+   * path. First answer wins: returns null if the player already answered,
+   * otherwise the ids of everyone who has answered `qIndex` so far.
+   */
+  async recordAnswer(
     code: string,
     qIndex: number,
     playerId: string,
     answer: StoredAnswer,
-  ): Promise<boolean> {
-    const key = keys.answers(code, qIndex);
-    const [[, set]] = (await this.redis
-      .multi()
-      .hsetnx(key, playerId, JSON.stringify(answer))
-      .expire(key, TTL_SECONDS)
-      .exec()) as [[Error | null, number]];
-    return set === 1;
+  ): Promise<string[] | null> {
+    const answered = await this.redis.eval(
+      RECORD_ANSWER_SCRIPT,
+      2,
+      keys.answers(code, qIndex),
+      keys.lb(code),
+      playerId,
+      JSON.stringify(answer),
+      answer.score,
+      TTL_SECONDS,
+    );
+    return (answered as string[] | null) ?? null;
   }
 
   async getAnswers(
@@ -363,14 +394,6 @@ export class GameStoreService {
   }
 
   // -- leaderboard ---------------------------------------------------------
-
-  async addScore(code: string, playerId: string, delta: number): Promise<void> {
-    await this.redis
-      .multi()
-      .zincrby(keys.lb(code), delta, playerId)
-      .expire(keys.lb(code), TTL_SECONDS)
-      .exec();
-  }
 
   /** playerId → score, descending. */
   async leaderboard(code: string): Promise<ScoreEntry[]> {

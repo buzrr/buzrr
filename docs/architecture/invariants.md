@@ -47,7 +47,8 @@ the docs, and write an ADR.
 7. **[explicit] Game end is single-claimant.** `claimEnded` atomically flips
    phase→`ended`; only the winner persists and cleans up. Any new
    end-of-game side effect belongs inside/behind that claim.
-8. **[explicit] First answer wins.** `HSETNX` per (game, question, player) —
+8. **[explicit] First answer wins.** `HSETNX` per (game, question, player),
+   with the score added in the same script (`RECORD_ANSWER_SCRIPT`) —
    duplicates must never re-score.
 9. **[explicit] Ban beats connect.** The ban set is written before the kick;
    roster registration is atomic with the ban check

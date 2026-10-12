@@ -28,8 +28,12 @@ export type EngineEvent =
   | { type: "host-next" }
   /** The game's scheduled deadline came due (local timer or sweeper). */
   | { type: "deadline" }
-  /** An answer to question `qIndex` was stored. */
-  | { type: "answer-recorded"; qIndex: number }
+  /**
+   * An answer to question `qIndex` was stored. `answered` is everyone who has
+   * answered it, read atomically with the write — so the per-answer path
+   * needs no read of the answers after it.
+   */
+  | { type: "answer-recorded"; qIndex: number; answered: readonly string[] }
   /** Close the open question now (everyone connected has answered). */
   | { type: "close-question"; qIndex: number }
   /** The roster shrank or a player dropped (kick, ban, leave, disconnect). */
@@ -37,15 +41,15 @@ export type EngineEvent =
 
 /**
  * What the shell must load for each event. `answer-recorded` runs once per
- * answer — the hot path — so it reads only what deciding an early close
- * needs; the close itself is a follow-up `close-question` event with a full
- * load.
+ * answer — the hot path — so it needs only the roster (the answers come with
+ * the event), which the shell already read to judge the answer; the close
+ * itself is a follow-up `close-question` event with a full load.
  */
 export const PARTS_FOR: Record<EngineEvent["type"], readonly StatePart[]> = {
   start: [],
   "host-next": ["questions", "roster", "answers", "scores"],
   deadline: ["questions", "roster", "answers", "scores"],
-  "answer-recorded": ["roster", "answers"],
+  "answer-recorded": ["roster"],
   "close-question": ["questions", "roster", "answers", "scores"],
   "roster-changed": ["roster", "answers", "scores"],
 };
@@ -95,7 +99,7 @@ export function step(
     case "deadline":
       return onDeadline(state, now, pacing, ctx);
     case "answer-recorded":
-      return onAnswerRecorded(state, event.qIndex);
+      return onAnswerRecorded(state, event.qIndex, event.answered);
     case "close-question":
       // Only the question that met the early-close condition: if another
       // path already revealed it and opened the next, this is stale.
@@ -381,8 +385,12 @@ function enterFinal(state: GameState, pacing: PacingStrategy): Transition {
  * The host's "answers in" meter, and the early close: a question ends as
  * soon as every *connected* rostered player has answered.
  */
-function onAnswerRecorded(state: GameState, qIndex: number): Transition {
-  const { meta, roster, answers } = state;
+function onAnswerRecorded(
+  state: GameState,
+  qIndex: number,
+  answered: readonly string[],
+): Transition {
+  const { meta, roster } = state;
   // An answer that lost a race with the question closing has nothing left
   // to count toward.
   if (meta.phase !== "question" || qIndex !== meta.qIndex) return noop(state);
@@ -395,11 +403,12 @@ function onAnswerRecorded(state: GameState, qIndex: number): Transition {
       to: ROOM,
       message: {
         event: "answer-count",
-        payload: { index: qIndex, answered: Object.keys(answers).length },
+        payload: { index: qIndex, answered: answered.length },
       },
     },
   ];
-  if (connected.every((p) => answers[p.id])) {
+  const done = new Set(answered);
+  if (connected.every((p) => done.has(p.id))) {
     // Closing needs the full state (questions, scores), which the per-answer
     // path doesn't load — so it is a follow-up event with a fresh read.
     effects.push({ kind: "dispatch", event: "close-question", qIndex });
@@ -415,7 +424,7 @@ function onAnswerRecorded(state: GameState, qIndex: number): Transition {
 function onRosterChanged(state: GameState): Transition {
   const { meta } = state;
   if (meta.phase === "question") {
-    return onAnswerRecorded(state, meta.qIndex);
+    return onAnswerRecorded(state, meta.qIndex, Object.keys(state.answers));
   }
   if (meta.phase === "reveal" || meta.phase === "final") {
     const inReveal = meta.phase === "reveal";

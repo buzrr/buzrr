@@ -37,7 +37,10 @@
   `KEYS game:*`, `HGETALL game:<CODE>:meta`,
   `ZRANGE games:deadlines 0 -1 WITHSCORES`, `ZRANGE mm:duel:queue 0 -1 WITHSCORES`.
 - **Engine rules without a browser**: `yarn workspace server test` runs the
-  pure core's specs (`game-engine/core/__tests__`, no Redis needed).
+  pure core's specs (`game-engine/core/__tests__`, no Redis needed). The
+  real-Redis answer-cost spec runs only with `REDIS_TEST_URL` set (it uses DB
+  15), e.g. `docker run -d --rm -p 6390:6379 redis:7-alpine` and
+  `REDIS_TEST_URL=redis://localhost:6390 yarn workspace server test`.
 - **Single app**: `yarn dev:server` / `yarn dev:web`. Server logs are Nest
   `Logger` lines on stdout (game/duel events log by gameCode).
 

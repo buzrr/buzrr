@@ -459,17 +459,16 @@ export class GameEngineService
     // Taken before any Redis round trip so store latency isn't billed to the
     // player.
     const receivedAt = Date.now();
-    // The single roster entry rather than the whole roster: this runs once
-    // per answer, and judging only needs to know the player is still in.
-    const [state, rosterEntry] = await Promise.all([
-      this.store.loadState(gameCode, ["questions"]),
-      this.store.getPlayer(gameCode, playerId),
-    ]);
+    // This runs once per player per question, so it is kept to two round
+    // trips and four commands: one pipelined read (meta, questions, roster)
+    // serves both judging and the early-close check, and one script stores
+    // the answer, adds the score and says who has answered.
+    const state = await this.store.loadState(gameCode, ["questions", "roster"]);
     if (!state) {
       return { accepted: false, reason: "No question is active" };
     }
     const judgement = judgeAnswer(
-      { ...state, roster: rosterEntry ? [rosterEntry] : [] },
+      state,
       { playerId, qIndex, answer },
       receivedAt,
     );
@@ -479,18 +478,26 @@ export class GameEngineService
 
     // First write wins: a duplicate (or a resend racing the original) never
     // re-scores.
-    const stored = await this.store.putAnswer(
+    const answered = await this.store.recordAnswer(
       gameCode,
       qIndex,
       playerId,
       judgement.stored,
     );
-    if (!stored) {
+    if (!answered) {
       return { accepted: false, reason: "Already answered" };
     }
-    await this.store.addScore(gameCode, playerId, judgement.stored.score);
 
-    await this.dispatch(gameCode, { type: "answer-recorded", qIndex }, qIndex);
+    // Stepped on the state read above rather than a fresh load. If the
+    // question closed in between, the step still sees it open: the meter
+    // update is harmless, and a close it asks for is dropped by
+    // `close-question`, which re-reads before acting.
+    const { effects } = step(
+      state,
+      { type: "answer-recorded", qIndex, answered },
+      Date.now(),
+    );
+    await this.run(gameCode, effects);
     return { accepted: true };
   }
 

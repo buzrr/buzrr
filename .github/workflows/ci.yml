@@ -96,6 +96,9 @@ jobs:
       # BILLING stays unset for the build; the specs configure it themselves.
       - name: Test (server)
         run: yarn workspace server test
+        env:
+          # Opt-in for the real-Redis specs (answer cost); DB 15 only.
+          REDIS_TEST_URL: redis://localhost:6379
 
       - name: Test (web)
         run: yarn workspace web test

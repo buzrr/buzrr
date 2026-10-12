@@ -66,7 +66,7 @@ class MemoryStore {
   async roster() {
     return [...this.players.values()];
   }
-  async putAnswer(
+  async recordAnswer(
     _code: string,
     qIndex: number,
     playerId: string,
@@ -74,12 +74,10 @@ class MemoryStore {
   ) {
     const forQuestion = this.answers.get(qIndex) ?? new Map();
     this.answers.set(qIndex, forQuestion);
-    if (forQuestion.has(playerId)) return false;
+    if (forQuestion.has(playerId)) return null;
     forQuestion.set(playerId, answer);
-    return true;
-  }
-  async addScore(_code: string, playerId: string, delta: number) {
-    this.scores.set(playerId, (this.scores.get(playerId) ?? 0) + delta);
+    this.scores.set(playerId, (this.scores.get(playerId) ?? 0) + answer.score);
+    return [...forQuestion.keys()];
   }
   async setDeadline() {}
   async parkDeadline() {}

@@ -39,10 +39,13 @@ lobby → starting → question ⇄ reveal → final → ended
   the orderings below (window before broadcast, personal results before the
   reveal) are encoded as effect order and asserted in `machine.spec.ts`.
   `endGame` (the claim + persistence) stays in the shell.
-- Each event loads only the state parts it needs (`PARTS_FOR`, one pipelined
-  round trip after the meta via `store.loadState`). The per-answer
-  `answer-recorded` event loads roster + answers only; the early close is a
-  follow-up `close-question` event (a `dispatch` effect) with a full load.
+- Each event loads only the state parts it needs (`PARTS_FOR`, via
+  `store.loadState`: one pipelined round trip after the meta when the current
+  question's answers are needed, otherwise one round trip with the meta in
+  it). The per-answer `answer-recorded` event is stepped on the state
+  `submitAnswer` already read, with the answered ids carried in the event; the
+  early close is a follow-up `close-question` event (a `dispatch` effect)
+  with a full load.
 
 ### Pacing
 
@@ -154,12 +157,21 @@ quitter finish on score instead of forfeiting.
    1000 → 100 linearly over the question's `timeOut`; wrong = 0. Steps 1–4
    are the pure `judgeAnswer` (`core/answers.ts`); the gateway first checks
    the payload shape against the contract's `submitAnswerSchema`.
-5. First write wins via `HSETNX` (`store.putAnswer`); duplicates rejected.
-6. Score added to the Redis leaderboard zset; the shell dispatches
-   `answer-recorded`, whose step first broadcasts `answer-count` (`{ index, answered }`, total answers so
+5. First write wins: `store.recordAnswer` is one Lua script that does the
+   `HSETNX`, adds the score to the leaderboard zset only if the answer was
+   stored, and returns every answered id (`HKEYS`); duplicates are rejected.
+6. The shell steps `answer-recorded` (with those ids) on the state it read
+   for judging, whose step first broadcasts `answer-count` (`{ index, answered }`, total answers so
    far) — the host's "answers in" meter; question-phase `state-sync` carries
    the same number as `answeredCount` for reconnects — then, if every
    connected player has answered, closes the question early.
+
+**Cost per answer** (the hot path, once per player per question): one
+pipelined read (`HGETALL` meta, `GET` questions, `HGETALL` players), one
+`EVAL`, and one `PUBLISH` for `answer-count` — 5 commands, measured on a real
+Redis by `game-engine/__tests__/answer-cost.spec.ts`. It was 10 + 1 `PUBLISH`
+(and 4 `MULTI`/`EXEC`) before the read was shared and the writes merged. If
+you add a Redis call here, update that spec's expected list on purpose.
 
 **Window stamping.** Opening a question (`openQuestion` in the core) writes the `games:deadlines` entry, then
 opens the phase in one meta write carrying `qStartAt = now`,

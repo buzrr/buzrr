@@ -324,7 +324,11 @@ describe("host-next", () => {
 describe("answer-recorded", () => {
   it("updates the host's meter while players are still thinking", () => {
     const s = questionOpen({ answers: { p1: answer("q1-a") } });
-    const { effects } = step(s, { type: "answer-recorded", qIndex: 0 }, T0);
+    const { effects } = step(
+      s,
+      { type: "answer-recorded", qIndex: 0, answered: ["p1"] },
+      T0,
+    );
     expect(kinds(effects)).toEqual(["emit"]);
     expect(emitted(effects)[0]?.message).toMatchObject({
       event: "answer-count",
@@ -337,7 +341,11 @@ describe("answer-recorded", () => {
       roster: [player("p1"), player("p2", { connected: false })],
       answers: { p1: answer("q1-a") },
     });
-    const { effects } = step(s, { type: "answer-recorded", qIndex: 0 }, T0);
+    const { effects } = step(
+      s,
+      { type: "answer-recorded", qIndex: 0, answered: ["p1"] },
+      T0,
+    );
     expect(effects.at(-1)).toEqual({
       kind: "dispatch",
       event: "close-question",
@@ -359,26 +367,42 @@ describe("answer-recorded", () => {
 
   it("ignores an answer to a question that has already moved on", () => {
     const s = questionOpen({ answers: { p1: answer("q2-a") } }, {}, 1);
-    expect(step(s, { type: "answer-recorded", qIndex: 0 }, T0).effects).toEqual(
-      [],
-    );
+    expect(
+      step(s, { type: "answer-recorded", qIndex: 0, answered: ["p1"] }, T0)
+        .effects,
+    ).toEqual([]);
   });
 
   it("does nothing once the question has closed", () => {
     const s = questionOpen();
     const revealed = { ...s, meta: { ...s.meta, phase: "reveal" as const } };
     expect(
-      step(revealed, { type: "answer-recorded", qIndex: 0 }, T0).effects,
+      step(revealed, { type: "answer-recorded", qIndex: 0, answered: [] }, T0)
+        .effects,
     ).toEqual([]);
+  });
+
+  it("waits on a connected player even when the answer count matches", () => {
+    // p2 answered and dropped; p3 is connected and still thinking. Two
+    // answers for two connected players must not read as "everyone's in".
+    const s = questionOpen({
+      roster: [player("p1"), player("p2", { connected: false }), player("p3")],
+    });
+    const { effects } = step(
+      s,
+      { type: "answer-recorded", qIndex: 0, answered: ["p1", "p2"] },
+      T0,
+    );
+    expect(kinds(effects)).toEqual(["emit"]);
   });
 
   it("does not close a question with nobody connected", () => {
     const s = questionOpen({
       roster: [player("p1", { connected: false })],
     });
-    expect(step(s, { type: "answer-recorded", qIndex: 0 }, T0).effects).toEqual(
-      [],
-    );
+    expect(
+      step(s, { type: "answer-recorded", qIndex: 0, answered: [] }, T0).effects,
+    ).toEqual([]);
   });
 });
 
