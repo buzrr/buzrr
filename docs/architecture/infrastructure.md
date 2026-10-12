@@ -192,9 +192,15 @@ One workflow, four jobs, on every push/PR to `main`:
    migrations apply from scratch), then `pytest`.
 
 Notes: read-only token, concurrency-cancel superseded runs. For `apps/web`,
-"CI green" still means lint+types+build only. In `apps/server` the engine's
-pure core is unit-tested, but its shell (`GameEngineService`, the Lua
-scripts in `GameStoreService`, ELO persistence) has no automated tests. Husky pre-commit runs
+"CI green" means lint+types+build plus `yarn workspace web test` (the
+live-game slice and `resyncOnReturn`); components and pages have no tests. In
+`apps/server` the engine's pure core is unit-tested, and parts of its shell
+are too: `GameEngineService` presence handling (`presence.spec.ts`, against
+fakes) and the per-answer Redis path, including `recordAnswer`'s Lua script
+(`answer-cost.spec.ts`, real Redis, opt-in via `REDIS_TEST_URL`, which CI
+sets). Still untested: the shell's timers, recovery and ELO persistence, and
+the other Lua scripts in `GameStoreService` (meta init, owner renewal,
+player registration, pause/resume/end claims). Husky pre-commit runs
 lint-staged + lint + typecheck locally.
 
 ## External services (integration points)
