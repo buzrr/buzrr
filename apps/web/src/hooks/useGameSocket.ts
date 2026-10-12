@@ -30,6 +30,23 @@ export interface UseGameSocketOptions {
 }
 
 /**
+ * Re-syncs a page coming back to the foreground. Phones suspend background
+ * tabs, and a suspended socket can still look connected for a ping timeout
+ * after the server dropped it — every event in between is lost, and with no
+ * reconnect there is no `state-sync` to repair the screen. Asking for one on
+ * return covers that; on a socket that is in fact dead the emit fails, the
+ * client reconnects, and the connect-time snapshot does the same job. A
+ * disconnected socket is left to the manager: one the server refused must
+ * not be reconnected from here.
+ */
+export function resyncOnReturn(
+  conn: Pick<GameSocket, "connected" | "emit">,
+  visibility: DocumentVisibilityState,
+): void {
+  if (visibility === "visible" && conn.connected) conn.emit("request-sync");
+}
+
+/**
  * Owns the socket lifecycle and mirrors all server-pushed game state into the
  * `game` slice. The server sends a full `state-sync` on every (re)connection,
  * so reconnects need no client-side bookkeeping — the whole screen re-renders
@@ -87,6 +104,9 @@ export function useGameSocket({
       dispatch(setConnection("disconnected"));
     };
     conn.io.on("reconnect_failed", onReconnectFailed);
+    const onVisibilityChange = () =>
+      resyncOnReturn(conn, document.visibilityState);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     conn.on("connect_error", () => {
       // The manager keeps retrying with backoff, so this is transient.
       dispatch(setConnection("reconnecting"));
@@ -123,6 +143,7 @@ export function useGameSocket({
 
     return () => {
       conn.io.off("reconnect_failed", onReconnectFailed);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       conn.disconnect();
       setSocket(null);
       dispatch(resetGame());

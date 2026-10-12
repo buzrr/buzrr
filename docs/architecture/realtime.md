@@ -185,6 +185,18 @@ masked until the reveal (`buildSnapshot`).
   **almost no client bookkeeping** — the whole screen re-renders from the
   snapshot (`apps/web/src/hooks/useGameSocket.ts` → `applySync` in
   `apps/web/src/state/game/gameSlice.ts`).
+- **A snapshot can be older than events already received.** It is read from
+  Redis and sent once the read finishes, so a phase change in between (for
+  example the host's next `question-start`) reaches the client first.
+  `applySync` drops any snapshot that is behind the client's current point in
+  the game (`gameProgress`; phases only move forward within a game). Without
+  that check, a stale reveal snapshot left players on the result screen after
+  the game had moved on. A new socket resets the slice to `idle`, so the
+  first snapshot on a reconnect is always applied.
+- A page coming back to the foreground emits `request-sync`
+  (`resyncOnReturn`). A suspended mobile tab can still look connected after
+  the server dropped it, and would otherwise miss every event until the
+  client noticed the connection was dead.
 - The one exception is an **answer in flight when the socket dropped**: its ack
   never fires (socket.io discards pending acks on close) and the buffered emit
   is dropped server-side if it lands before the gateway registers handlers. So
@@ -272,9 +284,25 @@ information, it does.
    `remove-player`); players get `submit-answer` (with ack) and `leave-room`.
 5. Snapshot is sent immediately.
 
-Disconnect: hosts flip `hostConnected` meta; players get marked disconnected
-and a grace timer starts (60s lobby removal, or 30s duel forfeit via
-`resolveDuelForfeit`); duel-queue sockets are dequeued.
+Disconnect: hosts flip `hostConnected` meta (`hostDisconnected`); players get
+marked disconnected and a grace timer starts (60s lobby removal, or 30s duel
+forfeit via `resolveDuelForfeit`); duel-queue sockets are dequeued.
+
+**Presence is per person, not per socket**, so a closing socket only marks its
+owner gone if they have no other socket in the game. A client that reconnects
+gets a new socket while the server still holds the old one until the ping
+timeout (`pingInterval` + `pingTimeout`, 10s + 10s on the gateway). Before the
+check, the old socket closing marked a player who was still connected as gone.
+The early close then ended the next question as soon as everyone else had
+answered, and a host could be marked gone and caught by the abandon sweep.
+`playerDisconnected` / `hostDisconnected` look for a remaining socket with
+`fetchSockets()` (cluster-wide via the Redis adapter) in `player:{id}` /
+`host:{gameCode}`. They match on `socket.data` (this game, this player or the
+host), because `player:{userId}` also holds a duel user's queue and invite
+sockets. Each one checks, writes, then checks again, so a reconnect that lands
+mid-write can't be overwritten. If the lookup fails, the person is treated as
+gone (the previous behaviour). Covered by
+`game-engine/__tests__/presence.spec.ts`.
 
 ## Kick / ban semantics
 

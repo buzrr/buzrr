@@ -134,9 +134,12 @@ keep `docs/CONTEXT.md` about the present, not history.
 - Husky pre-commit runs `lint-staged` + `yarn lint` + `yarn check-types`.
 - CI = lint, typecheck, `yarn workspace server test` (vitest: billing specs
   against Postgres, plus the engine core, question types, storage and LLM
-  adapters), build, a `docker compose up` self-host smoke test; `apps/ai` has
-  its own pytest job. The web app and the engine's I/O shell
-  (`GameEngineService`, Lua scripts) have no tests — don't claim those pass.
+  adapters, and the shell's presence handling against fakes),
+  `yarn workspace web test` (vitest: the live-game slice and socket
+  helpers), build, a `docker compose up` self-host smoke test; `apps/ai` has
+  its own pytest job. The rest of the web app (components, pages) and the
+  engine shell's timers, recovery and Lua scripts have no tests — don't claim
+  those pass.
 - Socket/REST shapes change in `packages/contract` only; never re-declare a
   payload type in an app.
 - DB changes go through `packages/prisma/schema.prisma` **plus** a migration in

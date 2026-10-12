@@ -69,12 +69,47 @@ const initialState: GameLiveState = {
   rated: false,
 };
 
+/**
+ * How far into the game a phase is. Within one game the phases only move
+ * forward — lobby → starting → (question → reveal) per question → final →
+ * ended — so a larger number is always a later moment.
+ */
+export function gameProgress(phase: GamePhase, qIndex: number): number {
+  switch (phase) {
+    case "lobby":
+      return 0;
+    case "starting":
+      return 1;
+    case "question":
+      return 2 + qIndex * 2;
+    case "reveal":
+      return 3 + qIndex * 2;
+    case "final":
+      return Number.MAX_SAFE_INTEGER - 1;
+    case "ended":
+      return Number.MAX_SAFE_INTEGER;
+  }
+}
+
 const gameSlice = createSlice({
   name: "game",
   initialState,
   reducers: {
     applySync: (state, action: PayloadAction<StateSyncPayload>) => {
       const s = action.payload;
+      // A snapshot is read from Redis and sent once the read finishes, so a
+      // phase change in between reaches the client first — e.g. the host's
+      // next question, followed by a snapshot still showing the reveal.
+      // Applying it would strand the player on the old screen until the next
+      // event. A new socket resets the slice to "idle", so a real reconnect
+      // always takes its first snapshot.
+      if (
+        state.phase !== "idle" &&
+        gameProgress(s.phase, s.qIndex) <
+          gameProgress(state.phase, state.qIndex)
+      ) {
+        return;
+      }
       state.phase = s.phase;
       state.mode = s.mode;
       state.qIndex = s.qIndex;

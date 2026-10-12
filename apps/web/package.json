@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "check-types": "tsc --noEmit",
+    "test": "vitest run",
     "dev:vinext": "vinext dev --port 3001",
     "build:vinext": "vinext build",
     "build:vercel": "vite build",
@@ -73,7 +74,8 @@
     "tailwindcss": "^4.2.0",
     "typescript": "^5",
     "vinext": "^0.0.55",
-    "vite": "^8.0.16"
+    "vite": "^8.0.16",
+    "vitest": "^3.2.4"
   },
   "type": "module"
 }

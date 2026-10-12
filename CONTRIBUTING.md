@@ -46,6 +46,7 @@ optional — see the [README](README.md#-develop-locally)).
    yarn lint
    yarn check-types
    yarn workspace server test   # engine core, question types, adapters (+ billing, needs Postgres)
+   yarn workspace web test      # live-game slice
    yarn build          # optional but recommended — this is what CI runs
    yarn format         # apply Prettier
    ```
@@ -116,8 +117,8 @@ doesn't compile. Authoring UI is separate — the question editor posts
 
 ## Pull request checklist
 
-- [ ] `yarn lint`, `yarn check-types`, `yarn workspace server test` and
-      `yarn build` pass.
+- [ ] `yarn lint`, `yarn check-types`, `yarn workspace server test`,
+      `yarn workspace web test` and `yarn build` pass.
 - [ ] The change is covered by the PR description (what & why).
 - [ ] Docs/README updated if behavior or setup changed.
 - [ ] No secrets, credentials, or personal data in the diff.

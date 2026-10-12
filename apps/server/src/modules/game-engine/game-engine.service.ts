@@ -11,6 +11,7 @@ import { applyFloor, eloDelta, kFactor } from "../../common/utils/elo";
 import { PrismaService } from "../../prisma/prisma.service";
 import { toLiveQuestion } from "../question-types";
 import type {
+  SocketData,
   StateSyncPayload,
   SubmitAnswerAck,
   TypedServer,
@@ -531,7 +532,22 @@ export class GameEngineService
     return true;
   }
 
+  /**
+   * One of the player's sockets closed. Presence is per player, not per
+   * socket: a client that reconnected already has a new socket, and the old
+   * one may only close now (the server notices a dead transport a ping
+   * timeout later). Marking the player gone then would count a live player
+   * as absent — and the early close would skip them on the next question.
+   */
   async playerDisconnected(gameCode: string, playerId: string): Promise<void> {
+    // `player:{id}` also holds a duel user's queue/invite sockets — only a
+    // socket in this game, as this player, counts as them still being here.
+    const stillHere = () =>
+      this.hasLiveSocket(
+        `player:${playerId}`,
+        (d) => d.gameCode === gameCode && d.playerId === playerId,
+      );
+    if (await stillHere()) return;
     const entry = await this.store.getPlayer(gameCode, playerId);
     if (!entry) return;
     await this.store.upsertPlayer(gameCode, {
@@ -539,6 +555,20 @@ export class GameEngineService
       connected: false,
       lastSeenAt: Date.now(),
     });
+    // A reconnect that joined the room after the check above may have
+    // written `connected: true` before our write landed. Re-checking after
+    // the write closes that gap: either we see its socket here, or its
+    // write comes after ours.
+    if (await stillHere()) {
+      const current = await this.store.getPlayer(gameCode, playerId);
+      if (current) {
+        await this.store.upsertPlayer(gameCode, {
+          ...current,
+          connected: true,
+        });
+      }
+      return;
+    }
     this.emitRoom(gameCode).emit("player-connection", {
       playerId,
       connected: false,
@@ -730,11 +760,33 @@ export class GameEngineService
     return this.store.isBanned(gameCode, playerId);
   }
 
-  async hostConnected(gameCode: string, connected: boolean): Promise<void> {
+  async hostConnected(gameCode: string): Promise<void> {
     await this.store.patchMeta(gameCode, {
-      hostConnected: connected,
+      hostConnected: true,
       hostLastSeenAt: Date.now(),
     });
+  }
+
+  /**
+   * A host socket closed. As with players, a stale socket closing after the
+   * host reconnected must not mark them gone — the abandon sweep would end a
+   * game whose host is still on it. Same check-write-recheck as
+   * `playerDisconnected`.
+   */
+  async hostDisconnected(gameCode: string): Promise<void> {
+    const stillHere = () =>
+      this.hasLiveSocket(
+        `host:${gameCode}`,
+        (d) => d.gameCode === gameCode && d.isRoomHost === true,
+      );
+    if (await stillHere()) return;
+    await this.store.patchMeta(gameCode, {
+      hostConnected: false,
+      hostLastSeenAt: Date.now(),
+    });
+    if (await stillHere()) {
+      await this.store.patchMeta(gameCode, { hostConnected: true });
+    }
   }
 
   // -- snapshot ----------------------------------------------------------------------
@@ -1124,6 +1176,27 @@ export class GameEngineService
     if (meta.phase !== "lobby") return;
     await this.store.removePlayer(gameCode, playerId);
     this.emitRoom(gameCode).emit("player-removed", { id: playerId });
+  }
+
+  /**
+   * Whether `room` still holds a socket matching `match`, on any instance (the
+   * redis adapter answers `fetchSockets` cluster-wide). Socket.IO removes a
+   * closing socket from its rooms before `disconnect` fires, so the closing
+   * one never counts itself. If the check fails, assume nobody is left — the
+   * behaviour before this check existed.
+   */
+  private async hasLiveSocket(
+    room: string,
+    match: (data: Partial<SocketData>) => boolean,
+  ): Promise<boolean> {
+    if (!this.io) return false;
+    try {
+      const sockets = await this.io.in(room).fetchSockets();
+      return sockets.some((s) => match(s.data ?? {}));
+    } catch (err) {
+      this.logger.warn(`Presence check for ${room} failed`, err);
+      return false;
+    }
   }
 
   private emitRoom(gameCode: string) {

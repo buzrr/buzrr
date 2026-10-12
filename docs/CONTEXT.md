@@ -87,10 +87,13 @@ effects }` in `game-engine/core/`, unit-tested; `GameEngineService` is
 1. **Thin automated test coverage around the engine's edges.** The pure
    core (phase machine, judging, snapshots, pause/forfeit decisions) and the
    question-type, storage and LLM adapters now have vitest specs, alongside
-   billing. Still untested: the I/O shell (`GameEngineService`), the
+   billing, and the shell's presence handling (`__tests__/presence.spec.ts`,
+   in-memory store + fake Socket.IO). Still untested: the rest of the I/O
+   shell (`GameEngineService` timers, recovery, persistence), the
    Lua-scripted races in `GameStoreService`, ELO persistence, matchmaking and
-   invites — exercised only end to end. `apps/web` has no tests at all
-   (including the Dodo webhook forwarder). `apps/ai` has its own pytest suite.
+   invites — exercised only end to end. `apps/web` tests only the live-game
+   slice and `resyncOnReturn` (`yarn workspace web test`); components, pages
+   and the Dodo webhook forwarder have none. `apps/ai` has its own pytest suite.
 2. **Redis is a single point of failure** for all realtime + matchmaking;
    the server won't boot without it. No degraded mode. It now also carries
    Buzrr-AI's ingestion queue, so an outage degrades two subsystems (AI

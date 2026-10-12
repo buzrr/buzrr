@@ -175,7 +175,8 @@ One workflow, four jobs, on every push/PR to `main`:
    `yarn check-types` (root tsc -b for contract+server+prisma, then web
    tsc); `yarn workspace server test` (vitest: billing specs against the
    Postgres service, plus the pure engine core, question-type, storage and
-   LLM specs); `yarn build` (everything, via turbo).
+   LLM specs); `yarn workspace web test` (vitest: the live-game slice);
+   `yarn build` (everything, via turbo).
 2. **verify-docker-setup** — proves the contributor onboarding path:
    `docker compose up -d postgres redis`, wait for health, `db push`,
    teardown.

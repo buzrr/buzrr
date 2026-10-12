@@ -97,6 +97,9 @@ jobs:
       - name: Test (server)
         run: yarn workspace server test
 
+      - name: Test (web)
+        run: yarn workspace web test
+
       - name: Build
         run: yarn build
 

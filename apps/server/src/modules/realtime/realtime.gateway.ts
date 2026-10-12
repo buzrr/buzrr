@@ -27,6 +27,12 @@ type DuelInviteAck = (result: DuelInviteAcceptAck) => void;
     credentials: true,
     allowedHeaders: ["*"],
   },
+  // A dead transport is noticed within pingInterval + pingTimeout (20s; the
+  // Socket.IO default is 45s). Until then the server keeps the dead socket —
+  // the player misses events and the client doesn't know to reconnect.
+  // Not much tighter: a short pingTimeout drops players on slow mobile links.
+  pingInterval: 10_000,
+  pingTimeout: 10_000,
 })
 export class RealtimeGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
@@ -128,7 +134,10 @@ export class RealtimeGateway
       }
 
       if (isRoomHost) {
-        await this.engine.hostConnected(gameCode, true);
+        // Lets a host disconnect tell a stale socket from the host leaving
+        // (see GameEngineService.hostDisconnected).
+        await socket.join(`host:${gameCode}`);
+        await this.engine.hostConnected(gameCode);
         this.registerHostHandlers(socket, gameCode);
       } else {
         this.registerPlayerHandlers(socket, gameCode);
@@ -303,7 +312,7 @@ export class RealtimeGateway
     if (!data?.gameCode) return;
     try {
       if (data.isRoomHost) {
-        await this.engine.hostConnected(data.gameCode, false);
+        await this.engine.hostDisconnected(data.gameCode);
         this.logger.log(`Host left game ${data.gameCode}`);
       } else if (data.playerId) {
         await this.engine.playerDisconnected(data.gameCode, data.playerId);

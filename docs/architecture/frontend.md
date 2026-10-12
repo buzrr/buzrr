@@ -86,7 +86,8 @@ is invalid (missing token, mismatched id, profile gone).
 - `useGameSocket` — the core. Owns the socket lifecycle for
   `userType=admin|player|duel`, dispatches every server event into the `game`
   slice, maps connection states (including hard-fail on `io server
-disconnect`), emits `request-sync` on connect as a safety net, and exposes a
+disconnect`), emits `request-sync` on connect as a safety net and when the
+  page becomes visible again (`resyncOnReturn`), and exposes a
   `bind` callback for role-specific listeners. New socket events get wired
   here. Payload types come from `@buzrr/contract` (the same package the
   server compiles against — ADR-013); `src/types/socket.ts` holds only the
