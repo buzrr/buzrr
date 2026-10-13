@@ -134,6 +134,10 @@ effects }` in `game-engine/core/`, unit-tested; `GameEngineService` is
 13. **Crash recovery waits out the owner lock**: a restarted instance can't
     fire a game's deadlines until the dead one's 20s lock lapses, so a live
     question can stall ~20–30s after a crash (measured ≈29s).
+14. **React Compiler lint rules are warnings, not errors.** Next 16's
+    `eslint-plugin-react-hooks` v7 flags ~18 existing effects
+    (`set-state-in-effect`, `refs`); `apps/web/eslint.config.mjs` downgrades
+    both to `warn` until those effects are refactored.
 
 ## Active development areas (inferred from recent PR cadence)
 

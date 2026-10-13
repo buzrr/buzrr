@@ -30,7 +30,7 @@ Turborepo + Yarn 4 workspaces:
 
 | Path                                                   | What it is                                                                                                                                                                    |
 | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web`                                             | Next.js 15 frontend (React 19, App Router). Also hosts **Better Auth** (`/api/auth/*`) and the Dodo webhook forwarder (`/api/webhooks/dodo`) — the only web-owned API routes. |
+| `apps/web`                                             | Next.js 16 frontend (React 19, App Router). Also hosts **Better Auth** (`/api/auth/*`) and the Dodo webhook forwarder (`/api/webhooks/dodo`) — the only web-owned API routes. |
 | `apps/server`                                          | NestJS 11 — REST API (`/api/*`) + Socket.IO gateway + the server-authoritative game engine.                                                                                   |
 | `apps/ai`                                              | **Buzrr-AI** — Python 3.12 + FastAPI + arq worker. Knowledge Spaces, document ingestion, RAG quiz generation. Optional.                                                       |
 | `packages/prisma`                                      | `@buzrr/prisma`: Prisma schema, migrations, generated client, shared by both apps. `scripts/deploy.mjs` migrates (and baselines fresh databases).                             |

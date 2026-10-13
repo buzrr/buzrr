@@ -22,6 +22,10 @@ export default defineConfig({
     }),
     tailwindcss(),
   ],
+  // Inline config stops Vite loading postcss.config.mjs (Next-only Tailwind).
+  css: {
+    postcss: { plugins: [] },
+  },
   optimizeDeps: {
     exclude: ["better-auth"],
   },

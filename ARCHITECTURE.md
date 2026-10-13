@@ -31,7 +31,7 @@ flowchart LR
 
 | Package                                          | Description                                                                                     |
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| [`apps/web`](apps/web)                           | Next.js 15 app (React 19, MUI, Redux Toolkit, TanStack Query). Hosts the Better Auth endpoints. |
+| [`apps/web`](apps/web)                           | Next.js 16 app (React 19, MUI, Redux Toolkit, TanStack Query). Hosts the Better Auth endpoints. |
 | [`apps/server`](apps/server)                     | NestJS 11 API + Socket.IO gateway. Owns the realtime game loop.                                 |
 | [`apps/ai`](apps/ai)                             | Python 3.12 + FastAPI + arq. Knowledge Spaces, document RAG, question generation. Optional.     |
 | [`@buzrr/prisma`](packages/prisma)               | Prisma schema, migrations and the shared generated client.                                      |

@@ -8,7 +8,7 @@
 ```mermaid
 flowchart LR
     B([Browser])
-    B -- "SSR / Better Auth cookies" --> W["apps/web — Next.js 15<br/>hosts /api/auth/* + /api/webhooks/dodo"]
+    B -- "SSR / Better Auth cookies" --> W["apps/web — Next.js 16<br/>hosts /api/auth/* + /api/webhooks/dodo"]
     B -- "REST /api/* (JWT bearer)" --> S["apps/server — NestJS 11"]
     B -- "Socket.IO (JWT or cookie)" --> S
     W -- "Prisma (auth tables, role reads)" --> PG[(PostgreSQL)]

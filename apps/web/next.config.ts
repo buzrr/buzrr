@@ -27,6 +27,8 @@ function selfHostedImageOrigins(): RemotePattern[] {
   });
 }
 
+const selfHostedOrigins = selfHostedImageOrigins();
+
 const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
@@ -70,12 +72,16 @@ const nextConfig: NextConfig = {
     // inside the web container, so the optimizer can't fetch from it; the
     // self-host image sets this and lets browsers load images directly.
     unoptimized: process.env.NEXT_IMAGE_UNOPTIMIZED === "1",
+    // Next 16 refuses to optimize images from private/loopback IPs. A
+    // self-hosted http media origin is usually exactly that (localhost, LAN),
+    // so allow it only when the operator configured one.
+    dangerouslyAllowLocalIP: selfHostedOrigins.length > 0,
     remotePatterns: [
       {
         protocol: "https",
         hostname: "**",
       },
-      ...selfHostedImageOrigins(),
+      ...selfHostedOrigins,
     ],
   },
 };

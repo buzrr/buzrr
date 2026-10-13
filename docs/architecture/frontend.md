@@ -1,6 +1,6 @@
 # Frontend (Next.js web app)
 
-`apps/web` — Next.js 15 (App Router) + React 19, Tailwind v4 (+ some MUI,
+`apps/web` — Next.js 16 (App Router) + React 19, Tailwind v4 (+ some MUI,
 mainly `@mui/x-charts`), Redux Toolkit + redux-persist, TanStack React Query,
 socket.io-client. Default toolchain is the Next CLI; a parallel vinext/Vite
 setup exists (see [infrastructure.md](infrastructure.md#vinext)).

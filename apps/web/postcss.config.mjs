@@ -1,11 +1,8 @@
-const isNextJs = process.argv.some((arg) =>
-  /(?:^|[\\/])next(?:$|[\\/.])/.test(arg),
-);
-
+// Next.js uses PostCSS for Tailwind; Vite uses @tailwindcss/vite and opts out
+// of this file with an inline `css.postcss` in vite.config.ts, so stylesheets
+// aren't double-processed by the Oxide engine.
 const config = {
-  // Next.js uses PostCSS for Tailwind; Vite uses @tailwindcss/vite in vite.config.ts.
-  // Running both would double-process stylesheets via the Oxide engine.
-  plugins: isNextJs ? ["@tailwindcss/postcss"] : [],
+  plugins: ["@tailwindcss/postcss"],
 };
 
 export default config;
