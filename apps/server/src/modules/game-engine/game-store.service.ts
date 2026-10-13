@@ -59,7 +59,7 @@ function parseQuestions(raw: string | null): LiveQuestion[] | null {
  * Answers stored before answers were type-agnostic carried a bare
  * `optionId`; a deploy mid-game reads them as multiple-choice answers.
  */
-function parseAnswer(json: string): StoredAnswer {
+export function parseAnswer(json: string): StoredAnswer {
   const stored = JSON.parse(json) as StoredAnswer & { optionId?: string };
   if (stored.answer === undefined && stored.optionId !== undefined) {
     const { optionId, ...rest } = stored;
@@ -164,6 +164,19 @@ redis.call('EXPIRE', KEYS[1], ARGV[4])
 redis.call('ZINCRBY', KEYS[2], ARGV[3], ARGV[1])
 redis.call('EXPIRE', KEYS[2], ARGV[4])
 return redis.call('HKEYS', KEYS[1])
+`;
+
+// A further answer from a player who may send several: replaces the stored
+// one only if it is still what the caller merged into (compare-and-set), so
+// two answers racing from one player can't drop either. Scores are untouched
+// — only unscored types take more than one answer.
+const REPLACE_ANSWER_SCRIPT = `
+if redis.call('HGET', KEYS[1], ARGV[1]) ~= ARGV[2] then
+  return 0
+end
+redis.call('HSET', KEYS[1], ARGV[1], ARGV[3])
+redis.call('EXPIRE', KEYS[1], ARGV[4])
+return 1
 `;
 
 const CLAIM_ENDED_SCRIPT = `
@@ -380,6 +393,38 @@ export class GameStoreService {
       TTL_SECONDS,
     );
     return (answered as string[] | null) ?? null;
+  }
+
+  /** One player's stored answer, raw (for `replaceAnswer`), or null. */
+  async getAnswerRaw(
+    code: string,
+    qIndex: number,
+    playerId: string,
+  ): Promise<string | null> {
+    return this.redis.hget(keys.answers(code, qIndex), playerId);
+  }
+
+  /**
+   * Swaps a player's stored answer for `next` if it is still `previousRaw`.
+   * False when another write got there first — re-read and merge again.
+   */
+  async replaceAnswer(
+    code: string,
+    qIndex: number,
+    playerId: string,
+    previousRaw: string,
+    next: StoredAnswer,
+  ): Promise<boolean> {
+    const replaced = await this.redis.eval(
+      REPLACE_ANSWER_SCRIPT,
+      1,
+      keys.answers(code, qIndex),
+      playerId,
+      previousRaw,
+      JSON.stringify(next),
+      TTL_SECONDS,
+    );
+    return replaced === 1;
   }
 
   async getAnswers(

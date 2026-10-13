@@ -1,6 +1,6 @@
 import { ANSWER_GRACE_MS } from "../../../common/utils/answer-timing";
 import { planBotAnswer } from "../../../common/utils/duel-bot";
-import { toPublicQuestion } from "../../question-types";
+import { acceptsMoreAnswers, toPublicQuestion } from "../../question-types";
 import type { LiveQuestion } from "../game-engine.types";
 import { pacingFor, type PacingStrategy } from "./pacing";
 import {
@@ -41,17 +41,19 @@ export type EngineEvent =
 
 /**
  * What the shell must load for each event. `answer-recorded` runs once per
- * answer — the hot path — so it needs only the roster (the answers come with
- * the event), which the shell already read to judge the answer; the close
- * itself is a follow-up `close-question` event with a full load.
+ * answer — the hot path — so it needs only the roster and questions (the
+ * answers come with the event), which the shell already read to judge the
+ * answer; the close itself is a follow-up `close-question` event with a full
+ * load.
  */
 export const PARTS_FOR: Record<EngineEvent["type"], readonly StatePart[]> = {
   start: [],
   "host-next": ["questions", "roster", "answers", "scores"],
   deadline: ["questions", "roster", "answers", "scores"],
-  "answer-recorded": ["roster"],
+  "answer-recorded": ["questions", "roster"],
   "close-question": ["questions", "roster", "answers", "scores"],
-  "roster-changed": ["roster", "answers", "scores"],
+  // Questions too: whether the open one may close early depends on its type.
+  "roster-changed": ["questions", "roster", "answers", "scores"],
 };
 
 export interface StepContext {
@@ -338,7 +340,7 @@ function reveal(
     to: ROOM,
     message: {
       event: "question-end",
-      payload: buildReveal(question, meta.qIndex, answers),
+      payload: buildReveal(question, meta.qIndex, answers, roster),
     },
   });
   // Running leaderboard so the host screen needs no REST round trip.
@@ -383,7 +385,9 @@ function enterFinal(state: GameState, pacing: PacingStrategy): Transition {
 
 /**
  * The host's "answers in" meter, and the early close: a question ends as
- * soon as every *connected* rostered player has answered.
+ * soon as every *connected* rostered player has answered — unless it takes
+ * more than one answer each, when it runs to its deadline (or the host).
+ * Needs `questions` loaded for that check.
  */
 function onAnswerRecorded(
   state: GameState,
@@ -408,7 +412,9 @@ function onAnswerRecorded(
     },
   ];
   const done = new Set(answered);
-  if (connected.every((p) => done.has(p.id))) {
+  const question = state.questions[qIndex];
+  const holdsOpen = question ? acceptsMoreAnswers(question) : false;
+  if (!holdsOpen && connected.every((p) => done.has(p.id))) {
     // Closing needs the full state (questions, scores), which the per-answer
     // path doesn't load — so it is a follow-up event with a fresh read.
     effects.push({ kind: "dispatch", event: "close-question", qIndex });

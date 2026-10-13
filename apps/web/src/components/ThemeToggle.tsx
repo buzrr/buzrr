@@ -4,10 +4,13 @@ import { useAppSelector, useAppDispatch } from "@/state/hooks";
 import { PageTheme, setPageTheme } from "@/state/pageThemeSlice";
 import { Switch } from "@/components/ui/Switch";
 import { withThemeTransition } from "@/utils/themeTransition";
+import { useRenderedTheme } from "@/hooks/useRenderedTheme";
 
 const ThemeToggle = () => {
   const theme = useAppSelector((state) => state.pageTheme.theme);
   const dispatch = useAppDispatch();
+  // What to draw; `theme` (the stored one) drives the class and the toggle.
+  const shown = useRenderedTheme();
 
   useEffect(() => {
     if (theme === PageTheme.dark) {
@@ -34,7 +37,7 @@ const ThemeToggle = () => {
       </div>
       <div className="p-[6px] shadow-[0px_2px_4px_0px_rgba(0,0,0,0.15)] rounded-full bg-white dark:bg-card-dark">
         <Switch
-          checked={theme === PageTheme.dark}
+          checked={shown === PageTheme.dark}
           aria-label="Toggle dark mode"
           className="cursor-pointer"
           onClick={handler}

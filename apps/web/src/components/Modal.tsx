@@ -8,7 +8,8 @@ import { mutedText } from "@/components/Game/GameUI";
 /**
  * Trigger button + dialog. The dialog is a centred card on desktop and a
  * bottom sheet on small screens. `children` may be a function receiving
- * `close`, so forms can dismiss the dialog once they are done.
+ * `close`, so forms can dismiss the dialog once they are done. Pass `open`
+ * (with `onClose`) to control it from outside; it then renders no trigger.
  */
 export default function BasicModal(props: {
   btnTitle: string;
@@ -19,27 +20,36 @@ export default function BasicModal(props: {
   subtitle?: string;
   children: React.ReactNode | ((close: () => void) => React.ReactNode);
   isEdit?: boolean;
+  /** Wider dialog on desktop (the question editor's two columns). */
+  wide?: boolean;
+  open?: boolean;
+  onClose?: () => void;
 }) {
-  const [open, setOpen] = React.useState(false);
-  const handleOpen = () => setOpen(true);
-  const handleClose = () => setOpen(false);
+  const [ownOpen, setOwnOpen] = React.useState(false);
+  const controlled = props.open !== undefined;
+  const open = controlled ? Boolean(props.open) : ownOpen;
+  const handleOpen = () => setOwnOpen(true);
+  const handleClose = () =>
+    controlled ? props.onClose?.() : setOwnOpen(false);
   const id = React.useId();
   const titleId = `${id}-title`;
 
   return (
     <>
-      <button
-        type="button"
-        onClick={handleOpen}
-        className={
-          props.btnStyle ||
-          (props.isEdit
-            ? "p-1 text-lprimary mr-1 hover:bg-cardhover-light rounded-md dark:bg-dark-bg"
-            : "text-white font-sm bg-dark-bg dark:bg-dark-bg rounded-lg w-full mx-auto md:ml-5 p-2")
-        }
-      >
-        {props.btnContent ?? props.btnTitle}
-      </button>
+      {!controlled && (
+        <button
+          type="button"
+          onClick={handleOpen}
+          className={
+            props.btnStyle ||
+            (props.isEdit
+              ? "p-1 text-lprimary mr-1 hover:bg-cardhover-light rounded-md dark:bg-dark-bg"
+              : "text-white font-sm bg-dark-bg dark:bg-dark-bg rounded-lg w-full mx-auto md:ml-5 p-2")
+          }
+        >
+          {props.btnContent ?? props.btnTitle}
+        </button>
+      )}
 
       <Modal
         open={open}
@@ -57,7 +67,13 @@ export default function BasicModal(props: {
             if (e.target === e.currentTarget) handleClose();
           }}
         >
-          <div className="w-full md:max-w-[640px] max-h-[92dvh] overflow-y-auto flex flex-col rounded-t-[26px] md:rounded-[26px] border bg-white dark:bg-dark border-lprimary/15 dark:border-white/5 shadow-[0_40px_80px_-30px_rgba(0,0,0,0.6)] text-dark dark:text-white">
+          <div
+            className={clsx(
+              "w-full max-h-[92dvh]",
+              props.wide ? "md:max-w-[1040px]" : "md:max-w-[640px]",
+              "overflow-y-auto flex flex-col rounded-t-[26px] md:rounded-[26px] border bg-white dark:bg-dark border-lprimary/15 dark:border-white/5 shadow-[0_40px_80px_-30px_rgba(0,0,0,0.6)] text-dark dark:text-white",
+            )}
+          >
             <div className="flex items-start gap-4 px-5 pt-[22px] md:px-7 md:pt-[26px]">
               <span className="size-12 shrink-0 rounded-[14px] bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep text-white flex items-center justify-center shadow-[0_10px_24px_-10px_#7c4ddb]">
                 {props.isEdit ? <LuPencil size={22} /> : <LuPlus size={24} />}

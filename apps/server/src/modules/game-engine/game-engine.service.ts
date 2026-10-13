@@ -9,7 +9,14 @@ import { nanoid } from "nanoid";
 import { BotTier } from "../../common/utils/duel-bot";
 import { applyFloor, eloDelta, kFactor } from "../../common/utils/elo";
 import { PrismaService } from "../../prisma/prisma.service";
-import { toLiveQuestion } from "../question-types";
+import {
+  acceptsMoreAnswers,
+  isScored,
+  mergeAnswers,
+  summarizeAnswers,
+  toLiveQuestion,
+} from "../question-types";
+import { answerEntries } from "./core/views";
 import type {
   SocketData,
   StateSyncPayload,
@@ -38,11 +45,16 @@ import {
 } from "./core";
 import { DuelBotService } from "./duel-bot.service";
 import { GameMeta, LeaderboardEntry, LiveQuestion } from "./game-engine.types";
-import { GameStoreService } from "./game-store.service";
+import { GameStoreService, parseAnswer } from "./game-store.service";
 
 /** How long a disconnected lobby player is kept before removal. */
 const LOBBY_DISCONNECT_GRACE_MS = 60_000;
 const SWEEP_INTERVAL_MS = 15_000;
+/**
+ * How often, at most, the host is sent the running results of an unscored
+ * question. A trailing timer per game, so a burst of answers costs one read.
+ */
+const LIVE_SUMMARY_MS = 1_000;
 
 /**
  * The shell around the engine's pure core (`./core`). The rules of the game —
@@ -66,6 +78,7 @@ export class GameEngineService
   private io: TypedServer | null = null;
   private readonly timers = new Map<string, NodeJS.Timeout>();
   private readonly disconnectTimers = new Map<string, NodeJS.Timeout>();
+  private readonly liveSummaryTimers = new Map<string, NodeJS.Timeout>();
   private sweeper: NodeJS.Timeout | null = null;
 
   constructor(
@@ -92,6 +105,7 @@ export class GameEngineService
     if (this.sweeper) clearInterval(this.sweeper);
     for (const t of this.timers.values()) clearTimeout(t);
     for (const t of this.disconnectTimers.values()) clearTimeout(t);
+    for (const t of this.liveSummaryTimers.values()) clearTimeout(t);
   }
 
   // -- core plumbing -----------------------------------------------------------
@@ -484,7 +498,19 @@ export class GameEngineService
       playerId,
       judgement.stored,
     );
+    const question = state.questions[qIndex];
     if (!answered) {
+      // Questions that take several answers fold this one into the stored
+      // one; everything else is first-write-wins.
+      if (question && acceptsMoreAnswers(question)) {
+        return this.addToAnswer(
+          gameCode,
+          qIndex,
+          playerId,
+          question,
+          judgement.stored.answer,
+        );
+      }
       return { accepted: false, reason: "Already answered" };
     }
 
@@ -498,7 +524,99 @@ export class GameEngineService
       Date.now(),
     );
     await this.run(gameCode, effects);
-    return { accepted: true };
+    if (question && !isScored(question.type)) {
+      this.scheduleLiveSummary(gameCode, qIndex);
+    }
+    return { accepted: true, answer: judgement.stored.answer };
+  }
+
+  /**
+   * A further answer from a player who already answered a question that
+   * takes several. Read, merge, compare-and-set; a lost race (the same
+   * player's other answer landing in between) re-reads and tries again. The
+   * first answer's timing and (zero) score stay as they were, and the answer
+   * count doesn't change, so nothing else is stepped.
+   */
+  private async addToAnswer(
+    gameCode: string,
+    qIndex: number,
+    playerId: string,
+    question: LiveQuestion,
+    next: QuestionAnswer,
+  ): Promise<SubmitAnswerAck> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const raw = await this.store.getAnswerRaw(gameCode, qIndex, playerId);
+      if (raw === null) break;
+      const stored = parseAnswer(raw);
+      const merged = mergeAnswers(question, stored.answer, next);
+      if (!merged) {
+        return {
+          accepted: false,
+          reason: "That's the most answers you can send",
+        };
+      }
+      const replaced = await this.store.replaceAnswer(
+        gameCode,
+        qIndex,
+        playerId,
+        raw,
+        { ...stored, answer: merged },
+      );
+      if (replaced) {
+        this.scheduleLiveSummary(gameCode, qIndex);
+        return { accepted: true, answer: merged };
+      }
+    }
+    return {
+      accepted: false,
+      reason: "Couldn't save that answer — try again",
+    };
+  }
+
+  // -- live results (unscored types) -----------------------------------------------
+
+  /**
+   * Coalesces answers into at most one `live-summary` per `LIVE_SUMMARY_MS`.
+   * Kept off the answer path on purpose: an answer costs what it always did,
+   * and the summary costs one read per tick, not one per answer. The timer is
+   * per instance and best effort — several instances may each send one, and
+   * the host keeps whichever counts the most answers.
+   */
+  private scheduleLiveSummary(gameCode: string, qIndex: number): void {
+    if (this.liveSummaryTimers.has(gameCode)) return;
+    const timer = setTimeout(() => {
+      this.liveSummaryTimers.delete(gameCode);
+      void this.sendLiveSummary(gameCode, qIndex).catch((err) =>
+        this.logger.error(`Live summary failed for ${gameCode}`, err),
+      );
+    }, LIVE_SUMMARY_MS);
+    timer.unref();
+    this.liveSummaryTimers.set(gameCode, timer);
+  }
+
+  /**
+   * Sends the host the running results of the open question, if it is an
+   * unscored one. Scored types never go out before the reveal — the host
+   * screen is usually projected for the room to see. `qIndex` drops a tick
+   * that outlived its question.
+   */
+  async sendLiveSummary(gameCode: string, qIndex?: number): Promise<void> {
+    if (!this.io) return;
+    const state = await this.store.loadState(gameCode, [
+      "questions",
+      "roster",
+      "answers",
+    ]);
+    if (!state || state.meta.phase !== "question") return;
+    const { meta, answers, roster } = state;
+    if (qIndex !== undefined && meta.qIndex !== qIndex) return;
+    const question = state.questions[meta.qIndex];
+    if (!question || isScored(question.type)) return;
+    this.io.to(`host:${gameCode}`).emit("live-summary", {
+      index: meta.qIndex,
+      answered: Object.keys(answers).length,
+      summary: summarizeAnswers(question, answerEntries(answers, roster)),
+    });
   }
 
   // -- roster / presence -----------------------------------------------------------

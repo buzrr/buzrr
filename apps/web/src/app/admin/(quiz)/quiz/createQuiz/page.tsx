@@ -28,7 +28,7 @@ export default function CreateQuiz() {
   const title = values.title.trim();
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 md:pb-[18px] md:h-[calc(100dvh-7rem)] flex flex-col text-dark dark:text-white">
+    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 md:pb-[18px] md:h-[calc(100dvh-10rem)] flex flex-col text-dark dark:text-white">
       <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-2 gap-3.5 md:gap-5 pt-1">
         <section
           className={clsx(

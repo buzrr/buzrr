@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import QuestionAndResult from "./QuesAndResult";
 import type { PublicQuestion, QuestionAnswer } from "@buzrr/contract";
 import type { GameSocket } from "@/types/socket";
+import { acceptsMoreAnswers } from "@/components/QuestionTypes";
 
 /**
  * Answers go over the socket and the server measures the time taken; the
@@ -25,6 +26,9 @@ const Question = (params: {
   const deadline = useAppSelector((state) => state.game.deadline);
   const [answer, setAnswer] = useState<QuestionAnswer | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  /** A submission is in flight (multi-submission questions stay open). */
+  const [pending, setPending] = useState(false);
+  const more = acceptsMoreAnswers(params.question);
   /**
    * The pick whose ack has not come back yet. A socket that drops mid-flight
    * never calls it — socket.io discards pending acks on close — so without
@@ -39,6 +43,7 @@ const Question = (params: {
     liveQuestionId.current = params.question.id;
     setAnswer(null);
     setSubmitted(false);
+    setPending(false);
     unacked.current = null;
   }, [params.question.id]);
 
@@ -46,8 +51,11 @@ const Question = (params: {
     (picked: QuestionAnswer, opts?: { silent?: boolean }) => {
       const sentFor = liveQuestionId.current;
       unacked.current = picked;
-      setAnswer(picked);
+      // A further answer joins what's stored once the server says so; the
+      // first one shows straight away.
+      if (!more) setAnswer(picked);
       setSubmitted(true);
+      setPending(true);
       params.socket.emit(
         "submit-answer",
         { qIndex, answer: picked },
@@ -57,16 +65,21 @@ const Question = (params: {
           // question's state — unlocking an answer already sent for it, or
           // dropping its pending pick — so ignore it entirely.
           if (sentFor !== liveQuestionId.current) return;
+          setPending(false);
           if (result.accepted) {
             unacked.current = null;
+            // The server sends back everything this player has sent so far.
+            if (result.answer) setAnswer(result.answer);
             return;
           }
           // The server is the authority on what it stored, so unlock and ask
           // for a snapshot rather than assuming: an answer sent just before a
           // drop may have landed after all, and the sync will re-lock if so.
           unacked.current = null;
-          setSubmitted(false);
-          setAnswer(null);
+          if (!more) {
+            setSubmitted(false);
+            setAnswer(null);
+          }
           if (!opts?.silent) {
             toast.error(result.reason ?? "Answer was not accepted");
           }
@@ -74,7 +87,7 @@ const Question = (params: {
         },
       );
     },
-    [params.socket, qIndex],
+    [params.socket, qIndex, more],
   );
 
   /**
@@ -86,6 +99,8 @@ const Question = (params: {
    */
   useEffect(() => {
     if (!you) return;
+    // A snapshot settles anything in flight: socket.io drops pending acks.
+    setPending(false);
     if (you.answered) {
       unacked.current = null;
       setAnswer(you.answer);
@@ -103,7 +118,7 @@ const Question = (params: {
   }, [you, deadline, send]);
 
   const submitAnswer = (picked: QuestionAnswer) => {
-    if (submitted) return;
+    if (pending || (submitted && !more)) return;
     send(picked);
   };
 
@@ -119,7 +134,8 @@ const Question = (params: {
         screen="question"
         submitAnswer={submitAnswer}
         answer={answer}
-        locked={submitted}
+        locked={more ? pending : submitted}
+        canAddMore={more}
       />
     </>
   );

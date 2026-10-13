@@ -23,8 +23,15 @@ export interface QuestionRenderer<T extends QuestionType> {
     onSubmit: (answer: QuestionAnswer<T>) => void;
   }>;
 
-  /** The host's big-screen view of the open question. Not interactive. */
-  HostPrompt: ComponentType<{ question: PublicQuestion<T> }>;
+  /**
+   * The host's big-screen view of the open question. Not interactive.
+   * `live` is the running summary unscored types get while the question is
+   * open (`live-summary`); always null for scored types.
+   */
+  HostPrompt: ComponentType<{
+    question: PublicQuestion<T>;
+    live: RevealSummary<T> | null;
+  }>;
 
   /** The host's breakdown of how the room answered. */
   RevealBreakdown: ComponentType<{

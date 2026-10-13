@@ -23,10 +23,11 @@ Duels run on the shared engine — read [realtime.md](realtime.md) first.
 
 `DuelQuestionsService.build()` (`duel-questions.service.ts`) draws
 `DUEL_QUESTION_COUNT = 7` random questions where the quiz `isPublic = true`
-**and** `question.moderationStatus = 'approved'` (raw SQL `ORDER BY random()`,
-then a findMany re-ordered to the raw shuffle). Each row must pass its
-question type's own checks (`toLiveQuestion` — for multiple choice, 2–6
-options with exactly one correct); the rest are skipped. Throws if fewer than
+**and** `question.moderationStatus = 'approved'` **and** the question is
+duel-eligible — `multiple_choice` or `true_false` with exactly one correct
+option (raw SQL `ORDER BY random()`, then a findMany re-ordered to the raw
+shuffle). Each row must pass its question type's own checks
+(`toLiveQuestion`); the rest are skipped. Throws if fewer than
 3 usable — matchmaking and invites both
 surface that as "no questions". The moderation gate is what feeds this pool —
 see [backend.md](backend.md#moderation).

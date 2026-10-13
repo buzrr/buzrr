@@ -21,8 +21,9 @@ stats/history, health endpoint, Vercel Analytics.
   - **Pluggable question types** (ADR-011): `Question.type` + `config`
     (migration `20261006000001`); one pure server handler + one web renderer
     per type; the socket contract is type-agnostic (`submit-answer
-{ qIndex, answer }`, `question-end.summary`). Only `multiple_choice`
-    exists.
+{ qIndex, answer }`, `question-end.summary`). Six types now:
+    multiple choice, true / false, poll, word cloud, rating, open text; the
+    unscored ones send the host throttled `live-summary` results.
   - **Pure engine core** (ADR-012): `step(state, event, now) → { state,
 effects }` in `game-engine/core/`, unit-tested; `GameEngineService` is
     the I/O shell. **Pacing is a strategy** (`hostPaced`, `autoAdvance`).
@@ -66,10 +67,10 @@ effects }` in `game-engine/core/`, unit-tested; `GameEngineService` is
 
 1. **vinext/Vite parallel toolchain** — present, non-default, end-state
    unknown (ADR-008).
-2. **Question types beyond multiple choice** — the plumbing is done, but the
-   question editor (`AddQuesForm`) still authors only 4-option multiple
-   choice (the API already takes `type`/`config`/`options`), and no second
-   type exists yet.
+2. **Question types — follow-ups.** Six types ship (ADR-011 amendment);
+   still missing from the design: "show results on players' screens", the
+   word-cloud profanity filter and open-text host review. The spreadsheet
+   import and `POST /quizzes/ai` still produce multiple choice only.
 3. **Self-paced pacing** — planned; needs per-player question state the
    phase machine doesn't model yet (ADR-012).
 4. **REST validation is half on the contract** — `POST /quizzes/import` uses

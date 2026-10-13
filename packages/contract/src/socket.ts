@@ -57,6 +57,18 @@ export const answerCountSchema = z.object({
   answered: z.number().int(),
 });
 
+/**
+ * How the room is answering an unscored question (poll, word cloud, …),
+ * sent to the host only (`host:{gameCode}`) at most about once a second while
+ * the question is open. Best effort: keep the payload with the highest
+ * `answered` for the open `index`.
+ */
+export const liveSummarySchema = z.object({
+  index: z.number().int(),
+  answered: z.number().int(),
+  summary: revealSummarySchema,
+});
+
 /** Personal outcome, emitted to the per-player room `player:{id}`. */
 export const answerResultSchema = z.object({
   answered: z.boolean(),
@@ -154,6 +166,11 @@ export const submitAnswerSchema = z.object({
 export const submitAnswerAckSchema = z.object({
   accepted: z.boolean(),
   reason: z.string().optional(),
+  /**
+   * The player's answer as now stored. For a question that takes several
+   * submissions this is everything they have sent so far.
+   */
+  answer: questionAnswerSchema.optional(),
 });
 
 /** A roster member as announced on join/leave/kick. */
@@ -179,6 +196,7 @@ export type LeaderboardEntry = z.infer<typeof leaderboardEntrySchema>;
 export type QuestionStartPayload = z.infer<typeof questionStartSchema>;
 export type QuestionEndPayload = z.infer<typeof questionEndSchema>;
 export type AnswerCountPayload = z.infer<typeof answerCountSchema>;
+export type LiveSummaryPayload = z.infer<typeof liveSummarySchema>;
 export type AnswerResultPayload = z.infer<typeof answerResultSchema>;
 export type LeaderboardPayload = z.infer<typeof leaderboardSchema>;
 export type GameOverPayload = z.infer<typeof gameOverSchema>;
@@ -201,6 +219,7 @@ export interface ServerToClientEvents {
   "question-end": (payload: QuestionEndPayload) => void;
   "answer-result": (payload: AnswerResultPayload) => void;
   "answer-count": (payload: AnswerCountPayload) => void;
+  "live-summary": (payload: LiveSummaryPayload) => void;
   leaderboard: (payload: LeaderboardPayload) => void;
   "game-over": (payload: GameOverPayload) => void;
   "state-sync": (payload: StateSyncPayload) => void;

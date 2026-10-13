@@ -43,6 +43,18 @@ export interface QuestionDefinition<T extends QuestionType = QuestionType> {
   config: QuestionConfig<T>;
 }
 
+/** Who gave an answer, for types whose reveal names people (open text). */
+export interface AnswerAuthor {
+  name: string;
+  profilePic: string | null;
+}
+
+/** A stored answer, with its author when the roster still knows them. */
+export interface AnswerEntry<T extends QuestionType = QuestionType> {
+  answer: QuestionAnswer<T>;
+  author: AnswerAuthor | null;
+}
+
 /** Authored content the type can't accept; the message is user-facing. */
 export class QuestionDefinitionError extends Error {}
 
@@ -57,6 +69,12 @@ export class QuestionDefinitionError extends Error {}
  */
 export interface QuestionTypeHandler<T extends QuestionType = QuestionType> {
   readonly type: T;
+
+  /**
+   * Whether the type awards points. Unscored types (polls, word clouds, …)
+   * never mark an answer correct, and the host sees their results live.
+   */
+  readonly scored: boolean;
 
   /**
    * Checks authored options + config and returns the normalised form to
@@ -86,8 +104,32 @@ export interface QuestionTypeHandler<T extends QuestionType = QuestionType> {
   /** What the reveal shows, from every answer that was stored. */
   summarize(
     question: LiveQuestion<T>,
-    answers: QuestionAnswer<T>[],
+    entries: AnswerEntry<T>[],
   ): RevealSummary<T>;
+
+  /**
+   * Whether a checked definition may be played in ranked 1v1 duels — a
+   * single right answer that a head-to-head score can be built on. Anything
+   * else is kept out of moderation and the duel pool.
+   */
+  duelEligible(definition: QuestionDefinition<T>): boolean;
+
+  /**
+   * Whether a player who has answered may send more while the question is
+   * open. Such questions don't close early once everyone has answered.
+   * Omitted: one answer each, first one wins.
+   */
+  acceptsMoreAnswers?(question: LiveQuestion<T>): boolean;
+
+  /**
+   * Folds a further checked answer into the one already stored. Null when
+   * the stored answer can't take more (the per-player cap).
+   */
+  mergeAnswers?(
+    question: LiveQuestion<T>,
+    previous: QuestionAnswer<T>,
+    next: QuestionAnswer<T>,
+  ): QuestionAnswer<T> | null;
 
   /**
    * A plausible answer that is (or isn't) correct — how duel bots play the

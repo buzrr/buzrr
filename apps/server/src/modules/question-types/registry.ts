@@ -10,11 +10,17 @@ import {
 import {
   QuestionDefinitionError,
   type AnswerCheck,
+  type AnswerEntry,
   type LiveQuestion,
   type QuestionDefinition,
   type QuestionTypeHandler,
 } from "./question-type";
 import { multipleChoiceHandler } from "./types/multiple-choice";
+import { openTextHandler } from "./types/open-text";
+import { pollHandler } from "./types/poll";
+import { ratingHandler } from "./types/rating";
+import { trueFalseHandler } from "./types/true-false";
+import { wordCloudHandler } from "./types/word-cloud";
 
 /**
  * One handler per type. The mapped type makes this exhaustive: adding a type
@@ -22,6 +28,11 @@ import { multipleChoiceHandler } from "./types/multiple-choice";
  */
 const HANDLERS: { [K in QuestionType]: QuestionTypeHandler<K> } = {
   multiple_choice: multipleChoiceHandler,
+  true_false: trueFalseHandler,
+  poll: pollHandler,
+  word_cloud: wordCloudHandler,
+  rating: ratingHandler,
+  open_text: openTextHandler,
 };
 
 /**
@@ -64,11 +75,53 @@ export function toPublicQuestion(question: LiveQuestion): PublicQuestion {
   return handlerFor(question.type).toPublic(question);
 }
 
+/** `entries` oldest first — types that list answers show the newest first. */
 export function summarizeAnswers(
   question: LiveQuestion,
-  answers: QuestionAnswer[],
+  entries: AnswerEntry[],
 ): RevealSummary {
-  return handlerFor(question.type).summarize(question, answers);
+  return handlerFor(question.type).summarize(question, entries);
+}
+
+/** Whether a player may keep answering this question after their first. */
+export function acceptsMoreAnswers(question: LiveQuestion): boolean {
+  return handlerFor(question.type).acceptsMoreAnswers?.(question) ?? false;
+}
+
+/** A further answer folded into the stored one; null if it can't be. */
+export function mergeAnswers(
+  question: LiveQuestion,
+  previous: QuestionAnswer,
+  next: QuestionAnswer,
+): QuestionAnswer | null {
+  const handler = handlerFor(question.type);
+  if (!handler.acceptsMoreAnswers?.(question) || !handler.mergeAnswers) {
+    return null;
+  }
+  return handler.mergeAnswers(question, previous, next);
+}
+
+/** Whether the type awards points (and keeps its results for the reveal). */
+export function isScored(type: QuestionType): boolean {
+  return handlerFor(type).scored;
+}
+
+/**
+ * Whether authored content may be played in ranked duels. Unknown types and
+ * content that fails its type's checks are not.
+ */
+export function isDuelEligible(
+  type: string,
+  input: { options: AuthoredOption[]; config: unknown },
+): boolean {
+  if (!isQuestionType(type)) return false;
+  try {
+    const handler = handlerFor(type);
+    return handler.duelEligible(handler.validateDefinition(input));
+  } catch (err) {
+    if (err instanceof QuestionDefinitionError) return false;
+    throw err;
+  }
 }
 
 export function sampleAnswer(

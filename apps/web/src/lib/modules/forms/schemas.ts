@@ -1,3 +1,8 @@
+import {
+  RATING_LABEL_MAX,
+  questionTypeSchema,
+  ratingScaleSchema,
+} from "@buzrr/contract";
 import { z } from "zod";
 
 export const createQuizSchema = z.object({
@@ -37,17 +42,65 @@ export const hostQuizSchema = z.object({
   quizId: z.string().min(1),
 });
 
-const optionLetter = z.enum(["a", "b", "c", "d"]);
-
-export const addQuestionSchema = z.object({
-  title: z.string().min(1),
-  option1: z.string().min(1),
-  option2: z.string().min(1),
-  option3: z.string().min(1),
-  option4: z.string().min(1),
-  choose_option: optionLetter,
-  time: z.coerce.number().min(1).optional(),
+const authoredOption = z.object({
+  title: z.string(),
+  isCorrect: z.boolean(),
 });
+
+/**
+ * The question editor's values. One shape for every type — the editor keeps
+ * each type's settings while the author flips between types — checked per
+ * type on submit.
+ */
+export const addQuestionSchema = z
+  .object({
+    type: questionTypeSchema,
+    title: z.string().trim().min(1, "Write the question"),
+    time: z.coerce.number().min(1).optional(),
+    options: z.array(authoredOption),
+    mcqMulti: z.boolean(),
+    pollMulti: z.boolean(),
+    cloudMaxAnswers: z.number().int().min(1).max(3),
+    cloudMaxLength: z.union([z.literal(20), z.literal(40)]),
+    ratingScale: ratingScaleSchema,
+    lowLabel: z.string().max(RATING_LABEL_MAX),
+    highLabel: z.string().max(RATING_LABEL_MAX),
+    textMaxLength: z.union([z.literal(100), z.literal(200), z.literal(500)]),
+    allowAnonymous: z.boolean(),
+    multipleSubmissions: z.boolean(),
+  })
+  .superRefine((v, ctx) => {
+    if (!["multiple_choice", "true_false", "poll"].includes(v.type)) return;
+    v.options.forEach((o, i) => {
+      if (o.title.trim() === "") {
+        ctx.addIssue({
+          code: "custom",
+          path: ["options", i, "title"],
+          message: "Options can't be empty",
+        });
+      }
+    });
+    const correct = v.options.filter((o) => o.isCorrect).length;
+    if (
+      v.type === "multiple_choice" &&
+      (v.mcqMulti ? correct === 0 : correct !== 1)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["options"],
+        message: v.mcqMulti
+          ? "Mark at least one option correct"
+          : "Mark the correct option",
+      });
+    }
+    if (v.type === "true_false" && correct !== 1) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["options"],
+        message: "Mark True or False as the correct answer",
+      });
+    }
+  });
 
 export const createSpaceSchema = z.object({
   name: z.string().min(1, "Give your space a name").max(200),

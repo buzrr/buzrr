@@ -1,6 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { Prisma } from "@buzrr/prisma";
 import { PrismaService } from "../../prisma/prisma.service";
+import { isDuelEligible } from "../question-types";
 
 const REPORT_THRESHOLD = 5; // the 6th distinct reporter triggers auto-unapprove
 const DEFAULT_LIMIT = 20;
@@ -21,15 +26,9 @@ export class ModerationService {
 
     const rows = await this.prisma.db.question.findMany({
       where,
-      orderBy: [
-        { reportCount: "desc" },
-        { createdAt: "asc" },
-        { id: "asc" },
-      ],
+      orderBy: [{ reportCount: "desc" }, { createdAt: "asc" }, { id: "asc" }],
       take: limit + 1,
-      ...(params.cursor
-        ? { cursor: { id: params.cursor }, skip: 1 }
-        : {}),
+      ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
       include: {
         options: true,
         quiz: {
@@ -64,10 +63,21 @@ export class ModerationService {
   ): Promise<void> {
     const question = await this.prisma.db.question.findUnique({
       where: { id: questionId },
-      select: { id: true },
+      select: { id: true, type: true, config: true, options: true },
     });
     if (!question) {
       throw new NotFoundException("Question not found");
+    }
+    if (
+      moderationStatus === "approved" &&
+      !isDuelEligible(question.type, {
+        options: question.options,
+        config: question.config,
+      })
+    ) {
+      throw new BadRequestException(
+        "Only single-answer multiple choice and true / false questions can be approved for duels",
+      );
     }
     await this.prisma.db.$transaction([
       this.prisma.db.question.update({
@@ -79,7 +89,10 @@ export class ModerationService {
   }
 
   /** Only approved questions (the only status a player could ever see) can be reported. */
-  async reportQuestion(questionId: string, reporterUserId: string): Promise<void> {
+  async reportQuestion(
+    questionId: string,
+    reporterUserId: string,
+  ): Promise<void> {
     const question = await this.prisma.db.question.findUnique({
       where: { id: questionId },
       select: { id: true, moderationStatus: true },

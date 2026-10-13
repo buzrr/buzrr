@@ -16,7 +16,11 @@ import {
 } from "../../common/storage/media-storage";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
-import { QuestionDefinitionError, validateDefinition } from "../question-types";
+import {
+  isDuelEligible,
+  QuestionDefinitionError,
+  validateDefinition,
+} from "../question-types";
 import { ReorderQuestionsDto } from "./dto/reorder-questions.dto";
 
 type MultipartBody = Record<string, string | undefined>;
@@ -231,8 +235,14 @@ export class QuestionsService {
     const timeOut = parseInt(time ?? "", 10) || DEFAULT_TIME_OUT;
     // Any create/edit re-enters the moderation queue if the quiz is public --
     // approved content doesn't stay approved across an edit, since the
-    // reviewed text may have changed.
-    const moderationStatus = quiz.isPublic ? "pending" : "draft";
+    // reviewed text may have changed. Moderation only feeds the duel pool, so
+    // content duels can't play (polls, multi-answer questions, …) skips the
+    // queue and stays out of it.
+    const moderationStatus = !quiz.isPublic
+      ? "draft"
+      : isDuelEligible(type, definition)
+        ? "pending"
+        : "unapproved";
 
     if (quesId) {
       await this.prisma.db.$transaction(async (tx) => {

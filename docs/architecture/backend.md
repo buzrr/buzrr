@@ -51,18 +51,20 @@ services.
   quiz-creating path (`create`, `importQuestions`, `createWithAi`) calls
   `EntitlementsService.assertQuizCapacity` inside its insert transaction.
   `update()` runs in a transaction: flipping `isPublic: true` also moves every
-  `draft` question to `pending` (submits them for moderation; already-decided
-  ones untouched).
+  duel-eligible `draft` question to `pending` (submits them for moderation)
+  and every other draft to `unapproved`; already-decided ones are untouched.
 - `questions.service.ts` — the multipart upsert (`upsertFromMultipart`) is the
   single write path for questions from the UI (create and edit). Fields:
   `type` (default `multiple_choice`), optional `config` (JSON), and options
   as either an `options` JSON array of `{ title, isCorrect }` or the original
-  `option1..4` + `choose_option` a–d the editor sends. Options + config go
+  legacy `option1..4` + `choose_option` a–d fields (the editor now sends the
+  JSON form; types without options send `[]`). Options + config go
   through the type's `validateDefinition` (its `QuestionDefinitionError`
   becomes a 400). Optional file → `MediaStorage.upload`; replacing media
   removes the old object (drivers ignore URLs they didn't issue). Order maintenance: `reorder` is
   insert-at-position with shift-by-one `updateMany`s; `delete` closes the gap.
-  **Any edit resets `moderationStatus` (public → `pending`), zeroes
+  **Any edit resets `moderationStatus` (public → `pending`, or `unapproved`
+  when the type's `duelEligible` says duels can't play it), zeroes
   `reportCount`, and deletes existing reports** — approval never survives a
   content change.
 - `POST /quizzes/import` (`importQuestions`): the contract's `importQuizSchema`
@@ -87,6 +89,11 @@ services.
 - States: `draft` (private) → `pending` (public, awaiting review) →
   `approved` | `unapproved`. Only `approved` questions in public quizzes enter
   the duel pool.
+- Only **duel-eligible** questions are reviewed: single-answer multiple choice
+  and true / false (`isDuelEligible` in the question-type registry). Others
+  in a public quiz go straight to `unapproved` (so they never fill the queue),
+  `approve` refuses them with a 400, and the duel pool SQL filters on type
+  and a single correct option as a last guard.
 - Queue = `pending` ∪ (`unapproved` with `reportCount > 0`), most-reported
   first, cursor-paginated.
 - `reportQuestion` (any account, `report` rate profile): only `approved`

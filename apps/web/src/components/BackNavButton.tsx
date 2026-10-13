@@ -1,8 +1,8 @@
 "use client";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useAppSelector } from "@/state/hooks";
 import { PageTheme } from "@/state/pageThemeSlice";
+import { useRenderedTheme } from "@/hooks/useRenderedTheme";
 import { IconButton } from "@/components/ui/IconButton";
 
 /**
@@ -16,7 +16,7 @@ const BackNavButton = ({
   href?: string;
   onBack?: () => void;
 }) => {
-  const theme = useAppSelector((state) => state.pageTheme.theme);
+  const theme = useRenderedTheme();
   const router = useRouter();
 
   return (

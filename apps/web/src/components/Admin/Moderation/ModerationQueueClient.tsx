@@ -11,6 +11,10 @@ import {
 } from "@/lib/modules/moderation/hooks";
 import type { ModerationQueueItem } from "@/lib/modules/moderation/api";
 import { Button } from "@/components/ui/Button";
+import {
+  QuestionTypeTag,
+  cardType,
+} from "@/components/Admin/Quiz/QuestionCardBody";
 import Skeleton from "@/components/ui/Skeleton";
 
 const ROW_HEIGHT = 180;
@@ -147,6 +151,7 @@ function QueueRow({
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <StatusPill status={item.moderationStatus} />
+          <QuestionTypeTag type={cardType(item)} />
           {item.reportCount > 0 && (
             <span className="rounded-full bg-red-light/20 dark:bg-red-dark/20 px-2 py-0.5 text-xs font-bold text-red-light dark:text-red-dark">
               {item.reportCount} report{item.reportCount === 1 ? "" : "s"}

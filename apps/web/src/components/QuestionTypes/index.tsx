@@ -8,6 +8,11 @@ import type {
   RevealSummary,
 } from "@buzrr/contract";
 import { multipleChoiceRenderer } from "./MultipleChoice";
+import { openTextRenderer } from "./OpenText";
+import { pollRenderer } from "./Poll";
+import { ratingRenderer } from "./Rating";
+import { trueFalseRenderer } from "./TrueFalse";
+import { wordCloudRenderer } from "./WordCloud";
 import type { QuestionRenderer } from "./types";
 
 /**
@@ -16,6 +21,11 @@ import type { QuestionRenderer } from "./types";
  */
 const RENDERERS: { [K in QuestionType]: QuestionRenderer<K> } = {
   multiple_choice: multipleChoiceRenderer,
+  true_false: trueFalseRenderer,
+  poll: pollRenderer,
+  word_cloud: wordCloudRenderer,
+  rating: ratingRenderer,
+  open_text: openTextRenderer,
 };
 
 /**
@@ -26,6 +36,23 @@ function rendererFor(type: QuestionType): QuestionRenderer<QuestionType> {
   return RENDERERS[type] as unknown as QuestionRenderer<QuestionType>;
 }
 
+export { isScoredType } from "@buzrr/contract";
+
+/** Whether players may keep answering after their first submission. */
+export function acceptsMoreAnswers(question: PublicQuestion): boolean {
+  return "multipleSubmissions" in question && question.multipleSubmissions;
+}
+export {
+  QUESTION_TYPE_META,
+  QUESTION_TYPE_ORDER,
+  QuestionTypeIcon,
+  QuestionTypePill,
+} from "./meta";
+
+/**
+ * Keyed by question so a type's local draft (ticked options, typed words)
+ * never carries over to the next question.
+ */
 export function AnswerInput(props: {
   question: PublicQuestion;
   selected: QuestionAnswer | null;
@@ -33,12 +60,25 @@ export function AnswerInput(props: {
   onSubmit: (answer: QuestionAnswer) => void;
 }) {
   const { AnswerInput: Input } = rendererFor(props.question.type);
-  return <Input {...props} />;
+  return <Input key={props.question.id} {...props} />;
 }
 
-export function HostPrompt({ question }: { question: PublicQuestion }) {
+/** `live`: the running summary of an unscored question, if one arrived. */
+export function HostPrompt({
+  question,
+  live = null,
+}: {
+  question: PublicQuestion;
+  live?: RevealSummary | null;
+}) {
   const { HostPrompt: Prompt } = rendererFor(question.type);
-  return <Prompt question={question} />;
+  // Same rule as the reveal: a summary for another question is dropped.
+  return (
+    <Prompt
+      question={question}
+      live={live && live.type === question.type ? live : null}
+    />
+  );
 }
 
 export function RevealBreakdown(props: {

@@ -5,6 +5,7 @@ import { useAppDispatch } from "@/state/hooks";
 import {
   answerResult,
   answerCount,
+  liveSummary,
   applySync,
   gameOver,
   gameStarted,
@@ -118,6 +119,7 @@ export function useGameSocket({
     conn.on("question-end", (payload) => dispatch(questionEnd(payload)));
     conn.on("answer-result", (payload) => dispatch(answerResult(payload)));
     conn.on("answer-count", (payload) => dispatch(answerCount(payload)));
+    conn.on("live-summary", (payload) => dispatch(liveSummary(payload)));
     conn.on("leaderboard", (payload) => dispatch(leaderboardReceived(payload)));
     conn.on("game-over", (payload) =>
       dispatch(

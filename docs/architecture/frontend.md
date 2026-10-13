@@ -125,7 +125,11 @@ disconnect`), emits `request-sync` on connect as a safety net and when the
   input, `Question`/`QuesAndResult`), `HostPrompt` (host `QuestionScreen`),
   `RevealBreakdown` + `revealStats` (host `QuesResult`) and
   `describeAnswer` / `correctAnswers` (guest `Result`), which dispatch on
-  `question.type` to one renderer per type (`MultipleChoice.tsx` today). The
+  `question.type` to one renderer per type (`MultipleChoice`, `TrueFalse`,
+  `Poll`, `WordCloud`, `Rating`, `OpenText`; shared results views in
+  `Visuals.tsx`). For unscored types the host `QuestionScreen` passes the
+  slice's `liveSummary` (from `live-summary`) into `HostPrompt`, and the
+  guest `Result` shows "Response received" instead of right/wrong. The
   registry is a mapped type over the contract's `QuestionType`, so a type
   without a renderer fails `check-types`. Answers are type-shaped values
   (`QuestionAnswer`), sent as `submit-answer { qIndex, answer }`; the reveal

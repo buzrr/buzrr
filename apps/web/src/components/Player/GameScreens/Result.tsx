@@ -2,7 +2,11 @@
 import React from "react";
 import QuestionAndResult from "./QuesAndResult";
 import { useAppSelector } from "@/state/hooks";
-import { correctAnswers, describeAnswer } from "@/components/QuestionTypes";
+import {
+  correctAnswers,
+  describeAnswer,
+  isScoredType,
+} from "@/components/QuestionTypes";
 import type { AnswerResultPayload } from "@buzrr/contract";
 
 /**
@@ -53,7 +57,13 @@ const Result = (params: {
       hostImage={params.hostImage}
       screen="result"
       status={
-        !you.answered ? "timesout" : you.isCorrect ? "correct" : "incorrect"
+        !you.answered
+          ? "timesout"
+          : question && !isScoredType(question.type)
+            ? "received"
+            : you.isCorrect
+              ? "correct"
+              : "incorrect"
       }
       points={you.score}
       yourAnswer={you.answered ? yourAnswer : null}

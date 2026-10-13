@@ -134,6 +134,12 @@ html.theme-anim *::after {
 
 /* Not utilities, so plain custom properties rather than @theme tokens. */
 :root {
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+}
+
+/* The dark theme sets `.dark` on <html>; keep the deeper slate there. */
+:root.dark {
   --scrollbar-thumb: #475569;
   --scrollbar-thumb-hover: #64748b;
 }

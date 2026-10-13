@@ -20,6 +20,13 @@ export class DuelQuestionsService {
       JOIN "Quiz" z ON z."id" = q."quizId"
       WHERE z."isPublic" = true
         AND q."moderationStatus" = 'approved'
+        -- Duels score head to head: one right answer, scored types only
+        -- (approval already requires this; kept here as the last guard).
+        AND q."type" IN ('multiple_choice', 'true_false')
+        AND (
+          SELECT count(*) FROM "Option" o
+          WHERE o."questionId" = q."id" AND o."isCorrect" = true
+        ) = 1
       ORDER BY random()
       LIMIT ${DUEL_QUESTION_COUNT}
     `;

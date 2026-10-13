@@ -3,7 +3,11 @@ import type {
   LeaderboardEntry,
   StateSyncPayload,
 } from "@buzrr/contract";
-import { summarizeAnswers, toPublicQuestion } from "../../question-types";
+import {
+  summarizeAnswers,
+  toPublicQuestion,
+  type AnswerEntry,
+} from "../../question-types";
 import type {
   LiveQuestion,
   RosterEntry,
@@ -78,17 +82,37 @@ export function buildAnswerResult(
   };
 }
 
+/**
+ * Stored answers as a type's `summarize` takes them: oldest first, each with
+ * its author while the roster still has them.
+ */
+export function answerEntries(
+  answers: Record<string, StoredAnswer>,
+  roster: RosterEntry[],
+): AnswerEntry[] {
+  const byId = new Map(roster.map((p) => [p.id, p]));
+  return Object.entries(answers)
+    .sort(([, a], [, b]) => a.answeredAt - b.answeredAt)
+    .map(([playerId, stored]) => {
+      const player = byId.get(playerId);
+      return {
+        answer: stored.answer,
+        author: player
+          ? { name: player.name, profilePic: player.profilePic }
+          : null,
+      };
+    });
+}
+
 export function buildReveal(
   question: LiveQuestion,
   index: number,
   answers: Record<string, StoredAnswer>,
+  roster: RosterEntry[],
 ) {
   return {
     index,
-    summary: summarizeAnswers(
-      question,
-      Object.values(answers).map((a) => a.answer),
-    ),
+    summary: summarizeAnswers(question, answerEntries(answers, roster)),
     avgTimeMs: averageAnswerMs(answers),
   };
 }
@@ -134,7 +158,12 @@ export function buildSnapshot(
         : question.timeOut * 1000;
       payload.answeredCount = Object.keys(answers).length;
     } else {
-      payload.reveal = buildReveal(question, meta.qIndex, answers);
+      payload.reveal = buildReveal(
+        question,
+        meta.qIndex,
+        answers,
+        state.roster,
+      );
     }
   }
 
