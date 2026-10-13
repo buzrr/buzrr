@@ -20,7 +20,16 @@ export interface MarketingPage {
   ogEyebrow: string;
   ogTitle: string;
   ogAlt: string;
+  /**
+   * Files (relative to `apps/web/src`) whose content the page renders. The
+   * sitemap's `lastModified` is the newest git commit touching any of them.
+   */
+  sourceFiles: string[];
 }
+
+const MARKETING = "app/(marketing)";
+const COMPETITOR_DATA = "data/marketing/competitors.ts";
+const USE_CASE_DATA = "data/marketing/use-cases.ts";
 
 export const OPEN_SOURCE_PAGE: MarketingPage = {
   path: "/open-source-quiz-platform",
@@ -28,6 +37,7 @@ export const OPEN_SOURCE_PAGE: MarketingPage = {
   ogEyebrow: "Open source · AGPL-3.0",
   ogTitle: "An open-source quiz platform you can read, run and change",
   ogAlt: "Buzrr: an open-source quiz platform",
+  sourceFiles: [`${MARKETING}/open-source-quiz-platform/page.tsx`],
 };
 
 export const SELF_HOST_PAGE: MarketingPage = {
@@ -36,14 +46,18 @@ export const SELF_HOST_PAGE: MarketingPage = {
   ogEyebrow: "Self-hosting",
   ogTitle: "Run your own live quiz server with Buzrr",
   ogAlt: "Self-hosting Buzrr, the open-source quiz platform",
+  sourceFiles: [`${MARKETING}/self-hosted-quiz/page.tsx`],
 };
 
 export const ALTERNATIVES_HUB: MarketingPage = {
   path: "/alternatives",
   ogKey: "alternatives",
   ogEyebrow: "Alternatives",
-  ogTitle: "Alternatives to Kahoot!, Slido, Mentimeter and Quizizz",
-  ogAlt: "Buzrr compared with Kahoot!, Slido, Mentimeter and Quizizz",
+  ogTitle:
+    "Open-source alternatives to Kahoot!, Wayground, Slido and Mentimeter",
+  ogAlt:
+    "Buzrr compared with Kahoot!, Wayground (Quizizz), Slido and Mentimeter",
+  sourceFiles: [`${MARKETING}/alternatives/page.tsx`, COMPETITOR_DATA],
 };
 
 export const USE_CASES_HUB: MarketingPage = {
@@ -52,6 +66,7 @@ export const USE_CASES_HUB: MarketingPage = {
   ogEyebrow: "Use cases",
   ogTitle: "Live quizzes for classrooms, events, teams and trivia nights",
   ogAlt: "What people use Buzrr for",
+  sourceFiles: [`${MARKETING}/use-cases/page.tsx`, USE_CASE_DATA],
 };
 
 export function alternativePage(slug: keyof typeof COMPETITORS): MarketingPage {
@@ -62,6 +77,10 @@ export function alternativePage(slug: keyof typeof COMPETITORS): MarketingPage {
     ogEyebrow: `${c.displayName} alternative`,
     ogTitle: c.alternative.h1,
     ogAlt: `Buzrr as a ${c.displayName} alternative`,
+    sourceFiles: [
+      `${MARKETING}/alternatives/[competitor]/page.tsx`,
+      COMPETITOR_DATA,
+    ],
   };
 }
 
@@ -73,6 +92,7 @@ export function comparePage(slug: keyof typeof COMPETITORS): MarketingPage {
     ogEyebrow: "Comparison",
     ogTitle: `Buzrr vs ${c.displayName}, feature by feature`,
     ogAlt: `Buzrr vs ${c.displayName} comparison`,
+    sourceFiles: [`${MARKETING}/compare/[slug]/page.tsx`, COMPETITOR_DATA],
   };
 }
 
@@ -84,6 +104,7 @@ export function pageForUseCase(slug: keyof typeof USE_CASES): MarketingPage {
     ogEyebrow: u.name,
     ogTitle: u.h1,
     ogAlt: `Buzrr for ${u.name.toLowerCase()}`,
+    sourceFiles: [`${MARKETING}/use-cases/[slug]/page.tsx`, USE_CASE_DATA],
   };
 }
 

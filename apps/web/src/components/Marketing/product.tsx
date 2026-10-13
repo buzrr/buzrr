@@ -5,6 +5,7 @@ import {
   BUZRR_CELLS,
   COMPETITORS,
   FACTS_CHECKED,
+  QUIZIZZ_REBRAND,
   ROW_LABELS,
   alternativePath,
   comparePath,
@@ -18,7 +19,7 @@ import {
   type FeatureId,
 } from "@/data/marketing/product";
 import { USE_CASES, type UseCaseSlug } from "@/data/marketing/use-cases";
-import { Answer, type LinkCardItem } from "./primitives";
+import { Answer, Prose, Section, type LinkCardItem } from "./primitives";
 
 export function FeatureGrid({ ids }: { ids: FeatureId[] }) {
   return (
@@ -327,5 +328,31 @@ export function InlineLink({
     >
       {children}
     </Link>
+  );
+}
+
+/**
+ * On the Quizizz pages: the rebrand, sourced, with links to the Wayground
+ * pages so searchers who know either name end up on the right one.
+ */
+export function QuizizzRebrand() {
+  return (
+    <Section title={QUIZIZZ_REBRAND.heading}>
+      <Prose paragraphs={QUIZIZZ_REBRAND.paragraphs} />
+      <p className="mt-4 max-w-3xl text-dark/80 dark:text-off-white">
+        Searching under the new name? See the{" "}
+        <InlineLink href={alternativePath("wayground")}>
+          open-source Wayground alternative
+        </InlineLink>{" "}
+        and the{" "}
+        <InlineLink href={comparePath("wayground")}>
+          Buzrr vs Wayground feature and pricing comparison
+        </InlineLink>
+        .
+      </p>
+      <div className="mt-4">
+        <SourceList slug="quizizz" />
+      </div>
+    </Section>
   );
 }

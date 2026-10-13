@@ -7,7 +7,9 @@ import {
   GITHUB_LINK,
   ISSUES_LINK,
 } from "@/components/Landing/links";
+import { JsonLd } from "@/components/Marketing/primitives";
 import supportLinks from "@/data/support-links.json";
+import { siteGraph } from "@/lib/seo/json-ld";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = buildPageMetadata({
@@ -50,6 +52,7 @@ const cardClass =
 export default function SupportPage() {
   return (
     <div className="min-h-dvh bg-light-bg dark:bg-dark-bg">
+      <JsonLd nodes={siteGraph()} />
       <LandingNavbar />
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">

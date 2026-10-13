@@ -10,8 +10,11 @@ import {
 
 /**
  * Schema.org builders. Everything here must describe what is visible on the
- * page: no ratings, reviews, FAQ or HowTo markup — Buzrr has no verified
- * reviews, and FAQ rich results are reserved for authoritative sites.
+ * page: no ratings, reviews or HowTo markup — Buzrr has no verified reviews.
+ * FAQPage is used only where the same questions and answers are rendered on
+ * the page (`FaqList`). Google limits FAQ rich results to authoritative
+ * sites, so it is there for other search engines and answer engines, not for
+ * a Google snippet.
  */
 
 type JsonLdNode = Record<string, unknown>;
@@ -128,6 +131,23 @@ export function webPageSchema({
     inLanguage: "en",
     isPartOf: { "@id": WEBSITE_ID },
     about: { "@id": SOFTWARE_ID },
+  };
+}
+
+export interface Faq {
+  question: string;
+  answer: string;
+}
+
+export function faqPageSchema(path: string, faqs: Faq[]): JsonLdNode {
+  return {
+    "@type": "FAQPage",
+    "@id": `${absoluteUrl(path)}#faq`,
+    mainEntity: faqs.map((faq) => ({
+      "@type": "Question",
+      name: faq.question,
+      acceptedAnswer: { "@type": "Answer", text: faq.answer },
+    })),
   };
 }
 

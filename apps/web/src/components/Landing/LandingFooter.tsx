@@ -3,9 +3,11 @@ import { LuGithub, LuHeart, LuInstagram, LuYoutube } from "react-icons/lu";
 import ClientImage from "@/components/ClientImage";
 import { LEGAL_PAGES } from "@/data/legal";
 import {
+  COMPARE_SLUGS,
   COMPETITORS,
   COMPETITOR_SLUGS,
   alternativePath,
+  comparePath,
 } from "@/data/marketing/competitors";
 import { USE_CASES, USE_CASE_SLUGS } from "@/data/marketing/use-cases";
 import {
@@ -32,10 +34,17 @@ const columns = [
     links: [
       { name: "All alternatives", href: "/alternatives" },
       ...COMPETITOR_SLUGS.map((slug) => ({
-        name: `${COMPETITORS[slug].displayName.replace(/ \(.*\)$/, "")} alternative`,
+        name: `${COMPETITORS[slug].searchName} alternative`,
         href: alternativePath(slug),
       })),
     ],
+  },
+  {
+    title: "Compare",
+    links: COMPARE_SLUGS.map((slug) => ({
+      name: `Buzrr vs ${COMPETITORS[slug].searchName}`,
+      href: comparePath(slug),
+    })),
   },
   {
     title: "Use cases",
@@ -66,7 +75,7 @@ const LandingFooter = () => {
   return (
     <footer className="border-t border-card-light dark:border-card-dark bg-white dark:bg-dark">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-8">
           <div className="col-span-2 md:col-span-4 lg:col-span-2">
             <ClientImage
               props={{

@@ -5,7 +5,9 @@ import LandingFooter from "@/components/Landing/LandingFooter";
 import PricingPlans from "@/components/Pricing/PricingPlans";
 import PricingFaq from "@/components/Pricing/PricingFaq";
 import PlanComparison from "@/components/Pricing/PlanComparison";
+import { JsonLd } from "@/components/Marketing/primitives";
 import { auth } from "@/lib/auth";
+import { siteGraph } from "@/lib/seo/json-ld";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 import { getVisitorPriceRegion } from "@/lib/visitor-region";
 
@@ -26,6 +28,7 @@ export default async function PricingPage() {
 
   return (
     <div className="min-h-dvh flex flex-col bg-light-bg dark:bg-dark-bg">
+      <JsonLd nodes={siteGraph()} />
       <LandingNavbar />
       <main className="flex-1 px-4 sm:px-6 lg:px-8 py-16 md:py-24">
         <div className="max-w-5xl mx-auto">

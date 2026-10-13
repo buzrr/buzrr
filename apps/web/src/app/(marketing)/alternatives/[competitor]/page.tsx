@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  Answer,
   BulletList,
   CtaPanel,
+  FaqList,
   JsonLd,
   LinkCards,
   PageContainer,
@@ -15,13 +15,12 @@ import {
   breadcrumbSchema,
 } from "@/components/Marketing/primitives";
 import {
-  ComparisonTable,
   FeatureGrid,
   InlineLink,
   OPEN_SOURCE_CARD,
   ProductShots,
+  QuizizzRebrand,
   SELF_HOST_CARD,
-  SourceList,
   WhatIsBuzrr,
   alternativeCards,
   compareCards,
@@ -32,12 +31,13 @@ import {
   COMPETITOR_SLUGS,
   FACTS_CHECKED,
   QUIZUP_ROWS,
+  ROW_LABELS,
   comparePath,
   type CompetitorSlug,
 } from "@/data/marketing/competitors";
 import { alternativePage, ogImageFor } from "@/data/marketing/pages";
 import { HOST_STEPS } from "@/data/marketing/product";
-import { siteGraph, webPageSchema } from "@/lib/seo/json-ld";
+import { faqPageSchema, siteGraph, webPageSchema } from "@/lib/seo/json-ld";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 
 export const dynamicParams = false;
@@ -69,6 +69,16 @@ export async function generateMetadata({
     ogImage: ogImageFor(page),
   });
 }
+
+/** Rows named in the link to the comparison page. */
+const COMPARE_TEASER_ROWS = [
+  "pricing",
+  "freeLimits",
+  "selfHost",
+  "offline",
+  "aiQuiz",
+  "oneVsOne",
+] as const;
 
 const DUEL_STEPS = [
   {
@@ -113,6 +123,7 @@ export default async function AlternativePage({ params }: { params: Params }) {
             description: alt.description,
           }),
           breadcrumbSchema(crumbs),
+          faqPageSchema(page.path, alt.faq),
         ]}
       />
       <PageHero
@@ -128,7 +139,7 @@ export default async function AlternativePage({ params }: { params: Params }) {
         secondary={
           c.compare
             ? {
-                label: `Buzrr vs ${c.displayName} table`,
+                label: `Buzrr vs ${c.searchName} comparison`,
                 href: comparePath(c.slug),
               }
             : { label: "Host a quiz room instead", href: "/admin" }
@@ -137,18 +148,11 @@ export default async function AlternativePage({ params }: { params: Params }) {
 
       <WhatIsBuzrr />
 
-      <Section title={`About ${c.displayName}`}>
-        <p className="max-w-3xl text-dark/80 dark:text-off-white leading-relaxed">
-          {c.summary.text}
-        </p>
-        <div className="mt-4">
-          <SourceList slug={c.slug} />
-        </div>
-      </Section>
-
       <Section title={alt.whyLook.heading}>
         <PointGrid points={alt.whyLook.points} />
       </Section>
+
+      {c.slug === "quizizz" && <QuizizzRebrand />}
 
       {isQuizUp ? (
         <Section
@@ -197,19 +201,21 @@ export default async function AlternativePage({ params }: { params: Params }) {
           </div>
         </Section>
       ) : (
-        <Section
-          title={`Buzrr vs ${c.displayName} at a glance`}
-          intro={`The rows that matter most when switching from ${c.displayName}.`}
-        >
-          <ComparisonTable slug={c.slug} rows={alt.keyRows} />
-          <p className="mt-4 text-dark/80 dark:text-off-white">
-            The{" "}
-            <InlineLink href={comparePath(c.slug)}>
-              full Buzrr vs {c.displayName} comparison
-            </InlineLink>{" "}
-            covers AI generation, scoring, question types and pricing too.
-          </p>
-        </Section>
+        c.compare && (
+          <Section title={`Buzrr vs ${c.searchName}, feature by feature`}>
+            <p className="max-w-3xl text-dark/80 dark:text-off-white leading-relaxed">
+              Need the details before switching? The{" "}
+              <InlineLink href={comparePath(c.slug)}>
+                Buzrr vs {c.searchName} feature and pricing comparison
+              </InlineLink>{" "}
+              puts both tools side by side —{" "}
+              {COMPARE_TEASER_ROWS.map((row) =>
+                ROW_LABELS[row].toLowerCase(),
+              ).join(", ")}{" "}
+              — with a source for every {c.displayName} claim.
+            </p>
+          </Section>
+        )
       )}
 
       <Section title={alt.differences.heading}>
@@ -247,13 +253,11 @@ export default async function AlternativePage({ params }: { params: Params }) {
         <ProductShots />
       </Section>
 
-      <Section title="The short answer">
-        <Answer question={alt.answer.question}>
-          <p>{alt.answer.text}</p>
-          <p className="mt-3 text-xs text-dark/60 dark:text-gray">
-            {c.displayName} facts checked {FACTS_CHECKED}.
-          </p>
-        </Answer>
+      <Section title={`${c.searchName} alternative FAQ`}>
+        <FaqList faqs={alt.faq} />
+        <p className="mt-4 text-xs text-dark/60 dark:text-gray">
+          {c.displayName} facts checked {FACTS_CHECKED}.
+        </p>
       </Section>
 
       <Section title="What people use Buzrr for">

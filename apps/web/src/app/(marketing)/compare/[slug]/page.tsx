@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import {
-  BulletList,
   CtaPanel,
+  FaqList,
   JsonLd,
   LinkCards,
   PageContainer,
@@ -15,20 +15,23 @@ import {
   ComparisonTable,
   InlineLink,
   OPEN_SOURCE_CARD,
+  QuizizzRebrand,
   SELF_HOST_CARD,
   SourceList,
   compareCards,
   cardsForUseCases,
 } from "@/components/Marketing/product";
 import {
+  COMPARE_ROWS,
   COMPARE_SLUGS,
   COMPETITORS,
   alternativePath,
+  compareTitle,
   type CompetitorSlug,
 } from "@/data/marketing/competitors";
 import { comparePage, ogImageFor } from "@/data/marketing/pages";
 import { PLAN_FACTS } from "@/data/marketing/product";
-import { siteGraph, webPageSchema } from "@/lib/seo/json-ld";
+import { faqPageSchema, siteGraph, webPageSchema } from "@/lib/seo/json-ld";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 
 export const dynamicParams = false;
@@ -60,7 +63,8 @@ export async function generateMetadata({
   if (!found) return {};
   const page = comparePage(found.competitor.slug);
   return buildPageMetadata({
-    title: found.compare.title,
+    title: compareTitle(found.competitor),
+    absoluteTitle: true,
     description: found.compare.description,
     path: page.path,
     ogImage: ogImageFor(page),
@@ -72,6 +76,7 @@ export default async function ComparePage({ params }: { params: Params }) {
   if (!found) notFound();
   const { competitor: c, compare } = found;
   const page = comparePage(c.slug);
+  const title = compareTitle(c);
 
   const crumbs = [
     { name: "Home", path: "/" },
@@ -86,28 +91,29 @@ export default async function ComparePage({ params }: { params: Params }) {
           ...siteGraph(),
           webPageSchema({
             path: page.path,
-            title: compare.title,
+            title,
             description: compare.description,
           }),
           breadcrumbSchema(crumbs),
+          faqPageSchema(page.path, compare.faq),
         ]}
       />
       <PageHero
         crumbs={crumbs}
         eyebrow="Comparison"
-        title={compare.h1}
-        lead={compare.intro[0]}
+        title={`Buzrr vs ${c.displayName}`}
+        lead={compare.lead}
         primary={{ label: "Try Buzrr free", href: "/admin" }}
         secondary={{
-          label: `Why switch from ${c.displayName}`,
+          label: `Open-source ${c.searchName} alternative`,
           href: alternativePath(c.slug),
         }}
       />
 
-      <Prose paragraphs={compare.intro.slice(1)} />
+      {c.slug === "quizizz" && <QuizizzRebrand />}
 
-      <Section title="Feature comparison">
-        <ComparisonTable slug={c.slug} rows={compare.rows} />
+      <Section title="Feature and pricing comparison">
+        <ComparisonTable slug={c.slug} rows={COMPARE_ROWS} />
       </Section>
 
       <Section title="Pricing">
@@ -123,28 +129,20 @@ export default async function ComparePage({ params }: { params: Params }) {
         </p>
       </Section>
 
-      <Section title="Which should you pick?">
-        <div className="grid gap-8 md:grid-cols-2">
-          <div>
-            <h3 className="font-bold text-dark dark:text-white mb-3">
-              Pick Buzrr if…
-            </h3>
-            <BulletList items={compare.chooseBuzrr} tone="positive" />
-          </div>
-          <div>
-            <h3 className="font-bold text-dark dark:text-white mb-3">
-              Pick {c.displayName} if…
-            </h3>
-            <BulletList items={compare.chooseCompetitor} />
-          </div>
-        </div>
-        <p className="mt-6 text-dark/80 dark:text-off-white">
-          Reasons people move, and what Buzrr does differently, are on the{" "}
+      <Section title={`What ${c.displayName} and Buzrr are`}>
+        <Prose paragraphs={[c.summary.text, ...compare.overview]} />
+        <p className="mt-6 max-w-3xl text-dark/80 dark:text-off-white">
+          Deciding whether to switch? The{" "}
           <InlineLink href={alternativePath(c.slug)}>
-            {c.displayName} alternative page
-          </InlineLink>
-          .
+            open-source {c.searchName} alternative guide
+          </InlineLink>{" "}
+          covers why people move, who Buzrr suits, and when {c.displayName} is
+          the better fit.
         </p>
+      </Section>
+
+      <Section title={`Buzrr vs ${c.searchName} FAQ`}>
+        <FaqList faqs={compare.faq} />
       </Section>
 
       <Section title="Sources">

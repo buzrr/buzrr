@@ -241,7 +241,7 @@ export default async function Home() {
                 {
                   href: "/alternatives",
                   title:
-                    "Alternatives to Kahoot, Slido, Mentimeter and Quizizz",
+                    "Alternatives to Kahoot, Wayground (Quizizz), Slido and Mentimeter",
                   text: "How Buzrr compares, with sources — and when another tool fits better.",
                 },
                 OPEN_SOURCE_CARD,

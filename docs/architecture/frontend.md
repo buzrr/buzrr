@@ -176,7 +176,9 @@ disconnect`), emits `request-sync` on connect as a safety net and when the
 - `lib/seo/`: `site.ts` (canonical origin **https://www.buzrr.in**; the apex
   redirects to www), `buildPageMetadata` (self-canonical + full OG/Twitter —
   child `openGraph` replaces the parent's, so always use it), JSON-LD builders
-  (no ratings/FAQ markup), `public-routes.ts`.
+  (no ratings; FAQPage only next to a visible `FaqList`), `last-modified.ts`
+  (sitemap `lastModified` from git, omitted without full history),
+  `public-routes.ts`.
 - The root layout sets **no canonical** on purpose (it would be inherited by
   every page). App areas are noindexed three ways: layout `robots` metadata,
   `X-Robots-Tag` headers in `next.config.ts`, and `robots.ts` disallows for

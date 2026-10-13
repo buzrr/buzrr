@@ -4,6 +4,7 @@ import {
   breadcrumbSchema,
   serializeJsonLd,
   type Crumb,
+  type Faq,
 } from "@/lib/seo/json-ld";
 
 /**
@@ -272,6 +273,27 @@ export function Answer({
         {children}
       </div>
     </div>
+  );
+}
+
+/** Visible FAQ. Pair with `faqPageSchema` over the same `faqs`. */
+export function FaqList({ faqs }: { faqs: Faq[] }) {
+  return (
+    <dl className="grid gap-4">
+      {faqs.map((faq) => (
+        <div
+          key={faq.question}
+          className="rounded-2xl border border-card-light dark:border-off-dark bg-white dark:bg-dark p-6"
+        >
+          <dt className="text-lg font-bold text-dark dark:text-white">
+            {faq.question}
+          </dt>
+          <dd className="mt-2 text-dark/80 dark:text-off-white leading-relaxed">
+            {faq.answer}
+          </dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

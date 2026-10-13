@@ -1,8 +1,8 @@
 import Link from "next/link";
 import {
-  Answer,
   BulletList,
   CtaPanel,
+  FaqList,
   JsonLd,
   LinkCards,
   PageContainer,
@@ -26,12 +26,17 @@ import {
   alternativePath,
 } from "@/data/marketing/competitors";
 import { ALTERNATIVES_HUB, ogImageFor } from "@/data/marketing/pages";
-import { webPageSchema, siteGraph } from "@/lib/seo/json-ld";
+import {
+  faqPageSchema,
+  siteGraph,
+  webPageSchema,
+  type Faq,
+} from "@/lib/seo/json-ld";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 
-const TITLE = "Alternatives to Kahoot, Slido, Mentimeter and Quizizz";
+const TITLE = "Open-Source Kahoot, Wayground, Slido & Mentimeter Alternatives";
 const DESCRIPTION =
-  "How Buzrr, an open-source live quiz platform, compares with Kahoot!, Slido, Mentimeter, Quizizz and QuizUp — and when another tool fits better.";
+  "How Buzrr, an open-source live quiz platform, compares with Kahoot!, Wayground (formerly Quizizz), Slido, Mentimeter and QuizUp — and when another tool fits better.";
 
 export const metadata = buildPageMetadata({
   title: TITLE,
@@ -47,12 +52,31 @@ const crumbs = [
 
 /** Plain-language routing: which tool fits which need. */
 const CHOOSING = [
-  "You want a live, competitive quiz game on players' own devices — Buzrr, Kahoot! and Quizizz/Wayground all run one; Buzrr is the open-source one.",
+  "You want a live, competitive quiz game on players' own devices — Buzrr, Kahoot! and Wayground (formerly Quizizz) all run one; Buzrr is the open-source one.",
   "You want to self-host or audit the code — of the tools here, only Buzrr is open source.",
   "You want ranked 1v1 quiz battles like QuizUp had — Buzrr's duel mode.",
   "You need audience Q&A, polls or word clouds — Slido or Mentimeter; Buzrr doesn't do these.",
+  "You want quiz or trivia games without Q&A and polls — Buzrr; Slido runs quizzes as one feature of a meeting tool.",
   "You want quiz questions inside a presentation — Mentimeter's quiz slides, or Slido's slide integrations.",
   "You assign self-paced homework, need LMS integration or accommodations — Wayground (formerly Quizizz) or Kahoot!'s self-paced challenges; Buzrr is live only.",
+];
+
+const FAQS: Faq[] = [
+  {
+    question: "Is Buzrr free?",
+    answer:
+      "Yes, there is a free plan with no time limit. Buzrr Pro raises room size, quiz and AI limits. Self-hosting the open-source code is free.",
+  },
+  {
+    question: "Is Buzrr open source?",
+    answer:
+      "Yes. The whole application is on GitHub under the AGPL-3.0 license, and you can run your own instance.",
+  },
+  {
+    question: "Which of these tools can be self-hosted?",
+    answer:
+      "Of the tools on this page, only Buzrr. Kahoot!, Wayground (formerly Quizizz), Slido and Mentimeter are cloud services.",
+  },
 ];
 
 export default function AlternativesHubPage() {
@@ -68,13 +92,14 @@ export default function AlternativesHubPage() {
             type: "CollectionPage",
           }),
           breadcrumbSchema(crumbs),
+          faqPageSchema(ALTERNATIVES_HUB.path, FAQS),
         ]}
       />
       <PageHero
         crumbs={crumbs}
         eyebrow="Alternatives"
         title={TITLE}
-        lead="Buzrr is one of several ways to run a live quiz. This page lays out what each popular tool is built for, where Buzrr overlaps with it, and where it doesn't — so you can pick the right one, even if that isn't us."
+        lead="Buzrr is a free, open-source and self-hostable alternative to Kahoot!, Wayground (Quizizz), Slido and Mentimeter for live quiz games. Here is what each tool is built for, so you can pick the right one, even if that isn't us."
         primary={{ label: "Try Buzrr free", href: "/admin" }}
         secondary={{
           label: "See it on GitHub",
@@ -171,7 +196,7 @@ export default function AlternativesHubPage() {
 
       <Section
         title="Side-by-side comparisons"
-        intro="Feature tables with a source for every competitor claim, and unknowns marked as unknown."
+        intro="Feature and pricing tables — free limits, self-hosting, offline use, joining, AI and 1v1 play — with a source for every competitor claim."
       >
         <LinkCards items={compareCards(COMPARE_SLUGS)} />
       </Section>
@@ -194,24 +219,14 @@ export default function AlternativesHubPage() {
       </Section>
 
       <Section title="Common questions">
-        <div className="grid gap-4">
-          <Answer question="Is Buzrr free?">
-            <p>
-              Yes, there is a free plan with no time limit. Buzrr Pro raises
-              room size, quiz and AI limits — see{" "}
-              <Link href="/pricing" className="underline underline-offset-4">
-                Buzrr pricing
-              </Link>
-              . Self-hosting the open-source code is free.
-            </p>
-          </Answer>
-          <Answer question="Is Buzrr open source?">
-            <p>
-              Yes. The whole application is on GitHub under the AGPL-3.0
-              license, and you can run your own instance.
-            </p>
-          </Answer>
-        </div>
+        <FaqList faqs={FAQS} />
+        <p className="mt-4 text-dark/80 dark:text-off-white">
+          Plan details are on{" "}
+          <Link href="/pricing" className="underline underline-offset-4">
+            Buzrr pricing
+          </Link>
+          .
+        </p>
       </Section>
 
       <CtaPanel
