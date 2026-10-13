@@ -39,7 +39,8 @@
     "STORAGE_LOCAL_DIR",
     "STORAGE_PUBLIC_URL",
     "MEDIA_ORIGIN",
-    "NEXT_IMAGE_UNOPTIMIZED"
+    "NEXT_IMAGE_UNOPTIMIZED",
+    "NEXT_IMAGE_ALLOW_LOCAL_IP"
   ],
   "tasks": {
     "build": {

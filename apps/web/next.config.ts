@@ -29,6 +29,11 @@ function selfHostedImageOrigins(): RemotePattern[] {
 
 const selfHostedOrigins = selfHostedImageOrigins();
 
+// Letting the optimizer fetch private/loopback IPs is an SSRF surface, so it
+// is an explicit opt-in, and while on it fetches only the self-hosted origins
+// (never the any-https-host pattern, which would reach internal hosts too).
+const allowLocalIP = process.env.NEXT_IMAGE_ALLOW_LOCAL_IP === "1";
+
 const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
@@ -73,16 +78,17 @@ const nextConfig: NextConfig = {
     // self-host image sets this and lets browsers load images directly.
     unoptimized: process.env.NEXT_IMAGE_UNOPTIMIZED === "1",
     // Next 16 refuses to optimize images from private/loopback IPs. A
-    // self-hosted http media origin is usually exactly that (localhost, LAN),
-    // so allow it only when the operator configured one.
-    dangerouslyAllowLocalIP: selfHostedOrigins.length > 0,
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "**",
-      },
-      ...selfHostedOrigins,
-    ],
+    // self-hosted http media origin is usually exactly that (localhost, LAN).
+    dangerouslyAllowLocalIP: allowLocalIP,
+    remotePatterns: allowLocalIP
+      ? selfHostedOrigins
+      : [
+          {
+            protocol: "https",
+            hostname: "**",
+          },
+          ...selfHostedOrigins,
+        ],
   },
 };
 
