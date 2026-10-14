@@ -1,8 +1,8 @@
 "use client";
 import clsx from "clsx";
 import Image from "next/image";
-import { useAppSelector } from "@/state/hooks";
 import { PageTheme } from "@/state/pageThemeSlice";
+import { useRenderedTheme } from "@/hooks/useRenderedTheme";
 
 const ClientImage = ({
   props,
@@ -16,7 +16,7 @@ const ClientImage = ({
     classname?: string;
   };
 }) => {
-  const theme = useAppSelector((state) => state.pageTheme.theme);
+  const theme = useRenderedTheme();
 
   return (
     <>

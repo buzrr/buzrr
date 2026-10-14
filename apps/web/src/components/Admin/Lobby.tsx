@@ -163,7 +163,7 @@ const Lobby = (params: {
   const startDisabled = players.length === 0 || load || !socket?.connected;
 
   return (
-    <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 pb-16 md:pb-0 md:h-[calc(100dvh-7rem)] text-dark dark:text-white">
+    <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 pb-4 md:pb-0 md:h-[calc(100dvh-10rem)] text-dark dark:text-white">
       <div className="flex flex-wrap md:flex-nowrap items-center gap-2.5 md:gap-[18px] py-3.5 md:py-[18px] shrink-0">
         <ConnectionStatusPill className="!shadow-none !text-[13px] !font-semibold !px-3 !py-1.5 !border-lprimary/15 dark:!border-white/10 !bg-white dark:!bg-white/5" />
         <div className="order-last md:order-none basis-full md:basis-auto flex-1 min-w-0 flex flex-col md:flex-row md:items-baseline gap-0.5 md:gap-3">

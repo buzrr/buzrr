@@ -83,8 +83,9 @@ Common types: `feat`, `fix`, `refactor`, `docs`, `chore`, `test`, `ci`.
 ## Adding a question type
 
 Question types are plugins: the game engine never needs to change
-([ADR-011](docs/adr/011-pluggable-question-types.md)). Using a hypothetical
-`true_false` type as the example:
+([ADR-011](docs/adr/011-pluggable-question-types.md)). Six ship today
+(multiple choice, true / false, poll, word cloud, rating, open text). Using a
+hypothetical `ordering` type as the example:
 
 1. **Contract** — in
    [`packages/contract/src/question-types.ts`](packages/contract/src/question-types.ts),
@@ -92,18 +93,23 @@ Question types are plugins: the game engine never needs to change
    settings), `answer` (what a player sends), `publicQuestion` (what players
    see — never the answer key) and `summary` (what the reveal shows, with a
    `type` literal). Add it to `QUESTION_TYPES`, the three unions and
-   `QuestionTypeMap`.
+   `QuestionTypeMap` (and `SCORED_TYPES` if it awards points). Reuse an
+   existing answer shape where one fits; a new one must be `.strict()` and
+   not overlap the others in `questionAnswerSchema`.
 2. **Server handler** — create
-   `apps/server/src/modules/question-types/types/true-false.ts` implementing
-   `QuestionTypeHandler<"true_false">` (`validateDefinition`, `checkAnswer`,
-   `score`, `toPublic`, `summarize`, `sampleAnswer` for duel bots) and
-   register it in `registry.ts`. Handlers must be pure — no I/O, randomness
+   `apps/server/src/modules/question-types/types/ordering.ts` implementing
+   `QuestionTypeHandler<"ordering">` (`scored`, `validateDefinition`,
+   `checkAnswer`, `score`, `toPublic`, `summarize`, `sampleAnswer` for duel
+   bots, `duelEligible`) and register it in `registry.ts`. Unscored types
+   automatically get live host results and stay out of moderation and duels. Handlers must be pure — no I/O, randomness
    only through the `random` argument.
 3. **Web renderer** — create
-   `apps/web/src/components/QuestionTypes/TrueFalse.tsx` implementing
-   `QuestionRenderer<"true_false">` (`AnswerInput`, `HostPrompt`,
+   `apps/web/src/components/QuestionTypes/Ordering.tsx` implementing
+   `QuestionRenderer<"ordering">` (`AnswerInput`, `HostPrompt` — which gets
+   the `live` summary for unscored types —
    `RevealBreakdown`, `revealStats`, `describeAnswer`, `correctAnswers`) and
-   register it in `index.tsx`.
+   register it in `index.tsx`, plus a `QUESTION_TYPE_META` entry and icon in
+   `meta.tsx`.
 4. **Tests** — a spec next to
    `apps/server/src/modules/question-types/__tests__/multiple-choice.spec.ts`
    covering validation, answer checking, scoring, `toPublic` (no answer
@@ -111,9 +117,9 @@ Question types are plugins: the game engine never needs to change
 
 `yarn check-types` tells you when you've missed a step: both registries are
 exhaustive over `QuestionType`, so a type without a handler or a renderer
-doesn't compile. Authoring UI is separate — the question editor posts
-`type`, `config` and an `options` JSON array to
-`POST /api/quizzes/:quizId/questions`.
+doesn't compile. Authoring UI is separate — the question editor
+(`AddQuesForm`) posts `type`, `config` and an `options` JSON array to
+`POST /api/quizzes/:quizId/questions`; add the type's settings there.
 
 ## Pull request checklist
 

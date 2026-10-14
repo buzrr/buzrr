@@ -2,12 +2,12 @@
 import clsx from "clsx";
 import Image from "next/image";
 import type { ReactNode } from "react";
-import { LuCheck, LuClock, LuX } from "react-icons/lu";
+import { LuCheck, LuClock, LuSend, LuX } from "react-icons/lu";
 import type { PublicQuestion, QuestionAnswer } from "@buzrr/contract";
 import { DEFAULT_AVATAR } from "@/constants";
 import { useAppSelector } from "@/state/hooks";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
-import { AnswerInput } from "@/components/QuestionTypes";
+import { AnswerInput, QuestionTypePill } from "@/components/QuestionTypes";
 import {
   GameTopBar,
   StatTile,
@@ -36,6 +36,15 @@ const STATUS = {
       "bg-[#e5544e] shadow-[0_0_0_8px_rgba(229,84,78,0.14),0_0_0_16px_rgba(229,84,78,0.06)] md:shadow-[0_0_0_14px_rgba(229,84,78,0.14),0_0_0_30px_rgba(229,84,78,0.06)]",
     accent: "text-[#e5544e]",
     answer: "border-[#e5544e] bg-[#e5544e]/8",
+  },
+  /** An unscored question (poll, word cloud, …): nothing to get right. */
+  received: {
+    heading: "Response received",
+    icon: <LuSend size={48} strokeWidth={2.6} />,
+    circle:
+      "bg-lprimary dark:bg-dprimary shadow-[0_0_0_8px_rgba(124,77,219,0.14),0_0_0_16px_rgba(124,77,219,0.06)] md:shadow-[0_0_0_14px_rgba(124,77,219,0.14),0_0_0_30px_rgba(124,77,219,0.06)]",
+    accent: "text-lprimary dark:text-dprimary",
+    answer: "border-lprimary/40 dark:border-dprimary/40 bg-lprimary/8",
   },
   timesout: {
     heading: "Time's up!",
@@ -85,6 +94,8 @@ const QuestionAndResult = (params: {
   /** The answer sent (or being sent) for the open question. */
   answer?: QuestionAnswer | null;
   locked?: boolean;
+  /** The question takes more answers: no "waiting" footer after one. */
+  canAddMore?: boolean;
   status?: keyof typeof STATUS;
   /** Points earned this question (result screen). */
   points?: number;
@@ -117,7 +128,8 @@ const QuestionAndResult = (params: {
   // than overflow: a long title, or long options below it, gets a smaller one.
   const longTitle =
     (params.question?.title.length ?? 0) > 120 ||
-    (params.question?.type === "multiple_choice" &&
+    (params.question !== undefined &&
+      "options" in params.question &&
       params.question.options.some((o) => o.title.length > 80));
 
   function handleSubmit(answer: QuestionAnswer) {
@@ -245,10 +257,21 @@ const QuestionAndResult = (params: {
                   width={500}
                 />
               )}
-            <span className="hidden md:inline-block w-fit text-[12.5px] font-bold tracking-[0.06em] uppercase rounded-full px-3 py-1.5 text-lprimary dark:text-dprimary bg-lprimary/8 dark:bg-white/5">
-              Question {qIndex + 1}
-              {qCount > 0 && ` of ${qCount}`}
-            </span>
+            <div
+              className={clsx(
+                "flex flex-wrap items-center gap-2",
+                params.question?.type !== "multiple_choice" && "mb-3 md:mb-0",
+              )}
+            >
+              {params.question &&
+                params.question.type !== "multiple_choice" && (
+                  <QuestionTypePill type={params.question.type} />
+                )}
+              <span className="hidden md:inline-block w-fit text-[12.5px] font-bold tracking-[0.06em] uppercase rounded-full px-3 py-1.5 text-lprimary dark:text-dprimary bg-lprimary/8 dark:bg-white/5">
+                Question {qIndex + 1}
+                {qCount > 0 && ` of ${qCount}`}
+              </span>
+            </div>
             <h2
               className={clsx(
                 "md:mt-[18px] font-bold tracking-[-0.02em] leading-[1.22] text-pretty wrap-break-word animate-fade-up",
@@ -267,7 +290,7 @@ const QuestionAndResult = (params: {
                 onSubmit={handleSubmit}
               />
             )}
-            {params.locked && (
+            {params.locked && !params.canAddMore && (
               <div className="mt-6 flex justify-center animate-fade-up">
                 <WaitingDots>
                   Answer received — waiting for the results
@@ -302,7 +325,9 @@ const QuestionAndResult = (params: {
             >
               {params.status === "timesout"
                 ? "No answer this round"
-                : `+${params.points ?? 0} points`}
+                : params.status === "received"
+                  ? "Not scored — thanks for answering"
+                  : `+${params.points ?? 0} points`}
             </span>
             <div className="mt-3 md:mt-[22px] flex flex-col gap-3 md:gap-4 w-full max-w-[420px] animate-fade-up [animation-delay:150ms]">
               <AnswerRow
@@ -313,6 +338,7 @@ const QuestionAndResult = (params: {
                 {params.yourAnswer}
               </AnswerRow>
               {params.status !== "correct" &&
+                params.status !== "received" &&
                 params.correctAnswers?.map((node, i) => (
                   <AnswerRow
                     key={i}

@@ -57,6 +57,33 @@ as a handler.
   multiple choice; the API already accepts `type`, `config` and an `options`
   JSON array.
 
+## Amendment (2026-10-14): six types, scoring and live results
+
+- Types now: `multiple_choice` (4 options; single choice by default, or
+  `config.multiSelect` — the editor's "Multiple correct answers" toggle —
+  where players tick a set and only the exact set scores; unset on older
+  rows means "multiple if more than one option is correct"), `true_false`,
+  `poll` (optional multi-select), `word_cloud`, `rating` (1–5, 1–10 or stars)
+  and `open_text`. The last four are **unscored**: `handler.scored = false`,
+  answers are never correct and score 0.
+- Handlers gained `scored` and `duelEligible(definition)`. Duels need one
+  right answer for a head-to-head score, so only single-answer multiple
+  choice (`multiSelect` off) and true / false are eligible; moderation and the duel pool use
+  this (backend.md § Moderation).
+- `summarize` now takes `{ answer, author }` entries, oldest first, so open
+  text can name its authors (or not, when anonymous).
+- New socket event `live-summary`, host room only, throttled to ~1/s in the
+  engine shell, for unscored types (realtime.md § submit-answer step 7).
+  Scored types still reveal only at question end. `HostPrompt` renderers get
+  the `live` summary.
+- Word cloud and open text can take **multiple submissions** (a per-question
+  toggle): handlers gained optional `acceptsMoreAnswers` / `mergeAnswers`,
+  further answers are merged into the stored one (no early close, server cap
+  of 10 per player), and open text is stored as `{ entries }`. Their time
+  slider runs 15–75s with a 45s default.
+- Out of scope for now: "show results on players' screens", the word-cloud
+  profanity filter and open-text host review.
+
 ## Evidence
 
 `packages/contract/src/question-types.ts`,

@@ -428,6 +428,11 @@ export class RealtimeGateway
       );
       if (snapshot) {
         socket.emit("state-sync", snapshot);
+        // A (re)connecting host gets the running results right away rather
+        // than on the next answer.
+        if (socket.data.isRoomHost && snapshot.phase === "question") {
+          await this.engine.sendLiveSummary(socket.data.gameCode);
+        }
       }
     } catch (error) {
       this.logger.error("Error sending state snapshot:", error);

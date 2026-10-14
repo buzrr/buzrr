@@ -8,6 +8,7 @@ import reducer, {
   applySync,
   gameOver,
   gameProgress,
+  liveSummary,
   questionEnd,
   questionStart,
   resetGame,
@@ -25,11 +26,18 @@ const question = (id: string): PublicQuestion => ({
     { id: `${id}-a`, title: "A" },
     { id: `${id}-b`, title: "B" },
   ],
+  multiSelect: false,
 });
 
 const reveal = (index: number): QuestionEndPayload => ({
   index,
-  summary: { type: "multiple_choice", counts: [1, 0], correctOptionIds: [] },
+  summary: {
+    type: "multiple_choice",
+    counts: [1, 0],
+    responses: 1,
+    correctOptionIds: [],
+    correct: 0,
+  },
   avgTimeMs: null,
 });
 
@@ -170,5 +178,51 @@ describe("applySync", () => {
 
     expect(after.phase).toBe("reveal");
     expect(after.qIndex).toBe(1);
+  });
+});
+
+describe("liveSummary", () => {
+  const live = (index: number, answered: number) =>
+    liveSummary({
+      index,
+      answered,
+      summary: { type: "poll", counts: [answered, 0], responses: answered },
+    });
+
+  it("keeps the summary that counts the most answers", () => {
+    let state = reducer(onQuestion(0), live(0, 3));
+    state = reducer(state, live(0, 2));
+    expect(state.liveSummary?.answered).toBe(3);
+    state = reducer(state, live(0, 4));
+    expect(state.liveSummary?.answered).toBe(4);
+  });
+
+  it("ignores a summary for another question", () => {
+    const state = reducer(onQuestion(1), live(0, 3));
+    expect(state.liveSummary).toBeNull();
+  });
+
+  it("clears when the next question opens or the snapshot moves on", () => {
+    const held = reducer(onQuestion(0), live(0, 3));
+    expect(
+      reducer(
+        held,
+        questionStart({
+          index: 1,
+          qCount: 3,
+          question: question("q1"),
+          remainingMs: 10_000,
+        }),
+      ).liveSummary,
+    ).toBeNull();
+    // A same-question snapshot keeps it; the host is re-sent one right after.
+    expect(
+      reducer(held, applySync(sync({ phase: "question", qIndex: 0 })))
+        .liveSummary?.answered,
+    ).toBe(3);
+    expect(
+      reducer(held, applySync(sync({ phase: "reveal", qIndex: 0 })))
+        .liveSummary,
+    ).toBeNull();
   });
 });

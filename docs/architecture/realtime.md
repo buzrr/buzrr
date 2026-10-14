@@ -165,13 +165,34 @@ quitter finish on score instead of forfeiting.
    far) — the host's "answers in" meter; question-phase `state-sync` carries
    the same number as `answeredCount` for reconnects — then, if every
    connected player has answered, closes the question early.
+   **Exception — multiple submissions.** Word cloud and open text with
+   `config.multipleSubmissions` (`handler.acceptsMoreAnswers`) take further
+   answers: when `recordAnswer` reports a duplicate, the shell reads the
+   stored answer, folds the new one in with the type's `mergeAnswers`
+   (capped at `MAX_SUBMISSIONS` = 10 per player) and writes it back with a
+   compare-and-set Lua script (`replaceAnswer`, retried on a lost race).
+   Timing, score (0) and the answer count are unchanged, and such a
+   question **never closes early** — it runs to its deadline or the host's
+   Next (`onAnswerRecorded`, which is why `answer-recorded` and
+   `roster-changed` load `questions`). The `submit-answer` ack carries the
+   stored answer so the client shows everything sent so far.
+7. **Unscored types only** (poll, word cloud, rating, open text): the shell
+   schedules a `live-summary` — a per-game, per-instance trailing timer
+   (`LIVE_SUMMARY_MS` = 1s) that reads the open question's answers and
+   roster, runs the type's `summarize`, and emits `{ index, answered,
+summary }` to `host:{gameCode}` only. A host's `state-sync` is followed by
+   one immediately. It is best effort (several instances may each send one;
+   the client keeps the highest `answered`) and never runs for scored types:
+   the host screen is projected, so it would leak the answer.
 
 **Cost per answer** (the hot path, once per player per question): one
 pipelined read (`HGETALL` meta, `GET` questions, `HGETALL` players), one
 `EVAL`, and one `PUBLISH` for `answer-count` — 5 commands, measured on a real
 Redis by `game-engine/__tests__/answer-cost.spec.ts`. It was 10 + 1 `PUBLISH`
 (and 4 `MULTI`/`EXEC`) before the read was shared and the writes merged. If
-you add a Redis call here, update that spec's expected list on purpose.
+you add a Redis call here, update that spec's expected list on purpose. The
+live summary (step 7) stays off this path: one read per second per game,
+however many answers arrive.
 
 **Window stamping.** Opening a question (`openQuestion` in the core) writes the `games:deadlines` entry, then
 opens the phase in one meta write carrying `qStartAt = now`,
@@ -237,7 +258,8 @@ masked until the reveal (`buildSnapshot`).
   during the reveal, and reveal-phase `state-sync`) carry `delta` — points earned on that question;
   final/ended leaderboards omit it.
 - Event names: `question-start`, `question-end`, `answer-result`,
-  `answer-count`, `leaderboard`, `game-over`, `state-sync`, `player-connection`,
+  `answer-count`, `live-summary` (host room only), `leaderboard`, `game-over`,
+  `state-sync`, `player-connection`,
   `player-joined/removed/left`, `game-started`, `game-session-ended`, plus the
   `duel:*` family.
 - `game-started` carries `remainingMs` until question 1 opens (the server's

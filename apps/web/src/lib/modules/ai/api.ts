@@ -1,4 +1,5 @@
 import type { AxiosInstance } from "axios";
+import type { QuestionType } from "@buzrr/contract";
 import { getAiApiClient } from "@/lib/api/ai-client";
 import { getAuthApiClient } from "@/lib/api/client";
 
@@ -187,6 +188,7 @@ export async function importAsQuiz(
     description?: string;
     questions: {
       title: string;
+      type?: QuestionType;
       timeOut?: number;
       options: GeneratedOption[];
     }[];

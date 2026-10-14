@@ -5,11 +5,14 @@ import { LuMoon, LuSun } from "react-icons/lu";
 import { useAppSelector, useAppDispatch } from "@/state/hooks";
 import { PageTheme, setPageTheme } from "@/state/pageThemeSlice";
 import { withThemeTransition } from "@/utils/themeTransition";
+import { useRenderedTheme } from "@/hooks/useRenderedTheme";
 
 /** Compact sun/moon theme switch for the landing navbar. */
 const ThemeIconToggle = () => {
   const theme = useAppSelector((state) => state.pageTheme.theme);
   const dispatch = useAppDispatch();
+  // What to draw; `theme` (the stored one) drives the class and the toggle.
+  const shown = useRenderedTheme();
 
   useEffect(() => {
     if (theme === PageTheme.dark) {
@@ -35,7 +38,7 @@ const ThemeIconToggle = () => {
       onClick={handler}
       className="flex items-center justify-center size-9 rounded-full text-dark dark:text-white bg-card-light dark:bg-card-dark hover:bg-cardhover-light dark:hover:bg-cardhover-dark transition-colors"
     >
-      {theme === PageTheme.dark ? <LuSun size={16} /> : <LuMoon size={16} />}
+      {shown === PageTheme.dark ? <LuSun size={16} /> : <LuMoon size={16} />}
     </button>
   );
 };

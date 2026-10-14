@@ -1,4 +1,5 @@
 import type { AxiosInstance } from "axios";
+import type { QuestionType } from "@buzrr/contract";
 import type { GameSession, Quiz } from "@/types/db";
 import type { GameResult } from "@/lib/modules/game-sessions/api";
 import { getAuthApiClient } from "@/lib/api/client";
@@ -67,6 +68,7 @@ export async function importQuiz(
     description?: string;
     questions: {
       title: string;
+      type?: QuestionType;
       timeOut?: number;
       options: { title: string; isCorrect: boolean }[];
     }[];

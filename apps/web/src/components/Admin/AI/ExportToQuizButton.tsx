@@ -32,6 +32,10 @@ export default function ExportToQuizButton({
         description: "Generated from a Buzrr AI knowledge space",
         questions: keepers.map((question) => ({
           title: question.stem,
+          type:
+            question.type === "TRUE_FALSE"
+              ? ("true_false" as const)
+              : ("multiple_choice" as const),
           options: question.options,
         })),
       },

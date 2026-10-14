@@ -15,7 +15,11 @@ import {
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
 import { EntitlementsService } from "../billing/entitlements.service";
-import { QuestionDefinitionError, validateDefinition } from "../question-types";
+import {
+  isDuelEligible,
+  QuestionDefinitionError,
+  validateDefinition,
+} from "../question-types";
 import { CreateAiQuizDto } from "./dto/create-ai-quiz.dto";
 import { CreateQuizDto } from "./dto/create-quiz.dto";
 
@@ -130,10 +134,28 @@ export class QuizzesService {
       });
       // Going public submits never-yet-submitted questions for review;
       // already-decided ones (pending/approved/unapproved) are left alone.
+      // Review only feeds the duel pool, so questions duels can't play are
+      // set aside as unapproved instead.
       if (updated.count > 0 && dto.isPublic === true) {
-        await tx.question.updateMany({
+        const drafts = await tx.question.findMany({
           where: { quizId, moderationStatus: "draft" },
+          select: { id: true, type: true, config: true, options: true },
+        });
+        const eligible = drafts.filter((q) =>
+          isDuelEligible(q.type, { options: q.options, config: q.config }),
+        );
+        const eligibleIds = new Set(eligible.map((q) => q.id));
+        await tx.question.updateMany({
+          where: { id: { in: [...eligibleIds] } },
           data: { moderationStatus: "pending" },
+        });
+        await tx.question.updateMany({
+          where: {
+            id: {
+              in: drafts.filter((q) => !eligibleIds.has(q.id)).map((q) => q.id),
+            },
+          },
+          data: { moderationStatus: "unapproved" },
         });
       }
       return updated;

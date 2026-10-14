@@ -9,7 +9,11 @@ import { toast } from "react-toastify";
 import { useAppSelector } from "@/state/hooks";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
 import { buildJoinUrl } from "@/lib/join-link";
-import { HostPrompt } from "@/components/QuestionTypes";
+import {
+  HostPrompt,
+  QuestionTypePill,
+  isScoredType,
+} from "@/components/QuestionTypes";
 import {
   TimerRing,
   labelClass,
@@ -38,6 +42,7 @@ export default function QuestionScreen(props: QuestionScreenProps) {
   const qCount = useAppSelector((state) => state.game.qCount);
   const answered = useAppSelector((state) => state.game.answeredCount);
   const players = useAppSelector((state) => state.game.players);
+  const live = useAppSelector((state) => state.game.liveSummary);
   const remaining = useServerCountdown(deadline);
   const [copied, setCopied] = useState(false);
   const [canShare, setCanShare] = useState(false);
@@ -78,6 +83,7 @@ export default function QuestionScreen(props: QuestionScreenProps) {
   const total = Math.max(players.filter((p) => p.connected).length, answered);
   const answeredPct = total > 0 ? (answered / total) * 100 : 0;
   const left = qCount - (qIndex + 1);
+  const scored = isScoredType(question.type);
 
   return (
     <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3.5 md:gap-5 md:pb-[18px]">
@@ -185,8 +191,13 @@ export default function QuestionScreen(props: QuestionScreenProps) {
           <span className="text-[12.5px] font-bold tracking-[0.06em] uppercase rounded-full px-3 py-1.5 text-lprimary dark:text-dprimary bg-lprimary/8 dark:bg-white/5">
             Question {qIndex + 1} of {qCount}
           </span>
+          {question.type !== "multiple_choice" && (
+            <QuestionTypePill type={question.type} />
+          )}
           <span className={clsx("text-[13px]", mutedText)}>
-            {question.timeOut}s to answer
+            {scored
+              ? `${question.timeOut}s to answer`
+              : "Not scored · results update live"}
           </span>
         </div>
         {question.mediaType === "image" && question.media && (
@@ -206,7 +217,10 @@ export default function QuestionScreen(props: QuestionScreenProps) {
         >
           {question.title}
         </h2>
-        <HostPrompt question={question} />
+        <HostPrompt
+          question={question}
+          live={live?.index === qIndex ? live.summary : null}
+        />
         <div className="flex flex-wrap md:flex-nowrap items-center gap-3.5 mt-[22px] pt-5 border-t border-lprimary/15 dark:border-white/10">
           <p
             className={clsx(

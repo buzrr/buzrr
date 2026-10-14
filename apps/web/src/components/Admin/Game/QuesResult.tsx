@@ -14,7 +14,12 @@ import {
   useBanRoomPlayerMutation,
   useRemoveRoomPlayerMutation,
 } from "@/lib/modules/game-sessions/hooks";
-import { RevealBreakdown, revealStats } from "@/components/QuestionTypes";
+import {
+  RevealBreakdown,
+  revealStats,
+  QuestionTypePill,
+  isScoredType,
+} from "@/components/QuestionTypes";
 import {
   StatTile,
   labelClass,
@@ -96,6 +101,7 @@ export default function QuesResult(props: QuesResultProps) {
       ? `${(reveal.avgTimeMs / 1000).toFixed(1)}s`
       : "—";
   const isLastQuestion = qIndex === qCount - 1;
+  const scored = question ? isScoredType(question.type) : true;
 
   // Start on the pre-question standings, then count scores up and let rows
   // glide into their new ranks.
@@ -160,18 +166,26 @@ export default function QuesResult(props: QuesResultProps) {
         )}
       >
         <div>
-          <span className={labelClass}>Question {qIndex + 1} results</span>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className={labelClass}>Question {qIndex + 1} results</span>
+            {question && !scored && <QuestionTypePill type={question.type} />}
+          </div>
           <h2 className="mt-2 text-lg md:text-[22px] font-bold leading-[1.3] tracking-[-0.01em] text-pretty wrap-break-word">
             {question?.title}
           </h2>
         </div>
-        <div className="grid grid-cols-3 gap-2 md:gap-3">
+        <div
+          className={clsx(
+            "grid gap-2 md:gap-3",
+            scored ? "grid-cols-3" : "grid-cols-2",
+          )}
+        >
           <StatTile
             value={responses}
             suffix={` /${players.length}`}
             label="Responses"
           />
-          <StatTile value={`${correctPct}%`} label="Got it right" />
+          {scored && <StatTile value={`${correctPct}%`} label="Got it right" />}
           <StatTile value={avgTime} label="Avg. answer time" />
         </div>
         {question && reveal && (

@@ -72,8 +72,8 @@ export function QuizInfoContent(props: {
             }
           />
           <span className="text-sm max-w-[250px]">
-            Public — questions are submitted for admin review before appearing
-            in 1v1 duels
+            Public — scored questions are submitted for admin review before
+            appearing in 1v1 duels
           </span>
         </div>
         {showHostForm && (

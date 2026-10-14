@@ -3,6 +3,7 @@ import type {
   AnswerCountPayload,
   AnswerResultPayload,
   GamePhase,
+  LiveSummaryPayload,
   LeaderboardEntry,
   PublicQuestion,
   QuestionEndPayload,
@@ -31,6 +32,11 @@ export interface GameLiveState {
   countdownMs: number;
   /** Answers received for the open question (host meter). */
   answeredCount: number;
+  /**
+   * Host only: running results of an unscored open question
+   * (`live-summary`). Best effort — the highest `answered` wins.
+   */
+  liveSummary: LiveSummaryPayload | null;
   reveal: QuestionEndPayload | null;
   leaderboard: LeaderboardEntry[];
   isFinalLeaderboard: boolean;
@@ -58,6 +64,7 @@ const initialState: GameLiveState = {
   deadline: 0,
   countdownMs: 0,
   answeredCount: 0,
+  liveSummary: null,
   reveal: null,
   leaderboard: [],
   isFinalLeaderboard: false,
@@ -119,6 +126,11 @@ const gameSlice = createSlice({
         s.remainingMs === undefined ? 0 : Date.now() + s.remainingMs;
       state.countdownMs = s.phase === "starting" ? (s.remainingMs ?? 0) : 0;
       state.answeredCount = s.answeredCount ?? 0;
+      // The host is sent a fresh summary right after its snapshot; keep the
+      // one already held while it still belongs to the open question.
+      if (s.phase !== "question" || state.liveSummary?.index !== s.qIndex) {
+        state.liveSummary = null;
+      }
       state.reveal = s.reveal ?? null;
       state.leaderboard = s.leaderboard ?? [];
       state.isFinalLeaderboard = s.phase === "final" || s.phase === "ended";
@@ -140,6 +152,7 @@ const gameSlice = createSlice({
       state.question = q.question;
       state.deadline = Date.now() + q.remainingMs;
       state.answeredCount = 0;
+      state.liveSummary = null;
       state.reveal = null;
       state.you = null;
     },
@@ -154,6 +167,17 @@ const gameSlice = createSlice({
     answerCount: (state, action: PayloadAction<AnswerCountPayload>) => {
       if (action.payload.index === state.qIndex) {
         state.answeredCount = action.payload.answered;
+      }
+    },
+    liveSummary: (state, action: PayloadAction<LiveSummaryPayload>) => {
+      const live = action.payload;
+      if (
+        state.phase === "question" &&
+        live.index === state.qIndex &&
+        (state.liveSummary?.index !== live.index ||
+          live.answered >= state.liveSummary.answered)
+      ) {
+        state.liveSummary = live;
       }
     },
     leaderboardReceived: (
@@ -218,6 +242,7 @@ export const {
   questionEnd,
   answerResult,
   answerCount,
+  liveSummary,
   leaderboardReceived,
   gameOver,
   playerConnection,

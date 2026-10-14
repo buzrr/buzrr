@@ -5,6 +5,10 @@ import ShowMedia from "./ShowMediaComp";
 import Image from "next/image";
 import { LuClock, LuGripVertical } from "react-icons/lu";
 import AddQuesForm from "./AddQuesForm";
+import QuestionCardBody, {
+  QuestionTypeTag,
+  cardType,
+} from "./QuestionCardBody";
 import BasicModal from "@/components/Modal";
 import { toast } from "react-toastify";
 import { useMemo, useState } from "react";
@@ -149,47 +153,15 @@ export default function AllQues(props: { quizId: string }) {
                                   </span>{" "}
                                   {ques?.title}
                                 </p>
-                                <span className="shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap rounded-[9px] px-3 py-1.5 text-[13px] font-bold bg-lprimary/10 dark:bg-white/5">
-                                  <LuClock size={14} />
-                                  {ques?.timeOut} sec
-                                </span>
+                                <div className="shrink-0 flex flex-col md:flex-row items-end md:items-center gap-1.5">
+                                  <QuestionTypeTag type={cardType(ques)} />
+                                  <span className="shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap rounded-[9px] px-3 py-1.5 text-[13px] font-bold bg-lprimary/10 dark:bg-white/5">
+                                    <LuClock size={14} />
+                                    {ques?.timeOut} sec
+                                  </span>
+                                </div>
                               </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                                {ques?.options?.map(
-                                  (
-                                    op: { title?: string; isCorrect?: boolean },
-                                    opIndex: number,
-                                  ) => (
-                                    <p
-                                      key={opIndex}
-                                      className={clsx(
-                                        "flex items-center gap-[11px] rounded-xl border-[1.5px] px-3.5 py-3 text-[14.5px] wrap-break-word min-w-0",
-                                        op.isCorrect
-                                          ? "font-semibold border-lprimary dark:border-dprimary bg-lprimary/10 dark:bg-dprimary/15"
-                                          : "font-medium border-lprimary/15 dark:border-white/10",
-                                      )}
-                                    >
-                                      <span
-                                        aria-hidden="true"
-                                        className={clsx(
-                                          "relative size-5 shrink-0 rounded-full border-2",
-                                          op.isCorrect
-                                            ? "border-lprimary dark:border-dprimary after:absolute after:inset-[3px] after:rounded-full after:bg-lprimary dark:after:bg-dprimary"
-                                            : "border-[#8a8896] dark:border-off-dark",
-                                        )}
-                                      />
-                                      <span className="min-w-0">
-                                        {op.title}
-                                      </span>
-                                      {op.isCorrect && (
-                                        <span className="sr-only">
-                                          (correct)
-                                        </span>
-                                      )}
-                                    </p>
-                                  ),
-                                )}
-                              </div>
+                              <QuestionCardBody question={ques} />
                             </div>
                           </div>
                           <div className="flex items-center gap-[22px] px-4 md:px-[22px] py-3 bg-lprimary/10 dark:bg-dprimary/10 border-t border-lprimary/15 dark:border-white/10">
@@ -205,6 +177,7 @@ export default function AllQues(props: { quizId: string }) {
                             </button>
                             <BasicModal
                               isEdit={true}
+                              wide
                               btnTitle="Edit Question"
                               subtitle={`Question ${index + 1} · changes apply the next time you host.`}
                               btnStyle="text-sm font-semibold text-lprimary dark:text-dprimary hover:underline cursor-pointer"

@@ -109,7 +109,9 @@ describe("buildSnapshot", () => {
     expect(snapshot.reveal?.summary).toEqual({
       type: "multiple_choice",
       counts: [1, 0, 0, 0],
+      responses: 1,
       correctOptionIds: ["q1-a"],
+      correct: 1,
     });
     expect(snapshot.leaderboard?.[0]).toMatchObject({
       playerId: "p1",
