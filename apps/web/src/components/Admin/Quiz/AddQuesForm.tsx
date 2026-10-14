@@ -130,15 +130,14 @@ function optionsFor(type: QuestionType, from: AuthoredOption[]) {
     }));
   }
   // Coming from true/false, its fixed labels aren't worth keeping.
-  const titles = from
-    .filter((o) => !TRUE_FALSE.some((t) => t.title === o.title))
-    .map((o) => o.title);
+  const kept = from.filter((o) => !TRUE_FALSE.some((t) => t.title === o.title));
+  const titles = kept.map((o) => o.title);
   if (type === "multiple_choice") {
     // Single choice is the default: one correct option, A until picked.
     return singleCorrect(
       blankOptions(MCQ_OPTIONS).map((o, i) => ({
         title: titles[i] ?? "",
-        isCorrect: from[i]?.isCorrect ?? false,
+        isCorrect: kept[i]?.isCorrect ?? false,
       })),
     );
   }

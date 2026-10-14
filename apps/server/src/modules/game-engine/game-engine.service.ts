@@ -525,7 +525,7 @@ export class GameEngineService
     );
     await this.run(gameCode, effects);
     if (question && !isScored(question.type)) {
-      this.scheduleLiveSummary(gameCode, qIndex);
+      this.scheduleLiveSummary(gameCode);
     }
     return { accepted: true, answer: judgement.stored.answer };
   }
@@ -563,7 +563,7 @@ export class GameEngineService
         { ...stored, answer: merged },
       );
       if (replaced) {
-        this.scheduleLiveSummary(gameCode, qIndex);
+        this.scheduleLiveSummary(gameCode);
         return { accepted: true, answer: merged };
       }
     }
@@ -580,13 +580,16 @@ export class GameEngineService
    * Kept off the answer path on purpose: an answer costs what it always did,
    * and the summary costs one read per tick, not one per answer. The timer is
    * per instance and best effort — several instances may each send one, and
-   * the host keeps whichever counts the most answers.
+   * the host keeps whichever counts the most answers. The tick reports
+   * whichever question is open when it fires: pinning the one that armed it
+   * would drop the tick if the question moved on, and the per-game guard
+   * would keep the next question from scheduling its own.
    */
-  private scheduleLiveSummary(gameCode: string, qIndex: number): void {
+  private scheduleLiveSummary(gameCode: string): void {
     if (this.liveSummaryTimers.has(gameCode)) return;
     const timer = setTimeout(() => {
       this.liveSummaryTimers.delete(gameCode);
-      void this.sendLiveSummary(gameCode, qIndex).catch((err) =>
+      void this.sendLiveSummary(gameCode).catch((err) =>
         this.logger.error(`Live summary failed for ${gameCode}`, err),
       );
     }, LIVE_SUMMARY_MS);
