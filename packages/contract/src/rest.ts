@@ -26,12 +26,12 @@ export const questionDefinitionSchema = z.object({
   timeOut: z.number().int().min(MIN_TIME_OUT).optional(),
   options: z.array(authoredOptionSchema).max(MAX_OPTIONS).default([]),
   config: z.record(z.string(), z.unknown()).default({}),
-  /** Category ids the question belongs to (zero or more). */
-  categoryIds: z
-    .array(z.string().min(1))
-    .max(MAX_QUESTION_CATEGORIES)
-    .optional(),
 });
+
+/** Category ids for a question (zero or more). Only admins tag questions. */
+export const questionCategoryIdsSchema = z
+  .array(z.string().min(1))
+  .max(MAX_QUESTION_CATEGORIES);
 
 /**
  * `POST /api/quizzes/import` — a whole generated quiz in one transaction
@@ -48,7 +48,14 @@ export const importQuizSchema = z.object({
  * of duel-pool content. Admin-only; every question enters moderation.
  */
 export const createStandaloneQuestionsSchema = z.object({
-  questions: z.array(questionDefinitionSchema).min(1).max(500),
+  questions: z
+    .array(
+      questionDefinitionSchema.extend({
+        categoryIds: questionCategoryIdsSchema.optional(),
+      }),
+    )
+    .min(1)
+    .max(500),
 });
 
 // ---------------------------------------------------------------------------
@@ -78,7 +85,51 @@ export const upsertCategorySchema = z.object({
 
 /** `PATCH /api/moderation/questions/:id/categories` (admin). */
 export const setQuestionCategoriesSchema = z.object({
-  categoryIds: z.array(z.string().min(1)).max(MAX_QUESTION_CATEGORIES),
+  categoryIds: questionCategoryIdsSchema,
+});
+
+// ---------------------------------------------------------------------------
+// Moderation (admin): status tabs and bulk actions
+// ---------------------------------------------------------------------------
+
+/** The moderation states an admin lists; `draft` never reaches moderation. */
+export const MODERATION_LIST_STATUSES = [
+  "pending",
+  "approved",
+  "unapproved",
+] as const;
+export const moderationListStatusSchema = z.enum(MODERATION_LIST_STATUSES);
+
+/** Bulk endpoints take at most this many question ids per request. */
+export const MAX_BULK_MODERATION_IDS = 100;
+
+const bulkQuestionIdsSchema = z
+  .array(z.string().min(1))
+  .min(1)
+  .max(MAX_BULK_MODERATION_IDS);
+
+/** `PATCH /api/moderation/questions/approve` and `.../unapprove`. */
+export const bulkModerationSchema = z.object({ ids: bulkQuestionIdsSchema });
+
+/** `PATCH /api/moderation/questions/categories` — retag many questions. */
+export const bulkSetCategoriesSchema = z.object({
+  ids: bulkQuestionIdsSchema,
+  categoryIds: questionCategoryIdsSchema,
+  /** add: tag on top of existing; remove: untag; replace: exactly these. */
+  mode: z.enum(["add", "remove", "replace"]),
+});
+
+/** What a bulk moderation call did; skipped ids say why. */
+export const bulkModerationResultSchema = z.object({
+  updated: z.number().int(),
+  skipped: z.array(z.object({ id: z.string(), reason: z.string() })),
+});
+
+/** `GET /api/moderation/questions/counts`. */
+export const moderationCountsSchema = z.object({
+  pending: z.number().int(),
+  approved: z.number().int(),
+  unapproved: z.number().int(),
 });
 
 // ---------------------------------------------------------------------------
@@ -163,6 +214,11 @@ export type CreateStandaloneQuestionsBody = z.input<
 export type Category = z.infer<typeof categorySchema>;
 export type UpsertCategory = z.infer<typeof upsertCategorySchema>;
 export type SetQuestionCategories = z.infer<typeof setQuestionCategoriesSchema>;
+export type ModerationListStatus = z.infer<typeof moderationListStatusSchema>;
+export type BulkModeration = z.infer<typeof bulkModerationSchema>;
+export type BulkSetCategories = z.infer<typeof bulkSetCategoriesSchema>;
+export type BulkModerationResult = z.infer<typeof bulkModerationResultSchema>;
+export type ModerationCounts = z.infer<typeof moderationCountsSchema>;
 export type DuelCategoriesResponse = z.infer<
   typeof duelCategoriesResponseSchema
 >;

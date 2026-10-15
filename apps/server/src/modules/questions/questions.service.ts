@@ -7,7 +7,6 @@ import {
 import {
   DEFAULT_QUESTION_TYPE,
   DEFAULT_TIME_OUT,
-  MAX_QUESTION_CATEGORIES,
   authoredOptionSchema,
   type AuthoredOption,
   type CreateStandaloneQuestions,
@@ -68,22 +67,6 @@ function optionsFromMultipart(body: MultipartBody): AuthoredOption[] {
   }));
 }
 
-/** `categoryIds` from a multipart body: a JSON string array, or absent. */
-function categoryIdsFromMultipart(body: MultipartBody): string[] | undefined {
-  const json = parseJsonField(body.categoryIds, "categoryIds");
-  if (json === undefined) return undefined;
-  if (
-    !Array.isArray(json) ||
-    json.length > MAX_QUESTION_CATEGORIES ||
-    json.some((id) => typeof id !== "string" || id.length === 0)
-  ) {
-    throw new BadRequestException(
-      `categoryIds must be up to ${MAX_QUESTION_CATEGORIES} category ids`,
-    );
-  }
-  return json as string[];
-}
-
 /**
  * Who may edit or delete a question: its author, or the owner of the quiz it
  * belongs to.
@@ -117,10 +100,7 @@ export class QuestionsService {
     await this.assertQuizOwned(quizId, user.userId);
     const questions = await this.prisma.db.question.findMany({
       where: { quizId },
-      include: {
-        options: true,
-        categories: { select: { categoryId: true } },
-      },
+      include: { options: true },
       orderBy: { order: "asc" },
     });
     return { status: 200, questions };
@@ -233,13 +213,9 @@ export class QuestionsService {
       }
       throw err;
     }
+    // Categories are admin-only (Duel Portal); an edit keeps whatever
+    // categories an admin set, and a `categoryIds` field here is ignored.
     const { options, config } = definition;
-    // Undefined leaves an edited question's categories untouched.
-    const rawCategoryIds = categoryIdsFromMultipart(body);
-    const categoryIds =
-      rawCategoryIds === undefined
-        ? undefined
-        : await this.categories.assertExist(rawCategoryIds);
 
     // Ownership first: the old media we may delete below is the edited
     // question's own, read from the database.
@@ -321,17 +297,6 @@ export class QuestionsService {
           })),
         });
         await tx.questionReport.deleteMany({ where: { questionId: quesId } });
-        if (categoryIds !== undefined) {
-          await tx.questionCategory.deleteMany({
-            where: { questionId: quesId },
-          });
-          await tx.questionCategory.createMany({
-            data: categoryIds.map((categoryId) => ({
-              questionId: quesId,
-              categoryId,
-            })),
-          });
-        }
       });
       // Only now, and only the question's own stored media — never a URL
       // the client sent (`file_link`), which could name anyone's upload.
@@ -354,11 +319,6 @@ export class QuestionsService {
             order: count + 1,
             moderationStatus,
             createdById: user.userId,
-            categories: {
-              create: (categoryIds ?? []).map((categoryId) => ({
-                categoryId,
-              })),
-            },
           },
         });
       });

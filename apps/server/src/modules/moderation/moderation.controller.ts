@@ -10,7 +10,11 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import {
+  bulkModerationSchema,
+  bulkSetCategoriesSchema,
   setQuestionCategoriesSchema,
+  type BulkModeration,
+  type BulkSetCategories,
   type SetQuestionCategories,
 } from "@buzrr/contract";
 import { Roles } from "../../common/decorators/roles.decorator";
@@ -30,6 +34,42 @@ export class ModerationController {
     return this.moderation.listQueue(query);
   }
 
+  @Get("counts")
+  counts() {
+    return this.moderation.counts();
+  }
+
+  // Bulk routes are one segment shorter than the `:id/...` ones, so they
+  // never match an id.
+  @Patch("approve")
+  bulkApprove(
+    @Body(new ZodValidationPipe(bulkModerationSchema)) body: BulkModeration,
+  ) {
+    return this.moderation.bulkApprove(body.ids);
+  }
+
+  @Patch("unapprove")
+  bulkUnapprove(
+    @Body(new ZodValidationPipe(bulkModerationSchema)) body: BulkModeration,
+  ) {
+    return this.moderation.bulkUnapprove(body.ids);
+  }
+
+  @Patch("pending")
+  bulkMoveToPending(
+    @Body(new ZodValidationPipe(bulkModerationSchema)) body: BulkModeration,
+  ) {
+    return this.moderation.bulkMoveToPending(body.ids);
+  }
+
+  @Patch("categories")
+  bulkSetCategories(
+    @Body(new ZodValidationPipe(bulkSetCategoriesSchema))
+    body: BulkSetCategories,
+  ) {
+    return this.moderation.bulkSetCategories(body);
+  }
+
   @Patch(":id/approve")
   @HttpCode(HttpStatus.NO_CONTENT)
   approve(@Param("id") id: string) {
@@ -40,6 +80,12 @@ export class ModerationController {
   @HttpCode(HttpStatus.NO_CONTENT)
   unapprove(@Param("id") id: string) {
     return this.moderation.unapprove(id);
+  }
+
+  @Patch(":id/pending")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  moveToPending(@Param("id") id: string) {
+    return this.moderation.moveToPending(id);
   }
 
   @Patch(":id/categories")

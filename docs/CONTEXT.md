@@ -85,10 +85,11 @@ effects }` in `game-engine/core/`, unit-tested; `GameEngineService` is
 4. **REST validation is half on the contract** — `POST /quizzes/import` uses
    the zod contract; other endpoints still use class-validator DTOs and
    hand-mirrored web response types.
-5. **Categories have no admin UI.** The seed ships 20 starter categories
-   (only General Knowledge has enough pool questions to be playable); create
-   or rename others via `POST`/`PATCH /api/categories`. Bulk upload is the
-   JSON `POST /api/questions` endpoint only — no file import UI.
+5. **Only General Knowledge is playable out of the box.** The seed ships 20
+   starter categories but only tags the starter pack; admins fill the rest
+   from the Duel Portal (`/admin/duel-portal`: Excel/CSV bulk upload per
+   category, bulk approve/retag, category management). Tagging is
+   admin-only — quiz authors can't set categories.
 6. **Dodo dashboard configuration lives outside the repo.** The Pro product,
    its ₹399 INR localized price and pricing mode,
    any product-level discount, the Adaptive Currency setting, the webhook endpoint and events, and the

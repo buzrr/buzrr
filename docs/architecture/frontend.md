@@ -7,22 +7,22 @@ setup exists (see [infrastructure.md](infrastructure.md#vinext)).
 
 ## Route map (`src/app/`)
 
-| Route group                                                                                                            | Audience                  | Gate                                                          |
-| ---------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------- |
-| `/` landing, `/pricing`, `/docs`, `/support`                                                                           | public                    | —                                                             |
-| `/auth/login`                                                                                                          | public                    | —                                                             |
-| `(marketing)` — `/alternatives[/*]`, `/compare/*`, `/use-cases[/*]`, `/open-source-quiz-platform`, `/self-hosted-quiz` | public (SEO)              | — (static, SSG)                                               |
-| `/admin/(mains)` — quiz list, history, profile, settings                                                               | host (account)            | session in `admin/layout.tsx` (+ role via `SessionProvider`)  |
-| `/admin/(quiz)/quiz/*` — quiz detail/create, post-game leaderboard                                                     | host                      | same                                                          |
-| `/admin/(gameplay)/play/[roomId]` (lobby) & `/game/[roomId]` (live host screen)                                        | host                      | session per page                                              |
-| `/admin/(mains)/ai`, `/admin/ai/[spaceId]` — AI Knowledge Spaces                                                       | host (account)            | same; nav entry hidden unless `NEXT_PUBLIC_AI_API_URL` is set |
-| `/admin/(privileged)/moderation`                                                                                       | admin+superadmin          | role re-check in `(privileged)/layout.tsx`                    |
-| `/admin/(privileged)/superadmin/admins`                                                                                | superadmin                | nested layout re-check                                        |
-| `/player`, `/player/joinRoom/[playerId]`, `/player/play/[playerId]`                                                    | anonymous guests          | none (player identity in localStorage)                        |
-| `/join/[gameCode]`                                                                                                     | guests via shared link/QR | none                                                          |
-| `/duel`, `/duel/game/[gameCode]`, `/duel/invite/[code]`, `/duel/profile`                                               | account                   | per-page `requireDuelSession`                                 |
-| `/billing/checkout` (pay page), `/billing/success` (Dodo `return_url`)                                                 | account                   | per-page `requireBillingSession(callbackURL)`                 |
-| `/admin/(mains)/billing` — plan, usage, portal                                                                         | host (account)            | session in `admin/layout.tsx`                                 |
+| Route group                                                                                                                                      | Audience                  | Gate                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------- | ------------------------------------------------------------- |
+| `/` landing, `/pricing`, `/docs`, `/support`                                                                                                     | public                    | —                                                             |
+| `/auth/login`                                                                                                                                    | public                    | —                                                             |
+| `(marketing)` — `/alternatives[/*]`, `/compare/*`, `/use-cases[/*]`, `/open-source-quiz-platform`, `/self-hosted-quiz`                           | public (SEO)              | — (static, SSG)                                               |
+| `/admin/(mains)` — quiz list, history, profile, settings                                                                                         | host (account)            | session in `admin/layout.tsx` (+ role via `SessionProvider`)  |
+| `/admin/(quiz)/quiz/*` — quiz detail/create, post-game leaderboard                                                                               | host                      | same                                                          |
+| `/admin/(gameplay)/play/[roomId]` (lobby) & `/game/[roomId]` (live host screen)                                                                  | host                      | session per page                                              |
+| `/admin/(mains)/ai`, `/admin/ai/[spaceId]` — AI Knowledge Spaces                                                                                 | host (account)            | same; nav entry hidden unless `NEXT_PUBLIC_AI_API_URL` is set |
+| `/admin/(privileged)/duel-portal` (+ `/upload`, `/categories`) — duel questions by status, bulk upload, categories; `/moderation` redirects here | admin+superadmin          | role re-check in `(privileged)/layout.tsx`                    |
+| `/admin/(privileged)/superadmin/admins`                                                                                                          | superadmin                | nested layout re-check                                        |
+| `/player`, `/player/joinRoom/[playerId]`, `/player/play/[playerId]`                                                                              | anonymous guests          | none (player identity in localStorage)                        |
+| `/join/[gameCode]`                                                                                                                               | guests via shared link/QR | none                                                          |
+| `/duel`, `/duel/game/[gameCode]`, `/duel/invite/[code]`, `/duel/profile`                                                                         | account                   | per-page `requireDuelSession`                                 |
+| `/billing/checkout` (pay page), `/billing/success` (Dodo `return_url`)                                                                           | account                   | per-page `requireBillingSession(callbackURL)`                 |
+| `/admin/(mains)/billing` — plan, usage, portal                                                                                                   | host (account)            | session in `admin/layout.tsx`                                 |
 
 Server components handle session/role gating and param unwrapping; nearly all
 real UI is in `"use client"` components under `src/components/` (`Admin/`,
