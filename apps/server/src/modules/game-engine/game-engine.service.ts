@@ -1138,9 +1138,10 @@ export class GameEngineService
       rosterById.get(e.playerId)?.userId ?? null;
 
     // Each duellist's outcome: the forfeiter loses outright; otherwise total
-    // score decides, and equal scores are a draw.
+    // score decides, and equal scores are a draw. An abandoned duel (both
+    // gone) has no outcome.
     const outcomes = new Map<string, DuelOutcome>();
-    if (meta.mode === "duel" && entries.length === 2) {
+    if (meta.mode === "duel" && entries.length === 2 && !opts?.abandoned) {
       const [a, b] = entries;
       const forfeiter = opts?.forfeitLoserId;
       const forfeited = (e: LeaderboardEntry) =>

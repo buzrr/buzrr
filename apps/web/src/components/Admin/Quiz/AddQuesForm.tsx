@@ -377,6 +377,7 @@ const AddQuesForm = (props: {
     setFile(null);
     setFileLink(question?.media ? question.media : "");
     setPreviewUrl(null);
+    setCategoryIds(question?.categories?.map((c) => c.categoryId) ?? []);
     setCustomTime(
       !isSliderTime(
         question?.type && isQuestionType(question.type)
@@ -536,6 +537,7 @@ const AddQuesForm = (props: {
           // Stay on the same type, ready for the next one.
           reset(valuesFor(undefined, data.type));
           setCustomTime(false);
+          setCategoryIds([]);
           deleteFile();
         }
       },

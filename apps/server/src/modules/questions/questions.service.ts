@@ -85,15 +85,14 @@ function categoryIdsFromMultipart(body: MultipartBody): string[] | undefined {
 }
 
 /**
- * Who may edit or delete a question: its author, or (for rows predating
- * `createdById`) the owner of its quiz.
+ * Who may edit or delete a question: its author, or the owner of the quiz it
+ * belongs to.
  */
 function ownsQuestion(
   question: { createdById: string | null; quiz: { userId: string } | null },
   userId: string,
 ): boolean {
-  if (question.createdById) return question.createdById === userId;
-  return question.quiz?.userId === userId;
+  return question.createdById === userId || question.quiz?.userId === userId;
 }
 
 @Injectable()
@@ -250,7 +249,13 @@ export class QuestionsService {
         where: { id: quesId },
         include: { quiz: true },
       });
-      if (!question || !ownsQuestion(question, user.userId)) {
+      // Edits stay in the quiz named by the URL: no moving a question to
+      // another quiz, or pulling a standalone one into a quiz.
+      if (
+        !question ||
+        question.quizId !== quizId ||
+        !ownsQuestion(question, user.userId)
+      ) {
         throw new ForbiddenException("Unauthorized");
       }
       existing = question;

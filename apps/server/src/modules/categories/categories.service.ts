@@ -42,7 +42,7 @@ export class CategoriesService {
         data: { name: dto.name, slug, hue: dto.hue ?? 270 },
       });
     } catch (err) {
-      throw this.mapUniqueError(err);
+      throw this.mapPrismaError(err);
     }
   }
 
@@ -57,7 +57,7 @@ export class CategoriesService {
         },
       });
     } catch (err) {
-      throw this.mapUniqueError(err);
+      throw this.mapPrismaError(err);
     }
   }
 
@@ -66,7 +66,7 @@ export class CategoriesService {
     try {
       await this.prisma.db.category.delete({ where: { id } });
     } catch (err) {
-      throw this.mapUniqueError(err);
+      throw this.mapPrismaError(err);
     }
   }
 
@@ -83,7 +83,7 @@ export class CategoriesService {
     return unique;
   }
 
-  private mapUniqueError(err: unknown): unknown {
+  private mapPrismaError(err: unknown): unknown {
     if (err instanceof Prisma.PrismaClientKnownRequestError) {
       if (err.code === "P2002") {
         return new ConflictException("A category with that slug exists");

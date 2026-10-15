@@ -215,21 +215,30 @@ function sourceLabel(item: ModerationQueueItem): string {
  */
 function QueueRowCategories({ item }: { item: ModerationQueueItem }) {
   const [editing, setEditing] = useState(false);
+  // The selection being edited: kept locally so a click made while the queue
+  // refetches builds on the previous one rather than on stale item data.
+  const [selected, setSelected] = useState<string[]>([]);
   const setCategories = useSetQuestionCategoriesMutation();
-  const ids = item.categories.map((c) => c.id);
 
   if (editing) {
     return (
       <div className="flex flex-col gap-2">
         <CategoryChips
-          value={ids}
+          value={selected}
           disabled={setCategories.isPending}
-          onChange={(categoryIds) =>
+          onChange={(categoryIds) => {
+            const previous = selected;
+            setSelected(categoryIds);
             setCategories.mutate(
               { id: item.id, categoryIds },
-              { onError: (err) => toast.error(getApiErrorMessage(err)) },
-            )
-          }
+              {
+                onError: (err) => {
+                  setSelected(previous);
+                  toast.error(getApiErrorMessage(err));
+                },
+              },
+            );
+          }}
         />
         <button
           type="button"
@@ -262,7 +271,10 @@ function QueueRowCategories({ item }: { item: ModerationQueueItem }) {
       )}
       <button
         type="button"
-        onClick={() => setEditing(true)}
+        onClick={() => {
+          setSelected(item.categories.map((c) => c.id));
+          setEditing(true);
+        }}
         className="cursor-pointer font-semibold text-lprimary dark:text-dprimary"
       >
         Edit
