@@ -54,8 +54,8 @@ scoring is unchanged.
   score-based.
 - A user can change their time zone, which could repeat or skip a day once;
   accepted for a streak with no rewards attached.
-- There is no admin UI for creating categories yet — the seed script ships
-  20 and the REST endpoints manage the rest.
+- The seed script ships 20 categories; admins create, edit and delete them
+  from the Duel Portal (`/admin/duel-portal/categories`).
 
 ## Evidence
 

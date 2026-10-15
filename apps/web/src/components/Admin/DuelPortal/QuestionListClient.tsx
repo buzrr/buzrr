@@ -305,8 +305,7 @@ export default function QuestionListClient({
 function StatusTabs({ status }: { status: ModerationListStatus }) {
   const counts = useModerationCountsQuery();
   return (
-    <div
-      role="tablist"
+    <nav
       aria-label="Moderation status"
       className="inline-flex max-w-full overflow-x-auto rounded-xl bg-lprimary/5 dark:bg-white/5 p-1"
     >
@@ -316,8 +315,7 @@ function StatusTabs({ status }: { status: ModerationListStatus }) {
         return (
           <Link
             key={tab.status}
-            role="tab"
-            aria-selected={active}
+            aria-current={active ? "page" : undefined}
             href={`/admin/duel-portal?status=${tab.status}`}
             className={clsx(
               "flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition-colors",
@@ -335,7 +333,7 @@ function StatusTabs({ status }: { status: ModerationListStatus }) {
           </Link>
         );
       })}
-    </div>
+    </nav>
   );
 }
 

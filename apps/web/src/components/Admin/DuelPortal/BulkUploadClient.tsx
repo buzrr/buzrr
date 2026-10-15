@@ -114,7 +114,9 @@ export default function BulkUploadClient() {
   };
 
   const handleUpload = async () => {
-    if (!parsed || parsed.valid.length === 0) return;
+    // A failed upload may have committed earlier chunks; only a new file
+    // (which resets `upload`) can be submitted again.
+    if (!parsed || parsed.valid.length === 0 || upload.kind !== "idle") return;
     const questions = parsed.valid;
     let created = 0;
     setUpload({ kind: "uploading", done: 0, total: questions.length });
@@ -143,6 +145,8 @@ export default function BulkUploadClient() {
           fromRow: part[0]!.row,
           message: getApiErrorMessage(err),
         });
+        // Let re-selecting the same (edited) file fire `onChange`.
+        if (fileInputRef.current) fileInputRef.current.value = "";
         void queryClient.invalidateQueries({
           queryKey: queryKeys.moderation.all,
         });
@@ -163,8 +167,7 @@ export default function BulkUploadClient() {
     !!parsed &&
     parsed.valid.length > 0 &&
     categoryIds.length > 0 &&
-    !uploading &&
-    upload.kind !== "done";
+    upload.kind === "idle";
 
   return (
     <div className="mt-4 flex max-w-3xl flex-col gap-6 text-dark dark:text-white">
@@ -292,8 +295,8 @@ export default function BulkUploadClient() {
         <p className="rounded-xl bg-red-light/10 dark:bg-red-dark/10 p-3 text-sm text-red-light dark:text-red-dark">
           Upload stopped at the batch starting on row {upload.fromRow}:{" "}
           {upload.message}. {upload.created} question
-          {upload.created === 1 ? " was" : "s were"} saved before it; remove
-          those rows before retrying.
+          {upload.created === 1 ? " was" : "s were"} saved before it. To
+          continue, remove those rows and select the edited file.
         </p>
       )}
       {upload.kind === "done" && (
