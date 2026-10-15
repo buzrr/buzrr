@@ -17,6 +17,15 @@ stats/history, health endpoint, Vercel Analytics.
 
 ## Recent architectural moves (still fresh, know they exist)
 
+- **Duel categories, standalone questions, daily streak** (2026-10, ADR-015):
+  `Question.quizId` is optional (`createdById` owns it; admin-only
+  `POST /api/questions` for standalone/bulk content); questions have 0..n
+  categories; duels are Random or one category, each with its own rating
+  (`UserCategoryRating`); one finished duel a day keeps a streak (user's time
+  zone, `DuelDay` calendar). Migration `20261015000001` needs
+  `migrate:deploy`. The design's in-game answer-streak multiplier was not
+  built.
+
 - **Phase 0 — architecture that makes later features cheap** (2026-10):
   - **Pluggable question types** (ADR-011): `Question.type` + `config`
     (migration `20261006000001`); one pure server handler + one web renderer
@@ -76,7 +85,11 @@ effects }` in `game-engine/core/`, unit-tested; `GameEngineService` is
 4. **REST validation is half on the contract** — `POST /quizzes/import` uses
    the zod contract; other endpoints still use class-validator DTOs and
    hand-mirrored web response types.
-5. **Dodo dashboard configuration lives outside the repo.** The Pro product,
+5. **Categories have no admin UI.** The seed ships 20 starter categories
+   (only General Knowledge has enough pool questions to be playable); create
+   or rename others via `POST`/`PATCH /api/categories`. Bulk upload is the
+   JSON `POST /api/questions` endpoint only — no file import UI.
+6. **Dodo dashboard configuration lives outside the repo.** The Pro product,
    its ₹399 INR localized price and pricing mode,
    any product-level discount, the Adaptive Currency setting, the webhook endpoint and events, and the
    recovery/portal settings are set by hand (checklist in ADR-010). Live prices and the

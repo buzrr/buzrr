@@ -15,8 +15,8 @@ export type DuelQueueStatus =
 
 /**
  * Matchmaking-queue connection (userType=duel, no gameCode). The server
- * pairs players by ELO proximity and pushes `duel:matched` with the room to
- * join.
+ * pairs players in the same category (null = Random) by rating proximity and
+ * pushes `duel:matched` with the room to join.
  */
 export function useDuelQueue(options: {
   onMatched: (payload: DuelMatchedPayload) => void;
@@ -25,6 +25,8 @@ export function useDuelQueue(options: {
   const [error, setError] = useState<string | null>(null);
   const [queuedAt, setQueuedAt] = useState<number | null>(null);
   const socketRef = useRef<GameSocket | null>(null);
+  // The category being searched; a reconnect re-queues in this one.
+  const categoryRef = useRef<string | null>(null);
   const onMatchedRef = useRef(options.onMatched);
   onMatchedRef.current = options.onMatched;
 
@@ -35,7 +37,7 @@ export function useDuelQueue(options: {
     };
   }, []);
 
-  const findMatch = useCallback(async () => {
+  const findMatch = useCallback(async (categoryId: string | null = null) => {
     setError(null);
     setStatus("connecting");
 
@@ -47,14 +49,16 @@ export function useDuelQueue(options: {
     }
 
     socketRef.current?.disconnect();
-    const conn: GameSocket = io(
-      `${process.env.NEXT_PUBLIC_SOCKET_URL}/?userType=duel`,
-      { withCredentials: true, auth: { token } },
-    );
+    categoryRef.current = categoryId;
+    const conn: GameSocket = io(`${process.env.NEXT_PUBLIC_SOCKET_URL}/`, {
+      withCredentials: true,
+      auth: { token },
+      query: queueQuery(categoryId),
+    });
     socketRef.current = conn;
 
     conn.on("connect", () => {
-      conn.emit("duel:queue");
+      conn.emit("duel:queue", { categoryId: categoryRef.current });
     });
     conn.on("duel:queued", () => {
       setStatus("queued");
@@ -93,5 +97,22 @@ export function useDuelQueue(options: {
     setQueuedAt(null);
   }, []);
 
-  return { status, error, queuedAt, findMatch, cancel };
+  /** Re-queues in another category (e.g. Random); the wait restarts. */
+  const switchCategory = useCallback((categoryId: string | null) => {
+    categoryRef.current = categoryId;
+    const conn = socketRef.current;
+    if (!conn) return;
+    // The handshake query is what the server enqueues on reconnect.
+    conn.io.opts.query = queueQuery(categoryId);
+    conn.emit("duel:queue", { categoryId });
+  }, []);
+
+  return { status, error, queuedAt, findMatch, cancel, switchCategory };
+}
+
+/** Handshake query for a queue socket; no `category` means Random. */
+function queueQuery(categoryId: string | null): Record<string, string> {
+  return categoryId
+    ? { userType: "duel", category: categoryId }
+    : { userType: "duel" };
 }

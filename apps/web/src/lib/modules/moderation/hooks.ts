@@ -1,6 +1,10 @@
 "use client";
 
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { queryKeys } from "@/lib/modules/query-keys";
 import { moderationApi } from "./api";
 
@@ -28,6 +32,17 @@ export function useUnapproveQuestionMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: moderationApi.unapprove,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.moderation.queue });
+    },
+  });
+}
+
+export function useSetQuestionCategoriesMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; categoryIds: string[] }) =>
+      moderationApi.setCategories(vars.id, vars.categoryIds),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.moderation.queue });
     },

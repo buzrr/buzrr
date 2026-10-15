@@ -56,6 +56,11 @@ export default function DuelInviteHostView({
         <p className="text-xs text-off-dark dark:text-off-white text-center">
           Send them this link. The duel starts the moment they accept.
         </p>
+        {invite.category && (
+          <p className="text-xs font-bold text-lprimary dark:text-dprimary text-center">
+            Category: {invite.category.name}
+          </p>
+        )}
       </div>
 
       <ShareRoom

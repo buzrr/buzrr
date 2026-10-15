@@ -90,6 +90,21 @@ const eloChangesSchema = z.record(
   z.object({ before: z.number(), after: z.number() }),
 );
 
+/** A duel's category; null means Random. */
+export const duelCategoryRefSchema = z
+  .object({ id: z.string(), name: z.string() })
+  .nullable();
+
+const streakChangesSchema = z.record(
+  z.string(),
+  z.object({
+    current: z.number(),
+    best: z.number(),
+    /** False when the player had already counted a duel today. */
+    advanced: z.boolean(),
+  }),
+);
+
 export const gameOverSchema = z.object({
   entries: z.array(leaderboardEntrySchema),
   resultId: z.string().optional(),
@@ -97,6 +112,10 @@ export const gameOverSchema = z.object({
   eloChanges: eloChangesSchema.optional(),
   /** True only for rated duels; friend invites are unrated. */
   rated: z.boolean().optional(),
+  /** Duels only: the category played (null = Random). */
+  category: duelCategoryRefSchema.optional(),
+  /** Duels only: daily-streak state per signed-in playerId after this duel. */
+  streaks: streakChangesSchema.optional(),
 });
 
 export const duelMatchedSchema = z.object({
@@ -107,7 +126,14 @@ export const duelMatchedSchema = z.object({
     profilePic: z.string().nullable(),
     elo: z.number(),
   }),
+  category: duelCategoryRefSchema,
+  questionCount: z.number(),
 });
+
+/** `duel:queue` — which pool to search; null/omitted means Random. */
+export const duelQueueSchema = z
+  .object({ categoryId: z.string().min(1).nullable().optional() })
+  .optional();
 
 export const duelInviteFailureSchema = z.enum([
   "not-found",
@@ -201,6 +227,8 @@ export type AnswerResultPayload = z.infer<typeof answerResultSchema>;
 export type LeaderboardPayload = z.infer<typeof leaderboardSchema>;
 export type GameOverPayload = z.infer<typeof gameOverSchema>;
 export type DuelMatchedPayload = z.infer<typeof duelMatchedSchema>;
+export type DuelQueuePayload = z.infer<typeof duelQueueSchema>;
+export type DuelCategoryRef = z.infer<typeof duelCategoryRefSchema>;
 export type DuelInviteFailure = z.infer<typeof duelInviteFailureSchema>;
 export type DuelInviteAcceptAck = z.infer<typeof duelInviteAcceptAckSchema>;
 export type PlayerConnectionPayload = z.infer<typeof playerConnectionSchema>;
@@ -242,7 +270,7 @@ export interface ServerToClientEvents {
 
 export interface ClientToServerEvents {
   // -- duel matchmaking --
-  "duel:queue": () => void;
+  "duel:queue": (payload?: DuelQueuePayload) => void;
   "duel:cancel": () => void;
   /**
    * The invited friend claims a pending invite. Emitted on the guest's own

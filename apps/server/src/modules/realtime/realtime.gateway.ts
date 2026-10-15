@@ -1,4 +1,4 @@
-import { submitAnswerSchema } from "@buzrr/contract";
+import { duelQueueSchema, submitAnswerSchema } from "@buzrr/contract";
 import { Logger } from "@nestjs/common";
 import {
   OnGatewayConnection,
@@ -84,6 +84,7 @@ export class RealtimeGateway
           result.gameCode,
           result.intent,
           { buffered, bufferAccept },
+          result.categoryId,
         );
         return;
       }
@@ -174,6 +175,7 @@ export class RealtimeGateway
       buffered: DuelInviteAck[];
       bufferAccept: (payload: { code: string }, ack: DuelInviteAck) => void;
     },
+    queueCategoryId: string | null,
   ): Promise<void> {
     await socket.join(`player:${user.id}`);
     socket.off("duel:invite-accept", earlyAccepts.bufferAccept);
@@ -240,21 +242,33 @@ export class RealtimeGateway
       };
       this.logger.log(`Duel queue connection: ${user.id}`);
 
+      // The handshake picks the first search's category; a later
+      // `duel:queue { categoryId }` switches it (e.g. to Random).
+      let categoryId = queueCategoryId;
       const enqueue = async () => {
         try {
-          await this.matchmaking.enqueue({
-            id: user.id,
-            name: user.name ?? "Player",
-            image: user.image,
-            elo: user.eloRating,
-          });
+          await this.matchmaking.enqueue(
+            {
+              id: user.id,
+              name: user.name ?? "Player",
+              image: user.image,
+              elo: user.eloRating,
+            },
+            categoryId,
+          );
         } catch (error) {
           this.logger.error("Error joining duel queue:", error);
           socket.emit("duel:error", { message: "Could not join the queue" });
         }
       };
 
-      socket.on("duel:queue", () => void enqueue());
+      socket.on("duel:queue", (payload) => {
+        const parsed = duelQueueSchema.safeParse(payload);
+        if (parsed.success && parsed.data?.categoryId !== undefined) {
+          categoryId = parsed.data.categoryId;
+        }
+        void enqueue();
+      });
       // Enqueue server-side too: the client emits duel:queue on connect,
       // which can arrive while validateConnection is still running — before
       // this handler exists — and socket.io drops events with no listener.

@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
+import type { DuelCategoryRef } from "@buzrr/contract";
 import Redis from "ioredis";
 import { PrismaService } from "../../prisma/prisma.service";
 import { REDIS } from "../../redis/redis.constants";
@@ -82,6 +83,12 @@ redis.call('DEL', KEYS[2])
 return 1
 `;
 
+function categoryOf(record: InviteRecord): DuelCategoryRef {
+  return record.categoryId
+    ? { id: record.categoryId, name: record.categoryName ?? "" }
+    : null;
+}
+
 interface InviteRecord {
   hostId: string;
   hostName: string;
@@ -89,6 +96,9 @@ interface InviteRecord {
   hostElo: string;
   createdAt: string;
   expiresAt: string;
+  /** Empty string for Random (absent on invites from before categories). */
+  categoryId?: string;
+  categoryName?: string;
   claimedBy?: string;
   claimedAt?: string;
 }
@@ -97,6 +107,7 @@ export interface DuelInviteView {
   code: string;
   host: { id: string; name: string; image: string | null; elo: number };
   expiresAt: number;
+  category: DuelCategoryRef;
   status: "pending" | "claimed";
   isHost: boolean;
   /** True when the viewer is the guest who claimed this invite. */
@@ -127,18 +138,27 @@ export class DuelInviteService {
     this.io = io;
   }
 
-  /** Mints a code, or returns the host's existing pending invite. */
-  async create(user: {
-    id: string;
-    name: string | null;
-    image: string | null;
-    elo: number;
-  }): Promise<{ code: string; expiresAt: number }> {
+  /**
+   * Mints a code, or returns the host's existing pending invite when it is
+   * for the same category (a different category replaces it).
+   */
+  async create(
+    user: {
+      id: string;
+      name: string | null;
+      image: string | null;
+      elo: number;
+    },
+    category: DuelCategoryRef = null,
+  ): Promise<{ code: string; expiresAt: number }> {
     const existing = await this.redis.get(hostIndexKey(user.id));
     if (existing) {
       const record = await this.read(existing);
       if (record && !record.claimedBy) {
-        return { code: existing, expiresAt: Number(record.expiresAt) };
+        if ((record.categoryId || null) === (category?.id ?? null)) {
+          return { code: existing, expiresAt: Number(record.expiresAt) };
+        }
+        await this.cancel(existing, user.id);
       }
     }
 
@@ -167,6 +187,10 @@ export class DuelInviteService {
         String(now),
         "expiresAt",
         String(expiresAt),
+        "categoryId",
+        category?.id ?? "",
+        "categoryName",
+        category?.name ?? "",
       )) as number;
 
       if (result === 1) {
@@ -199,6 +223,7 @@ export class DuelInviteService {
         elo: Number(record.hostElo),
       },
       expiresAt: Number(record.expiresAt),
+      category: categoryOf(record),
       status: record.claimedBy ? "claimed" : "pending",
       isHost: record.hostId === viewerId,
       isClaimer: Boolean(record.claimedBy) && record.claimedBy === viewerId,
@@ -243,9 +268,10 @@ export class DuelInviteService {
     if (!hostPresence.waitingOn.includes(code)) return fail("host-offline");
     if (hostPresence.inLiveDuel) return fail("busy");
 
+    const category = categoryOf(record);
     let questions;
     try {
-      questions = await this.questions.build();
+      questions = await this.questions.build(category?.id ?? null);
     } catch (err) {
       this.logger.error("Failed to build duel question set", err);
       return fail("no-questions");
@@ -298,7 +324,7 @@ export class DuelInviteService {
           userId: p.id,
         })),
         questions,
-        { rated: false },
+        { rated: false, category },
       );
     } catch (err) {
       this.logger.error(`Failed to start invited duel ${code}`, err);
@@ -316,6 +342,8 @@ export class DuelInviteService {
         profilePic: challenger.image,
         elo: challenger.elo,
       },
+      category,
+      questionCount: questions.length,
     });
     this.io?.to(`player:${challenger.id}`).emit("duel:matched", {
       gameCode: code,
@@ -325,6 +353,8 @@ export class DuelInviteService {
         profilePic: host.image,
         elo: host.elo,
       },
+      category,
+      questionCount: questions.length,
     });
     this.logger.log(
       `Invited duel ${code}: ${host.id} vs ${challenger.id} (unrated)`,

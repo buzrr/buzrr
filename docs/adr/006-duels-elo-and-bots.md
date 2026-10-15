@@ -17,7 +17,7 @@ vector.
 - **Queue:** Redis zset keyed by ELO; longest-waiting seeker first; the
   acceptable gap widens 100→500 with wait time (`eloBand`); 60s timeout; one
   match per 2s tick; lazy worker.
-- **Bots:** a queuer alone ≥15s gets a difficulty-tiered bot (tier by their
+- **Bots:** a queuer alone ≥8s gets a difficulty-tiered bot (tier by their
   ELO; bot ELO mirrors theirs ±75) unless `DUEL_BOTS=OFF`. Bot duels are
   **rated** (only the human's rating updates; the bot's comes from meta) and
   deliberately indistinguishable from human matches in every payload; bot
@@ -28,7 +28,7 @@ vector.
 
 ## Consequences
 
-- **When bot fallback is available**, nobody waits more than ~15s for _a_
+- **When bot fallback is available**, nobody waits more than ~10s for _a_
   game. That bound depends on it: with `DUEL_BOTS=OFF` — or when a bot match
   is declined because a pairable human is still queued — the seeker waits out
   the full 60s `QUEUE_TIMEOUT_MS` and gets `duel:queue-timeout` instead.

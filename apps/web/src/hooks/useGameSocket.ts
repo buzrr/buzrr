@@ -127,6 +127,8 @@ export function useGameSocket({
           entries: payload.entries,
           eloChanges: payload.eloChanges,
           rated: payload.rated,
+          category: payload.category,
+          streaks: payload.streaks,
         }),
       ),
     );

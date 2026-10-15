@@ -45,7 +45,8 @@ export default function DuelInviteGuestView({
           challenged you to a 1v1
         </p>
         <p className="text-xs text-off-dark dark:text-off-white text-center">
-          Rating {invite.host.elo} · Friendly duel, no rating at stake
+          {invite.category ? `${invite.category.name} · ` : ""}Friendly duel, no
+          rating at stake
         </p>
       </div>
 

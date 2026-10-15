@@ -5,23 +5,29 @@ import {
   OnApplicationShutdown,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import type { DuelCategoryRef } from "@buzrr/contract";
 import Redis from "ioredis";
 import { createBotOpponent } from "../../common/utils/duel-bot";
+import { PrismaService } from "../../prisma/prisma.service";
 import { REDIS } from "../../redis/redis.constants";
 import { GameEngineService } from "../game-engine/game-engine.service";
 import type { LiveQuestion } from "../game-engine/game-engine.types";
 import type { TypedServer } from "../realtime/realtime.types";
 import { generateDuelCode } from "./duel-code";
-import { DuelQuestionsService } from "./duel-questions.service";
+import {
+  DuelCategoryUnavailableError,
+  DuelQuestionsService,
+} from "./duel-questions.service";
 
-const QUEUE_KEY = "mm:duel:queue"; // zset userId -> elo
-const META_KEY = "mm:duel:meta"; // hash userId -> JSON {name, image, joinedAt}
+const QUEUE_KEY = "mm:duel:queue"; // zset userId -> rating in their category
+// hash userId -> JSON {name, image, joinedAt, category}
+const META_KEY = "mm:duel:meta";
 const LOCK_KEY = "mm:duel:lock";
 
 const QUEUE_TIMEOUT_MS = 60_000;
 const TICK_MS = 2_000;
 /** Wait this long with nobody else in the queue and you get a bot. */
-const BOT_MATCH_MS = 12_000;
+const BOT_MATCH_MS = 8_000;
 
 interface QueueEntry {
   userId: string;
@@ -29,11 +35,16 @@ interface QueueEntry {
   name: string;
   image: string | null;
   joinedAt: number;
+  /** The pool being searched; null = Random. Only equal categories pair. */
+  category: DuelCategoryRef;
 }
+
+const sameCategory = (a: QueueEntry, b: QueueEntry) =>
+  (a.category?.id ?? null) === (b.category?.id ?? null);
 
 /** Rating gap a player will accept, widening the longer they have waited. */
 function eloBand(waitMs: number): number {
-  return Math.min(100 + 50 * Math.floor(waitMs / 5_000), 500);
+  return Math.min(100 + 50 * Math.floor(waitMs / 2_000), 500);
 }
 
 /**
@@ -41,6 +52,7 @@ function eloBand(waitMs: number): number {
  * a long waiter's widened band can reach a rating its own is too narrow for.
  */
 function eloEligible(a: QueueEntry, b: QueueEntry, now: number): boolean {
+  if (!sameCategory(a, b)) return false;
   const gap = Math.abs(a.elo - b.elo);
   return gap <= Math.max(eloBand(now - a.joinedAt), eloBand(now - b.joinedAt));
 }
@@ -65,6 +77,7 @@ export class MatchmakingService implements OnApplicationShutdown {
     private readonly questions: DuelQuestionsService,
     private readonly engine: GameEngineService,
     private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
   ) {}
 
   setServer(io: TypedServer): void {
@@ -75,15 +88,47 @@ export class MatchmakingService implements OnApplicationShutdown {
     if (this.worker) clearInterval(this.worker);
   }
 
-  async enqueue(user: {
-    id: string;
-    name: string;
-    image: string | null;
-    elo: number;
-  }): Promise<void> {
+  /**
+   * Joins (or re-joins, resetting the wait) the queue for one category.
+   * `user.elo` is the global rating, used for Random; a category search is
+   * keyed by that category's own rating.
+   */
+  async enqueue(
+    user: {
+      id: string;
+      name: string;
+      image: string | null;
+      elo: number;
+    },
+    categoryId: string | null = null,
+  ): Promise<void> {
+    let category: DuelCategoryRef;
+    try {
+      category = await this.questions.resolveCategory(categoryId);
+    } catch (err) {
+      if (err instanceof DuelCategoryUnavailableError) {
+        await this.dequeue(user.id);
+        this.io
+          ?.to(`player:${user.id}`)
+          .emit("duel:error", { message: err.message });
+        return;
+      }
+      throw err;
+    }
+    const elo = category
+      ? ((
+          await this.prisma.db.userCategoryRating.findUnique({
+            where: {
+              userId_categoryId: { userId: user.id, categoryId: category.id },
+            },
+            select: { rating: true },
+          })
+        )?.rating ?? 1200)
+      : user.elo;
+
     await this.redis
       .multi()
-      .zadd(QUEUE_KEY, user.elo, user.id)
+      .zadd(QUEUE_KEY, elo, user.id)
       .hset(
         META_KEY,
         user.id,
@@ -91,10 +136,11 @@ export class MatchmakingService implements OnApplicationShutdown {
           name: user.name,
           image: user.image,
           joinedAt: Date.now(),
+          category,
         }),
       )
       .exec();
-    this.io?.to(`player:${user.id}`).emit("duel:queued", { elo: user.elo });
+    this.io?.to(`player:${user.id}`).emit("duel:queued", { elo });
     this.ensureWorker();
     await this.tick();
   }
@@ -147,7 +193,9 @@ export class MatchmakingService implements OnApplicationShutdown {
       const band = eloBand(now - seeker.joinedAt);
       const candidate = waiting.find(
         (c) =>
-          c.userId !== seeker.userId && Math.abs(c.elo - seeker.elo) <= band,
+          c.userId !== seeker.userId &&
+          sameCategory(c, seeker) &&
+          Math.abs(c.elo - seeker.elo) <= band,
       );
       if (!candidate) continue;
       const paired = await this.pair(seeker, candidate);
@@ -219,7 +267,7 @@ export class MatchmakingService implements OnApplicationShutdown {
   private async createDuel(a: QueueEntry, b: QueueEntry): Promise<void> {
     let questions: LiveQuestion[];
     try {
-      questions = await this.questions.build();
+      questions = await this.questions.build(a.category?.id ?? null);
     } catch (err) {
       this.logger.error("Failed to build duel question set", err);
       for (const p of [a, b]) {
@@ -240,14 +288,20 @@ export class MatchmakingService implements OnApplicationShutdown {
         userId: p.userId,
       })),
       questions,
+      { category: a.category },
     );
 
-    this.io?.to(`player:${a.userId}`).emit("duel:matched", {
+    const shared = {
       gameCode,
+      category: a.category,
+      questionCount: questions.length,
+    };
+    this.io?.to(`player:${a.userId}`).emit("duel:matched", {
+      ...shared,
       opponent: { id: b.userId, name: b.name, profilePic: b.image, elo: b.elo },
     });
     this.io?.to(`player:${b.userId}`).emit("duel:matched", {
-      gameCode,
+      ...shared,
       opponent: { id: a.userId, name: a.name, profilePic: a.image, elo: a.elo },
     });
     this.logger.log(
@@ -263,7 +317,7 @@ export class MatchmakingService implements OnApplicationShutdown {
   private async createBotDuel(human: QueueEntry): Promise<void> {
     let questions: LiveQuestion[];
     try {
-      questions = await this.questions.build();
+      questions = await this.questions.build(human.category?.id ?? null);
     } catch (err) {
       this.logger.error("Failed to build duel question set", err);
       this.io?.to(`player:${human.userId}`).emit("duel:error", {
@@ -291,7 +345,10 @@ export class MatchmakingService implements OnApplicationShutdown {
         },
       ],
       questions,
-      { bot: { id: bot.id, tier: bot.tier, elo: bot.elo } },
+      {
+        bot: { id: bot.id, tier: bot.tier, elo: bot.elo },
+        category: human.category,
+      },
     );
 
     this.io?.to(`player:${human.userId}`).emit("duel:matched", {
@@ -302,6 +359,8 @@ export class MatchmakingService implements OnApplicationShutdown {
         profilePic: bot.profilePic,
         elo: bot.elo,
       },
+      category: human.category,
+      questionCount: questions.length,
     });
     this.logger.log(
       `Matched duel ${gameCode}: ${human.userId} (${human.elo}) vs ${bot.tier} bot (${bot.elo})`,
@@ -321,9 +380,10 @@ export class MatchmakingService implements OnApplicationShutdown {
             name: string;
             image: string | null;
             joinedAt: number;
+            category?: DuelCategoryRef;
           })
         : { name: "Player", image: null, joinedAt: Date.now() };
-      entries.push({ userId, elo, ...m });
+      entries.push({ userId, elo, ...m, category: m.category ?? null });
     }
     return entries;
   }

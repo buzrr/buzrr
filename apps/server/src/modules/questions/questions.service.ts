@@ -7,8 +7,10 @@ import {
 import {
   DEFAULT_QUESTION_TYPE,
   DEFAULT_TIME_OUT,
+  MAX_QUESTION_CATEGORIES,
   authoredOptionSchema,
   type AuthoredOption,
+  type CreateStandaloneQuestions,
 } from "@buzrr/contract";
 import {
   MediaStorage,
@@ -21,6 +23,7 @@ import {
   QuestionDefinitionError,
   validateDefinition,
 } from "../question-types";
+import { CategoriesService } from "../categories/categories.service";
 import { ReorderQuestionsDto } from "./dto/reorder-questions.dto";
 
 type MultipartBody = Record<string, string | undefined>;
@@ -65,11 +68,39 @@ function optionsFromMultipart(body: MultipartBody): AuthoredOption[] {
   }));
 }
 
+/** `categoryIds` from a multipart body: a JSON string array, or absent. */
+function categoryIdsFromMultipart(body: MultipartBody): string[] | undefined {
+  const json = parseJsonField(body.categoryIds, "categoryIds");
+  if (json === undefined) return undefined;
+  if (
+    !Array.isArray(json) ||
+    json.length > MAX_QUESTION_CATEGORIES ||
+    json.some((id) => typeof id !== "string" || id.length === 0)
+  ) {
+    throw new BadRequestException(
+      `categoryIds must be up to ${MAX_QUESTION_CATEGORIES} category ids`,
+    );
+  }
+  return json as string[];
+}
+
+/**
+ * Who may edit or delete a question: its author, or the owner of the quiz it
+ * belongs to.
+ */
+function ownsQuestion(
+  question: { createdById: string | null; quiz: { userId: string } | null },
+  userId: string,
+): boolean {
+  return question.createdById === userId || question.quiz?.userId === userId;
+}
+
 @Injectable()
 export class QuestionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: MediaStorage,
+    private readonly categories: CategoriesService,
   ) {}
 
   private async assertQuizOwned(quizId: string, userId: string) {
@@ -86,7 +117,10 @@ export class QuestionsService {
     await this.assertQuizOwned(quizId, user.userId);
     const questions = await this.prisma.db.question.findMany({
       where: { quizId },
-      include: { options: true },
+      include: {
+        options: true,
+        categories: { select: { categoryId: true } },
+      },
       orderBy: { order: "asc" },
     });
     return { status: 200, questions };
@@ -105,9 +139,11 @@ export class QuestionsService {
       throw new NotFoundException("Question not found");
     }
     if (
+      !dragQues.quiz ||
       dragQues.quizId !== dropQues.quizId ||
       dragQues.quiz.userId !== user.userId
     ) {
+      // Standalone questions have no order to change.
       throw new ForbiddenException("Unauthorized");
     }
 
@@ -147,11 +183,15 @@ export class QuestionsService {
     if (!question) {
       throw new NotFoundException("Question not found");
     }
-    if (question.quiz.userId !== user.userId) {
+    if (!ownsQuestion(question, user.userId)) {
       throw new ForbiddenException("Unauthorized");
     }
     const deletedOrder = question.order;
     const quizId = question.quizId;
+    if (!quizId) {
+      await this.prisma.db.question.delete({ where: { id: quesId } });
+      return;
+    }
     await this.prisma.db.$transaction([
       this.prisma.db.question.delete({ where: { id: quesId } }),
       this.prisma.db.question.updateMany({
@@ -194,6 +234,12 @@ export class QuestionsService {
       throw err;
     }
     const { options, config } = definition;
+    // Undefined leaves an edited question's categories untouched.
+    const rawCategoryIds = categoryIdsFromMultipart(body);
+    const categoryIds =
+      rawCategoryIds === undefined
+        ? undefined
+        : await this.categories.assertExist(rawCategoryIds);
 
     // Ownership first: the old media we may delete below is the edited
     // question's own, read from the database.
@@ -203,7 +249,13 @@ export class QuestionsService {
         where: { id: quesId },
         include: { quiz: true },
       });
-      if (!question || question.quiz.userId !== user.userId) {
+      // Edits stay in the quiz named by the URL: no moving a question to
+      // another quiz, or pulling a standalone one into a quiz.
+      if (
+        !question ||
+        question.quizId !== quizId ||
+        !ownsQuestion(question, user.userId)
+      ) {
         throw new ForbiddenException("Unauthorized");
       }
       existing = question;
@@ -269,6 +321,17 @@ export class QuestionsService {
           })),
         });
         await tx.questionReport.deleteMany({ where: { questionId: quesId } });
+        if (categoryIds !== undefined) {
+          await tx.questionCategory.deleteMany({
+            where: { questionId: quesId },
+          });
+          await tx.questionCategory.createMany({
+            data: categoryIds.map((categoryId) => ({
+              questionId: quesId,
+              categoryId,
+            })),
+          });
+        }
       });
       // Only now, and only the question's own stored media — never a URL
       // the client sent (`file_link`), which could name anyone's upload.
@@ -290,9 +353,78 @@ export class QuestionsService {
             mediaType: mediaType || null,
             order: count + 1,
             moderationStatus,
+            createdById: user.userId,
+            categories: {
+              create: (categoryIds ?? []).map((categoryId) => ({
+                categoryId,
+              })),
+            },
           },
         });
       });
     }
+  }
+
+  /**
+   * Standalone questions (no quiz) — duel-pool content, e.g. a bulk upload.
+   * They skip the quiz-only `draft` state and go straight to moderation;
+   * content duels can't play is parked as `unapproved`.
+   */
+  async createStandalone(
+    user: AuthUser,
+    body: CreateStandaloneQuestions,
+  ): Promise<{ created: number; ids: string[] }> {
+    const questions = body.questions.map((question, index) => {
+      try {
+        const definition = validateDefinition(question.type, {
+          options: question.options,
+          config: question.config,
+        });
+        return { ...question, ...definition };
+      } catch (err) {
+        if (err instanceof QuestionDefinitionError) {
+          throw new BadRequestException(
+            `Question ${index + 1}: ${err.message}`,
+          );
+        }
+        throw err;
+      }
+    });
+    await this.categories.assertExist(
+      questions.flatMap((q) => q.categoryIds ?? []),
+    );
+
+    const ids = await this.prisma.db.$transaction(async (tx) => {
+      const created: string[] = [];
+      for (const question of questions) {
+        const row = await tx.question.create({
+          data: {
+            type: question.type,
+            title: question.title,
+            config: question.config,
+            timeOut: question.timeOut ?? DEFAULT_TIME_OUT,
+            createdById: user.userId,
+            moderationStatus: isDuelEligible(question.type, question)
+              ? "pending"
+              : "unapproved",
+            options: {
+              create: question.options.map((option) => ({
+                title: option.title,
+                isCorrect: option.isCorrect,
+              })),
+            },
+            categories: {
+              create: [...new Set(question.categoryIds ?? [])].map(
+                (categoryId) => ({ categoryId }),
+              ),
+            },
+          },
+          select: { id: true },
+        });
+        created.push(row.id);
+      }
+      return created;
+    });
+    return { created: ids.length, ids };
   }
 }

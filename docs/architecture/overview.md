@@ -91,9 +91,10 @@ apps/server/src/
     game-engine/          # ★ core/ (pure phase machine, judging, views, pacing) + shell service + Redis store + bot driver
     question-types/       # ★ one pure handler per question type + registry
     realtime/             # ★ Socket.IO gateway, connection validation (contract types re-exported)
-    duel/                 # matchmaking, friend invites, duel question pool, ELO endpoints
+    duel/                 # matchmaking, friend invites, duel question pool, ratings + daily-streak endpoints
     game-sessions/        # classic rooms: create/join/kick/ban/end + history/results
-    quizzes/ questions/   # quiz + question CRUD (incl. AI generation, import)
+    quizzes/ questions/   # quiz + question CRUD (incl. AI generation, import, standalone questions)
+    categories/           # duel categories (question tags) CRUD
     moderation/           # public-question approve/report queue
     players/              # ephemeral guest identities + player JWTs
     admin-users/ users/   # superadmin role management; profile stats

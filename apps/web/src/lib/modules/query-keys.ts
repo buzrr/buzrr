@@ -33,6 +33,9 @@ export const queryKeys = {
   moderation: {
     queue: ["moderation", "queue"] as const,
   },
+  categories: {
+    all: ["categories"] as const,
+  },
   admins: {
     lists: ["admins", "list"] as const,
     list: (search: string) => ["admins", "list", search] as const,

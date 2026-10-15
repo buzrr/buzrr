@@ -12,6 +12,7 @@ import {
   LlmTimeoutError,
   TextGenerator,
 } from "../../common/llm/text-generator";
+import { CategoriesService } from "../categories/categories.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
 import { EntitlementsService } from "../billing/entitlements.service";
@@ -83,6 +84,7 @@ export class QuizzesService {
     private readonly prisma: PrismaService,
     private readonly llm: TextGenerator,
     private readonly entitlements: EntitlementsService,
+    private readonly categories: CategoriesService,
   ) {}
 
   async create(
@@ -238,6 +240,9 @@ export class QuizzesService {
         throw err;
       }
     });
+    await this.categories.assertExist(
+      questions.flatMap((q) => q.categoryIds ?? []),
+    );
 
     const quiz = await this.prisma.db.$transaction(async (tx) => {
       await this.entitlements.assertQuizCapacity(tx, user.userId);
@@ -253,6 +258,12 @@ export class QuizzesService {
               timeOut: question.timeOut ?? DEFAULT_TIME_OUT,
               order: index + 1,
               config: question.config,
+              createdById: user.userId,
+              categories: {
+                create: [...new Set(question.categoryIds ?? [])].map(
+                  (categoryId) => ({ categoryId }),
+                ),
+              },
               options: {
                 create: question.options.map((option) => ({
                   title: option.title,
@@ -379,6 +390,7 @@ Rules:
               options: { create: q.options },
               timeOut: dto.time,
               order: index + 1,
+              createdById: user.userId,
             })),
           },
         },

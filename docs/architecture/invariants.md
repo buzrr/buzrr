@@ -101,9 +101,11 @@ the docs, and write an ADR.
     ratings can't be farmed; matchmade (including bot) duels are rated. The
     check is `rated !== false` for pre-field compatibility
     (`persistResult` comment).
-20. **[explicit] The duel pool only serves `isPublic` quizzes with `approved`
-    questions** (`duel-questions.service.ts`), and **any edit re-enters
-    moderation** (`questions.service.ts` comment). Don't create bypasses.
+20. **[explicit] The duel pool only serves `approved` questions that are in
+    an `isPublic` quiz or standalone (no quiz)** (`duel-questions.service.ts`),
+    and **any edit re-enters moderation** (`questions.service.ts` comment).
+    Admin category retagging is the one change that doesn't (ADR-015). Don't
+    create bypasses.
 21. **[explicit] Bots must be indistinguishable and validated.** Bot answers
     go through the normal `submitAnswer` path; `duel:matched` payloads are
     shape-identical to human matches; `bot_` id prefix keeps them out of User

@@ -43,37 +43,49 @@ model Session {
 }
 
 model User {
-  id                String           @id @default(cuid())
-  name              String?
-  email             String           @unique
-  image             String?
-  password          String?
-  createdAt         DateTime         @default(now()) @map("created_at")
-  updatedAt         DateTime         @default(now()) @updatedAt @map("updated_at")
-  emailVerified     Boolean          @default(false) @map("email_verified")
-  eloRating         Int              @default(1200) @map("elo_rating")
-  duelsPlayed       Int              @default(0) @map("duels_played")
+  id                  String               @id @default(cuid())
+  name                String?
+  email               String               @unique
+  image               String?
+  password            String?
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @default(now()) @updatedAt @map("updated_at")
+  emailVerified       Boolean              @default(false) @map("email_verified")
+  eloRating           Int                  @default(1200) @map("elo_rating")
+  duelsPlayed         Int                  @default(0) @map("duels_played")
   /// Manual per-user room-size override. The effective cap is
   /// max(plan cap, hostSizeLimit) — see billing/entitlements.service.ts.
-  hostSizeLimit     Int              @default(50) @map("host_size_limit")
-  role              Role             @default(user)
+  hostSizeLimit       Int                  @default(50) @map("host_size_limit")
+  role                Role                 @default(user)
   /// Dodo Payments customer, set by the first verified billing webhook.
-  dodoCustomerId    String?          @unique @map("dodo_customer_id")
+  dodoCustomerId      String?              @unique @map("dodo_customer_id")
   /// Lifetime Free-plan AI generations spent (never refills).
-  freeAiTokensUsed  Int              @default(0) @map("free_ai_tokens_used")
+  freeAiTokensUsed    Int                  @default(0) @map("free_ai_tokens_used")
   /// Pro AI generations spent in the rolling 7-day window starting at
   /// `proAiWindowStart`; the window resets lazily on the next reservation.
-  proAiTokensUsed   Int              @default(0) @map("pro_ai_tokens_used")
-  proAiWindowStart  DateTime?        @map("pro_ai_window_start")
-  hostedResults     GameResult[]
-  GameSessions      GameSession[]
-  quizzes           Quiz[]
-  accounts          Account[]
-  sessions          Session[]
-  reportedQuestions QuestionReport[]
-  subscriptions     Subscription[]
-  payments          Payment[]
+  proAiTokensUsed     Int                  @default(0) @map("pro_ai_tokens_used")
+  proAiWindowStart    DateTime?            @map("pro_ai_window_start")
+  /// IANA zone reported by the browser; decides what "today" means for the
+  /// daily duel streak. Null falls back to UTC.
+  timeZone            String?              @map("time_zone")
+  /// Daily duel streak. `currentStreak` is only meaningful while
+  /// `lastStreakDay` is today or yesterday in `timeZone` — readers decay it
+  /// (common/utils/daily-streak.ts `effectiveStreak`).
+  currentStreak       Int                  @default(0) @map("current_streak")
+  bestStreak          Int                  @default(0) @map("best_streak")
+  lastStreakDay       DateTime?            @map("last_streak_day") @db.Date
+  hostedResults       GameResult[]
+  GameSessions        GameSession[]
+  quizzes             Quiz[]
+  accounts            Account[]
+  sessions            Session[]
+  reportedQuestions   QuestionReport[]
+  subscriptions       Subscription[]
+  payments            Payment[]
   aiTokenReservations AiTokenReservation[]
+  questions           Question[]
+  categoryRatings     UserCategoryRating[]
+  duelDays            DuelDay[]
 
   @@index([role])
   @@map("users")
@@ -109,30 +121,85 @@ model Quiz {
 }
 
 model Question {
-  id               String           @id @default(cuid())
+  id               String             @id @default(cuid())
   title            String
   /// Question type key, e.g. "multiple_choice". A plain string rather than an
   /// enum on purpose: types are registered in code (one handler per type in
   /// apps/server/src/modules/question-types), so a new type needs no migration.
   /// Unknown values are rejected by the handler registry, not the database.
-  type             String           @default("multiple_choice")
+  type             String             @default("multiple_choice")
   /// Type-specific settings, validated by the type's handler on every write.
-  config           Json             @default("{}")
-  quizId           String
-  createdAt        DateTime         @default(now())
-  timeOut          Int              @default(15)
+  config           Json               @default("{}")
+  /// Null for a standalone question (no quiz) — e.g. bulk-uploaded pool
+  /// content. Standalone questions reach players only through the duel pool.
+  quizId           String?
+  /// Author; the ownership check for edits. Backfilled from `Quiz.userId`.
+  createdById      String?
+  createdAt        DateTime           @default(now())
+  timeOut          Int                @default(15)
   media            String?
   mediaType        String?
-  order            Int              @default(1)
+  order            Int                @default(1)
   /// Per-question moderation gate for the duel pool; the quiz's `isPublic`
   /// flag alone no longer decides eligibility.
-  moderationStatus ModerationStatus @default(draft)
-  reportCount      Int              @default(0)
+  moderationStatus ModerationStatus   @default(draft)
+  reportCount      Int                @default(0)
   options          Option[]
   reports          QuestionReport[]
-  quiz             Quiz             @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  categories       QuestionCategory[]
+  quiz             Quiz?              @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  createdBy        User?              @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([moderationStatus, reportCount])
+  @@index([createdById])
+}
+
+/// A duel topic. A question belongs to zero or more categories; each
+/// category has its own duel rating per user.
+model Category {
+  id        String               @id @default(cuid())
+  slug      String               @unique
+  name      String
+  /// OKLCH hue (0–360) for the category swatch.
+  hue       Int                  @default(270)
+  createdAt DateTime             @default(now())
+  questions QuestionCategory[]
+  ratings   UserCategoryRating[]
+  results   GameResult[]
+}
+
+model QuestionCategory {
+  questionId String
+  categoryId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([questionId, categoryId])
+  @@index([categoryId])
+}
+
+/// Per-category duel rating. "Random" duels keep using `User.eloRating`.
+model UserCategoryRating {
+  userId      String
+  categoryId  String
+  rating      Int      @default(1200)
+  duelsPlayed Int      @default(0)
+  updatedAt   DateTime @default(now()) @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([userId, categoryId])
+  @@index([categoryId])
+}
+
+/// One row per local calendar day on which the user finished a duel; feeds
+/// the streak calendar.
+model DuelDay {
+  userId String
+  day    DateTime @db.Date
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, day])
 }
 
 model Option {
@@ -195,16 +262,20 @@ model GameResult {
   questionCount Int
   startedAt     DateTime
   endedAt       DateTime          @default(now())
+  /// Duel category; null for classic games and Random duels.
+  categoryId    String?
   host          User?             @relation(fields: [hostId], references: [id])
   quiz          Quiz?             @relation(fields: [quizId], references: [id])
+  category      Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   entries       GameResultEntry[]
 
   @@index([hostId])
   @@index([quizId])
+  @@index([categoryId])
 }
 
 model GameResultEntry {
-  id           String     @id @default(cuid())
+  id           String       @id @default(cuid())
   gameResultId String
   /// Snapshot — players are ephemeral rows that don't survive the game.
   playerName   String
@@ -216,7 +287,9 @@ model GameResultEntry {
   correctCount Int
   eloBefore    Int?
   eloAfter     Int?
-  result       GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
+  /// Duel outcome for this participant; null for classic games.
+  outcome      DuelOutcome?
+  result       GameResult   @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -319,6 +392,12 @@ enum AiTokenBucket {
 enum AiTokenReservationStatus {
   consumed
   refunded
+}
+
+enum DuelOutcome {
+  win
+  loss
+  draw
 }
 
 enum GameMode {

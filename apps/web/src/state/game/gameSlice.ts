@@ -1,6 +1,8 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import type {
   AnswerCountPayload,
+  DuelCategoryRef,
+  GameOverPayload,
   AnswerResultPayload,
   GamePhase,
   LiveSummaryPayload,
@@ -53,6 +55,10 @@ export interface GameLiveState {
   eloChanges: Record<string, { before: number; after: number }> | null;
   /** True only for rated duels; friend invites play unrated. */
   rated: boolean;
+  /** Duels only: the category played (null = Random), from game-over. */
+  category: DuelCategoryRef;
+  /** Duels only: daily streak per signed-in playerId, from game-over. */
+  streaks: GameOverPayload["streaks"] | null;
 }
 
 const initialState: GameLiveState = {
@@ -74,6 +80,8 @@ const initialState: GameLiveState = {
   gameOver: false,
   eloChanges: null,
   rated: false,
+  category: null,
+  streaks: null,
 };
 
 /**
@@ -199,6 +207,8 @@ const gameSlice = createSlice({
         entries: LeaderboardEntry[];
         eloChanges?: Record<string, { before: number; after: number }>;
         rated?: boolean;
+        category?: DuelCategoryRef;
+        streaks?: GameOverPayload["streaks"];
       }>,
     ) => {
       state.phase = "ended";
@@ -207,6 +217,8 @@ const gameSlice = createSlice({
       state.gameOver = true;
       state.eloChanges = action.payload.eloChanges ?? null;
       state.rated = action.payload.rated ?? false;
+      state.category = action.payload.category ?? null;
+      state.streaks = action.payload.streaks ?? null;
     },
     playerConnection: (
       state,

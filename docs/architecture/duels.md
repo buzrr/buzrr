@@ -21,9 +21,10 @@ Duels run on the shared engine — read [realtime.md](realtime.md) first.
 
 ## Question pool
 
-`DuelQuestionsService.build()` (`duel-questions.service.ts`) draws
-`DUEL_QUESTION_COUNT = 7` random questions where the quiz `isPublic = true`
-**and** `question.moderationStatus = 'approved'` **and** the question is
+`DuelQuestionsService.build(categoryId?)` (`duel-questions.service.ts`) draws
+`DUEL_QUESTION_COUNT = 7` random questions that are **standalone (no quiz) or
+in an `isPublic` quiz**, **and** `question.moderationStatus = 'approved'`,
+**and** (for a category duel) tagged with that category, **and** the question is
 duel-eligible — `multiple_choice` or `true_false` with exactly one correct
 option (raw SQL `ORDER BY random()`, then a findMany re-ordered to the raw
 shuffle). Each row must pass its question type's own checks
@@ -33,25 +34,43 @@ surface that as "no questions". The moderation gate is what feeds this pool —
 see [backend.md](backend.md#moderation).
 `packages/prisma/scripts/seed-duel-starter.mjs` seeds a system-owned "Duel
 Starter Pack" so the pool is never empty (the self-host `migrate` container
-runs it on every start; it is idempotent).
+runs it on every start; it is idempotent) and the starter categories, with
+the pack tagged General Knowledge.
+
+## Categories
+
+A duel is **Random** (no category — the whole pool) or one **category**
+([ADR-015](../adr/015-duel-categories-and-standalone-questions.md)).
+`GET /api/duel/categories` lists only categories with ≥7 pool questions, with
+play counts (`GameResult.categoryId`). Each category has its **own rating**
+(`UserCategoryRating`, created lazily at 1200); Random uses `User.eloRating`.
+The category travels as: socket handshake `?category=` / `duel:queue
+{ categoryId }` → the queue meta → `startDuel(..., { category })` →
+`GameMeta.categoryId/categoryName` → `GameResult.categoryId` and the
+`game-over` payload. `duel:matched` carries `category` + `questionCount` for
+the countdown screen.
 
 ## Matchmaking (`matchmaking.service.ts`)
 
-State (all Redis): `mm:duel:queue` (zset userId→elo), `mm:duel:meta` (hash
-userId→{name,image,joinedAt}), `mm:duel:lock`.
+State (all Redis): `mm:duel:queue` (zset userId→rating in the searched
+category), `mm:duel:meta` (hash userId→{name,image,joinedAt,category}),
+`mm:duel:lock`. **Only players searching the same category pair**, and only
+a reachable human in the same category blocks the bot fallback. Re-emitting
+`duel:queue { categoryId: null }` mid-search switches to Random (the web
+offers it after 10s) and restarts the wait.
 
 - `enqueue` on socket connect (server enqueues proactively because the
   client's `duel:queue` emit can arrive before handlers are registered).
 - A **2s worker tick runs only while the queue is non-empty** (lazy start/stop
   — Upstash cost, same pattern as the engine sweeper).
 - Pairing: longest-waiting seeker first; acceptable ELO gap widens with wait —
-  `eloBand = min(100 + 50*floor(wait/5s), 500)`; either side's band suffices
+  `eloBand = min(100 + 50*floor(wait/2s), 500)`; either side's band suffices
   (`eloEligible`). One match per tick.
 - Claiming both players is guarded by `mm:duel:lock` (`SET NX PX 5000`) +
   `zrem` count check, with rollback if only one was removed — safe across
   instances.
 - Queue timeout 60s → `duel:queue-timeout`.
-- **Bot fallback**: a player alone ≥12s (`BOT_MATCH_MS`) gets a bot — unless
+- **Bot fallback**: a player alone ≥8s (`BOT_MATCH_MS`) gets a bot — unless
   `DUEL_BOTS=OFF`. `tryBotMatch` re-reads the queue first and only bots the
   player if no _reachable_ human exists (someone outside the band doesn't
   block it). Matched payloads for bot duels are shape-identical to human ones
@@ -132,25 +151,48 @@ REST surface (`duel.controller.ts`): `GET /api/duel/me`, `POST
 - Outcome: forfeiter loses outright; otherwise total score decides; equal
   scores = draw (0.5).
 - Applied only when: mode `duel`, `rated !== false`, exactly 2 entries, not
-  abandoned (both gone). Updates `User.eloRating`/`duelsPlayed` and writes
-  `eloBefore/After` into `GameResultEntry` **in one transaction** with the
-  `GameResult` insert. `eloChanges` ride the `game-over` payload so the client
+  abandoned (both gone). `applyDuelRatings` updates the rating being played —
+  `UserCategoryRating` for a category duel, `User.eloRating`/`duelsPlayed`
+  for Random — and writes `eloBefore/After` plus each entry's `outcome` into
+  `GameResultEntry` **in one transaction** with the `GameResult` insert. `eloChanges` ride the `game-over` payload so the client
   shows before→after without another fetch.
 - `rated !== false` (not truthiness) is deliberate: duels created before the
   `rated` field existed have no flag in Redis and must stay rated across a
   deploy.
 
+## Daily streak
+
+One finished duel a day keeps a streak (`common/utils/daily-streak.ts`, pure
+and unit-tested). A "day" is a calendar date in the user's IANA
+`User.timeZone` (the web `PUT /api/duel/me/timezone`s the browser zone when
+it differs; unset = UTC).
+
+- `applyDailyStreaks` runs in the same `persistResult` transaction for
+  **every** non-abandoned duel — rated, unrated invites and bot duels — for
+  each signed-in duellist who didn't forfeit. Same day → no change;
+  `lastStreakDay` = yesterday → +1; otherwise → 1. It inserts a `DuelDay` row
+  (the calendar) and the result rides `game-over.streaks`.
+- The stored `currentStreak` is never decayed in place: readers use
+  `effectiveStreak` (0 once `lastStreakDay` is older than yesterday).
+- REST: `GET /api/duel/me` (`streak`, plus Random and per-category records
+  with W/L/D from `GameResultEntry.outcome`), `GET /api/duel/streak?month=`
+  (calendar days).
+
 ## Client-side flow (web)
 
-- `/duel` (`DuelClient.tsx`) — profile + queue UI. `useDuelQueue` opens a
-  `userType=duel` socket with no gameCode, emits `duel:queue`, navigates to
-  `/duel/game/{code}` on `duel:matched` (opponent cached in sessionStorage
-  for the countdown screen).
+- `/duel` (`DuelClient.tsx`) — category picker (`CategoryPicker`, selection
+  in `?category=`; `?auto=1` starts searching — "Play Again"), per-category
+  `DuelProfileCard`, `StreakButton` calendar in the header, queue UI.
+  `useDuelQueue` opens a `userType=duel` socket with no gameCode (and
+  `?category=`), emits `duel:queue`, navigates to `/duel/game/{code}` on
+  `duel:matched` (payload cached in sessionStorage via `matchedStorage.ts` for
+  the countdown screen).
 - `/duel/invite/[code]` (`DuelInviteClient` + host/guest views) — polls `GET
 invites/:code` every 3s (`useDuelInviteQuery`) for status/host-presence, and
   holds the `intent=invite` socket (`useDuelInvite`) for accept + `duel:matched`.
 - `/duel/game/[gameCode]` (`DuelGameClient.tsx`) — standard `useGameSocket`
-  with `userType=duel`; renders from the `game` Redux slice; shows ELO deltas
-  from `game-over`.
+  with `userType=duel`; renders from the `game` Redux slice; the result
+  screen shows the category rating before→after and the daily streak from
+  `game-over`.
 - All `/duel/*` pages are session-gated per page via `requireDuelSession`
   (`lib/duel-session.ts`) to preserve deep-link callbacks.

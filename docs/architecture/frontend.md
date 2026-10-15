@@ -118,8 +118,11 @@ disconnect`), emits `request-sync` on connect as a safety net and when the
   `Player/GameScreens/*` (`Question` submits with ack + rollback toast,
   `Result`, `WaitGameStart` with the canvas bubble mini-game in `Game.tsx`,
   `Leaderboard`).
-- Duel screen: `Duel/DuelGameClient` (score bar, countdown, reuses
-  `GameScreens/Question`/`Result`, ELO delta panel, `DuelAudio`).
+- Duel screen: `Duel/DuelGameClient` (score bar, countdown with category and
+  streak chip, reuses `GameScreens/Question`/`Result`, rating + daily-streak
+  result panel, `DuelAudio`). Duel home: `CategoryPicker`, `DuelProfileCard`,
+  `StreakButton` (calendar popover); duel-only icons/helpers in
+  `Duel/duelUi.tsx`, the `flame` colour token in `globals.css`.
 - **Question-type renderers** (`components/QuestionTypes/`): the screens
   above never draw a question themselves. They call `AnswerInput` (guest
   input, `Question`/`QuesAndResult`), `HostPrompt` (host `QuestionScreen`),

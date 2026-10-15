@@ -1,7 +1,8 @@
 /**
  * Seeds the "Duel Starter Pack" — a public quiz owned by a system user so the
- * duel question pool is never empty. Idempotent: re-running updates nothing
- * if the pack already exists.
+ * duel question pool is never empty — and the starter duel categories, with
+ * the pack tagged "General Knowledge". Idempotent: re-running only heals
+ * drift (approval, tags, missing categories).
  *
  * Run from packages/prisma:  yarn seed:duel
  */
@@ -9,6 +10,32 @@ import { prisma, connectDatabase } from "../dist/index.js";
 
 const SYSTEM_EMAIL = "system@buzrr.local";
 const PACK_TITLE = "Duel Starter Pack";
+
+/** Starter duel categories: [slug, name, OKLCH hue]. Empty ones stay hidden
+ * from players until they hold a full duel's worth of approved questions. */
+const CATEGORIES = [
+  ["general-knowledge", "General Knowledge", 200],
+  ["science", "Science", 175],
+  ["history", "History", 45],
+  ["geography", "Geography", 110],
+  ["sports", "Sports", 140],
+  ["movies-and-tv", "Movies & TV", 350],
+  ["music", "Music", 290],
+  ["tech-trivia", "Tech Trivia", 230],
+  ["programming", "Programming", 215],
+  ["math-and-logic", "Math & Logic", 60],
+  ["literature", "Literature", 80],
+  ["art-and-design", "Art & Design", 340],
+  ["food-and-drink", "Food & Drink", 35],
+  ["space", "Space", 250],
+  ["mythology", "Mythology", 300],
+  ["video-games", "Video Games", 260],
+  ["anime", "Anime", 320],
+  ["cricket", "Cricket", 130],
+  ["football", "Football", 150],
+  ["bollywood", "Bollywood", 10],
+];
+const PACK_CATEGORY = "general-knowledge";
 
 const QUESTIONS = [
   {
@@ -89,7 +116,10 @@ async function main() {
     await prisma.questionReport.deleteMany({
       where: { question: { quizId: existing.id } },
     });
-    console.log(`"${PACK_TITLE}" already seeded (${existing.id}); ensured public.`);
+    await seedCategories(existing.id, systemUser.id);
+    console.log(
+      `"${PACK_TITLE}" already seeded (${existing.id}); ensured public.`,
+    );
     return;
   }
 
@@ -102,6 +132,7 @@ async function main() {
       questions: {
         create: QUESTIONS.map((q, i) => ({
           title: q.title,
+          createdById: systemUser.id,
           order: i + 1,
           timeOut: 15,
           moderationStatus: "approved",
@@ -115,7 +146,37 @@ async function main() {
       },
     },
   });
-  console.log(`Seeded "${PACK_TITLE}" (${quiz.id}) with ${QUESTIONS.length} questions.`);
+  await seedCategories(quiz.id, systemUser.id);
+  console.log(
+    `Seeded "${PACK_TITLE}" (${quiz.id}) with ${QUESTIONS.length} questions.`,
+  );
+}
+
+/** Upserts the starter categories and tags the pack with its category. */
+async function seedCategories(quizId, systemUserId) {
+  for (const [slug, name, hue] of CATEGORIES) {
+    await prisma.category.upsert({
+      where: { slug },
+      update: {},
+      create: { slug, name, hue },
+    });
+  }
+  const category = await prisma.category.findUniqueOrThrow({
+    where: { slug: PACK_CATEGORY },
+  });
+  const questions = await prisma.question.findMany({
+    where: { quizId },
+    select: { id: true },
+  });
+  await prisma.questionCategory.createMany({
+    data: questions.map((q) => ({ questionId: q.id, categoryId: category.id })),
+    skipDuplicates: true,
+  });
+  await prisma.question.updateMany({
+    where: { quizId, createdById: null },
+    data: { createdById: systemUserId },
+  });
+  console.log(`Ensured ${CATEGORIES.length} duel categories.`);
 }
 
 main()
