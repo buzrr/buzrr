@@ -28,8 +28,9 @@ Global modules: `ConfigModule`, `RedisModule` (3 ioredis clients),
 | `players`        | `POST /players` (mint guest + player JWT), `PATCH /players/name`, `GET /players/:id`, `PATCH /players/:id/clear-game` — all `@Public()` + rate-limited                                                                                                                                                                              | own JwtModule                            |
 | `game-sessions`  | `POST /game-sessions` (create room), `POST /join`, `GET /player-play/:playerId` (public), `GET /history`, `GET /results/:resultId`, `GET /:roomId/lobby`, `POST /:roomId/end`, `DELETE /:roomId/players/:playerId` (kick), `POST /:roomId/players/:playerId/ban`                                                                    | GameEngine, Billing                      |
 | `quizzes`        | CRUD `/quizzes`, `POST /quizzes/ai` (`TextGenerator`; `ai` rate profile; spends an AI token), `POST /quizzes/import` (batch import from Buzrr-AI; body = contract `importQuizSchema`)                                                                                                                                               | TextGenerator, question types, Billing   |
-| `questions`      | `PATCH /questions/reorder`, `DELETE /questions/:id`, `POST /questions/:id/report`; plus `QuizQuestionsController`: `GET/POST /quizzes/:quizId/questions` (multipart upsert; media via `MediaStorage`)                                                                                                                               | MediaStorage, question types, Moderation |
-| `moderation`     | `GET /moderation/questions`, `PATCH .../:id/approve`, `PATCH .../:id/unapprove` — `@Roles("admin","superadmin")`                                                                                                                                                                                                                    | —                                        |
+| `questions`      | `POST /questions` (standalone/bulk, no quiz; admin-only; body = contract `createStandaloneQuestionsSchema`), `PATCH /questions/reorder`, `DELETE /questions/:id`, `POST /questions/:id/report`; plus `QuizQuestionsController`: `GET/POST /quizzes/:quizId/questions` (multipart upsert; media via `MediaStorage`)                  | MediaStorage, question types, Moderation |
+| `moderation`     | `GET /moderation/questions`, `PATCH .../:id/approve`, `PATCH .../:id/unapprove`, `PATCH .../:id/categories` (retag; no re-moderation) — `@Roles("admin","superadmin")`                                                                                                                                                              | —                                        |
+| `categories`     | `GET /categories` (any account — for tagging), `POST`/`PATCH`/`DELETE /categories[/:id]` (`@Roles("admin","superadmin")`); `CategoriesService.assertExist` validates `categoryIds` on every question write                                                                                                                          | —                                        |
 | `admin-users`    | `GET /superadmin/users`, `PATCH /superadmin/users/:id/role` — `@Roles("superadmin")`                                                                                                                                                                                                                                                | —                                        |
 | `users`          | `GET /users/me/stats` (aggregates over GameResultEntry)                                                                                                                                                                                                                                                                             | —                                        |
 | `billing`        | `GET /billing/me`, `POST /billing/checkout`, `POST /billing/portal`, `POST /billing/sync` (`report` rate profile), `POST /billing/ai-tokens/reserve` + `/release` (called by Buzrr-AI with the caller's JWT), `POST /billing/webhooks/dodo` (`@Public()`, Dodo signature) — see [Billing](#billing--entitlements-srcmodulesbilling) | Dodo SDK                                 |
@@ -87,8 +88,13 @@ services.
 ([duels.md](duels.md#question-pool)):
 
 - States: `draft` (private) → `pending` (public, awaiting review) →
-  `approved` | `unapproved`. Only `approved` questions in public quizzes enter
-  the duel pool.
+  `approved` | `unapproved`. Only `approved` questions in public quizzes — or
+  **standalone** questions (no quiz), which skip `draft` and start `pending`
+  — enter the duel pool. The queue labels standalone rows "Standalone ·
+  author" (`createdBy`).
+- Ownership of a question is `Question.createdById` (falling back to
+  `quiz.userId` for rows without one); standalone creation is admin-only
+  because plan limits count quizzes, not questions.
 - Only **duel-eligible** questions are reviewed: single-answer multiple choice
   and true / false (`isDuelEligible` in the question-type registry). Others
   in a public quiz go straight to `unapproved` (so they never fill the queue),

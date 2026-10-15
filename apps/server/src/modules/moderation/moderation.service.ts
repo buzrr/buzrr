@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { Prisma } from "@buzrr/prisma";
+import { CategoriesService } from "../categories/categories.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { isDuelEligible } from "../question-types";
 
@@ -12,7 +13,10 @@ const DEFAULT_LIMIT = 20;
 
 @Injectable()
 export class ModerationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly categories: CategoriesService,
+  ) {}
 
   /** Pending questions, plus previously-approved ones that got auto-flagged by reports. */
   async listQueue(params: { cursor?: string; limit?: number }) {
@@ -38,15 +42,43 @@ export class ModerationService {
             user: { select: { name: true, email: true } },
           },
         },
+        createdBy: { select: { name: true, email: true } },
+        categories: {
+          select: { category: { select: { id: true, name: true, hue: true } } },
+        },
       },
     });
 
     const hasMore = rows.length > limit;
-    const items = hasMore ? rows.slice(0, limit) : rows;
+    const items = (hasMore ? rows.slice(0, limit) : rows).map(
+      ({ categories, ...row }) => ({
+        ...row,
+        categories: categories.map((c) => c.category),
+      }),
+    );
     return {
       items,
       nextCursor: hasMore ? items[items.length - 1]!.id : null,
     };
+  }
+
+  /**
+   * Retag a question. Categories only steer which duel pool serves it, so an
+   * admin retag doesn't send the question back through moderation.
+   */
+  async setCategories(questionId: string, categoryIds: string[]) {
+    const ids = await this.categories.assertExist(categoryIds);
+    const question = await this.prisma.db.question.findUnique({
+      where: { id: questionId },
+      select: { id: true },
+    });
+    if (!question) throw new NotFoundException("Question not found");
+    await this.prisma.db.$transaction([
+      this.prisma.db.questionCategory.deleteMany({ where: { questionId } }),
+      this.prisma.db.questionCategory.createMany({
+        data: ids.map((categoryId) => ({ questionId, categoryId })),
+      }),
+    ]);
   }
 
   async approve(questionId: string) {

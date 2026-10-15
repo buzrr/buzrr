@@ -18,7 +18,9 @@ point."
   plus `reportCount` and a `QuestionReport` table (one row per distinct
   reporter, DB-unique).
 - Pool eligibility = `quiz.isPublic AND question.moderationStatus =
-'approved'` (`duel-questions.service.ts`).
+'approved'` (`duel-questions.service.ts`). _Amended by
+  [ADR-015](015-duel-categories-and-standalone-questions.md): standalone
+  questions (no quiz) are eligible once approved._
 - Making a quiz public submits its `draft` questions as `pending`; **any
   edit** of a public question resets it to `pending` and wipes reports —
   approval doesn't survive content changes.

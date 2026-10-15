@@ -4,9 +4,16 @@ import {
   OnApplicationBootstrap,
   OnApplicationShutdown,
 } from "@nestjs/common";
-import type { QuestionAnswer } from "@buzrr/contract";
+import type { GameOverPayload, QuestionAnswer } from "@buzrr/contract";
+import type { DuelOutcome, Prisma } from "@buzrr/prisma";
 import { nanoid } from "nanoid";
 import { BotTier } from "../../common/utils/duel-bot";
+import {
+  advanceStreak,
+  dateToDay,
+  dayToDate,
+  localDay,
+} from "../../common/utils/daily-streak";
 import { applyFloor, eloDelta, kFactor } from "../../common/utils/elo";
 import { PrismaService } from "../../prisma/prisma.service";
 import {
@@ -44,7 +51,12 @@ import {
   type Outbound,
 } from "./core";
 import { DuelBotService } from "./duel-bot.service";
-import { GameMeta, LeaderboardEntry, LiveQuestion } from "./game-engine.types";
+import {
+  GameMeta,
+  LeaderboardEntry,
+  LiveQuestion,
+  RosterEntry,
+} from "./game-engine.types";
 import { GameStoreService, parseAnswer } from "./game-store.service";
 
 /** How long a disconnected lobby player is kept before removal. */
@@ -69,6 +81,19 @@ const LIVE_SUMMARY_MS = 1_000;
  * (GameStoreService) so a process restart or a second instance can pick a
  * game back up.
  */
+type StreakChanges = NonNullable<GameOverPayload["streaks"]>;
+
+const OUTCOME_BY_SCORE: Record<1 | 0.5 | 0, DuelOutcome> = {
+  1: "win",
+  0.5: "draw",
+  0: "loss",
+};
+const SCORE_BY_OUTCOME: Record<DuelOutcome, 1 | 0.5 | 0> = {
+  win: 1,
+  draw: 0.5,
+  loss: 0,
+};
+
 @Injectable()
 export class GameEngineService
   implements OnApplicationBootstrap, OnApplicationShutdown
@@ -306,14 +331,19 @@ export class GameEngineService
     opts?: {
       rated?: boolean;
       bot?: { id: string; tier: BotTier; elo: number };
+      /** Null/absent = Random. */
+      category?: { id: string; name: string } | null;
     },
   ): Promise<void> {
     const now = Date.now();
     const firstQuestionAt = now + START_COUNTDOWN_MS;
+    const category = opts?.category ?? null;
     await this.store.initMeta(gameCode, {
       sessionId: "",
       quizId: "",
-      quizTitle: "1v1 Duel",
+      quizTitle: category ? `1v1 Duel · ${category.name}` : "1v1 Duel",
+      categoryId: category?.id,
+      categoryName: category?.name,
       hostId: "",
       mode: "duel",
       pacing: "auto",
@@ -424,7 +454,7 @@ export class GameEngineService
       this.store.roster(gameCode),
     ]);
     const entries = buildLeaderboard(scores, roster);
-    const { resultId, eloChanges } = await this.persistResult(
+    const { resultId, eloChanges, streaks } = await this.persistResult(
       gameCode,
       meta,
       entries,
@@ -436,6 +466,14 @@ export class GameEngineService
       resultId,
       eloChanges,
       rated: meta.mode === "duel" && meta.rated !== false,
+      ...(meta.mode === "duel"
+        ? {
+            category: meta.categoryId
+              ? { id: meta.categoryId, name: meta.categoryName ?? "" }
+              : null,
+            streaks,
+          }
+        : {}),
     });
     this.emitRoom(gameCode).emit("game-session-ended");
 
@@ -1072,6 +1110,7 @@ export class GameEngineService
   ): Promise<{
     resultId?: string;
     eloChanges?: Record<string, { before: number; after: number }>;
+    streaks?: StreakChanges;
   }> {
     if (!meta.startedAt || meta.qCount === 0) return {};
 
@@ -1094,7 +1133,30 @@ export class GameEngineService
       meta.rated !== false &&
       entries.length === 2 &&
       !opts?.abandoned;
-    const isBotDuel = isRatedDuel && Boolean(meta.botId);
+    const categoryId = meta.mode === "duel" ? (meta.categoryId ?? null) : null;
+    const userIdOf = (e: LeaderboardEntry) =>
+      rosterById.get(e.playerId)?.userId ?? null;
+
+    // Each duellist's outcome: the forfeiter loses outright; otherwise total
+    // score decides, and equal scores are a draw.
+    const outcomes = new Map<string, DuelOutcome>();
+    if (meta.mode === "duel" && entries.length === 2) {
+      const [a, b] = entries;
+      const forfeiter = opts?.forfeitLoserId;
+      const forfeited = (e: LeaderboardEntry) =>
+        forfeiter !== undefined &&
+        (e.playerId === forfeiter || userIdOf(e) === forfeiter);
+      let scoreA: 1 | 0.5 | 0;
+      if (forfeited(a) || forfeited(b)) {
+        scoreA = forfeited(a) ? 0 : 1;
+      } else if (a.score === b.score) {
+        scoreA = 0.5;
+      } else {
+        scoreA = a.score > b.score ? 1 : 0;
+      }
+      outcomes.set(a.playerId, OUTCOME_BY_SCORE[scoreA]);
+      outcomes.set(b.playerId, OUTCOME_BY_SCORE[(1 - scoreA) as 1 | 0.5 | 0]);
+    }
 
     const data = (
       quizId: string | null,
@@ -1106,6 +1168,7 @@ export class GameEngineService
       quizId,
       quizTitle: meta.quizTitle,
       hostId,
+      categoryId,
       playerCount: entries.length,
       questionCount: meta.qCount,
       startedAt: new Date(meta.startedAt),
@@ -1113,152 +1176,42 @@ export class GameEngineService
         create: entries.map((e) => ({
           playerName: e.name,
           profilePic: e.profilePic,
-          userId: rosterById.get(e.playerId)?.userId ?? null,
+          userId: userIdOf(e),
           score: e.score,
           rank: e.rank,
           correctCount: correctCounts.get(e.playerId) ?? 0,
           eloBefore: elo?.[e.playerId]?.before ?? null,
           eloAfter: elo?.[e.playerId]?.after ?? null,
+          outcome: outcomes.get(e.playerId) ?? null,
         })),
       },
     });
 
     try {
-      // Bot duels are rated too, but only one side has a User row to update;
-      // the bot's rating comes from meta.
-      if (isBotDuel) {
-        const human = entries.find((e) => e.playerId !== meta.botId);
-        const bot = entries.find((e) => e.playerId === meta.botId);
-        if (human && bot) {
-          return await this.prisma.db.$transaction(async (tx) => {
-            const userId =
-              rosterById.get(human.playerId)?.userId ?? human.playerId;
-            const user = await tx.user.findUnique({
-              where: { id: userId },
-              select: { eloRating: true, duelsPlayed: true },
-            });
-            if (!user) {
-              const result = await tx.gameResult.create({
-                data: data(null, null),
-                select: { id: true },
-              });
-              return { resultId: result.id };
-            }
-
-            let scoreH: 1 | 0.5 | 0;
-            if (opts?.forfeitLoserId) {
-              scoreH = opts.forfeitLoserId === userId ? 0 : 1;
-            } else if (human.score === bot.score) {
-              scoreH = 0.5;
-            } else {
-              scoreH = human.score > bot.score ? 1 : 0;
-            }
-
-            const delta = eloDelta(
-              user.eloRating,
-              meta.botElo ?? user.eloRating,
-              scoreH,
-              kFactor(user.duelsPlayed),
-            );
-            const eloChanges: Record<
-              string,
-              { before: number; after: number }
-            > = {
-              [human.playerId]: {
-                before: user.eloRating,
-                after: applyFloor(user.eloRating + delta),
-              },
-            };
-
-            await tx.user.update({
-              where: { id: userId },
-              data: {
-                eloRating: eloChanges[human.playerId].after,
-                duelsPlayed: { increment: 1 },
-              },
-            });
-            const result = await tx.gameResult.create({
-              data: data(null, null, eloChanges),
-              select: { id: true },
-            });
-            return { resultId: result.id, eloChanges };
-          });
-        }
-      }
-
-      if (isRatedDuel) {
+      // A finished duel (not abandoned) applies ratings when rated and the
+      // daily streak always, in the same transaction as the result insert.
+      if (meta.mode === "duel" && !opts?.abandoned) {
         return await this.prisma.db.$transaction(async (tx) => {
-          const [a, b] = entries;
-          const userIdA = rosterById.get(a.playerId)?.userId ?? a.playerId;
-          const userIdB = rosterById.get(b.playerId)?.userId ?? b.playerId;
-          const users = await tx.user.findMany({
-            where: { id: { in: [userIdA, userIdB] } },
-            select: { id: true, eloRating: true, duelsPlayed: true },
-          });
-          const userA = users.find((u) => u.id === userIdA);
-          const userB = users.find((u) => u.id === userIdB);
-          if (!userA || !userB) {
-            const result = await tx.gameResult.create({
-              data: data(null, null),
-              select: { id: true },
-            });
-            return { resultId: result.id };
-          }
-
-          // Outcome: forfeiter loses outright; otherwise total score decides,
-          // equal scores are a tie.
-          let scoreA: 1 | 0.5 | 0;
-          if (opts?.forfeitLoserId) {
-            scoreA = opts.forfeitLoserId === userIdA ? 0 : 1;
-          } else if (a.score === b.score) {
-            scoreA = 0.5;
-          } else {
-            scoreA = a.score > b.score ? 1 : 0;
-          }
-
-          const deltaA = eloDelta(
-            userA.eloRating,
-            userB.eloRating,
-            scoreA,
-            kFactor(userA.duelsPlayed),
+          const eloChanges = isRatedDuel
+            ? await this.applyDuelRatings(
+                tx,
+                meta,
+                entries,
+                rosterById,
+                outcomes,
+              )
+            : undefined;
+          const streaks = await this.applyDailyStreaks(
+            tx,
+            entries,
+            rosterById,
+            opts?.forfeitLoserId,
           );
-          const deltaB = eloDelta(
-            userB.eloRating,
-            userA.eloRating,
-            (1 - scoreA) as 1 | 0.5 | 0,
-            kFactor(userB.duelsPlayed),
-          );
-          const eloChanges: Record<string, { before: number; after: number }> =
-            {
-              [a.playerId]: {
-                before: userA.eloRating,
-                after: applyFloor(userA.eloRating + deltaA),
-              },
-              [b.playerId]: {
-                before: userB.eloRating,
-                after: applyFloor(userB.eloRating + deltaB),
-              },
-            };
-
-          await tx.user.update({
-            where: { id: userIdA },
-            data: {
-              eloRating: eloChanges[a.playerId].after,
-              duelsPlayed: { increment: 1 },
-            },
-          });
-          await tx.user.update({
-            where: { id: userIdB },
-            data: {
-              eloRating: eloChanges[b.playerId].after,
-              duelsPlayed: { increment: 1 },
-            },
-          });
           const result = await tx.gameResult.create({
             data: data(null, null, eloChanges),
             select: { id: true },
           });
-          return { resultId: result.id, eloChanges };
+          return { resultId: result.id, eloChanges, streaks };
         });
       }
 
@@ -1268,10 +1221,11 @@ export class GameEngineService
       });
       return { resultId: result.id };
     } catch (err) {
-      // Quiz/host may have been deleted mid-game; keep the result anyway.
+      // Quiz/host/category may have been deleted mid-game; keep the result
+      // anyway.
       try {
         const result = await this.prisma.db.gameResult.create({
-          data: data(null, null),
+          data: { ...data(null, null), categoryId: null },
           select: { id: true },
         });
         return { resultId: result.id };
@@ -1281,6 +1235,141 @@ export class GameEngineService
         return {};
       }
     }
+  }
+
+  /**
+   * Rated duels: each human's rating moves against the opponent's — the
+   * category's own rating for a category duel, the global one for Random.
+   * A bot's rating comes from meta. Returns undefined (no rating change) if a
+   * human's account is gone.
+   */
+  private async applyDuelRatings(
+    tx: Prisma.TransactionClient,
+    meta: GameMeta,
+    entries: LeaderboardEntry[],
+    rosterById: Map<string, RosterEntry>,
+    outcomes: Map<string, DuelOutcome>,
+  ): Promise<Record<string, { before: number; after: number }> | undefined> {
+    const categoryId = meta.categoryId ?? null;
+    const current = new Map<string, { rating: number; duelsPlayed: number }>();
+    for (const e of entries) {
+      if (e.playerId === meta.botId) continue;
+      const userId = rosterById.get(e.playerId)?.userId ?? e.playerId;
+      if (categoryId) {
+        const exists = await tx.user.count({ where: { id: userId } });
+        if (!exists) return undefined;
+        const row = await tx.userCategoryRating.findUnique({
+          where: { userId_categoryId: { userId, categoryId } },
+          select: { rating: true, duelsPlayed: true },
+        });
+        current.set(e.playerId, row ?? { rating: 1200, duelsPlayed: 0 });
+      } else {
+        const user = await tx.user.findUnique({
+          where: { id: userId },
+          select: { eloRating: true, duelsPlayed: true },
+        });
+        if (!user) return undefined;
+        current.set(e.playerId, {
+          rating: user.eloRating,
+          duelsPlayed: user.duelsPlayed,
+        });
+      }
+    }
+
+    const changes: Record<string, { before: number; after: number }> = {};
+    for (const e of entries) {
+      const mine = current.get(e.playerId);
+      if (!mine) continue; // the bot
+      const opponent = entries.find((o) => o.playerId !== e.playerId);
+      const opponentRating =
+        opponent && opponent.playerId === meta.botId
+          ? (meta.botElo ?? mine.rating)
+          : (current.get(opponent?.playerId ?? "")?.rating ?? mine.rating);
+      const outcome = outcomes.get(e.playerId) ?? "draw";
+      const after = applyFloor(
+        mine.rating +
+          eloDelta(
+            mine.rating,
+            opponentRating,
+            SCORE_BY_OUTCOME[outcome],
+            kFactor(mine.duelsPlayed),
+          ),
+      );
+      changes[e.playerId] = { before: mine.rating, after };
+
+      const userId = rosterById.get(e.playerId)?.userId ?? e.playerId;
+      if (categoryId) {
+        await tx.userCategoryRating.upsert({
+          where: { userId_categoryId: { userId, categoryId } },
+          create: { userId, categoryId, rating: after, duelsPlayed: 1 },
+          update: { rating: after, duelsPlayed: { increment: 1 } },
+        });
+      } else {
+        await tx.user.update({
+          where: { id: userId },
+          data: { eloRating: after, duelsPlayed: { increment: 1 } },
+        });
+      }
+    }
+    return changes;
+  }
+
+  /**
+   * Daily streak: every signed-in duellist who finished (didn't forfeit)
+   * counts today, in their own time zone — rated, unrated and bot duels alike.
+   */
+  private async applyDailyStreaks(
+    tx: Prisma.TransactionClient,
+    entries: LeaderboardEntry[],
+    rosterById: Map<string, RosterEntry>,
+    forfeitLoserId: string | undefined,
+  ): Promise<StreakChanges> {
+    const now = new Date();
+    const streaks: StreakChanges = {};
+    for (const e of entries) {
+      const userId = rosterById.get(e.playerId)?.userId;
+      if (!userId) continue; // bots have no account
+      if (forfeitLoserId === userId || forfeitLoserId === e.playerId) continue;
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: {
+          timeZone: true,
+          currentStreak: true,
+          bestStreak: true,
+          lastStreakDay: true,
+        },
+      });
+      if (!user) continue;
+      const today = localDay(now, user.timeZone);
+      const next = advanceStreak(
+        {
+          current: user.currentStreak,
+          best: user.bestStreak,
+          lastDay: user.lastStreakDay ? dateToDay(user.lastStreakDay) : null,
+        },
+        today,
+      );
+      if (next.advanced) {
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            currentStreak: next.current,
+            bestStreak: next.best,
+            lastStreakDay: dayToDate(today),
+          },
+        });
+        await tx.duelDay.createMany({
+          data: [{ userId, day: dayToDate(today) }],
+          skipDuplicates: true,
+        });
+      }
+      streaks[e.playerId] = {
+        current: next.current,
+        best: next.best,
+        advanced: next.advanced,
+      };
+    }
+    return streaks;
   }
 
   // -- helpers ------------------------------------------------------------------------

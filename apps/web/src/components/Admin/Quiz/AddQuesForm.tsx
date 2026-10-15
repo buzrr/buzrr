@@ -11,6 +11,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { LuCheck, LuImagePlus, LuPlus, LuTrash2, LuX } from "react-icons/lu";
 import Image from "next/image";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import CategoryChips from "@/components/Admin/CategoryChips";
 import {
   DEFAULT_QUESTION_TYPE,
   MAX_POLL_OPTIONS,
@@ -59,7 +60,8 @@ interface Question {
   type?: string;
   config?: unknown;
   title?: string;
-  quizId?: string;
+  quizId?: string | null;
+  categories?: { categoryId: string }[];
   createdAt?: Date;
   timeOut?: number;
   media?: string | null;
@@ -344,6 +346,9 @@ const AddQuesForm = (props: {
     question?.media ? question.media : "",
   );
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [categoryIds, setCategoryIds] = useState<string[]>(
+    question?.categories?.map((c) => c.categoryId) ?? [],
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [customTime, setCustomTime] = useState(
     !isSliderTime(
@@ -518,6 +523,7 @@ const AddQuesForm = (props: {
     );
     fd.append("file_link", fileLink);
     fd.append("media_type", file ? "" : (question?.mediaType ?? ""));
+    fd.append("categoryIds", JSON.stringify(categoryIds));
     if (question?.id) fd.append("ques_id", question.id);
     if (file) fd.append("file", file);
 
@@ -1084,6 +1090,16 @@ const AddQuesForm = (props: {
             />
           </div>
         </div>
+      </div>
+
+      <div className="flex flex-col gap-2 px-5 pt-4 md:px-7">
+        <span className={fieldLabelClass}>
+          Categories
+          <span className={clsx("text-xs font-normal", mutedText)}>
+            Optional · decides which duel categories can serve it
+          </span>
+        </span>
+        <CategoryChips value={categoryIds} onChange={setCategoryIds} />
       </div>
 
       <div className="mt-5 flex flex-col md:flex-row items-stretch md:items-center gap-3.5 border-t border-lprimary/15 dark:border-white/10 px-5 pt-[18px] pb-6 md:px-7 md:py-4">

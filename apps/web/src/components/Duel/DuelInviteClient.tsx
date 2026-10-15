@@ -10,6 +10,7 @@ import DuelInviteGuestView from "@/components/Duel/DuelInviteGuestView";
 import DuelInviteHostView from "@/components/Duel/DuelInviteHostView";
 import { useDuelInviteQuery } from "@/lib/modules/duel/hooks";
 import type { DuelMatchedPayload } from "@buzrr/contract";
+import { storeMatched } from "./matchedStorage";
 
 /**
  * Landing page for a 1v1 friend challenge. One URL serves both sides: the host
@@ -21,14 +22,7 @@ export default function DuelInviteClient({ code }: { code: string }) {
 
   const onMatched = useCallback(
     (payload: DuelMatchedPayload) => {
-      try {
-        sessionStorage.setItem(
-          `duel:opponent:${payload.gameCode}`,
-          JSON.stringify(payload.opponent),
-        );
-      } catch {
-        // Non-fatal: the game screen falls back to the roster.
-      }
+      storeMatched(payload);
       router.push(`/duel/game/${payload.gameCode}`);
     },
     [router],

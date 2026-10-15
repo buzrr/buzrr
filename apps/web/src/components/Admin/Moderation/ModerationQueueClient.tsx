@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { toast } from "react-toastify";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import {
   useApproveQuestionMutation,
   useModerationQueueQuery,
+  useSetQuestionCategoriesMutation,
   useUnapproveQuestionMutation,
 } from "@/lib/modules/moderation/hooks";
+import CategoryChips from "@/components/Admin/CategoryChips";
+import { categorySwatch } from "@/components/Duel/duelUi";
 import type { ModerationQueueItem } from "@/lib/modules/moderation/api";
 import { Button } from "@/components/ui/Button";
 import {
@@ -158,7 +161,7 @@ function QueueRow({
             </span>
           )}
           <span className="min-w-0 break-words text-xs text-off-dark dark:text-off-white">
-            {item.quiz.title} · {item.quiz.user.name ?? item.quiz.user.email}
+            {sourceLabel(item)}
           </span>
         </div>
         <p className="mt-1 break-words font-bold text-dark dark:text-white">
@@ -179,6 +182,7 @@ function QueueRow({
           ))}
         </div>
       </div>
+      <QueueRowCategories item={item} />
       <div className="flex gap-2">
         <Button size="sm" disabled={pending} onClick={onApprove}>
           Approve
@@ -192,6 +196,77 @@ function QueueRow({
           Unapprove
         </Button>
       </div>
+    </div>
+  );
+}
+
+/** Where a question lives: its quiz and owner, or "Standalone" + author. */
+function sourceLabel(item: ModerationQueueItem): string {
+  if (item.quiz) {
+    return `${item.quiz.title} · ${item.quiz.user.name ?? item.quiz.user.email}`;
+  }
+  const author = item.createdBy?.name ?? item.createdBy?.email;
+  return author ? `Standalone · ${author}` : "Standalone";
+}
+
+/**
+ * The question's categories, editable in place. Retagging only changes which
+ * duel pools serve the question, so it doesn't re-moderate it.
+ */
+function QueueRowCategories({ item }: { item: ModerationQueueItem }) {
+  const [editing, setEditing] = useState(false);
+  const setCategories = useSetQuestionCategoriesMutation();
+  const ids = item.categories.map((c) => c.id);
+
+  if (editing) {
+    return (
+      <div className="flex flex-col gap-2">
+        <CategoryChips
+          value={ids}
+          disabled={setCategories.isPending}
+          onChange={(categoryIds) =>
+            setCategories.mutate(
+              { id: item.id, categoryIds },
+              { onError: (err) => toast.error(getApiErrorMessage(err)) },
+            )
+          }
+        />
+        <button
+          type="button"
+          onClick={() => setEditing(false)}
+          className="self-start cursor-pointer text-xs font-semibold text-lprimary dark:text-dprimary"
+        >
+          Done
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+      {item.categories.length === 0 ? (
+        <span className="text-off-dark dark:text-off-white">No categories</span>
+      ) : (
+        item.categories.map((c) => (
+          <span
+            key={c.id}
+            className="inline-flex items-center gap-1.5 rounded-full bg-card-light dark:bg-card-dark px-2 py-0.5 font-semibold text-dark dark:text-white"
+          >
+            <span
+              className="h-2 w-2 rounded-[3px]"
+              style={{ background: categorySwatch(c.hue) }}
+            />
+            {c.name}
+          </span>
+        ))
+      )}
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="cursor-pointer font-semibold text-lprimary dark:text-dprimary"
+      >
+        Edit
+      </button>
     </div>
   );
 }

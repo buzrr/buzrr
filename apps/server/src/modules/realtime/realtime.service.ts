@@ -37,6 +37,7 @@ export class RealtimeService {
 
     const userType = normalizeQueryValue(socket.handshake.query.userType);
     const gameCode = normalizeQueryValue(socket.handshake.query.gameCode);
+    const category = normalizeQueryValue(socket.handshake.query.category);
     const validUserType =
       userType === "player" || userType === "admin" || userType === "duel";
     const validGameCode = /^[a-zA-Z0-9_-]{4,20}$/.test(gameCode);
@@ -101,6 +102,8 @@ export class RealtimeService {
           normalizeQueryValue(socket.handshake.query.intent) === "invite"
             ? ("invite" as const)
             : ("queue" as const),
+        // Queue connections: the category to search (empty = Random).
+        categoryId: /^[a-zA-Z0-9_-]{1,40}$/.test(category) ? category : null,
       };
     }
 

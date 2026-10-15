@@ -1,44 +1,115 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
+import type { DuelCategory, DuelMatchedPayload } from "@buzrr/contract";
 import { DEFAULT_AVATAR } from "@/constants";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/Button";
 import Skeleton from "@/components/ui/Skeleton";
 import ClientImage from "@/components/ClientImage";
+import { labelClass } from "@/components/Game/GameUI";
 import { useDuelQueue } from "@/hooks/useDuelQueue";
 import {
   useCreateDuelInviteMutation,
+  useDuelCategoriesQuery,
   useDuelProfileQuery,
+  useSyncDuelTimeZone,
 } from "@/lib/modules/duel/hooks";
+import CategoryPicker from "./CategoryPicker";
+import DuelProfileCard from "./DuelProfileCard";
+import StreakButton from "./StreakButton";
+import { RANDOM_HUE, categorySwatch } from "./duelUi";
+import { storeMatched } from "./matchedStorage";
 
-export default function DuelClient() {
+/** After this long searching a category, offer Random instead. */
+const SWITCH_TO_RANDOM_AFTER_S = 10;
+
+export default function DuelClient({
+  initialCategoryId,
+  autoStart,
+}: {
+  initialCategoryId: string | null;
+  /** "Play Again": start searching as soon as the page loads. */
+  autoStart: boolean;
+}) {
   const router = useRouter();
   const { data: session } = authClient.useSession();
   const { data: profile, isPending } = useDuelProfileQuery();
+  const { data: catalog, isPending: catalogPending } = useDuelCategoriesQuery();
+  useSyncDuelTimeZone(profile ? profile.timeZone : undefined);
   const createInvite = useCreateDuelInviteMutation();
-  const { status, error, queuedAt, findMatch, cancel } = useDuelQueue({
-    onMatched: (payload) => {
-      try {
-        sessionStorage.setItem(
-          `duel:opponent:${payload.gameCode}`,
-          JSON.stringify(payload.opponent),
-        );
-      } catch {
-        // Non-fatal: the game screen falls back to the roster.
-      }
-      router.push(`/duel/game/${payload.gameCode}`);
+  const [categoryId, setCategoryId] = useState<string | null>(
+    initialCategoryId,
+  );
+
+  // A stale link (category removed or emptied) falls back to Random.
+  const category: DuelCategory | null =
+    (categoryId && catalog?.categories.find((c) => c.id === categoryId)) ||
+    null;
+  const effectiveId = catalog ? (category?.id ?? null) : categoryId;
+  const categoryName = category?.name ?? "Random";
+
+  const { status, error, queuedAt, findMatch, cancel, switchCategory } =
+    useDuelQueue({
+      onMatched: (payload: DuelMatchedPayload) => {
+        storeMatched(payload);
+        router.push(`/duel/game/${payload.gameCode}`);
+      },
+    });
+  const [searchingId, setSearchingId] = useState<string | null>(null);
+
+  const select = useCallback(
+    (id: string | null) => {
+      setCategoryId(id);
+      router.replace(
+        id ? `/duel?category=${encodeURIComponent(id)}` : "/duel",
+        {
+          scroll: false,
+        },
+      );
     },
-  });
+    [router],
+  );
+
+  const start = useCallback(() => {
+    setSearchingId(effectiveId);
+    void findMatch(effectiveId);
+  }, [effectiveId, findMatch]);
+
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!autoStart || autoStarted.current || catalogPending) return;
+    autoStarted.current = true;
+    start();
+    // Drop `auto` so a reload doesn't re-queue.
+    router.replace(
+      effectiveId
+        ? `/duel?category=${encodeURIComponent(effectiveId)}`
+        : "/duel",
+      { scroll: false },
+    );
+  }, [autoStart, catalogPending, start, router, effectiveId]);
+
+  const searching = status === "queued" || status === "connecting";
+  const searchingCategory =
+    (searchingId && catalog?.categories.find((c) => c.id === searchingId)) ||
+    null;
+
+  const invite = () =>
+    createInvite.mutate(effectiveId, {
+      onSuccess: (res) => router.push(`/duel/invite/${res.code}`),
+      onError: () =>
+        toast.error("Couldn't create a challenge link. Try again."),
+    });
 
   return (
-    <div className="flex flex-col min-h-dvh">
-      <header className="sticky top-0 z-40 bg-light-bg/90 dark:bg-dark-bg/90 backdrop-blur border-b border-card-light dark:border-card-dark">
-        <div className="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8 py-3">
+    <div className="flex min-h-dvh flex-col">
+      <header className="sticky top-0 z-40 border-b border-card-light dark:border-card-dark bg-light-bg/90 dark:bg-dark-bg/90 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <Link href="/" aria-label="Buzrr home">
             <ClientImage
               props={{
@@ -50,100 +121,120 @@ export default function DuelClient() {
               }}
             />
           </Link>
-          <Link href="/duel/profile" aria-label="Open your profile">
-            <Image
-              src={session?.user?.image || DEFAULT_AVATAR}
-              width={40}
-              height={40}
-              alt="Profile"
-              className="rounded-full h-10 w-10 hover:opacity-90 transition-opacity"
-            />
-          </Link>
+          <div className="flex items-center gap-2.5 sm:gap-3.5">
+            {profile && <StreakButton streak={profile.streak} />}
+            <Link href="/duel/profile" aria-label="Open your profile">
+              <Image
+                src={session?.user?.image || DEFAULT_AVATAR}
+                width={40}
+                height={40}
+                alt="Profile"
+                className="h-10 w-10 rounded-full transition-opacity hover:opacity-90"
+              />
+            </Link>
+          </div>
         </div>
       </header>
 
-      <div className="flex-1 flex flex-col items-center justify-center gap-6 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-        <h1 className="text-3xl md:text-5xl font-black text-dark dark:text-white text-center animate-fade-up">
-          1v1 Duel
-        </h1>
-        <p className="text-sm text-off-dark dark:text-off-white text-center max-w-md animate-fade-up [animation-delay:100ms]">
-          Get matched with a player near your rating and battle through quick
-          questions. Faster correct answers score more.
-        </p>
+      <div className="flex w-full flex-1 flex-col items-center px-4 pb-44 pt-5 sm:justify-center sm:px-6 sm:pb-16 sm:pt-10">
+        <div className="flex w-full max-w-[660px] flex-col gap-3.5 sm:gap-[18px]">
+          <h1 className="text-[28px] font-extrabold tracking-tight text-dark dark:text-white sm:text-center sm:text-5xl md:text-6xl animate-fade-up">
+            1v1 Duel
+          </h1>
 
-        {isPending ? (
-          <Skeleton className="h-28 w-full max-w-sm rounded-2xl bg-white dark:bg-card-dark" />
-        ) : profile ? (
-          <Link
-            href="/duel/profile"
-            aria-label="Open your profile"
-            className="flex items-center gap-4 bg-white dark:bg-dark rounded-2xl p-5 w-full max-w-sm shadow border border-card-light dark:border-off-dark animate-fade-up [animation-delay:150ms] hover:border-lprimary/40 dark:hover:border-dprimary/40 transition-colors"
-          >
-            <Image
-              src={profile.image || DEFAULT_AVATAR}
-              width={56}
-              height={56}
-              alt="Profile"
-              className="rounded-full h-14 w-14"
+          {isPending ? (
+            <Skeleton className="h-16 w-full rounded-2xl bg-white dark:bg-card-dark sm:h-40" />
+          ) : profile ? (
+            <>
+              <div className="sm:hidden">
+                <DuelProfileCard
+                  profile={profile}
+                  categoryId={effectiveId}
+                  categoryName={categoryName}
+                  compact
+                />
+              </div>
+              <div className="hidden sm:block">
+                <DuelProfileCard
+                  profile={profile}
+                  categoryId={effectiveId}
+                  categoryName={categoryName}
+                />
+              </div>
+            </>
+          ) : null}
+
+          {searching ? (
+            <SearchingCard
+              queuedAt={queuedAt}
+              category={searchingCategory}
+              onSwitchToRandom={() => {
+                setSearchingId(null);
+                select(null);
+                switchCategory(null);
+              }}
+              onCancel={cancel}
             />
-            <div className="flex-1">
-              <p className="font-bold text-dark dark:text-white">
-                {profile.name ?? "Player"}
-              </p>
-              <p className="text-xs text-off-dark dark:text-off-white">
-                {profile.duelsPlayed} duel{profile.duelsPlayed === 1 ? "" : "s"}{" "}
-                played
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-2xl font-black text-lprimary dark:text-dprimary">
-                {profile.eloRating}
-              </p>
-              <p className="text-xs text-off-dark dark:text-off-white">
-                rating
-              </p>
-            </div>
-          </Link>
-        ) : null}
+          ) : status === "matched" ? (
+            <p className="animate-pulse text-center font-bold text-dark dark:text-white">
+              Opponent found — starting…
+            </p>
+          ) : (
+            <>
+              <div className="mt-1.5 hidden items-baseline justify-between sm:flex">
+                <span className={labelClass}>Category</span>
+                <span className="text-[13.5px] text-off-dark dark:text-muted-dark">
+                  Each category has its own rating
+                </span>
+              </div>
+              {catalogPending ? (
+                <Skeleton className="h-64 w-full rounded-2xl bg-white dark:bg-card-dark" />
+              ) : (
+                <CategoryPicker
+                  categories={catalog?.categories ?? []}
+                  randomPlays={catalog?.randomPlays ?? 0}
+                  selected={effectiveId}
+                  onSelect={select}
+                />
+              )}
 
-        {status === "queued" || status === "connecting" ? (
-          <SearchingCard queuedAt={queuedAt} onCancel={cancel} />
-        ) : status === "matched" ? (
-          <p className="font-bold text-dark dark:text-white animate-pulse">
-            Opponent found — starting…
-          </p>
-        ) : (
-          <div className="flex flex-col items-center gap-3 w-full max-w-sm">
-            {status === "timeout" && (
-              <p className="text-sm text-dark dark:text-white text-center">
-                No opponent found this time. Try again?
-              </p>
-            )}
-            {status === "error" && error && (
-              <p className="text-sm text-red-light dark:text-red-dark text-center">
-                {error}
-              </p>
-            )}
-            <Button fullWidth size="lg" onClick={() => void findMatch()}>
-              Find Match
-            </Button>
-            <Button
-              variant="outline"
-              fullWidth
-              size="lg"
-              disabled={createInvite.isPending}
-              onClick={() =>
-                createInvite.mutate(undefined, {
-                  onSuccess: (res) => router.push(`/duel/invite/${res.code}`),
-                  onError: () =>
-                    toast.error("Couldn't create a challenge link. Try again."),
-                })
-              }
-            >
-              {createInvite.isPending ? "Creating link…" : "Invite a Friend"}
-            </Button>
-          </div>
-        )}
+              {status === "timeout" && (
+                <p className="text-center text-sm text-dark dark:text-white">
+                  No opponent found this time. Try again?
+                </p>
+              )}
+              {status === "error" && error && (
+                <p className="text-center text-sm text-red-light dark:text-red-dark">
+                  {error}
+                </p>
+              )}
+
+              {/* Floating on mobile so the CTAs stay reachable while scrolling. */}
+              <div className="fixed inset-x-0 bottom-0 z-30 flex flex-col gap-2 bg-linear-to-t from-light-bg from-70% to-transparent px-4 pb-[22px] pt-3.5 dark:from-dark-bg sm:static sm:mt-2 sm:gap-3 sm:bg-none sm:p-0">
+                <Button
+                  fullWidth
+                  size="lg"
+                  onClick={start}
+                  className="shadow-[0_12px_28px_-14px_rgba(60,30,160,0.55)] sm:shadow-none"
+                >
+                  Find Match · {categoryName}
+                </Button>
+                <Button
+                  variant="outline"
+                  fullWidth
+                  size="lg"
+                  disabled={createInvite.isPending}
+                  onClick={invite}
+                  className="bg-white! dark:bg-dark! sm:bg-transparent!"
+                >
+                  {createInvite.isPending
+                    ? "Creating link…"
+                    : "Invite a Friend"}
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -151,32 +242,56 @@ export default function DuelClient() {
 
 function SearchingCard({
   queuedAt,
+  category,
+  onSwitchToRandom,
   onCancel,
 }: {
   queuedAt: number | null;
+  /** Null = searching Random. */
+  category: DuelCategory | null;
+  onSwitchToRandom: () => void;
   onCancel: () => void;
 }) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
     if (!queuedAt) return;
-    const interval = setInterval(
-      () => setElapsed(Math.floor((Date.now() - queuedAt) / 1000)),
-      500,
-    );
+    const tick = () => setElapsed(Math.floor((Date.now() - queuedAt) / 1000));
+    tick();
+    const interval = setInterval(tick, 500);
     return () => clearInterval(interval);
   }, [queuedAt]);
 
   return (
-    <div className="flex flex-col items-center gap-4 bg-white dark:bg-dark rounded-2xl p-6 w-full max-w-sm shadow border border-card-light dark:border-off-dark animate-fade-up">
-      <div className="h-12 w-12 rounded-full border-4 border-lprimary dark:border-dprimary border-t-transparent dark:border-t-transparent animate-spin" />
-      <p className="font-bold text-dark dark:text-white">
+    <div className="flex w-full flex-col items-center gap-3.5 rounded-[22px] border border-lprimary/15 dark:border-white/5 bg-white dark:bg-dark px-6 py-8 text-center shadow-[0_10px_30px_-18px_rgba(70,40,160,0.35)] animate-fade-up">
+      <div className="h-16 w-16 animate-spin rounded-full border-[5px] border-card-light dark:border-card-dark border-t-lprimary dark:border-t-dprimary" />
+      <h3 className="mt-1.5 text-xl font-bold text-dark dark:text-white sm:text-[22px]">
         Searching for an opponent… {queuedAt ? `${elapsed}s` : ""}
-      </p>
-      <p className="text-xs text-off-dark dark:text-off-white text-center">
+      </h3>
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-card-light dark:bg-card-dark px-3 py-1.5 text-[13.5px] font-bold text-lprimary dark:text-dprimary">
+        <span
+          className="h-[9px] w-[9px] rounded-[3px]"
+          style={{ background: categorySwatch(category?.hue ?? RANDOM_HUE) }}
+        />
+        {category?.name ?? "Random"}
+      </span>
+      <p className="text-[15px] text-off-dark dark:text-muted-dark">
         The rating range widens the longer you wait.
       </p>
-      <Button variant="outline" fullWidth onClick={onCancel}>
+      {category && queuedAt && elapsed >= SWITCH_TO_RANDOM_AFTER_S && (
+        <p className="text-sm text-off-dark dark:text-muted-dark">
+          Taking a while?{" "}
+          <button
+            type="button"
+            onClick={onSwitchToRandom}
+            className="cursor-pointer font-semibold text-lprimary hover:underline dark:text-dprimary"
+          >
+            Switch to Random
+          </button>{" "}
+          for a faster match.
+        </p>
+      )}
+      <Button variant="outline" fullWidth onClick={onCancel} className="mt-1.5">
         Cancel
       </Button>
     </div>

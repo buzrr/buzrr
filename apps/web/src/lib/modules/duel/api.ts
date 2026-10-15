@@ -1,17 +1,17 @@
 import type { AxiosInstance } from "axios";
+import type {
+  DuelCategoriesResponse,
+  DuelCategoryRef,
+  DuelProfile,
+  StreakMonth,
+} from "@buzrr/contract";
 import { getAuthApiClient } from "@/lib/api/client";
 import type {
   GameResultEntry,
   GameResultWithEntries,
 } from "@/lib/modules/game-sessions/api";
 
-export type DuelProfile = {
-  id: string;
-  name: string | null;
-  image: string | null;
-  eloRating: number;
-  duelsPlayed: number;
-};
+export type { DuelProfile };
 
 export type RecentDuel = GameResultEntry & {
   result: GameResultWithEntries;
@@ -21,6 +21,7 @@ export type DuelInvite = {
   code: string;
   host: { id: string; name: string; image: string | null; elo: number };
   expiresAt: number;
+  category: DuelCategoryRef;
   status: "pending" | "claimed";
   /** True when the viewer created this challenge. */
   isHost: boolean;
@@ -32,9 +33,30 @@ export type DuelInvite = {
 
 export type CreatedDuelInvite = { code: string; expiresAt: number };
 
-export async function createDuelInvite(client: AxiosInstance) {
-  const { data } = await client.post<CreatedDuelInvite>("/duel/invites");
+export async function createDuelInvite(
+  client: AxiosInstance,
+  categoryId: string | null,
+) {
+  const { data } = await client.post<CreatedDuelInvite>("/duel/invites", {
+    categoryId,
+  });
   return data;
+}
+
+export async function getDuelCategories(client: AxiosInstance) {
+  const { data } = await client.get<DuelCategoriesResponse>("/duel/categories");
+  return data;
+}
+
+export async function getStreakMonth(client: AxiosInstance, month: string) {
+  const { data } = await client.get<StreakMonth>("/duel/streak", {
+    params: { month },
+  });
+  return data;
+}
+
+export async function setDuelTimeZone(client: AxiosInstance, timeZone: string) {
+  await client.put("/duel/me/timezone", { timeZone });
 }
 
 export async function getDuelInvite(client: AxiosInstance, code: string) {
@@ -63,7 +85,12 @@ export async function getRecentDuels(client: AxiosInstance, limit?: number) {
 export const duelApi = {
   me: () => getDuelProfile(getAuthApiClient()),
   recent: (limit?: number) => getRecentDuels(getAuthApiClient(), limit),
-  createInvite: () => createDuelInvite(getAuthApiClient()),
+  createInvite: (categoryId: string | null) =>
+    createDuelInvite(getAuthApiClient(), categoryId),
+  categories: () => getDuelCategories(getAuthApiClient()),
+  streakMonth: (month: string) => getStreakMonth(getAuthApiClient(), month),
+  setTimeZone: (timeZone: string) =>
+    setDuelTimeZone(getAuthApiClient(), timeZone),
   getInvite: (code: string) => getDuelInvite(getAuthApiClient(), code),
   cancelInvite: (code: string) => cancelDuelInvite(getAuthApiClient(), code),
 };

@@ -30,6 +30,9 @@ export interface GameMeta {
   botId?: string;
   botTier?: BotTier;
   botElo?: number;
+  /** Duels only: the category played; absent = Random. */
+  categoryId?: string;
+  categoryName?: string;
   /**
    * The bot's answer to the open question (JSON), so a restart can re-arm it.
    * Older games stored a bare `botOptionId` instead; `botAnswerOf` reads both.

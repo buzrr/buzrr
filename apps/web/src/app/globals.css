@@ -33,6 +33,8 @@
   /* Unpicked/wrong answer bars on the reveal screen (used at 45% opacity). */
   --color-bar-muted: #8a8896;
   --color-bar-muted-dark: #71717a;
+  /* Daily-streak flame (duels). */
+  --color-flame: #f0612a;
   --breakpoint-medium: 860px;
 
   --animate-float: float 5s ease-in-out infinite;

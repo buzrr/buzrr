@@ -15,8 +15,8 @@ export type DuelQueueStatus =
 
 /**
  * Matchmaking-queue connection (userType=duel, no gameCode). The server
- * pairs players by ELO proximity and pushes `duel:matched` with the room to
- * join.
+ * pairs players in the same category (null = Random) by rating proximity and
+ * pushes `duel:matched` with the room to join.
  */
 export function useDuelQueue(options: {
   onMatched: (payload: DuelMatchedPayload) => void;
@@ -35,7 +35,7 @@ export function useDuelQueue(options: {
     };
   }, []);
 
-  const findMatch = useCallback(async () => {
+  const findMatch = useCallback(async (categoryId: string | null = null) => {
     setError(null);
     setStatus("connecting");
 
@@ -47,14 +47,16 @@ export function useDuelQueue(options: {
     }
 
     socketRef.current?.disconnect();
+    const query = new URLSearchParams({ userType: "duel" });
+    if (categoryId) query.set("category", categoryId);
     const conn: GameSocket = io(
-      `${process.env.NEXT_PUBLIC_SOCKET_URL}/?userType=duel`,
+      `${process.env.NEXT_PUBLIC_SOCKET_URL}/?${query.toString()}`,
       { withCredentials: true, auth: { token } },
     );
     socketRef.current = conn;
 
     conn.on("connect", () => {
-      conn.emit("duel:queue");
+      conn.emit("duel:queue", { categoryId });
     });
     conn.on("duel:queued", () => {
       setStatus("queued");
@@ -93,5 +95,10 @@ export function useDuelQueue(options: {
     setQueuedAt(null);
   }, []);
 
-  return { status, error, queuedAt, findMatch, cancel };
+  /** Re-queues in another category (e.g. Random); the wait restarts. */
+  const switchCategory = useCallback((categoryId: string | null) => {
+    socketRef.current?.emit("duel:queue", { categoryId });
+  }, []);
+
+  return { status, error, queuedAt, findMatch, cancel, switchCategory };
 }

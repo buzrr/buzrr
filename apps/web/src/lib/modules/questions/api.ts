@@ -2,7 +2,10 @@ import type { AxiosInstance } from "axios";
 import type { Option, Question } from "@/types/db";
 import { getAuthApiClient } from "@/lib/api/client";
 
-export type QuestionWithOptions = Question & { options: Option[] };
+export type QuestionWithOptions = Question & {
+  options: Option[];
+  categories?: { categoryId: string }[];
+};
 
 export async function listQuestions(client: AxiosInstance, quizId: string) {
   const { data } = await client.get<{
@@ -29,7 +32,10 @@ export async function reorderQuestions(
   await client.patch("/questions/reorder", body);
 }
 
-export async function deleteQuestion(client: AxiosInstance, questionId: string) {
+export async function deleteQuestion(
+  client: AxiosInstance,
+  questionId: string,
+) {
   await client.delete(`/questions/${questionId}`);
 }
 
@@ -39,5 +45,6 @@ export const questionsApi = {
     upsertQuestionMultipart(getAuthApiClient(), quizId, formData),
   reorder: (body: Parameters<typeof reorderQuestions>[1]) =>
     reorderQuestions(getAuthApiClient(), body),
-  delete: (questionId: string) => deleteQuestion(getAuthApiClient(), questionId),
+  delete: (questionId: string) =>
+    deleteQuestion(getAuthApiClient(), questionId),
 };
