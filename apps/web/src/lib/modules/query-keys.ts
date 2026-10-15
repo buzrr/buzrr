@@ -1,3 +1,5 @@
+import type { ModerationListStatus } from "@buzrr/contract";
+
 export const queryKeys = {
   questions: (quizId: string) => ["questions", quizId] as const,
   leaderboard: (gameCode: string) => ["leaderboard", gameCode] as const,
@@ -31,7 +33,10 @@ export const queryKeys = {
     run: (runId: string) => ["ai", "runs", runId] as const,
   },
   moderation: {
-    queue: ["moderation", "queue"] as const,
+    all: ["moderation"] as const,
+    queue: (status: ModerationListStatus) =>
+      ["moderation", "queue", status] as const,
+    counts: ["moderation", "counts"] as const,
   },
   categories: {
     all: ["categories"] as const,

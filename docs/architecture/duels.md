@@ -44,7 +44,9 @@ A duel is **Random** (no category — the whole pool) or one **category**
 `GET /api/duel/categories` lists only categories with ≥7 pool questions, with
 play counts (`GameResult.categoryId`). Each category has its **own rating**
 (`UserCategoryRating`, created lazily at 1200); Random uses `User.eloRating`.
-The category travels as: socket handshake `?category=` / `duel:queue
+Only admins tag questions, from the **Duel Portal**
+(`/admin/duel-portal`: bulk upload by category, per-row and bulk retag,
+category create/edit/delete); quiz authors can't. The category travels as: socket handshake `?category=` / `duel:queue
 { categoryId }` → the queue meta → `startDuel(..., { category })` →
 `GameMeta.categoryId/categoryName` → `GameResult.categoryId` and the
 `game-over` payload. `duel:matched` carries `category` + `questionCount` for

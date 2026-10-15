@@ -4,7 +4,6 @@ import { getAuthApiClient } from "@/lib/api/client";
 
 export type QuestionWithOptions = Question & {
   options: Option[];
-  categories?: { categoryId: string }[];
 };
 
 export async function listQuestions(client: AxiosInstance, quizId: string) {

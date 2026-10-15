@@ -12,7 +12,7 @@ import {
   LuHistory,
   LuLogOut,
   LuSettings,
-  LuShieldCheck,
+  LuSwords,
   LuSparkles,
   LuUserCog,
 } from "react-icons/lu";
@@ -54,9 +54,9 @@ export default function Navbar() {
     ...(role === "admin" || role === "superadmin"
       ? [
           {
-            href: "/admin/moderation",
-            label: "Question Review",
-            icon: LuShieldCheck,
+            href: "/admin/duel-portal",
+            label: "Duel Portal",
+            icon: LuSwords,
           },
         ]
       : []),

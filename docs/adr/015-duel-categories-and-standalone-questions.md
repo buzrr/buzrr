@@ -24,7 +24,9 @@ every question belonged to a quiz, ownership was derived only through
 2. **Categories are many-to-many** through an explicit `QuestionCategory`
    table (the raw pool SQL joins it). A question has zero or more (max 5).
    Admins retag from the moderation queue without re-moderation, since
-   categories only choose which pool serves a question. Players see only
+   categories only choose which pool serves a question. _(2026-10-15:
+   tagging became admin-only — the quiz editor and `POST /quizzes/import` no
+   longer accept categories; admins tag from the Duel Portal.)_ Players see only
    categories with a full duel's worth (7) of pool questions.
 3. **A rating per category.** `UserCategoryRating` (lazy, default 1200)
    holds a category's rating and its own provisional K-factor count; Random
@@ -52,8 +54,8 @@ scoring is unchanged.
   score-based.
 - A user can change their time zone, which could repeat or skip a day once;
   accepted for a streak with no rewards attached.
-- There is no admin UI for creating categories yet — the seed script ships
-  20 and the REST endpoints manage the rest.
+- The seed script ships 20 categories; admins create, edit and delete them
+  from the Duel Portal (`/admin/duel-portal/categories`).
 
 ## Evidence
 
