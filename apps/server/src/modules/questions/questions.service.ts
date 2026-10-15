@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   BadRequestException,
   ForbiddenException,
@@ -354,37 +355,51 @@ export class QuestionsService {
       questions.flatMap((q) => q.categoryIds ?? []),
     );
 
-    const ids = await this.prisma.db.$transaction(async (tx) => {
-      const created: string[] = [];
-      for (const question of questions) {
-        const row = await tx.question.create({
-          data: {
-            type: question.type,
-            title: question.title,
-            config: question.config,
-            timeOut: question.timeOut ?? DEFAULT_TIME_OUT,
-            createdById: user.userId,
-            moderationStatus: isDuelEligible(question.type, question)
-              ? "pending"
-              : "unapproved",
-            options: {
-              create: question.options.map((option) => ({
-                title: option.title,
-                isCorrect: option.isCorrect,
-              })),
-            },
-            categories: {
-              create: [...new Set(question.categoryIds ?? [])].map(
-                (categoryId) => ({ categoryId }),
-              ),
-            },
-          },
-          select: { id: true },
-        });
-        created.push(row.id);
-      }
-      return created;
-    });
+    // Three bulk inserts in one batch transaction rather than a nested create
+    // per question: up to 500 sequential nested creates over a remote link
+    // outlived the interactive-transaction timeout, whose mid-write rollback
+    // surfaced as a foreign key error on the children.
+    const rows = questions.map((question) => ({
+      ...question,
+      id: randomUUID(),
+    }));
+    // Options are read back ordered by createdAt; distinct timestamps keep
+    // the authored order.
+    const base = Date.now();
+    await this.prisma.db.$transaction([
+      this.prisma.db.question.createMany({
+        data: rows.map((question) => ({
+          id: question.id,
+          type: question.type,
+          title: question.title,
+          config: question.config,
+          timeOut: question.timeOut ?? DEFAULT_TIME_OUT,
+          createdById: user.userId,
+          moderationStatus: isDuelEligible(question.type, question)
+            ? "pending"
+            : "unapproved",
+        })),
+      }),
+      this.prisma.db.option.createMany({
+        data: rows.flatMap((question) =>
+          question.options.map((option, index) => ({
+            questionId: question.id,
+            title: option.title,
+            isCorrect: option.isCorrect,
+            createdAt: new Date(base + index),
+          })),
+        ),
+      }),
+      this.prisma.db.questionCategory.createMany({
+        data: rows.flatMap((question) =>
+          [...new Set(question.categoryIds ?? [])].map((categoryId) => ({
+            questionId: question.id,
+            categoryId,
+          })),
+        ),
+      }),
+    ]);
+    const ids = rows.map((question) => question.id);
     return { created: ids.length, ids };
   }
 }
