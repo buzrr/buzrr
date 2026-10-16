@@ -95,9 +95,9 @@ GEMINI_API_KEY=""
 # …or any OpenAI-compatible server, e.g. a local Ollama:
 # LLM_BASE_URL="http://localhost:11434/v1"
 # LLM_MODEL="llama3.1"
-# Image uploads are stored in ./uploads and served at /uploads by default.
-# Set these to use Cloudinary instead (https://cloudinary.com), or see
-# apps/server/.env.example for S3-compatible storage.
+# Image uploads are disabled (503) until a store is configured. Set these for
+# Cloudinary (https://cloudinary.com), or see apps/server/.env.example for
+# S3-compatible storage or STORAGE_DRIVER="local" (this server's disk).
 CLOUDINARY_CLOUD_NAME=""
 CLOUDINARY_API_KEY=""
 CLOUDINARY_API_SECRET=""

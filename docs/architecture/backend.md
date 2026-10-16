@@ -194,10 +194,13 @@ max, resetsAt? }`; the web client's upgrade prompt keys on that body.
 
 - `MediaStorage` (`storage/`) — where question images go: `cloudinary`, `s3`
   (any S3-compatible store; built-in SigV4 signer) or `local` (API disk,
-  served at `/uploads`). Chosen by `STORAGE_DRIVER`; unset = Cloudinary if
-  `CLOUDINARY_CLOUD_NAME` is set, else local. `s3`/`local` accept only
+  served at `/uploads`), or `none`. Chosen by `STORAGE_DRIVER`; unset =
+  Cloudinary if `CLOUDINARY_CLOUD_NAME` is set, else `none` — never a silent
+  fall back to disk. `none` rejects uploads with 503 "Media upload is currently unavailable"; it is
+  also bound when `CLOUDINARY_*` or `S3_BUCKET`/`S3_ACCESS_KEY_ID`/
+  `S3_SECRET_ACCESS_KEY` are incomplete. `s3`/`local` accept only
   magic-byte-sniffed PNG/JPEG/GIF/WebP/AVIF (no SVG — they serve bytes as-is).
-  A misconfigured driver fails at boot.
+  Only an unknown `STORAGE_DRIVER` fails at boot.
 - `TextGenerator` (`llm/`) — prompt in, text out: `GeminiGenerator` or
   `OpenAICompatibleGenerator` (plain `fetch` to `/chat/completions`). Chosen
   by `LLM_PROVIDER` / `LLM_BASE_URL`; `configured` is false with nothing set,

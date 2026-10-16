@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import {
   DEFAULT_QUESTION_TYPE,
@@ -14,6 +15,7 @@ import {
 } from "@buzrr/contract";
 import {
   MediaStorage,
+  MediaUnavailableError,
   UnsupportedMediaError,
 } from "../../common/storage/media-storage";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -251,6 +253,9 @@ export class QuestionsService {
       } catch (err) {
         if (err instanceof UnsupportedMediaError) {
           throw new BadRequestException(err.message);
+        }
+        if (err instanceof MediaUnavailableError) {
+          throw new ServiceUnavailableException(err.message);
         }
         throw err;
       }
