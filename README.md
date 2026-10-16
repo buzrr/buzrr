@@ -103,16 +103,16 @@ Open http://localhost:3000 and create a local account (email + password —
 
 ### Optional features
 
-| Feature              | Add to `.env`                                                                                                     | Where to get it                                                                                                                           |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Google sign-in       | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (in `apps/web/.env`)                                                   | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) — redirect URI `http://localhost:3000/api/auth/callback/google` |
-| AI quiz generation   | `GEMINI_API_KEY` — or `LLM_BASE_URL` + `LLM_MODEL` for any OpenAI-compatible server                               | [Google AI Studio](https://aistudio.google.com/app/apikey), or a local [Ollama](https://ollama.com)                                       |
-| Image uploads        | Work out of the box (stored in `apps/server/uploads`). For a CDN: `CLOUDINARY_*`, or `STORAGE_DRIVER=s3` + `S3_*` | [Cloudinary](https://cloudinary.com) / any S3-compatible store                                                                            |
-| Landing GitHub stats | `GITHUB_TOKEN` (in `apps/web/.env`)                                                                               | [GitHub personal access tokens](https://github.com/settings/tokens) — no scopes needed for public repos                                   |
-| Rate limiting        | `RATELIMIT=ON` + `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                             | [Upstash](https://upstash.com)                                                                                                            |
-| AI Knowledge Spaces  | `NEXT_PUBLIC_AI_API_URL` (web) + `apps/ai/.env`                                                                   | See [apps/ai/README.md](apps/ai/README.md)                                                                                                |
-| Billing (Buzrr Pro)  | `BILLING=ON` + `DODO_*`, `APP_URL` (server), `DODO_PAYMENTS_WEBHOOK_KEY` (web)                                    | [Dodo Payments](https://dodopayments.com) — hosted version only; leave off when self-hosting                                              |
-| Landing-page video   | `LANDING_VIDEO_URL` (in `apps/web/.env`) — an MP4 URL                                                             | Any video host; Cloudinary URLs also get a poster frame                                                                                   |
+| Feature              | Add to `.env`                                                                                                 | Where to get it                                                                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Google sign-in       | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (in `apps/web/.env`)                                               | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) — redirect URI `http://localhost:3000/api/auth/callback/google` |
+| AI quiz generation   | `GEMINI_API_KEY` — or `LLM_BASE_URL` + `LLM_MODEL` for any OpenAI-compatible server                           | [Google AI Studio](https://aistudio.google.com/app/apikey), or a local [Ollama](https://ollama.com)                                       |
+| Image uploads        | `CLOUDINARY_*`, or `STORAGE_DRIVER=s3` + `S3_*`, or `STORAGE_DRIVER=local`. Unconfigured ⇒ uploads return 503 | [Cloudinary](https://cloudinary.com) / any S3-compatible store                                                                            |
+| Landing GitHub stats | `GITHUB_TOKEN` (in `apps/web/.env`)                                                                           | [GitHub personal access tokens](https://github.com/settings/tokens) — no scopes needed for public repos                                   |
+| Rate limiting        | `RATELIMIT=ON` + `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                         | [Upstash](https://upstash.com)                                                                                                            |
+| AI Knowledge Spaces  | `NEXT_PUBLIC_AI_API_URL` (web) + `apps/ai/.env`                                                               | See [apps/ai/README.md](apps/ai/README.md)                                                                                                |
+| Billing (Buzrr Pro)  | `BILLING=ON` + `DODO_*`, `APP_URL` (server), `DODO_PAYMENTS_WEBHOOK_KEY` (web)                                | [Dodo Payments](https://dodopayments.com) — hosted version only; leave off when self-hosting                                              |
+| Landing-page video   | `LANDING_VIDEO_URL` (in `apps/web/.env`) — an MP4 URL                                                         | Any video host; Cloudinary URLs also get a poster frame                                                                                   |
 
 ## 🔧 Environment variables
 
@@ -128,7 +128,7 @@ the [`.env.example`](.env.example) files for the full, commented list.
 | `REDIS_URL`                                      |    ✅    | Redis for live game state (server won't boot without it).           |
 | `NEXT_PUBLIC_SOCKET_URL` / `NEXT_PUBLIC_API_URL` |    ✅    | Where the browser reaches the API.                                  |
 | `GEMINI_API_KEY` or `LLM_BASE_URL` + `LLM_MODEL` |    ➖    | Enables AI quiz generation (Gemini or an OpenAI-compatible server). |
-| `STORAGE_DRIVER` + `CLOUDINARY_*` / `S3_*`       |    ➖    | Where question images go (default: local disk).                     |
+| `STORAGE_DRIVER` + `CLOUDINARY_*` / `S3_*`       |    ➖    | Where question images go (unset: uploads disabled).                 |
 | `GITHUB_TOKEN`                                   |    ➖    | Raises GitHub API rate limits for landing-page repo stats (web).    |
 | `LANDING_VIDEO_URL`                              |    ➖    | MP4 shown on the landing page (web); unset hides the section.       |
 | `NEXT_PUBLIC_AI_API_URL`                         |    ➖    | Where the browser reaches Buzrr-AI; unset hides AI Spaces.          |

@@ -16,7 +16,10 @@ competitors can't offer — without changing how the hosted service runs.
    `cloudinary`, `s3` (any S3-compatible store — a dependency-free SigV4
    signer, checked against AWS's published test vector) and `local` (the
    API's disk, served at `/uploads`). Picked by `STORAGE_DRIVER`; unset keeps
-   Cloudinary when its credentials exist, else local. Drivers that serve
+   Cloudinary when its credentials exist, else local. _Amended 2026-10-16:_
+   the unset fallback is now `none` (uploads return 503) — a silent disk
+   fallback produced localhost URLs and images lost on redeploy; `local` is
+   opt-in. Drivers that serve
    bytes as-is accept only magic-byte-sniffed raster images (no SVG/HTML).
 2. **Models behind `TextGenerator`** (Nest) and the existing provider
    protocols (`apps/ai`): Gemini, or any server speaking the OpenAI

@@ -4,14 +4,15 @@ import { CloudinaryStorage } from "./cloudinary.storage";
 import { LOCAL_UPLOADS_ROUTE, LocalStorage } from "./local.storage";
 import { MediaStorage, type StorageDriver } from "./media-storage";
 import { S3Storage } from "./s3.storage";
+import { UnavailableStorage } from "./unavailable.storage";
 
-const DRIVERS: StorageDriver[] = ["cloudinary", "s3", "local"];
+const DRIVERS: StorageDriver[] = ["cloudinary", "s3", "local", "none"];
 
 /**
  * `STORAGE_DRIVER` picks the store. Unset keeps existing deployments as they
- * were: Cloudinary when its credentials are present, otherwise local disk —
- * so a fresh checkout (or an offline install) has working uploads with no
- * account anywhere.
+ * were: Cloudinary when its credentials are present, otherwise `none` —
+ * uploads fail with a 503 rather than silently landing on local disk. Local
+ * disk is opt-in via `STORAGE_DRIVER=local`.
  */
 export function resolveStorageDriver(
   env: (key: string) => string | undefined,
@@ -25,7 +26,7 @@ export function resolveStorageDriver(
     }
     return explicit as StorageDriver;
   }
-  return env("CLOUDINARY_CLOUD_NAME") ? "cloudinary" : "local";
+  return env("CLOUDINARY_CLOUD_NAME") ? "cloudinary" : "none";
 }
 
 /** Where local uploads live on disk and the URL they are served from. */
@@ -39,28 +40,29 @@ export function localStorageConfig(env: (key: string) => string | undefined) {
   };
 }
 
-function required(env: (key: string) => string | undefined, key: string) {
-  const value = env(key);
-  if (!value) {
-    throw new Error(`${key} is required when STORAGE_DRIVER=s3`);
-  }
-  return value;
-}
-
 export function createStorage(
   env: (key: string) => string | undefined,
 ): MediaStorage {
   const driver = resolveStorageDriver(env);
   switch (driver) {
-    case "cloudinary":
-      return new CloudinaryStorage({
-        cloudName: env("CLOUDINARY_CLOUD_NAME"),
-        apiKey: env("CLOUDINARY_API_KEY"),
-        apiSecret: env("CLOUDINARY_API_SECRET"),
-      });
+    case "cloudinary": {
+      const cloudName = env("CLOUDINARY_CLOUD_NAME");
+      const apiKey = env("CLOUDINARY_API_KEY");
+      const apiSecret = env("CLOUDINARY_API_SECRET");
+      // Incomplete credentials would fail every upload anyway; report it as
+      // "unavailable" up front instead of as an opaque Cloudinary error.
+      if (!cloudName || !apiKey || !apiSecret) return new UnavailableStorage();
+      return new CloudinaryStorage({ cloudName, apiKey, apiSecret });
+    }
     case "s3": {
+      const bucket = env("S3_BUCKET");
+      const accessKeyId = env("S3_ACCESS_KEY_ID");
+      const secretAccessKey = env("S3_SECRET_ACCESS_KEY");
+      // Same as Cloudinary: missing credentials disable uploads, not boot.
+      if (!bucket || !accessKeyId || !secretAccessKey) {
+        return new UnavailableStorage();
+      }
       const region = env("S3_REGION") || "us-east-1";
-      const bucket = required(env, "S3_BUCKET");
       const customEndpoint = env("S3_ENDPOINT");
       const endpoint = customEndpoint || `https://s3.${region}.amazonaws.com`;
       // Self-hosted stores are path-style; AWS itself prefers virtual hosts.
@@ -72,8 +74,8 @@ export function createStorage(
         endpoint,
         region,
         bucket,
-        accessKeyId: required(env, "S3_ACCESS_KEY_ID"),
-        secretAccessKey: required(env, "S3_SECRET_ACCESS_KEY"),
+        accessKeyId,
+        secretAccessKey,
         forcePathStyle,
         prefix: prefix && !prefix.endsWith("/") ? `${prefix}/` : prefix,
         publicUrl:
@@ -85,6 +87,8 @@ export function createStorage(
     }
     case "local":
       return new LocalStorage(localStorageConfig(env));
+    case "none":
+      return new UnavailableStorage();
   }
 }
 
@@ -93,9 +97,14 @@ export const storageProvider: Provider = {
   inject: [ConfigService],
   useFactory: (config: ConfigService) => {
     const storage = createStorage((key) => config.get<string>(key));
-    new Logger("MediaStorage").log(
-      `Question media stored via ${storage.driver}`,
-    );
+    const logger = new Logger("MediaStorage");
+    if (storage.driver === "none") {
+      logger.warn(
+        "No media store configured (set CLOUDINARY_* or STORAGE_DRIVER) — question image uploads will fail with 503",
+      );
+    } else {
+      logger.log(`Question media stored via ${storage.driver}`);
+    }
     return storage;
   },
 };

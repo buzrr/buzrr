@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { sniffImage } from "../image-sniff";
 import { LocalStorage } from "../local.storage";
-import { UnsupportedMediaError } from "../media-storage";
+import { MediaUnavailableError, UnsupportedMediaError } from "../media-storage";
 import { signS3Request } from "../s3.storage";
 import { createStorage, resolveStorageDriver } from "../storage.provider";
 
@@ -84,11 +84,14 @@ describe("LocalStorage", () => {
 });
 
 describe("driver selection", () => {
-  it("keeps Cloudinary deployments on Cloudinary, everyone else on disk", () => {
+  it("keeps Cloudinary deployments on Cloudinary, everyone else unconfigured", () => {
     expect(resolveStorageDriver(env({ CLOUDINARY_CLOUD_NAME: "demo" }))).toBe(
       "cloudinary",
     );
-    expect(resolveStorageDriver(env({}))).toBe("local");
+    expect(resolveStorageDriver(env({}))).toBe("none");
+    expect(resolveStorageDriver(env({ STORAGE_DRIVER: "local" }))).toBe(
+      "local",
+    );
     expect(
       resolveStorageDriver(
         env({ STORAGE_DRIVER: "S3", CLOUDINARY_CLOUD_NAME: "demo" }),
@@ -96,12 +99,45 @@ describe("driver selection", () => {
     ).toBe("s3");
   });
 
-  it("rejects an unknown driver and an incomplete S3 config at boot", () => {
+  it("rejects an unknown driver at boot", () => {
     expect(() => resolveStorageDriver(env({ STORAGE_DRIVER: "ftp" }))).toThrow(
       /STORAGE_DRIVER/,
     );
-    expect(() => createStorage(env({ STORAGE_DRIVER: "s3" }))).toThrow(
-      /S3_BUCKET/,
-    );
+  });
+
+  it("refuses uploads instead of falling back to disk when unconfigured", async () => {
+    for (const vars of <Record<string, string>[]>[
+      {},
+      { CLOUDINARY_CLOUD_NAME: "demo" },
+      { STORAGE_DRIVER: "cloudinary", CLOUDINARY_API_KEY: "k" },
+      { STORAGE_DRIVER: "s3" },
+      { STORAGE_DRIVER: "s3", S3_BUCKET: "b", S3_ACCESS_KEY_ID: "k" },
+    ]) {
+      const storage = createStorage(env(vars));
+      expect(storage.driver).toBe("none");
+      await expect(storage.upload(PNG)).rejects.toBeInstanceOf(
+        MediaUnavailableError,
+      );
+      await expect(storage.remove("https://x/y.png")).resolves.toBeUndefined();
+    }
+    expect(
+      createStorage(
+        env({
+          CLOUDINARY_CLOUD_NAME: "demo",
+          CLOUDINARY_API_KEY: "k",
+          CLOUDINARY_API_SECRET: "s",
+        }),
+      ).driver,
+    ).toBe("cloudinary");
+    expect(
+      createStorage(
+        env({
+          STORAGE_DRIVER: "s3",
+          S3_BUCKET: "b",
+          S3_ACCESS_KEY_ID: "k",
+          S3_SECRET_ACCESS_KEY: "s",
+        }),
+      ).driver,
+    ).toBe("s3");
   });
 });

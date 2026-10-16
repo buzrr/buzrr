@@ -4,7 +4,7 @@ export interface StoredMedia {
   mediaType: string;
 }
 
-export type StorageDriver = "cloudinary" | "s3" | "local";
+export type StorageDriver = "cloudinary" | "s3" | "local" | "none";
 
 /** What the client claimed about an upload. Drivers that serve bytes as-is
  * ignore it and sniff the content instead. */
@@ -38,3 +38,10 @@ export abstract class MediaStorage {
 
 /** An upload the configured store refuses; the message is user-facing. */
 export class UnsupportedMediaError extends Error {}
+
+/** No store is configured (or its credentials are incomplete). */
+export class MediaUnavailableError extends Error {
+  constructor() {
+    super("Media upload is currently unavailable. Please try again later.");
+  }
+}
