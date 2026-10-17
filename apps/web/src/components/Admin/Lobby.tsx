@@ -1,7 +1,13 @@
 "use client";
 import clsx from "clsx";
 import { DEFAULT_AVATAR } from "@/constants";
-import { useEffect, useRef, useState, useCallback } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import { removePlayer, setPlayers } from "@/state/admin/playersSlice";
 import Image from "next/image";
@@ -82,6 +88,23 @@ const Lobby = (params: {
   const [bubbles, setBubbles] = useState<
     Record<string, { hits: number; misses: number }>
   >({});
+  // Last reaction per player (shown on their card for a few seconds).
+  const [lastReaction, setLastReaction] = useState<
+    Record<string, { emoji: string; at: number }>
+  >({});
+  useEffect(() => {
+    if (!socket) return;
+    const onReaction = (r: { playerId: string; emoji: string }) =>
+      setLastReaction((prev) => ({
+        ...prev,
+        [r.playerId]: { emoji: r.emoji, at: Date.now() },
+      }));
+    socket.on("reaction", onReaction);
+    return () => {
+      socket.off("reaction", onReaction);
+    };
+  }, [socket]);
+
   // Every newly popped bubble rises out of that player's card, so the host
   // sees the lobby is live.
   const { spawn: spawnBubble, layer: bubbleLayer } = useFlyers();
@@ -189,9 +212,29 @@ const Lobby = (params: {
   const joinUrl = buildJoinUrl(params.gameCode);
   const isFull = players.length >= maxPlayers;
   const fillPct = Math.min(100, (players.length / maxPlayers) * 100);
-  const visiblePlayers = players.filter((p) =>
-    (p.name ?? "").toLowerCase().includes(query.trim().toLowerCase()),
-  );
+  // Waiting list order: whoever just reacted floats to the top (and shows
+  // the reaction for a few seconds), everyone else by bubble score.
+  const now = useNow(Object.keys(lastReaction).length > 0);
+  const fresh = (id: string) => {
+    const r = lastReaction[id];
+    return r && now - r.at < REACTION_SHOW_MS ? r : null;
+  };
+  const visiblePlayers = players
+    .filter((p) =>
+      (p.name ?? "").toLowerCase().includes(query.trim().toLowerCase()),
+    )
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => {
+      const ra = fresh(a.p.id)?.at ?? 0;
+      const rb = fresh(b.p.id)?.at ?? 0;
+      if (ra !== rb) return rb - ra;
+      const sa = bubbleScore(bubbles[a.p.id]);
+      const sb = bubbleScore(bubbles[b.p.id]);
+      return sb - sa || a.i - b.i;
+    })
+    .map(({ p }) => p);
+  const listRef = useRef<HTMLDivElement>(null);
+  useFlip2d(listRef, visiblePlayers.map((p) => p.id).join());
 
   useEffect(() => {
     setCanShare(typeof navigator.share === "function");
@@ -394,11 +437,15 @@ const Lobby = (params: {
             </label>
           </div>
 
-          <div className="md:flex-1 md:min-h-0 md:overflow-y-auto px-4 py-3 md:px-[22px] md:py-4 grid grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-2.5 content-start">
+          <div
+            ref={listRef}
+            className="md:flex-1 md:min-h-0 md:overflow-y-auto px-4 py-3 md:px-[22px] md:py-4 grid grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-2.5 content-start"
+          >
             {visiblePlayers.map((player) => (
               <div
                 key={player.id}
                 data-player-card={player.id}
+                data-flip-id={player.id}
                 className="group flex items-center gap-[11px] min-w-0 rounded-[14px] border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 hover:border-dprimary py-2 pr-2 pl-[9px] transition-colors animate-pop-in"
               >
                 <Image
@@ -419,6 +466,15 @@ const Lobby = (params: {
                     <BubbleLine stats={bubbles[player.id]!} />
                   )}
                 </span>
+                {fresh(player.id) && (
+                  <span
+                    key={fresh(player.id)!.at}
+                    aria-label={`Reacted ${fresh(player.id)!.emoji}`}
+                    className="shrink-0 text-2xl leading-none animate-pop-in"
+                  >
+                    {fresh(player.id)!.emoji}
+                  </span>
+                )}
                 <span className="flex gap-0.5 shrink-0 md:opacity-55 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
                   <button
                     type="button"
@@ -491,6 +547,57 @@ const Lobby = (params: {
     </div>
   );
 };
+
+const REACTION_SHOW_MS = 5000;
+
+/** Bubble ranking: hits, scaled down by the share of taps that missed. */
+function bubbleScore(stats: { hits: number; misses: number } | undefined) {
+  if (!stats) return -1;
+  const taps = stats.hits + stats.misses;
+  return taps > 0 ? (stats.hits * stats.hits) / taps : 0;
+}
+
+/** The current time, ticking every 500 ms while `active`. */
+function useNow(active: boolean) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const t = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(t);
+  }, [active]);
+  return active ? now : 0;
+}
+
+/** Glide `[data-flip-id]` children to their new spot (both axes, grid-safe). */
+function useFlip2d(
+  container: { current: HTMLElement | null },
+  orderKey: string,
+) {
+  const last = useRef(new Map<string, { x: number; y: number }>());
+  useLayoutEffect(() => {
+    const root = container.current;
+    if (!root) return;
+    const next = new Map<string, { x: number; y: number }>();
+    root.querySelectorAll<HTMLElement>("[data-flip-id]").forEach((el) => {
+      const r = el.getBoundingClientRect();
+      const id = el.dataset.flipId!;
+      next.set(id, { x: r.left, y: r.top });
+      const prev = last.current.get(id);
+      if (prev && (prev.x !== r.left || prev.y !== r.top)) {
+        el.animate(
+          [
+            {
+              transform: `translate(${prev.x - r.left}px, ${prev.y - r.top}px)`,
+            },
+            { transform: "translate(0, 0)" },
+          ],
+          { duration: 450, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+        );
+      }
+    });
+    last.current = next;
+  }, [container, orderKey]);
+}
 
 /** "🫧 12 · 80% hits" — the tally ticks up as the server relays new totals. */
 function BubbleLine({ stats }: { stats: { hits: number; misses: number } }) {
