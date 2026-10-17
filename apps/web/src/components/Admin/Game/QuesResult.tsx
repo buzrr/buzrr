@@ -294,7 +294,7 @@ export default function QuesResult(props: QuesResultProps) {
             >
               <StatTile
                 value={responses}
-                suffix={` /${players.length}`}
+                suffix={` /${Math.max(players.filter((p) => p.connected).length, responses)}`}
                 label={t("Responses")}
               />
               {scored && !closed && (

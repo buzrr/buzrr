@@ -143,9 +143,14 @@ export function ClosedSlide({
     (state) => state.game.myAnswerMs ?? state.game.you?.timeTakenMs ?? null,
   );
   const answered = !onNext && myMs !== null;
+  // Players online, like the question screen's meter (offline ones may come back).
+  const total = Math.max(
+    players.filter((p) => p.connected).length,
+    answeredCount,
+  );
   return (
     <Slide
-      badge={answered ? t("Answer locked in") : "Time's up"}
+      badge={answered ? t("Answer locked in") : t("Time's up")}
       title={
         answered
           ? t("You answered within {s} seconds", {
@@ -157,7 +162,9 @@ export function ClosedSlide({
           : (question?.title ?? t("Time's up!"))
       }
       subtitle={
-        onNext ? `${answeredCount} of ${players.length} answered` : undefined
+        onNext
+          ? t("{n} of {total} answered", { n: answeredCount, total })
+          : undefined
       }
       onNext={onNext}
       nextLabel={nextLabel}

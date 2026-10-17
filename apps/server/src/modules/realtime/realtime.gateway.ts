@@ -1,5 +1,6 @@
 import { signAssetsDeep } from "../../common/storage/asset-signing";
 import {
+  HEARTBEAT_TIMEOUT_MS,
   bubbleStatsSchema,
   duelQueueSchema,
   preloadStatusSchema,
@@ -28,6 +29,11 @@ import type {
 } from "./realtime.types";
 
 type DuelInviteAck = (result: DuelInviteAcceptAck) => void;
+
+/** How often a player socket's heartbeat is checked. */
+const HEARTBEAT_CHECK_MS = 5_000;
+/** A disconnected lobby player keeps their place at least this long. */
+const REJOIN_GRACE_MS = 10_000;
 
 @WebSocketGateway({
   cors: {
@@ -140,6 +146,7 @@ export class RealtimeGateway
           return;
         }
         this.server.to(gameCode).emit("player-joined", player);
+        this.watchHeartbeat(socket, gameCode);
       }
 
       if (isRoomHost) {
@@ -337,7 +344,19 @@ export class RealtimeGateway
         await this.engine.hostDisconnected(data.gameCode);
         this.logger.log(`Host left game ${data.gameCode}`);
       } else if (data.playerId) {
-        await this.engine.playerDisconnected(data.gameCode, data.playerId);
+        // A lobby player leaves the list three missed beats after their last
+        // one — but never sooner than a page reload takes to come back.
+        const graceMs = data.lastBeatAt
+          ? Math.max(
+              REJOIN_GRACE_MS,
+              data.lastBeatAt + HEARTBEAT_TIMEOUT_MS - Date.now(),
+            )
+          : undefined;
+        await this.engine.playerDisconnected(
+          data.gameCode,
+          data.playerId,
+          graceMs,
+        );
         this.logger.log(
           `Player ${data.playerId} disconnected from ${data.gameCode}`,
         );
@@ -345,6 +364,33 @@ export class RealtimeGateway
     } catch (err) {
       this.logger.error("Error handling disconnect:", err);
     }
+  }
+
+  /**
+   * Players' devices beat every `HEARTBEAT_INTERVAL_MS`. A socket that has
+   * beaten once and then misses three beats (`HEARTBEAT_TIMEOUT_MS`) is
+   * dropped — the transport's own ping can't tell a frozen page from a live
+   * one — and the player shows as offline. Clients too old to beat are left
+   * to that ping. The last beat also sets how long a lobby player keeps
+   * their place once gone (see handleDisconnect).
+   */
+  private watchHeartbeat(socket: TypedSocket, gameCode: string) {
+    socket.on("heartbeat", () => {
+      socket.data.lastBeatAt = Date.now();
+    });
+    const check = setInterval(() => {
+      const last = socket.data.lastBeatAt;
+      if (!last || Date.now() - last < HEARTBEAT_TIMEOUT_MS) return;
+      clearInterval(check);
+      this.logger.log(
+        `Player ${socket.data.playerId} missed heartbeats in ${gameCode} — dropping the socket`,
+      );
+      // Close the transport, not the socket: a page that wakes up again
+      // reconnects on its own ("transport close"), where a server-side
+      // socket disconnect would read as refused and never retry.
+      socket.conn.close();
+    }, HEARTBEAT_CHECK_MS);
+    socket.once("disconnect", () => clearInterval(check));
   }
 
   /**

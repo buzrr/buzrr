@@ -768,6 +768,7 @@ export const DE: Record<string, string> = {
   "Time per question": "Zeit pro Frage",
   "Time to answer": "Antwortzeit",
   "time's up": "Zeit abgelaufen",
+  "Time's up": "Zeit abgelaufen",
   "Time's up!": "Zeit abgelaufen!",
   "Today's duel counted": "Heutiges Duell gezählt",
   "Today's duel done · come back tomorrow for day {n}":

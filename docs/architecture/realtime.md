@@ -94,7 +94,8 @@ instanceId)` — a `SET NX PX 20000` owner lock with renew-if-held Lua — so
   (comment in `ensureSweeper`: an unconditional 15s poll ≈ 350K Redis
   commands/month at zero users). Don't make them unconditional.
 
-Grace timers (lobby disconnect 60s, duel forfeit 30s) are **in-memory only**
+Grace timers (lobby disconnect 35s after the last heartbeat, duel forfeit 30s)
+are **in-memory only**
 (`disconnectTimers`) — they do not survive a restart. The sweeper is the
 backstop for the two that matter: the abandon check for classic, and
 `sweepDuelForfeits` for duel forfeits (below). Lobby removal has none.
@@ -319,8 +320,25 @@ information, it does.
 5. Snapshot is sent immediately.
 
 Disconnect: hosts flip `hostConnected` meta (`hostDisconnected`); players get
-marked disconnected and a grace timer starts (60s lobby removal, or 30s duel
-forfeit via `resolveDuelForfeit`); duel-queue sockets are dequeued.
+marked disconnected and a grace timer starts (lobby removal, or 30s duel
+forfeit via `resolveDuelForfeit`); duel-queue sockets are dequeued. The lobby
+removal comes `HEARTBEAT_TIMEOUT_MS` (35s) after the player's last heartbeat,
+at least 10s after the disconnect (a page reload), or 35s after the disconnect
+for clients that don't beat. It only takes them off the Redis roster and the
+host's list: their Postgres row still points at the room, so a player who
+comes back is simply admitted again.
+
+**Heartbeat.** Player clients emit `heartbeat` on connect, on returning to the
+foreground and every `HEARTBEAT_INTERVAL_MS` (10s, `@buzrr/contract`). The
+gateway (`watchHeartbeat`) records it in `socket.data.lastBeatAt`; a socket
+that has beaten once and then stays quiet for `HEARTBEAT_TIMEOUT_MS` (35s,
+three missed beats) gets its transport closed. The transport's own ping can't
+tell a frozen page from a live one. Closing the transport rather than the
+socket makes a page that wakes up reconnect by itself, since a server-side
+socket disconnect reads as "refused" and is never retried. Mid-game the player
+then only shows as offline and keeps score and answers. Clients that never
+beat (older pages) are left to the transport ping. The host's in-game counters
+("x of y answered", responses) count online players only.
 
 **Presence is per person, not per socket**, so a closing socket only marks its
 owner gone if they have no other socket in the game. A client that reconnects
@@ -340,7 +358,11 @@ gone (the previous behaviour). Covered by
 
 ## Kick / ban semantics
 
-- Kick = Redis roster+score removal, `player-removed` broadcast **before**
+- Kick = Redis roster removal with the score taken off the leaderboard but
+  parked in `game:{code}:departed` (`REMOVE_PLAYER_SCRIPT`). A player who
+  rejoins later (not banned) gets it back in `REGISTER_PLAYER_SCRIPT`, and
+  their answers never left. Same for a voluntary `leave-room` and the lobby
+  removal. Then `player-removed` broadcast **before**
   `disconnectSockets(true)` on `player:{id}` (so the kicked client hears it),
   then `afterRosterShrink` (may trigger early reveal / leaderboard refresh).
 - Ban = room-scoped Redis set `game:{code}:banned`, written **before** the

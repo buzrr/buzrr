@@ -62,6 +62,7 @@ except ImportError:
 ANSWER_DELAY = (0.5, 20.0)
 ACK_TIMEOUT = 15.0
 SYNC_PROBE_EVERY = 5.0
+HEARTBEAT_EVERY = 10.0  # HEARTBEAT_INTERVAL_MS in the contract
 PRELOAD_REPORT_EVERY = 0.4  # like the web client's throttle
 CHUNK = 64 * 1024
 
@@ -289,10 +290,12 @@ class Bot:
         bubbles = asyncio.create_task(self.pop_bubbles())
         probe = asyncio.create_task(self.sync_probe())
         reacts = asyncio.create_task(self.react())
+        beats = asyncio.create_task(self.heartbeat())
         await self.done.wait()
         bubbles.cancel()
         probe.cancel()
         reacts.cancel()
+        beats.cancel()
 
     async def load_context(self) -> None:
         """What the player page loads: the play context (quiz settings) and the skin."""
@@ -388,7 +391,7 @@ class Bot:
 
     async def _emit(self, event: str, payload) -> None:
         try:
-            await self.sio.emit(event, payload)
+            await self.sio.emit(event, payload) if payload is not None else await self.sio.emit(event)
             M.counts[f"{event} sent"] += 1
         except Exception:  # noqa: BLE001
             M.err(f"{event} emit failed")
@@ -544,9 +547,22 @@ class Bot:
                 self.done.set()
 
         @s.event
+        async def connect():
+            # The web client beats right on every (re)connect.
+            self.spawn(self._emit("heartbeat", None))
+
+        @s.event
         async def disconnect(*_args):
             if not self.done.is_set():
                 M.counts["socket disconnects (unexpected)"] += 1
+
+    async def heartbeat(self) -> None:
+        """Like the web client: one beat on connect, then every 10 s (missing
+        three gets the socket dropped by the server)."""
+        while True:
+            if self.sio.connected:
+                await self._emit("heartbeat", None)
+            await asyncio.sleep(HEARTBEAT_EVERY)
 
     async def pop_bubbles(self) -> None:
         """Lobby: 'pop' a few bubbles (some misses) and report once a second."""

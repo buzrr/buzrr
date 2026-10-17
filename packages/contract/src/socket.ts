@@ -434,6 +434,15 @@ export const playerRemovedSchema = playerRefSchema.extend({
 });
 
 /**
+ * Players' devices send `heartbeat` this often. A socket that has sent one
+ * and then stays quiet for `HEARTBEAT_TIMEOUT_MS` (three missed beats) is
+ * dropped and the player shows as offline; in the lobby, a player gone that
+ * long after their last beat leaves the list (and is back if they return).
+ */
+export const HEARTBEAT_INTERVAL_MS = 10_000;
+export const HEARTBEAT_TIMEOUT_MS = 35_000;
+
+/**
  * The lobby's bubble mini-game: a player's running totals, sent about once a
  * second while they wait; relayed to the host only (`host:{gameCode}`).
  */
@@ -554,6 +563,8 @@ export interface ClientToServerEvents {
     ack: (result: SubmitAnswerAck) => void,
   ) => void;
   "request-sync": () => void;
+  /** A player's device is still here (every `HEARTBEAT_INTERVAL_MS`). */
+  heartbeat: () => void;
   /** A player voluntarily leaves the room (back / leave-game confirmation). */
   "leave-room": () => void;
   /** A waiting player's bubble mini-game totals (about once a second). */

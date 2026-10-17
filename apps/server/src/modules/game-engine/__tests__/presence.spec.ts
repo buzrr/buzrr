@@ -174,3 +174,47 @@ describe("hostDisconnected", () => {
     expect(store.meta.hostConnected).toBe(true);
   });
 });
+
+describe("lobby grace", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("takes a player gone past the given grace off the lobby list", async () => {
+    vi.useFakeTimers();
+    const { store, io, engine } = setup(meta(), [player("p1"), player("p2")]);
+
+    await engine.playerDisconnected(CODE, "p2", 10_000);
+    await vi.advanceTimersByTimeAsync(9_999);
+    expect(io.events("player-removed")).toEqual([]);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(io.events("player-removed")).toEqual([
+      { room: CODE, event: "player-removed", payload: { id: "p2" } },
+    ]);
+    expect(store.players.has("p2")).toBe(false);
+  });
+
+  it("keeps a player who came back within the grace", async () => {
+    vi.useFakeTimers();
+    const { store, io, engine } = setup(meta(), [player("p1"), player("p2")]);
+
+    await engine.playerDisconnected(CODE, "p2", 10_000);
+    store.players.set("p2", player("p2", { connected: true }));
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(io.events("player-removed")).toEqual([]);
+    expect(store.players.has("p2")).toBe(true);
+  });
+
+  it("never removes a player once the game runs (they keep their score)", async () => {
+    vi.useFakeTimers();
+    const { store, io, engine } = openQuestion();
+    store.scores.set("p2", 900);
+
+    await engine.playerDisconnected(CODE, "p2", 10_000);
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(io.events("player-removed")).toEqual([]);
+    expect(store.players.get("p2")?.connected).toBe(false);
+    expect(store.scores.get("p2")).toBe(900);
+  });
+});
