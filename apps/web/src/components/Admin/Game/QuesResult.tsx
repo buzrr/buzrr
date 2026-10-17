@@ -98,11 +98,15 @@ export default function QuesResult(props: QuesResultProps) {
   // The reveal cue plays when the answer is shown, until the host moves on.
   const sound = useGameSound();
   const audioHere = sound ? sound.questionAudioHere(question?.audio) : true;
+  const a = question?.audio;
   useAudioSegment(
-    phase === "reveal" && audioHere ? question?.audio?.url : null,
-    question?.audio?.revealMs,
+    phase === "reveal" && audioHere
+      ? (a?.revealUrl ?? (a?.encrypted ? null : a?.url))
+      : null,
+    a?.revealMs,
     null,
     question?.id,
+    a?.revealUrl ? reveal?.audioRevealKey : null,
   );
   const [advancing, setAdvancing] = useState(false);
   const [playerToBan, setPlayerToBan] = useState<{

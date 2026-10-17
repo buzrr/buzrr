@@ -15,9 +15,12 @@ export default function GetReady({ title }: { title?: string }) {
   const deadline = useAppSelector((state) => state.game.deadline);
   const countdownMs = useAppSelector((state) => state.game.countdownMs);
   const qIndex = useAppSelector((state) => state.game.qIndex);
+  const preview = useAppSelector((state) => state.game.preview);
+  const waitingFor = useAppSelector((state) => state.game.waitingFor);
   const remaining = useServerCountdown(phase === "starting" ? deadline : 0);
   const seconds = Math.ceil(remaining);
-  const counting = phase === "starting" && deadline > 0;
+  // Countdown over but devices are still downloading the sound: spin instead.
+  const counting = phase === "starting" && deadline > 0 && waitingFor === 0;
 
   return (
     <div className="w-full max-w-3xl mx-auto flex flex-col justify-center px-4 py-6 md:py-10 min-h-[calc(100dvh-7.5rem)] text-dark dark:text-white">
@@ -49,6 +52,12 @@ export default function GetReady({ title }: { title?: string }) {
           total={countdownMs / 1000}
         />
 
+        {/* The question's text may be read during the countdown; options and media come with the question. */}
+        {(counting || waitingFor > 0) && preview && (
+          <p className="relative max-w-2xl text-xl md:text-3xl font-bold leading-snug text-pretty wrap-break-word animate-fade-up">
+            {preview.title}
+          </p>
+        )}
         <div className="relative min-h-6 flex items-center justify-center">
           {counting ? (
             <p className={clsx("text-base md:text-lg font-medium", mutedText)}>
@@ -56,6 +65,10 @@ export default function GetReady({ title }: { title?: string }) {
                 ? `Question ${qIndex + 1} coming up`
                 : "First question coming up"}
             </p>
+          ) : waitingFor > 0 ? (
+            <WaitingDots>
+              {`Waiting for sound downloads · ${waitingFor} left`}
+            </WaitingDots>
           ) : (
             <WaitingDots>Waiting for the question</WaitingDots>
           )}

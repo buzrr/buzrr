@@ -95,6 +95,11 @@ export const soundSkinSchema = z.object({
   isGlobal: z.boolean(),
   ownerId: z.string().nullable(),
   slots: z.partialRecord(soundSlotSchema, z.string()),
+  /**
+   * The final song, encrypted, for downloading ahead of time during a game;
+   * the key comes with the final leaderboard (`finalSoundKey`).
+   */
+  finalClipUrl: z.string().nullable().optional(),
 });
 
 /** `Quiz.settings`. Unknown/missing keys fall back to the defaults. */
@@ -123,11 +128,25 @@ export const playerReactionSchema = reactionSchema.extend({
 });
 
 /** A moderated game moved to a phase that has no payload event of its own. */
+/** "starting": the coming question's text — readable during the countdown; options and media wait for the question. */
+export const questionPreviewSchema = z.object({ title: z.string() });
+
 export const phaseChangeSchema = z.object({
   phase: gamePhaseSchema,
   qIndex: z.number().int(),
   /** "starting": time until the question opens (display only). */
   remainingMs: z.number().optional(),
+  preview: questionPreviewSchema.optional(),
+  /** "starting", countdown over: devices still downloading the question's sound. */
+  waitingFor: z.number().int().optional(),
+});
+
+/** A device's download progress for question `qIndex`'s sound clips. */
+export const preloadStatusSchema = z.object({
+  qIndex: z.number().int().nonnegative(),
+  loaded: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+  done: z.boolean(),
 });
 export const gameModeSchema = z.enum(["classic", "duel"]);
 
@@ -155,6 +174,20 @@ export const questionEndSchema = z.object({
   summary: revealSummarySchema,
   /** Mean answer time across everyone who answered; null when nobody did. */
   avgTimeMs: z.number().nullable(),
+  /** Decrypts the question sound's reveal clip (see `questionAudioSchema`). */
+  audioRevealKey: z.string().optional(),
+});
+
+/**
+ * Sent ahead (during the previous question's reveal / scores, the get-ready
+ * slide or the countdown): the next question's sound clips to download now.
+ * They are encrypted — the keys come with the question and its reveal.
+ */
+export const preloadSchema = z.object({
+  qIndex: z.number().int(),
+  urls: z.array(z.string()),
+  /** The question sound's own placement, so devices that won't play it skip the download. */
+  playOn: z.enum(["quiz", "host", "players", "both", "off"]),
 });
 
 /** Answers received so far for the open question (classic host meter). */
@@ -189,6 +222,8 @@ export const answerResultSchema = z.object({
 export const leaderboardSchema = z.object({
   entries: z.array(leaderboardEntrySchema),
   isFinal: z.boolean(),
+  /** Final leaderboard: decrypts the skin's preloaded final song. */
+  finalSoundKey: z.string().optional(),
 });
 
 const eloChangesSchema = z.record(
@@ -290,6 +325,10 @@ export const stateSyncSchema = z.object({
   you: answerResultSchema.optional(),
   /** Present for moderated games. */
   moderation: moderationSettingsSchema.optional(),
+  /** Present while phase is "starting": the coming question's text. */
+  preview: questionPreviewSchema.optional(),
+  /** Present on the final leaderboard: decrypts the skin's final song. */
+  finalSoundKey: z.string().optional(),
 });
 
 export const submitAnswerSchema = z.object({
@@ -344,6 +383,9 @@ export type SoundSlot = z.infer<typeof soundSlotSchema>;
 export type SoundSettings = z.infer<typeof soundSettingsSchema>;
 export type SoundSkin = z.infer<typeof soundSkinSchema>;
 export type PhaseChangePayload = z.infer<typeof phaseChangeSchema>;
+export type PreloadPayload = z.infer<typeof preloadSchema>;
+export type PreloadStatusPayload = z.infer<typeof preloadStatusSchema>;
+export type QuestionPreview = z.infer<typeof questionPreviewSchema>;
 export type BubbleStatsPayload = z.infer<typeof bubbleStatsSchema>;
 export type ReactionPayload = z.infer<typeof reactionSchema>;
 export type PlayerReactionPayload = z.infer<typeof playerReactionSchema>;
@@ -384,6 +426,8 @@ export interface ServerToClientEvents {
   "state-sync": (payload: StateSyncPayload) => void;
   /** Moderated games: ready / starting (countdown) / closed / scores. */
   "phase-change": (payload: PhaseChangePayload) => void;
+  /** Download the next question's (encrypted) sound clips now. */
+  preload: (payload: PreloadPayload) => void;
   /** Host only: a waiting player's bubble mini-game totals. */
   "bubble-stats": (payload: PlayerBubbleStatsPayload) => void;
   /** Host only: one live reaction from a player (one per tap). */
@@ -407,6 +451,8 @@ export interface ServerToClientEvents {
   "game-started": (payload: {
     remainingMs: number;
     moderation?: ModerationSettings;
+    /** Question 1's text, readable during the countdown. */
+    preview?: QuestionPreview;
   }) => void;
   /** Terminal signal for players: the room is gone, stop rendering it. */
   "game-session-ended": () => void;
@@ -437,6 +483,8 @@ export interface ClientToServerEvents {
   "bubble-stats": (payload: BubbleStatsPayload) => void;
   /** One tap on a reaction button (rate limited server-side). */
   reaction: (payload: ReactionPayload) => void;
+  /** Download progress of the next question's sound (see `preload`). */
+  "preload-status": (payload: PreloadStatusPayload) => void;
   // -- host intents (the server decides what each one means) --
   "remove-player": (player: { id: string }, gameCode?: string) => void;
   "start-game": (gameCode?: string) => void;

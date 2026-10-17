@@ -2,6 +2,7 @@ import { signAssetsDeep } from "../../common/storage/asset-signing";
 import {
   bubbleStatsSchema,
   duelQueueSchema,
+  preloadStatusSchema,
   reactionSchema,
   submitAnswerSchema,
 } from "@buzrr/contract";
@@ -345,7 +346,37 @@ export class RealtimeGateway
     }
   }
 
+  /**
+   * Download progress of the next question's sound, from players and the host
+   * (stored as "host"). The countdown into that question waits on it.
+   */
+  private registerPreloadStatus(
+    socket: TypedSocket,
+    gameCode: string,
+    id: string,
+  ) {
+    let last = 0;
+    socket.on("preload-status", (payload) => {
+      const parsed = preloadStatusSchema.safeParse(payload);
+      if (!parsed.success) return;
+      const now = Date.now();
+      // Progress at most every 300 ms; "done" always gets through.
+      if (!parsed.data.done && now - last < 300) return;
+      last = now;
+      const { qIndex, loaded, total, done } = parsed.data;
+      void this.store
+        .setPreloadStatus(gameCode, qIndex, id, {
+          loaded,
+          total,
+          done,
+          at: now,
+        })
+        .catch((err) => this.logger.error("Error storing preload status", err));
+    });
+  }
+
   private registerHostHandlers(socket: TypedSocket, gameCode: string): void {
+    this.registerPreloadStatus(socket, gameCode, "host");
     socket.on("remove-player", async (p: { id: string }) => {
       try {
         const removed = await this.realtimeService.removePlayer(
@@ -391,6 +422,9 @@ export class RealtimeGateway
   }
 
   private registerPlayerHandlers(socket: TypedSocket, gameCode: string): void {
+    if (socket.data.playerId) {
+      this.registerPreloadStatus(socket, gameCode, socket.data.playerId);
+    }
     // Lobby bubble game: relayed to the host as-is, nothing is stored. At most
     // one update per ~800ms per socket gets through.
     let lastBubbleStats = 0;

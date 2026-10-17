@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { decryptClip } from "@/lib/sound/preload";
 
 /**
  * Plays `url` from `startMs` for `durationMs` (or until the caller unmounts
@@ -51,16 +52,36 @@ export function playSegment(
   };
 }
 
-/** Hook form of `playSegment`: plays while mounted (and `url` is set). */
+/**
+ * Hook form of `playSegment`: plays while mounted (and `url` is set). With
+ * `decryptKey` the URL is an encrypted clip (possibly preloaded already):
+ * it is decrypted in the browser, then played.
+ */
 export function useAudioSegment(
   url: string | null | undefined,
   startMs: number | null | undefined,
   durationMs: number | null,
   /** Restart when this changes (e.g. the question id). */
   key: string | number | undefined,
+  decryptKey?: string | null,
 ) {
   useEffect(() => {
     if (!url || startMs === null || startMs === undefined) return;
-    return playSegment(url, startMs, durationMs);
-  }, [url, startMs, durationMs, key]);
+    if (!decryptKey) return playSegment(url, startMs, durationMs);
+    let stop: (() => void) | null = null;
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    decryptClip(url, decryptKey)
+      .then((u) => {
+        objectUrl = u;
+        if (!cancelled) stop = playSegment(u, startMs, durationMs);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+      stop?.();
+      // Let the fade-out finish before the data goes away.
+      if (objectUrl) setTimeout(() => URL.revokeObjectURL(objectUrl!), 1000);
+    };
+  }, [url, startMs, durationMs, key, decryptKey]);
 }

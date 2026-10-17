@@ -28,11 +28,18 @@ const Result = (params: {
   const you = params.you;
   const sound = useGameSound();
   const revealAudio = useAppSelector((state) => state.game.question?.audio);
+  const revealKey = useAppSelector(
+    (state) => state.game.reveal?.audioRevealKey,
+  );
   useAudioSegment(
-    sound?.questionAudioHere(revealAudio) ? revealAudio?.url : null,
+    sound?.questionAudioHere(revealAudio)
+      ? (revealAudio?.revealUrl ??
+          (revealAudio?.encrypted ? null : revealAudio?.url))
+      : null,
     revealAudio?.revealMs,
     null,
     revealAudio?.url,
+    revealAudio?.revealUrl ? revealKey : null,
   );
   const question = useAppSelector((state) => state.game.question);
   const reveal = useAppSelector((state) => state.game.reveal);

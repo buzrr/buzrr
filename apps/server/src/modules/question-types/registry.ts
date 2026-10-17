@@ -76,8 +76,38 @@ export function toPublicQuestion(question: LiveQuestion): PublicQuestion {
   // each handler's `toPublic`.
   return {
     ...handlerFor(question.type).toPublic(question),
-    audio: question.audio ?? null,
+    audio: publicAudio(question.audio),
   };
+}
+
+/** What devices get: the encrypted clips (question key only), or the file. */
+function publicAudio(audio: LiveQuestion["audio"]): PublicQuestion["audio"] {
+  if (!audio) return null;
+  if (!audio.clipUrl || !audio.clipKey) {
+    return {
+      url: audio.url,
+      startMs: audio.startMs,
+      revealMs: audio.revealMs,
+      playOn: audio.playOn,
+    };
+  }
+  return {
+    url: audio.clipUrl,
+    startMs: 0,
+    revealMs: audio.revealClipUrl ? 0 : null,
+    playOn: audio.playOn,
+    encrypted: true,
+    key: audio.clipKey,
+    revealUrl: audio.revealClipUrl ?? null,
+  };
+}
+
+/** The clips to download ahead of a question (no keys). */
+export function preloadUrls(question: LiveQuestion | undefined): string[] {
+  const a = question?.audio;
+  return a?.clipUrl
+    ? [a.clipUrl, ...(a.revealClipUrl ? [a.revealClipUrl] : [])]
+    : [];
 }
 
 /** `entries` oldest first — types that list answers show the newest first. */
@@ -151,6 +181,10 @@ export interface QuestionRecord {
   audioStartMs?: number | null;
   audioRevealMs?: number | null;
   audioPlayOn?: string | null;
+  audioClip?: string | null;
+  audioClipKey?: string | null;
+  audioRevealClip?: string | null;
+  audioRevealKey?: string | null;
 }
 
 type LiveOption = LiveQuestion["options"][number];
@@ -194,6 +228,10 @@ export function toLiveQuestion(row: QuestionRecord): LiveQuestion | null {
             startMs: row.audioStartMs ?? 0,
             revealMs: row.audioRevealMs ?? null,
             playOn: audioPlayOn(row.audioPlayOn),
+            clipUrl: row.audioClip ?? null,
+            clipKey: row.audioClipKey ?? null,
+            revealClipUrl: row.audioRevealClip ?? null,
+            revealKey: row.audioRevealKey ?? null,
           }
         : null,
     };

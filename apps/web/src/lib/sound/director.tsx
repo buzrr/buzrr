@@ -19,6 +19,7 @@ import {
 } from "@buzrr/contract";
 import { useAppSelector } from "@/state/hooks";
 import { soundSkinsApi } from "@/lib/modules/sound-skins/api";
+import { decryptClip, preloadClips } from "./preload";
 import {
   audioContext,
   isLoopSlot,
@@ -148,6 +149,26 @@ function playFile(url: string, loop: boolean, volume: number): SoundHandle {
   };
 }
 
+/** Decrypts a preloaded clip, then loops it like a file bed. */
+function playEncrypted(url: string, key: string, volume: number): SoundHandle {
+  let handle: SoundHandle | null = null;
+  let stopped = false;
+  let objectUrl: string | null = null;
+  decryptClip(url, key)
+    .then((u) => {
+      objectUrl = u;
+      if (!stopped) handle = playFile(u, true, volume);
+    })
+    .catch(() => undefined);
+  return {
+    stop: () => {
+      stopped = true;
+      handle?.stop();
+      if (objectUrl) setTimeout(() => URL.revokeObjectURL(objectUrl!), 1500);
+    },
+  };
+}
+
 /** Which bed (loop) a phase plays; null = none. */
 function bedFor(phase: string): SoundSlot | null {
   switch (phase) {
@@ -202,6 +223,8 @@ export function GameSounds({
   const deadline = useAppSelector((s) => s.game.deadline);
   const countdownMs = useAppSelector((s) => s.game.countdownMs);
   const question = useAppSelector((s) => s.game.question);
+  const preload = useAppSelector((s) => s.game.preload);
+  const finalSoundKey = useAppSelector((s) => s.game.finalSoundKey);
 
   const questionAudioHere = (audio: QuestionAudio | null | undefined) => {
     if (!audio) return false;
@@ -214,6 +237,11 @@ export function GameSounds({
     slot: SoundSlot,
     extra?: { progress?: () => number; remainingMs?: number },
   ) => {
+    if (slot === "final" && skin?.finalClipUrl) {
+      return finalSoundKey
+        ? playEncrypted(skin.finalClipUrl, finalSoundKey, 0.8)
+        : null;
+    }
     const builtin = (BUILTIN_SOUND_SKINS as readonly string[]).includes(
       settings.skin,
     );
@@ -236,7 +264,7 @@ export function GameSounds({
   const ownAudio = phase === "question" && questionAudioHere(question?.audio);
   const bedSlot = on && !ownAudio ? bedFor(phase) : null;
   const bedKey = bedSlot
-    ? `${bedSlot}:${settings.skin}:${skin?.id ?? ""}:${bedSlot === "question" ? qIndex : ""}`
+    ? `${bedSlot}:${settings.skin}:${skin?.id ?? ""}:${bedSlot === "question" ? qIndex : ""}:${bedSlot === "final" ? (finalSoundKey ?? "") : ""}`
     : "";
   useEffect(() => {
     if (bed.current?.key === bedKey) return;
@@ -254,6 +282,32 @@ export function GameSounds({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bedKey]);
   useEffect(() => () => bed.current?.handle?.stop(), []);
+
+  // Fetch the next question's (encrypted) clips early — on devices that will
+  // play them. They stay unplayable until the question hands out the key.
+  const wouldPlayHere = (playOn: QuestionAudio["playOn"]) =>
+    questionAudioHere({ url: "", startMs: 0, revealMs: null, playOn });
+  useEffect(() => {
+    if (preload && wouldPlayHere(preload.playOn)) {
+      preloadClips(preload.urls, preload.qIndex);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preload]);
+
+  // The skin's final song: fetched encrypted while the game runs — each
+  // device at a random moment within a minute of the start, so they don't
+  // all download at once — and playable once the final leaderboard brings
+  // the key.
+  const finalUrl = skin?.finalClipUrl ?? null;
+  const gameRunning = phase !== "idle" && phase !== "lobby";
+  useEffect(() => {
+    if (!on || !gameRunning || !finalUrl) return;
+    const t = setTimeout(
+      () => preloadClips([finalUrl]),
+      Math.random() * 60_000,
+    );
+    return () => clearTimeout(t);
+  }, [on, gameRunning, finalUrl]);
 
   // One-shots on transitions.
   const prev = useRef(phase);

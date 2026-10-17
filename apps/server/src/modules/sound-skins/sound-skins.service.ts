@@ -10,13 +10,16 @@ import {
   type SoundSkin,
   type SoundSlot,
 } from "@buzrr/contract";
+import { Prisma } from "@buzrr/prisma";
 import { PrismaService } from "../../prisma/prisma.service";
 import {
   MediaStorage,
   MediaUnavailableError,
   UnsupportedMediaError,
 } from "../../common/storage/media-storage";
-import { toMp3 } from "../../common/storage/audio-transcode";
+import { cutClip, toMp3 } from "../../common/storage/audio-transcode";
+import { encryptClip } from "../../common/storage/clip-crypto";
+import { finalClipOf } from "./final-clip";
 import {
   isPlayerAuthUser,
   type AuthUser,
@@ -30,7 +33,11 @@ type SkinRow = {
   userId: string | null;
   isGlobal: boolean;
   slots: unknown;
+  finalClip?: unknown;
 };
+
+/** Longest final song kept for devices (re-encoded small). */
+const FINAL_CLIP_MS = 5 * 60 * 1000;
 
 function slotsOf(raw: unknown): SoundSkin["slots"] {
   const out: SoundSkin["slots"] = {};
@@ -49,6 +56,8 @@ const toSkin = (row: SkinRow): SoundSkin => ({
   isGlobal: row.isGlobal,
   ownerId: row.userId,
   slots: slotsOf(row.slots),
+  // The URL only — the key never leaves with the skin.
+  finalClipUrl: finalClipOf(row.finalClip)?.url ?? null,
 });
 
 /**
@@ -118,7 +127,10 @@ export class SoundSkinsService {
     ) {
       throw new NotFoundException("Sound skin not found");
     }
-    return toSkin(row);
+    const skin = toSkin(row);
+    // Players get the final song only as the encrypted clip.
+    if (isPlayerAuthUser(user) && skin.finalClipUrl) delete skin.slots.final;
+    return skin;
   }
 
   async create(user: AuthUser, name: string): Promise<SoundSkin> {
@@ -164,14 +176,25 @@ export class SoundSkinsService {
     const row = await this.editable(user, id);
     if (!file || file.size === 0) throw new BadRequestException("Missing file");
     let url: string;
+    let finalClip: { url: string; key: string } | null = null;
     try {
+      const mp3 = await toMp3(file.buffer);
       url = (
-        await this.storage.upload(await toMp3(file.buffer), {
+        await this.storage.upload(mp3, {
           contentType: file.mimetype,
           filename: file.originalname,
           kind: "audio",
         })
       ).url;
+      if (slot === "final") {
+        // Devices download the final song during the game, encrypted.
+        const { blob, key } = encryptClip(await cutClip(mp3, 0, FINAL_CLIP_MS));
+        const stored = await this.storage.upload(blob, {
+          contentType: "application/octet-stream",
+          kind: "encrypted",
+        });
+        finalClip = { url: stored.url, key };
+      }
     } catch (err) {
       if (err instanceof UnsupportedMediaError) {
         throw new BadRequestException(err.message);
@@ -184,11 +207,16 @@ export class SoundSkinsService {
     const slots = slotsOf(row.slots);
     const old = slots[slot];
     slots[slot] = url;
+    const oldFinal = slot === "final" ? finalClipOf(row.finalClip) : null;
     const updated = await this.prisma.db.soundSkin.update({
       where: { id },
-      data: { slots },
+      data: {
+        slots,
+        ...(slot === "final" ? { finalClip: finalClip ?? Prisma.DbNull } : {}),
+      },
     });
     if (old) await this.storage.remove(old);
+    if (oldFinal) await this.storage.remove(oldFinal.url);
     return toSkin(updated);
   }
 
@@ -202,17 +230,24 @@ export class SoundSkinsService {
     const slots = slotsOf(row.slots);
     const old = slots[slot];
     delete slots[slot];
+    const oldFinal = slot === "final" ? finalClipOf(row.finalClip) : null;
     const updated = await this.prisma.db.soundSkin.update({
       where: { id },
-      data: { slots },
+      data: {
+        slots,
+        ...(slot === "final" ? { finalClip: Prisma.DbNull } : {}),
+      },
     });
     if (old) await this.storage.remove(old);
+    if (oldFinal) await this.storage.remove(oldFinal.url);
     return toSkin(updated);
   }
 
   async remove(user: AuthUser, id: string): Promise<void> {
     const row = await this.editable(user, id);
     await this.prisma.db.soundSkin.delete({ where: { id } });
+    const final = finalClipOf(row.finalClip);
+    if (final) await this.storage.remove(final.url);
     for (const url of Object.values(slotsOf(row.slots))) {
       await this.storage.remove(url);
     }

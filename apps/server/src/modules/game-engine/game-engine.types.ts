@@ -45,6 +45,10 @@ export interface GameMeta {
    * the quiz at start; absent = not moderated. Read via `moderationOf`.
    */
   moderation?: string;
+  /** Decrypts the sound skin's preloaded final song; sent with the final leaderboard. */
+  finalSoundKey?: string;
+  /** When the countdown started waiting for devices' downloads (0 = not waiting). */
+  preloadWaitSince?: number;
   /**
    * Duels only: when the match was frozen because no human was connected. 0
    * (or absent) means running; resumeDuel shifts every timestamp below by the
@@ -82,4 +86,13 @@ export interface StoredAnswer {
 export interface ScoreEntry {
   playerId: string;
   score: number;
+}
+
+/** A device's download of a question's sound clips (`preload-status`). */
+export interface PreloadStatus {
+  loaded: number;
+  total: number;
+  done: boolean;
+  /** When this status arrived (server clock). */
+  at: number;
 }

@@ -47,7 +47,11 @@ describe("start", () => {
     });
     expect(effectOf(effects, "set-deadline")?.at).toBe(T0 + START_COUNTDOWN_MS);
     expect(emitted(effects).map((e) => e.message)).toEqual([
-      { event: "game-started", deadline: T0 + START_COUNTDOWN_MS },
+      {
+        event: "game-started",
+        deadline: T0 + START_COUNTDOWN_MS,
+        preview: { title: "Question q1" },
+      },
     ]);
   });
 

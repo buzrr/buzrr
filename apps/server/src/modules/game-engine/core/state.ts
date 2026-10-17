@@ -4,6 +4,8 @@ import type {
   LeaderboardPayload,
   ModerationSettings,
   PhaseChangePayload,
+  PreloadPayload,
+  QuestionPreview,
   QuestionAnswer,
   QuestionEndPayload,
   QuestionStartPayload,
@@ -11,6 +13,7 @@ import type {
 import type {
   GameMeta,
   LiveQuestion,
+  PreloadStatus,
   RosterEntry,
   ScoreEntry,
   StoredAnswer,
@@ -29,9 +32,16 @@ export interface GameState {
   answers: Record<string, StoredAnswer>;
   /** The leaderboard zset, highest score first. */
   scores: ScoreEntry[];
+  /** Devices' downloads of `meta.qIndex`'s sound, by player id ("host" for the host). */
+  preloads: Record<string, PreloadStatus>;
 }
 
-export type StatePart = "questions" | "roster" | "answers" | "scores";
+export type StatePart =
+  | "questions"
+  | "roster"
+  | "answers"
+  | "scores"
+  | "preloads";
 
 /** Who an emitted message goes to. */
 export type Audience = { room: true } | { player: string };
@@ -43,7 +53,9 @@ export type Outbound =
       /** When question 1 opens; sent to clients as `remainingMs`. */
       deadline: number;
       moderation?: ModerationSettings;
+      preview?: QuestionPreview;
     }
+  | { event: "preload"; payload: PreloadPayload }
   | {
       event: "phase-change";
       payload: Omit<PhaseChangePayload, "remainingMs">;

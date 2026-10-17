@@ -150,6 +150,14 @@ model Question {
   /// Where the sound plays: null = like the quiz's sound setting, otherwise
   /// "host" | "players" | "both" | "off".
   audioPlayOn      String?
+  /// What devices actually load: the two played windows cut from `audio`
+  /// (mono, 96 kbit/s), each AES-256-GCM encrypted with its own key. The
+  /// question key goes out with `question-start`, the reveal key with the
+  /// reveal, so a clip can be preloaded early without being playable early.
+  audioClip        String?
+  audioClipKey     String?
+  audioRevealClip  String?
+  audioRevealKey   String?
   order            Int                @default(1)
   /// Per-question moderation gate for the duel pool; the quiz's `isPublic`
   /// flag alone no longer decides eligibility.
@@ -439,6 +447,9 @@ model SoundSkin {
   isGlobal  Boolean  @default(false) @map("is_global")
   /// slot -> uploaded MP3 URL (`soundSlotSchema`)
   slots     Json     @default("{}")
+  /// The final song as devices load it ahead of time: encrypted
+  /// ({ url, key }); the key goes out only with the final leaderboard.
+  finalClip Json?    @map("final_clip")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)

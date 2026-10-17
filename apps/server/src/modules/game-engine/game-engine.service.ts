@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { quizSettingsSchema } from "@buzrr/contract";
 import { signAssetsDeep } from "../../common/storage/asset-signing";
+import { finalClipOf } from "../sound-skins/final-clip";
 import type { GameOverPayload, QuestionAnswer } from "@buzrr/contract";
 import type { DuelOutcome, Prisma } from "@buzrr/prisma";
 import { nanoid } from "nanoid";
@@ -243,7 +244,12 @@ export class GameEngineService
         target.emit("game-started", {
           remainingMs: Math.max(0, message.deadline - Date.now()),
           ...(message.moderation ? { moderation: message.moderation } : {}),
+          ...(message.preview ? { preview: message.preview } : {}),
         });
+        break;
+      case "preload":
+        // Encrypted clips only; signed so the room can fetch them.
+        target.emit("preload", signAssetsDeep(message.payload));
         break;
       case "phase-change":
         target.emit("phase-change", {
@@ -434,6 +440,17 @@ export class GameEngineService
     // Moderated mode comes from the quiz's settings (invalid → unmoderated).
     const settings = quizSettingsSchema.safeParse(session.quiz.settings ?? {});
     const moderation = settings.success ? settings.data.moderation : null;
+    // A user sound skin's final song is preloaded encrypted; its key goes
+    // out with the final leaderboard.
+    const skinId = settings.success ? settings.data.sound.skin : null;
+    const skin =
+      skinId && !skinId.startsWith("builtin:")
+        ? await this.prisma.db.soundSkin.findUnique({
+            where: { id: skinId },
+            select: { finalClip: true },
+          })
+        : null;
+    const finalSoundKey = finalClipOf(skin?.finalClip)?.key ?? null;
 
     const { effects } = step(
       state,
@@ -442,6 +459,7 @@ export class GameEngineService
         questions,
         quizTitle: session.quiz.title,
         moderation: moderation?.enabled ? moderation : null,
+        finalSoundKey,
       },
       Date.now(),
     );

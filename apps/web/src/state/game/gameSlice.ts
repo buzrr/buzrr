@@ -9,6 +9,8 @@ import type {
   LeaderboardEntry,
   ModerationSettings,
   PhaseChangePayload,
+  PreloadPayload,
+  QuestionPreview,
   PublicQuestion,
   QuestionEndPayload,
   QuestionStartPayload,
@@ -63,6 +65,14 @@ export interface GameLiveState {
   streaks: GameOverPayload["streaks"] | null;
   /** Moderated games: the quiz's moderation settings; null otherwise. */
   moderation: ModerationSettings | null;
+  /** The coming question's text during its countdown. */
+  preview: QuestionPreview | null;
+  /** The latest preload hint (next question's sound clips). */
+  preload: PreloadPayload | null;
+  /** Final leaderboard: decrypts the sound skin's preloaded final song. */
+  finalSoundKey: string | null;
+  /** Countdown over, devices still downloading the question's sound. */
+  waitingFor: number;
 }
 
 const initialState: GameLiveState = {
@@ -87,6 +97,10 @@ const initialState: GameLiveState = {
   category: null,
   streaks: null,
   moderation: null,
+  preview: null,
+  preload: null,
+  finalSoundKey: null,
+  waitingFor: 0,
 };
 
 /**
@@ -159,12 +173,15 @@ const gameSlice = createSlice({
       state.players = s.players;
       state.you = s.you ?? null;
       state.moderation = s.moderation ?? null;
+      state.preview = s.preview ?? null;
+      state.finalSoundKey = s.finalSoundKey ?? null;
     },
     gameStarted: (
       state,
       action: PayloadAction<{
         remainingMs: number;
         moderation?: ModerationSettings;
+        preview?: QuestionPreview;
       }>,
     ) => {
       state.phase = "starting";
@@ -173,6 +190,10 @@ const gameSlice = createSlice({
       state.countdownMs = action.payload.remainingMs;
       state.gameOver = false;
       state.moderation = action.payload.moderation ?? null;
+      state.preview = action.payload.preview ?? null;
+    },
+    preloadHint: (state, action: PayloadAction<PreloadPayload>) => {
+      state.preload = action.payload;
     },
     /** Moderated games: ready / starting / closed / scores. */
     phaseChange: (state, action: PayloadAction<PhaseChangePayload>) => {
@@ -194,6 +215,8 @@ const gameSlice = createSlice({
         state.answeredCount = 0;
         state.liveSummary = null;
       }
+      state.preview = p.preview ?? null;
+      state.waitingFor = p.waitingFor ?? 0;
       if (p.phase === "starting") {
         const ms = p.remainingMs ?? 0;
         state.deadline = Date.now() + ms;
@@ -206,6 +229,7 @@ const gameSlice = createSlice({
     questionStart: (state, action: PayloadAction<QuestionStartPayload>) => {
       const q = action.payload;
       state.phase = "question";
+      state.preview = null;
       state.qIndex = q.index;
       state.qCount = q.qCount;
       state.question = q.question;
@@ -244,10 +268,14 @@ const gameSlice = createSlice({
       action: PayloadAction<{
         entries: LeaderboardEntry[];
         isFinal: boolean;
+        finalSoundKey?: string;
       }>,
     ) => {
       state.leaderboard = action.payload.entries;
       state.isFinalLeaderboard = action.payload.isFinal;
+      if (action.payload.finalSoundKey) {
+        state.finalSoundKey = action.payload.finalSoundKey;
+      }
       if (action.payload.isFinal) {
         state.phase = "final";
       }
@@ -302,6 +330,7 @@ export const {
   applySync,
   gameStarted,
   phaseChange,
+  preloadHint,
   questionStart,
   questionEnd,
   answerResult,

@@ -18,7 +18,8 @@ import {
   MediaUnavailableError,
   UnsupportedMediaError,
 } from "../../common/storage/media-storage";
-import { toMp3 } from "../../common/storage/audio-transcode";
+import { cutClip, toMp3 } from "../../common/storage/audio-transcode";
+import { encryptClip } from "../../common/storage/clip-crypto";
 import { stripAssetSignature } from "../../common/storage/asset-signing";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
@@ -31,6 +32,9 @@ import { CategoriesService } from "../categories/categories.service";
 import { ReorderQuestionsDto } from "./dto/reorder-questions.dto";
 
 type MultipartBody = Record<string, string | undefined>;
+
+/** How long the reveal clip plays (from the reveal cue). */
+const REVEAL_CLIP_MS = 15_000;
 
 function parseJsonField(raw: string | undefined, field: string): unknown {
   if (raw === undefined || raw.trim() === "") return undefined;
@@ -228,7 +232,17 @@ export class QuestionsService {
 
     // Ownership first: the old media we may delete below is the edited
     // question's own, read from the database.
-    let existing: { media: string | null; audio: string | null } | null = null;
+    let existing: {
+      media: string | null;
+      audio: string | null;
+      audioStartMs: number | null;
+      audioRevealMs: number | null;
+      timeOut: number;
+      audioClip: string | null;
+      audioClipKey: string | null;
+      audioRevealClip: string | null;
+      audioRevealKey: string | null;
+    } | null = null;
     if (quesId) {
       const question = await this.prisma.db.question.findUnique({
         where: { id: quesId },
@@ -254,9 +268,7 @@ export class QuestionsService {
       kind: "image" | "audio",
     ) => {
       try {
-        const buffer =
-          kind === "audio" ? await toMp3(upload.buffer) : upload.buffer;
-        return await this.storage.upload(buffer, {
+        return await this.storage.upload(upload.buffer, {
           contentType: upload.mimetype,
           filename: upload.originalname,
           kind,
@@ -275,8 +287,10 @@ export class QuestionsService {
     // Sound: a new upload replaces it, `audio_link` keeps a URL (normally the
     // stored one), neither means the question has none.
     let audio: string | null = null;
+    let audioMp3: Buffer | null = null;
     if (audioFile && audioFile.size > 0) {
-      audio = (await store(audioFile, "audio")).url;
+      audioMp3 = await toMp3(audioFile.buffer);
+      audio = (await store({ ...audioFile, buffer: audioMp3 }, "audio")).url;
     } else if (body.audio_link && /^https?:\/\//.test(body.audio_link)) {
       audio = stripAssetSignature(body.audio_link);
     }
@@ -306,6 +320,14 @@ export class QuestionsService {
     }
 
     const timeOut = parseInt(time ?? "", 10) || DEFAULT_TIME_OUT;
+    const clips = await this.audioClips(
+      audio,
+      audioMp3,
+      audioFields.audioStartMs,
+      audioFields.audioRevealMs,
+      timeOut,
+      existing,
+    );
     // Any create/edit re-enters the moderation queue if the quiz is public --
     // approved content doesn't stay approved across an edit, since the
     // reviewed text may have changed. Moderation only feeds the duel pool, so
@@ -330,6 +352,7 @@ export class QuestionsService {
             media: fileLink || null,
             mediaType: mediaType || null,
             ...audioFields,
+            ...clips.fields,
             moderationStatus,
             reportCount: 0,
           },
@@ -352,6 +375,7 @@ export class QuestionsService {
       if (existing?.audio && existing.audio !== audio) {
         await this.storage.remove(existing.audio);
       }
+      for (const old of clips.replaced) await this.storage.remove(old);
     } else {
       await this.prisma.db.$transaction(async (tx) => {
         const count = await tx.question.count({ where: { quizId } });
@@ -366,6 +390,7 @@ export class QuestionsService {
             media: fileLink || null,
             mediaType: mediaType || null,
             ...audioFields,
+            ...clips.fields,
             order: count + 1,
             moderationStatus,
             createdById: user.userId,
@@ -373,6 +398,87 @@ export class QuestionsService {
         });
       });
     }
+  }
+
+  /**
+   * The encrypted clips devices load for a question's sound: the window that
+   * plays while it is open (start cue, the question's time) and the reveal
+   * window (reveal cue, 15 s). Re-cut only when the sound, a cue or the time
+   * changed (or clips are missing); `replaced` lists the old files to delete
+   * once the question row points at the new ones.
+   */
+  private async audioClips(
+    audio: string | null,
+    freshMp3: Buffer | null,
+    startMs: number | null,
+    revealMs: number | null,
+    timeOut: number,
+    existing: {
+      media: string | null;
+      audio: string | null;
+      audioStartMs: number | null;
+      audioRevealMs: number | null;
+      timeOut: number;
+      audioClip: string | null;
+      audioClipKey: string | null;
+      audioRevealClip: string | null;
+      audioRevealKey: string | null;
+    } | null,
+  ) {
+    const old = [existing?.audioClip, existing?.audioRevealClip].filter(
+      (u): u is string => Boolean(u),
+    );
+    const none = {
+      audioClip: null,
+      audioClipKey: null,
+      audioRevealClip: null,
+      audioRevealKey: null,
+    };
+    if (!audio) return { fields: none, replaced: old };
+    const unchanged =
+      !freshMp3 &&
+      existing?.audio === audio &&
+      existing.audioClip &&
+      existing.audioStartMs === startMs &&
+      existing.audioRevealMs === revealMs &&
+      existing.timeOut === timeOut &&
+      (revealMs === null || existing.audioRevealClip);
+    if (unchanged && existing) {
+      return {
+        fields: {
+          audioClip: existing.audioClip,
+          audioClipKey: existing.audioClipKey,
+          audioRevealClip: existing.audioRevealClip,
+          audioRevealKey: existing.audioRevealKey,
+        },
+        replaced: [],
+      };
+    }
+    const source = freshMp3 ?? (await this.storage.read(audio));
+    // An external link we can't read plays as before: the whole file.
+    if (!source) return { fields: none, replaced: old };
+    const put = async (clip: Buffer) => {
+      const { blob, key } = encryptClip(clip);
+      const { url } = await this.storage.upload(blob, {
+        contentType: "application/octet-stream",
+        kind: "encrypted",
+      });
+      return { url, key };
+    };
+    const q = await put(await cutClip(source, startMs ?? 0, timeOut * 1000));
+    const r =
+      revealMs === null
+        ? null
+        : await put(await cutClip(source, revealMs, REVEAL_CLIP_MS));
+    return {
+      fields: {
+        audioClip: q.url,
+        audioClipKey: q.key,
+        audioRevealClip: r?.url ?? null,
+        audioRevealKey: r?.key ?? null,
+      },
+      replaced: old,
+    };
   }
 
   /**

@@ -31,11 +31,24 @@ export const DEFAULT_TIME_OUT = 15;
  * reveal.
  */
 export const questionAudioSchema = z.object({
+  /**
+   * What to load: the question's clip (encrypted, see `key`), or for sounds
+   * without clips (external links) the whole file, played from `startMs`.
+   */
   url: z.string(),
   startMs: z.number().int().nonnegative(),
   revealMs: z.number().int().nonnegative().nullable(),
   /** Where it plays; "quiz" follows the quiz's sound setting. */
   playOn: z.enum(["quiz", "host", "players", "both", "off"]).default("quiz"),
+  /**
+   * Clip files are AES-256-GCM encrypted (12-byte IV, ciphertext + tag);
+   * `key` (base64url) decrypts the question clip and comes only with the
+   * question itself. The reveal clip's key comes with the reveal.
+   */
+  encrypted: z.boolean().optional(),
+  key: z.string().optional(),
+  /** The reveal clip (played from its start), if there is one. */
+  revealUrl: z.string().nullable().optional(),
 });
 export type QuestionAudio = z.infer<typeof questionAudioSchema>;
 

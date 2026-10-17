@@ -54,6 +54,7 @@ export default function QuestionScreen(props: QuestionScreenProps) {
     question?.audio?.startMs,
     question ? question.timeOut * 1000 : null,
     question?.id,
+    question?.audio?.key,
   );
   const remaining = useServerCountdown(deadline);
   const [copied, setCopied] = useState(false);

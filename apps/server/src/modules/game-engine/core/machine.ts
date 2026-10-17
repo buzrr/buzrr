@@ -1,6 +1,10 @@
 import { ANSWER_GRACE_MS } from "../../../common/utils/answer-timing";
 import { planBotAnswer } from "../../../common/utils/duel-bot";
-import { acceptsMoreAnswers, toPublicQuestion } from "../../question-types";
+import {
+  acceptsMoreAnswers,
+  preloadUrls,
+  toPublicQuestion,
+} from "../../question-types";
 import type { ModerationSettings } from "@buzrr/contract";
 import type { LiveQuestion } from "../game-engine.types";
 import {
@@ -35,6 +39,8 @@ export type EngineEvent =
       quizTitle: string;
       /** Moderated mode settings from the quiz; null/absent = unmoderated. */
       moderation?: ModerationSettings | null;
+      /** The quiz's sound skin final-song key, if it has one. */
+      finalSoundKey?: string | null;
     }
   /** The host's single pacing intent — the machine decides what it means. */
   | { type: "host-next" }
@@ -61,7 +67,8 @@ export type EngineEvent =
 export const PARTS_FOR: Record<EngineEvent["type"], readonly StatePart[]> = {
   start: [],
   "host-next": ["questions", "roster", "answers", "scores"],
-  deadline: ["questions", "roster", "answers", "scores"],
+  // Preloads: a countdown into a question with sound waits for downloads.
+  deadline: ["questions", "roster", "answers", "scores", "preloads"],
   "answer-recorded": ["questions", "roster"],
   "close-question": ["questions", "roster", "answers", "scores"],
   // Questions too: whether the open one may close early depends on its type.
@@ -131,9 +138,13 @@ function start(
     questions: LiveQuestion[];
     quizTitle: string;
     moderation?: ModerationSettings | null;
+    finalSoundKey?: string | null;
   },
   now: number,
 ): Transition {
+  const keyPatch = event.finalSoundKey
+    ? { finalSoundKey: event.finalSoundKey }
+    : {};
   if (state.meta.phase !== "lobby") return noop(state);
   if (event.questions.length === 0) {
     return noop(state, {
@@ -153,6 +164,7 @@ function start(
       qIndex: 0,
       qDeadline: 0,
       moderation: JSON.stringify(mod),
+      ...keyPatch,
     };
     return {
       state: { ...withMeta(state, patch), questions: event.questions },
@@ -175,6 +187,7 @@ function start(
             payload: { phase: "ready", qIndex: 0 },
           },
         },
+        ...preloadEffects({ ...state, questions: event.questions }, 0),
       ],
     };
   }
@@ -186,6 +199,7 @@ function start(
     startedAt: now,
     qDeadline: firstQuestionAt,
     ...(mod ? { moderation: JSON.stringify(mod) } : {}),
+    ...keyPatch,
   };
   return {
     state: { ...withMeta(state, patch), questions: event.questions },
@@ -202,8 +216,10 @@ function start(
           event: "game-started",
           deadline: firstQuestionAt,
           ...(mod ? { moderation: mod } : {}),
+          preview: previewOf({ ...state, questions: event.questions }, 0),
         },
       },
+      ...preloadEffects({ ...state, questions: event.questions }, 0),
       { kind: "arm-timer", at: firstQuestionAt },
     ],
   };
@@ -250,8 +266,12 @@ function onDeadline(
   if (meta.pausedAt) return noop(state);
   switch (meta.phase) {
     case "starting":
-      // Question 1 after "start game", or a moderated game's next question.
-      return openQuestion(state, meta.qIndex, now, ctx);
+      // Question 1 after "start game", or a moderated game's next question —
+      // unless devices are still downloading its sound.
+      return (
+        waitForDownloads(state, now) ??
+        openQuestion(state, meta.qIndex, now, ctx)
+      );
     case "question":
       if (!meta.qStartAt) {
         // Legacy meta only — the window and the phase are one write now.
@@ -290,7 +310,10 @@ function advance(
   if (meta.qIndex + 1 < meta.qCount) {
     const mod = moderationOf(meta);
     if (mod?.confirmNextQuestion) return enterReady(state, meta.qIndex + 1);
-    if (mod) return startCountdown(state, meta.qIndex + 1, now);
+    // A question with sound always gets a countdown, so downloads can finish.
+    if (mod || preloadUrls(state.questions[meta.qIndex + 1]).length > 0) {
+      return startCountdown(state, meta.qIndex + 1, now);
+    }
     return openQuestion(state, meta.qIndex + 1, now, ctx);
   }
   return enterFinal(state, pacing);
@@ -313,6 +336,7 @@ function enterReady(state: GameState, index: number): Transition {
           payload: { phase: "ready", qIndex: index },
         },
       },
+      ...preloadEffects(state, index),
     ],
   };
 }
@@ -336,7 +360,11 @@ function startCountdown(
         to: ROOM,
         message: {
           event: "phase-change",
-          payload: { phase: "starting", qIndex: index },
+          payload: {
+            phase: "starting",
+            qIndex: index,
+            preview: previewOf(state, index),
+          },
           deadline: at,
         },
       },
@@ -379,6 +407,7 @@ function closeQuestion(
           payload: { phase: "closed", qIndex: state.meta.qIndex },
         },
       },
+      ...preloadEffects(state, state.meta.qIndex + 1),
     ],
   };
 }
@@ -437,6 +466,7 @@ function showScores(
         payload: { phase: "scores", qIndex: meta.qIndex },
       },
     },
+    ...preloadEffects(state, meta.qIndex + 1),
   );
   return { state: withMeta(state, patch), effects };
 }
@@ -474,6 +504,7 @@ function openQuestion(
     qId: question.id,
     qStartAt: now,
     qDeadline: deadline,
+    preloadWaitSince: 0,
     ...(plan ? { botAnswer: JSON.stringify(plan.answer), botAnswerAt } : {}),
   };
 
@@ -581,6 +612,8 @@ function reveal(
       },
     });
   }
+  // While the room looks at this answer, devices fetch the next sound.
+  effects.push(...preloadEffects(state, meta.qIndex + 1));
   return { state: withMeta(state, patch), effects };
 }
 
@@ -604,6 +637,10 @@ function enterFinal(state: GameState, pacing: PacingStrategy): Transition {
         payload: {
           entries: buildLeaderboard(state.scores, state.roster),
           isFinal: true,
+          // The preloaded final song becomes playable now.
+          ...(state.meta.finalSoundKey
+            ? { finalSoundKey: state.meta.finalSoundKey }
+            : {}),
         },
       },
     },
@@ -687,4 +724,82 @@ function onRosterChanged(state: GameState): Transition {
     });
   }
   return noop(state);
+}
+
+/** Tell the room to download question `index`'s sound clips now (if any). */
+function preloadEffects(state: GameState, index: number): Effect[] {
+  const urls = preloadUrls(state.questions[index]);
+  return urls.length > 0
+    ? [
+        {
+          kind: "emit",
+          to: ROOM,
+          message: {
+            event: "preload",
+            payload: {
+              qIndex: index,
+              urls,
+              playOn: state.questions[index]?.audio?.playOn ?? "quiz",
+            },
+          },
+        },
+      ]
+    : [];
+}
+
+/** The coming question's text for the countdown (no options, no media). */
+function previewOf(state: GameState, index: number) {
+  const q = state.questions[index];
+  return q ? { title: q.title } : undefined;
+}
+
+/** A device is ignored once its download stops moving this long. */
+export const DOWNLOAD_STALL_MS = 4_000;
+/** The countdown never waits longer than this for downloads. */
+export const DOWNLOAD_MAX_WAIT_MS = 30_000;
+const DOWNLOAD_RECHECK_MS = 1_000;
+
+/**
+ * The countdown is over, but devices that report downloading the question's
+ * sound aren't done: keep counting (re-checking every second) — except for
+ * devices that went quiet (no progress for `DOWNLOAD_STALL_MS`), left, or
+ * once `DOWNLOAD_MAX_WAIT_MS` have passed, so no one can block the game.
+ * Null = go ahead and open the question.
+ */
+function waitForDownloads(state: GameState, now: number): Transition | null {
+  const { meta } = state;
+  if (preloadUrls(state.questions[meta.qIndex]).length === 0) return null;
+  const connected = new Set(
+    state.roster.filter((p) => p.connected).map((p) => p.id),
+  );
+  if (meta.hostConnected) connected.add("host");
+  const pending = Object.entries(state.preloads).filter(
+    ([id, s]) => connected.has(id) && !s.done && now - s.at < DOWNLOAD_STALL_MS,
+  ).length;
+  const since = meta.preloadWaitSince || now;
+  if (pending === 0 || now - since >= DOWNLOAD_MAX_WAIT_MS) return null;
+  const at = now + DOWNLOAD_RECHECK_MS;
+  const patch = { preloadWaitSince: since, qDeadline: at };
+  return {
+    state: withMeta(state, patch),
+    effects: [
+      { kind: "set-deadline", at },
+      { kind: "patch-meta", patch },
+      {
+        kind: "emit",
+        to: ROOM,
+        message: {
+          event: "phase-change",
+          payload: {
+            phase: "starting",
+            qIndex: meta.qIndex,
+            preview: previewOf(state, meta.qIndex),
+            waitingFor: pending,
+          },
+          deadline: at,
+        },
+      },
+      { kind: "arm-timer", at },
+    ],
+  };
 }

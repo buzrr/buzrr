@@ -39,6 +39,7 @@ const Question = (params: {
     audio?.startMs,
     params.question.timeOut * 1000,
     params.question.id,
+    audio?.key,
   );
   /**
    * The pick whose ack has not come back yet. A socket that drops mid-flight

@@ -56,27 +56,65 @@ export async function toMp3(buffer: Buffer): Promise<Buffer> {
       "Only MP3, WAV, OGG/Opus, FLAC, M4A/AAC or WebM audio can be uploaded",
     );
   }
+  return runFfmpeg(buffer, [
+    "-i",
+    "pipe:0",
+    "-vn",
+    "-map_metadata",
+    "-1",
+    "-codec:a",
+    "libmp3lame",
+    "-q:a",
+    "4",
+    "-f",
+    "mp3",
+    "pipe:1",
+  ]);
+}
+
+/** Bit rate of the clips devices load (mono). */
+const CLIP_BITRATE = "96k";
+
+/**
+ * The `durationMs` from `startMs` of an MP3, re-encoded small (mono,
+ * 96 kbit/s) — what players' devices download instead of the whole file.
+ */
+export async function cutClip(
+  mp3: Buffer,
+  startMs: number,
+  durationMs: number,
+): Promise<Buffer> {
+  return runFfmpeg(mp3, [
+    "-ss",
+    (startMs / 1000).toFixed(3),
+    "-t",
+    (durationMs / 1000).toFixed(3),
+    "-i",
+    "pipe:0",
+    "-vn",
+    "-map_metadata",
+    "-1",
+    "-ac",
+    "1",
+    "-codec:a",
+    "libmp3lame",
+    "-b:a",
+    CLIP_BITRATE,
+    "-f",
+    "mp3",
+    "pipe:1",
+  ]);
+}
+
+/** Runs ffmpeg on `input` (stdin → stdout, no temp files) with a timeout and an output cap. */
+function runFfmpeg(input: Buffer, args: string[]): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const ff = spawn(
       "ffmpeg",
-      [
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-i",
-        "pipe:0",
-        "-vn",
-        "-map_metadata",
-        "-1",
-        "-codec:a",
-        "libmp3lame",
-        "-q:a",
-        "4",
-        "-f",
-        "mp3",
-        "pipe:1",
-      ],
-      { stdio: ["pipe", "pipe", "pipe"] },
+      ["-hide_banner", "-loglevel", "error", ...args],
+      {
+        stdio: ["pipe", "pipe", "pipe"],
+      },
     );
     const chunks: Buffer[] = [];
     let size = 0;
@@ -110,6 +148,6 @@ export async function toMp3(buffer: Buffer): Promise<Buffer> {
       resolve(Buffer.concat(chunks));
     });
     ff.stdin.on("error", () => undefined);
-    ff.stdin.end(buffer);
+    ff.stdin.end(input);
   });
 }

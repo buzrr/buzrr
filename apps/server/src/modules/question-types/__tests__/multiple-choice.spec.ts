@@ -281,13 +281,43 @@ describe("toLiveQuestion", () => {
       audioRevealMs: null,
     };
     const q = toLiveQuestion(withAudio)!;
-    expect(q.audio).toEqual({
+    expect(q.audio).toMatchObject({
       url: "https://x/a.mp3",
       startMs: 1500,
       revealMs: null,
       playOn: "quiz",
     });
-    expect(toPublicQuestion(q).audio).toEqual(q.audio);
+    // Without clips (e.g. an external link) devices get the file itself.
+    expect(toPublicQuestion(q).audio).toEqual({
+      url: "https://x/a.mp3",
+      startMs: 1500,
+      revealMs: null,
+      playOn: "quiz",
+    });
+  });
+
+  it("hands out the clip with the question key only", () => {
+    const q = toLiveQuestion({
+      ...row,
+      audio: "https://x/a.mp3",
+      audioStartMs: 1500,
+      audioRevealMs: 30_000,
+      audioClip: "https://x/q.bin",
+      audioClipKey: "QKEY",
+      audioRevealClip: "https://x/r.bin",
+      audioRevealKey: "RKEY",
+    })!;
+    const pub = toPublicQuestion(q).audio!;
+    expect(pub).toMatchObject({
+      url: "https://x/q.bin",
+      startMs: 0,
+      revealMs: 0,
+      encrypted: true,
+      key: "QKEY",
+      revealUrl: "https://x/r.bin",
+    });
+    expect(JSON.stringify(pub)).not.toContain("RKEY");
+    expect(JSON.stringify(pub)).not.toContain("a.mp3");
   });
 
   it("loads a playable row, settling its settings", () => {

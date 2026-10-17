@@ -1,4 +1,4 @@
-import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { nanoid } from "nanoid";
 import { sniffAudio, sniffImage } from "./image-sniff";
@@ -30,14 +30,27 @@ export class LocalStorage extends MediaStorage {
 
   async upload(buffer: Buffer, meta?: UploadMeta): Promise<StoredMedia> {
     const audio = meta?.kind === "audio";
-    const { ext } = audio ? sniffAudio(buffer) : sniffImage(buffer);
+    const { ext } =
+      meta?.kind === "encrypted"
+        ? { ext: "bin" }
+        : audio
+          ? sniffAudio(buffer)
+          : sniffImage(buffer);
     const key = `${nanoid(21)}.${ext}`;
     await mkdir(this.dir, { recursive: true });
     await writeFile(join(this.dir, key), buffer, { flag: "wx" });
     return {
       url: `${this.publicUrl}/${key}`,
-      mediaType: audio ? "audio" : "image",
+      mediaType:
+        meta?.kind === "encrypted" ? "encrypted" : audio ? "audio" : "image",
     };
+  }
+
+  async read(url: string): Promise<Buffer | null> {
+    if (!url.startsWith(`${this.publicUrl}/`)) return null;
+    const key = basename(url.slice(this.publicUrl.length + 1).split("?")[0]!);
+    if (!/^[\w-]+\.\w+$/.test(key)) return null;
+    return readFile(join(this.dir, key)).catch(() => null);
   }
 
   async remove(url: string): Promise<void> {

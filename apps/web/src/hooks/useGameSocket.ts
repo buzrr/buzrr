@@ -10,6 +10,7 @@ import {
   gameOver,
   gameStarted,
   phaseChange,
+  preloadHint,
   leaderboardReceived,
   playerConnection,
   playerRemoved,
@@ -19,6 +20,7 @@ import {
   setConnection,
 } from "@/state/game/gameSlice";
 import type { GameSocket } from "@/types/socket";
+import { onPreloadProgress } from "@/lib/sound/preload";
 
 export interface UseGameSocketOptions {
   userType: "admin" | "player" | "duel";
@@ -117,6 +119,16 @@ export function useGameSocket({
     conn.on("state-sync", (payload) => dispatch(applySync(payload)));
     conn.on("game-started", (payload) => dispatch(gameStarted(payload)));
     conn.on("phase-change", (payload) => dispatch(phaseChange(payload)));
+    conn.on("preload", (payload) => dispatch(preloadHint(payload)));
+    // Report downloads of the next question's sound (throttled; "done" always).
+    let lastReport = 0;
+    const offProgress = onPreloadProgress((r) => {
+      const now = Date.now();
+      if (!r.done && now - lastReport < 400) return;
+      lastReport = now;
+      if (conn.connected) conn.emit("preload-status", r);
+    });
+
     conn.on("question-start", (payload) => dispatch(questionStart(payload)));
     conn.on("question-end", (payload) => dispatch(questionEnd(payload)));
     conn.on("answer-result", (payload) => dispatch(answerResult(payload)));
@@ -148,6 +160,7 @@ export function useGameSocket({
     setSocket(conn);
 
     return () => {
+      offProgress();
       conn.io.off("reconnect_failed", onReconnectFailed);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       conn.disconnect();

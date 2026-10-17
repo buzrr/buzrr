@@ -115,6 +115,10 @@ export function buildReveal(
     index,
     summary: summarizeAnswers(question, answerEntries(answers, roster)),
     avgTimeMs: averageAnswerMs(answers),
+    // The reveal clip becomes playable only now.
+    ...(question.audio?.revealKey
+      ? { audioRevealKey: question.audio.revealKey }
+      : {}),
   };
 }
 
@@ -145,6 +149,8 @@ export function buildSnapshot(
   if (meta.phase === "starting") {
     // Lets a client that (re)connects mid-countdown show the real time left.
     payload.remainingMs = Math.max(0, meta.qDeadline - now);
+    const coming = state.questions[meta.qIndex];
+    if (coming) payload.preview = { title: coming.title };
   }
   const mod = moderationOf(meta);
   if (mod) payload.moderation = mod;
@@ -193,6 +199,13 @@ export function buildSnapshot(
       roster,
       inReveal || inScores ? answers : undefined,
     );
+  }
+
+  if (
+    (meta.phase === "final" || meta.phase === "ended") &&
+    meta.finalSoundKey
+  ) {
+    payload.finalSoundKey = meta.finalSoundKey;
   }
 
   if (playerId) {
