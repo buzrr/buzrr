@@ -58,6 +58,9 @@ const GamePage = (params: {
     phaseRef.current = phase;
   });
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
+  const playerCount =
+    useAppSelector((state) => state.game.leaderboardTotal) ??
+    leaderboard.length;
   const mine = leaderboard.find((e) => e.playerId === params.player.id);
   const question = useAppSelector((state) => state.game.question);
   const you = useAppSelector((state) => state.game.you);
@@ -93,10 +96,18 @@ const GamePage = (params: {
         quizTitle: game.quiz.title ?? "",
         position: mine?.rank ?? you?.rank ?? null,
         score: mine?.score ?? you?.totalScore ?? 0,
-        players: leaderboard.length,
+        players: playerCount,
       });
     }
-  }, [phase, leaderboard, mine, you, params.player.id, game.quiz.title]);
+  }, [
+    phase,
+    leaderboard,
+    playerCount,
+    mine,
+    you,
+    params.player.id,
+    game.quiz.title,
+  ]);
 
   // Guard the browser/hardware back button: leaving the game is confirmed via
   // a modal instead of silently dropping the player on the previous screen.
@@ -195,7 +206,7 @@ const GamePage = (params: {
           position={mine?.rank ?? you?.rank ?? null}
           score={mine?.score ?? you?.totalScore ?? 0}
           quizTitle={game.quiz.title ?? undefined}
-          players={leaderboard.length}
+          players={playerCount}
         />
       ) : (
         // "starting" — the pre-question countdown

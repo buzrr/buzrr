@@ -14,7 +14,7 @@ import type {
   ScoreEntry,
   StoredAnswer,
 } from "../game-engine.types";
-import { isScoredType } from "@buzrr/contract";
+import { PLAYER_LEADERBOARD_TOP, isScoredType } from "@buzrr/contract";
 import { leaderboardWithReveal, moderationOf } from "./moderation";
 import type { GameState } from "./state";
 
@@ -28,6 +28,21 @@ export function averageAnswerMs(
   return Math.round(
     list.reduce((sum, a) => sum + a.timeTakenMs, 0) / list.length,
   );
+}
+
+/**
+ * What a player is sent of the leaderboard: the top `PLAYER_LEADERBOARD_TOP`,
+ * plus their own row (snapshots only — a room broadcast has no "own").
+ */
+export function topOfLeaderboard(
+  entries: LeaderboardEntry[],
+  playerId?: string,
+): LeaderboardEntry[] {
+  const top = entries.slice(0, PLAYER_LEADERBOARD_TOP);
+  const own = playerId
+    ? entries.slice(PLAYER_LEADERBOARD_TOP).find((e) => e.playerId === playerId)
+    : undefined;
+  return own ? [...top, own] : top;
 }
 
 /**
@@ -218,11 +233,17 @@ export function buildSnapshot(
     meta.phase === "final" ||
     meta.phase === "ended"
   ) {
-    payload.leaderboard = buildLeaderboard(
+    const board = buildLeaderboard(
       scores,
       roster,
       inReveal || inScores ? answers : undefined,
     );
+    if (playerId && board.length > PLAYER_LEADERBOARD_TOP) {
+      payload.leaderboard = topOfLeaderboard(board, playerId);
+      payload.leaderboardTotal = board.length;
+    } else {
+      payload.leaderboard = board;
+    }
   }
 
   // A host reconnecting in "closed" gets the tally its screen shows.

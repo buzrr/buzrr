@@ -127,6 +127,8 @@ export class FakeServer {
       emit: (event: string, payload: unknown) => {
         this.emitted.push({ room, event, payload });
       },
+      // Recorded as "room!except", e.g. "ROOM01!host:ROOM01".
+      except: (other: string) => this.to(`${room}!${other}`),
     };
   }
   events(event: string) {

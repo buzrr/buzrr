@@ -4,7 +4,11 @@ import {
   OnApplicationBootstrap,
   OnApplicationShutdown,
 } from "@nestjs/common";
-import { HEARTBEAT_TIMEOUT_MS, quizSettingsSchema } from "@buzrr/contract";
+import {
+  HEARTBEAT_TIMEOUT_MS,
+  PLAYER_LEADERBOARD_TOP,
+  quizSettingsSchema,
+} from "@buzrr/contract";
 import { signAssetsDeep } from "../../common/storage/asset-signing";
 import { finalClipOf } from "../sound-skins/final-clip";
 import type { GameOverPayload, QuestionAnswer } from "@buzrr/contract";
@@ -26,7 +30,7 @@ import {
   summarizeAnswers,
   toLiveQuestion,
 } from "../question-types";
-import { answerEntries } from "./core/views";
+import { answerEntries, topOfLeaderboard } from "./core/views";
 import type {
   SocketData,
   StateSyncPayload,
@@ -287,9 +291,25 @@ export class GameEngineService
       case "answer-count":
         target.emit("answer-count", message.payload);
         break;
-      case "leaderboard":
-        target.emit("leaderboard", message.payload);
+      case "leaderboard": {
+        const { entries } = message.payload;
+        if (!("room" in to) || entries.length <= PLAYER_LEADERBOARD_TOP) {
+          target.emit("leaderboard", message.payload);
+          break;
+        }
+        // The host shows the whole board; the players get its top (and
+        // their own standing from answer-result) — one small broadcast.
+        this.io.to(`host:${gameCode}`).emit("leaderboard", message.payload);
+        this.io
+          .to(gameCode)
+          .except(`host:${gameCode}`)
+          .emit("leaderboard", {
+            ...message.payload,
+            entries: topOfLeaderboard(entries),
+            total: entries.length,
+          });
         break;
+      }
     }
   }
 

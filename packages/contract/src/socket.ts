@@ -292,8 +292,18 @@ export const answerResultSchema = z.object({
   timeTakenMs: z.number().nullable().optional(),
 });
 
+/**
+ * Players are sent only the top of a room's leaderboard (the host all of it):
+ * the whole board to everyone grows with the room twice over — entries times
+ * recipients — and held up the events behind it. A player's own standing
+ * comes with `answer-result`.
+ */
+export const PLAYER_LEADERBOARD_TOP = 10;
+
 export const leaderboardSchema = z.object({
   entries: z.array(leaderboardEntrySchema),
+  /** How many players there are, when `entries` is only the top. */
+  total: z.number().int().optional(),
   isFinal: z.boolean(),
   /** Final leaderboard: decrypts the skin's preloaded final song. */
   finalSoundKey: z.string().optional(),
@@ -393,6 +403,8 @@ export const stateSyncSchema = z.object({
   reveal: questionEndSchema.optional(),
   /** Present while phase is "reveal", "final" or "ended". */
   leaderboard: z.array(leaderboardEntrySchema).optional(),
+  /** Players: how many are on the board when `leaderboard` is only the top (and their own row). */
+  leaderboardTotal: z.number().int().optional(),
   players: z.array(rosterPlayerSchema),
   /** Present for player connections only. */
   you: answerResultSchema.optional(),

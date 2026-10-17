@@ -4,6 +4,7 @@ import {
   buildAnswerResult,
   buildLeaderboard,
   buildSnapshot,
+  topOfLeaderboard,
 } from "../views";
 import { T0, answer, meta, player, questionOpen, state } from "./fixtures";
 
@@ -126,5 +127,37 @@ describe("buildSnapshot", () => {
     const snapshot = buildSnapshot(state({ meta: meta() }), null, T0);
     expect(snapshot.you).toBeUndefined();
     expect(snapshot.players).toHaveLength(2);
+  });
+});
+
+describe("topOfLeaderboard", () => {
+  const roster = Array.from({ length: 15 }, (_, i) => player(`p${i + 1}`));
+  const scores = roster.map((p, i) => ({ playerId: p.id, score: 1500 - i }));
+  const board = buildLeaderboard(scores, roster);
+
+  it("keeps the top ten", () => {
+    expect(topOfLeaderboard(board).map((e) => e.rank)).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+    ]);
+  });
+
+  it("adds the player's own row below the top", () => {
+    const rows = topOfLeaderboard(board, "p13");
+    expect(rows).toHaveLength(11);
+    expect(rows.at(-1)).toMatchObject({ playerId: "p13", rank: 13 });
+  });
+
+  it("adds nothing for a player already in the top", () => {
+    expect(topOfLeaderboard(board, "p2")).toHaveLength(10);
+  });
+
+  it("sends players the top and the count in snapshots, the host everything", () => {
+    const s = state({ meta: meta({ phase: "final" }), roster, scores });
+    const forPlayer = buildSnapshot(s, "p13", T0);
+    expect(forPlayer.leaderboard).toHaveLength(11);
+    expect(forPlayer.leaderboardTotal).toBe(15);
+    const forHost = buildSnapshot(s, null, T0);
+    expect(forHost.leaderboard).toHaveLength(15);
+    expect(forHost.leaderboardTotal).toBeUndefined();
   });
 });

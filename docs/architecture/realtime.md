@@ -258,6 +258,14 @@ masked until the reveal (`buildSnapshot`).
   Reveal-time `leaderboard` entries (the reveal broadcast, a roster change
   during the reveal, and reveal-phase `state-sync`) carry `delta` — points earned on that question;
   final/ended leaderboards omit it.
+  A room-wide `leaderboard` with more than `PLAYER_LEADERBOARD_TOP` (10)
+  entries is split in `GameEngineService.send`: the host room gets all of it,
+  the rest of the room (`.except(host:{code})`) the top 10 plus `total`.
+  Sending the whole board to everyone grows with the room twice over
+  (entries × recipients); at 109 players it delayed the `phase-change` behind
+  it by about 300ms. A player's own standing comes with `answer-result`, and a
+  player's `state-sync` carries the top plus their own row and
+  `leaderboardTotal`.
 - Event names: `question-start`, `question-end`, `answer-result`,
   `answer-count`, `live-summary` (host room only), `leaderboard`, `game-over`,
   `state-sync`, `player-connection`,

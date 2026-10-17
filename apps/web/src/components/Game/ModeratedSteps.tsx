@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { LuPlay } from "react-icons/lu";
 import { DEFAULT_AVATAR } from "@/constants";
+import type { LeaderboardEntry } from "@buzrr/contract";
 import { useAppSelector } from "@/state/hooks";
 import {
   WaitingDots,
@@ -176,8 +177,27 @@ export function ClosedSlide({
 /** Players' standings after a question (moderated "show scores"). */
 export function PlayerScores({ playerId }: { playerId: string }) {
   const t = useT();
-  const leaderboard = useAppSelector((state) => state.game.leaderboard);
+  const board = useAppSelector((state) => state.game.leaderboard);
   const qIndex = useAppSelector((state) => state.game.qIndex);
+  const you = useAppSelector((state) => state.game.you);
+  const me = useAppSelector((state) =>
+    state.game.players.find((p) => p.id === playerId),
+  );
+  // Players are sent the top of the board; below it, their own standing.
+  const leaderboard: LeaderboardEntry[] =
+    board.some((e) => e.playerId === playerId) || !you?.rank
+      ? board
+      : [
+          ...board,
+          {
+            playerId,
+            name: me?.name ?? t("You"),
+            profilePic: me?.profilePic ?? null,
+            score: you.totalScore,
+            rank: you.rank,
+            delta: you.score,
+          },
+        ];
   return (
     <div className="w-full max-w-xl mx-auto px-4 py-6 md:py-10 text-dark dark:text-white">
       <section className={clsx(panelClass, "flex flex-col gap-3 p-5 md:p-7")}>
@@ -185,9 +205,14 @@ export function PlayerScores({ playerId }: { playerId: string }) {
           {t("Scores after question")} {qIndex + 1}
         </span>
         <div className="flex flex-col gap-1.5">
-          {leaderboard.map((e) => (
+          {leaderboard.map((e, i) => (
             <div
               key={e.playerId}
+              style={
+                i > 0 && e.rank > leaderboard[i - 1]!.rank + 1
+                  ? { marginTop: "0.75rem" }
+                  : undefined
+              }
               className={clsx(
                 "flex items-center gap-3 rounded-[14px] px-3 py-2.5",
                 e.playerId === playerId

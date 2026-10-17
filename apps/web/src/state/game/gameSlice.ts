@@ -44,6 +44,8 @@ export interface GameLiveState {
   liveSummary: LiveSummaryPayload | null;
   reveal: QuestionEndPayload | null;
   leaderboard: LeaderboardEntry[];
+  /** Players: how many are on the board when `leaderboard` is only its top. */
+  leaderboardTotal: number | null;
   isFinalLeaderboard: boolean;
   players: {
     id: string;
@@ -88,6 +90,7 @@ const initialState: GameLiveState = {
   liveSummary: null,
   reveal: null,
   leaderboard: [],
+  leaderboardTotal: null,
   isFinalLeaderboard: false,
   players: [],
   you: null,
@@ -171,6 +174,7 @@ const gameSlice = createSlice({
       }
       state.reveal = s.reveal ?? null;
       state.leaderboard = s.leaderboard ?? [];
+      state.leaderboardTotal = s.leaderboardTotal ?? null;
       state.isFinalLeaderboard = s.phase === "final" || s.phase === "ended";
       state.players = s.players;
       state.you = s.you ?? null;
@@ -278,11 +282,13 @@ const gameSlice = createSlice({
       state,
       action: PayloadAction<{
         entries: LeaderboardEntry[];
+        total?: number;
         isFinal: boolean;
         finalSoundKey?: string;
       }>,
     ) => {
       state.leaderboard = action.payload.entries;
+      state.leaderboardTotal = action.payload.total ?? null;
       state.isFinalLeaderboard = action.payload.isFinal;
       if (action.payload.finalSoundKey) {
         state.finalSoundKey = action.payload.finalSoundKey;
@@ -303,6 +309,7 @@ const gameSlice = createSlice({
     ) => {
       state.phase = "ended";
       state.leaderboard = action.payload.entries;
+      state.leaderboardTotal = null;
       state.isFinalLeaderboard = true;
       state.gameOver = true;
       state.eloChanges = action.payload.eloChanges ?? null;

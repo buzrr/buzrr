@@ -218,3 +218,57 @@ describe("lobby grace", () => {
     expect(store.scores.get("p2")).toBe(900);
   });
 });
+
+describe("leaderboard broadcast", () => {
+  const entries = Array.from({ length: 12 }, (_, i) => ({
+    playerId: `p${i + 1}`,
+    name: `P${i + 1}`,
+    profilePic: null,
+    score: 1200 - i,
+    rank: i + 1,
+  }));
+  const send = (engine: GameEngineService, n: number) =>
+    (
+      engine as unknown as {
+        send: (code: string, to: unknown, message: unknown) => void;
+      }
+    ).send(
+      CODE,
+      { room: true },
+      {
+        event: "leaderboard",
+        payload: { entries: entries.slice(0, n), isFinal: false },
+      },
+    );
+
+  it("sends the host the whole board and the players its top", () => {
+    const { io, engine } = setup(meta(), []);
+
+    send(engine, 12);
+
+    const [host, players] = io.events("leaderboard");
+    expect(host).toMatchObject({ room: `host:${CODE}` });
+    expect((host!.payload as { entries: unknown[] }).entries).toHaveLength(12);
+    expect(players).toMatchObject({
+      room: `${CODE}!host:${CODE}`,
+      payload: { total: 12 },
+    });
+    expect((players!.payload as { entries: unknown[] }).entries).toHaveLength(
+      10,
+    );
+  });
+
+  it("broadcasts a small board to the room as it is", () => {
+    const { io, engine } = setup(meta(), []);
+
+    send(engine, 4);
+
+    expect(io.events("leaderboard")).toEqual([
+      {
+        room: CODE,
+        event: "leaderboard",
+        payload: { entries: entries.slice(0, 4), isFinal: false },
+      },
+    ]);
+  });
+});
