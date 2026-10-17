@@ -25,8 +25,10 @@ export function closedNextLabel(
   mod: ModerationSettings | null,
   qIndex: number,
   qCount: number,
+  /** Unscored questions skip the scores step. */
+  scored = true,
 ): string {
   if (mod?.showAnswer) return "Show answer";
-  if (mod?.showScores) return "Show scores";
+  if (mod?.showScores && scored) return "Show scores";
   return nextQuestionLabel(qIndex, qCount);
 }

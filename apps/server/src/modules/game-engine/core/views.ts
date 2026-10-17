@@ -14,6 +14,7 @@ import type {
   ScoreEntry,
   StoredAnswer,
 } from "../game-engine.types";
+import { isScoredType } from "@buzrr/contract";
 import { leaderboardWithReveal, moderationOf } from "./moderation";
 import type { GameState } from "./state";
 
@@ -80,7 +81,31 @@ export function buildAnswerResult(
     score: answer?.score ?? 0,
     totalScore: index === -1 ? 0 : (scores[index]?.score ?? 0),
     rank: index === -1 ? null : index + 1,
+    timeTakenMs: answer?.timeTakenMs ?? null,
   };
+}
+
+/** The three quickest right answers (scored types only). */
+function fastestCorrect(
+  question: LiveQuestion,
+  answers: Record<string, StoredAnswer>,
+  roster: RosterEntry[],
+) {
+  if (!isScoredType(question.type)) return undefined;
+  const byId = new Map(roster.map((p) => [p.id, p]));
+  return Object.entries(answers)
+    .filter(([, a]) => a.isCorrect)
+    .sort(([, a], [, b]) => a.timeTakenMs - b.timeTakenMs)
+    .slice(0, 3)
+    .map(([playerId, a]) => {
+      const p = byId.get(playerId);
+      return {
+        playerId,
+        name: p?.name ?? "Player",
+        profilePic: p?.profilePic ?? null,
+        timeMs: a.timeTakenMs,
+      };
+    });
 }
 
 /**
@@ -115,6 +140,7 @@ export function buildReveal(
     index,
     summary: summarizeAnswers(question, answerEntries(answers, roster)),
     avgTimeMs: averageAnswerMs(answers),
+    fastest: fastestCorrect(question, answers, roster),
     // The reveal clip becomes playable only now.
     ...(question.audio?.revealKey
       ? { audioRevealKey: question.audio.revealKey }
@@ -201,12 +227,11 @@ export function buildSnapshot(
 
   // A host reconnecting in "closed" gets the tally its screen shows.
   if (!playerId && meta.phase === "closed" && question) {
-    const { audioRevealKey: _key, ...tally } = buildReveal(
-      question,
-      meta.qIndex,
-      answers,
-      roster,
-    );
+    const {
+      audioRevealKey: _key,
+      fastest: _fastest,
+      ...tally
+    } = buildReveal(question, meta.qIndex, answers, roster);
     void _key;
     payload.closedSummary = tally;
   }

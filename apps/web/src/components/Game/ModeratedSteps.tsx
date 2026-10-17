@@ -132,10 +132,19 @@ export function ClosedSlide({
   const question = useAppSelector((state) => state.game.question);
   const answeredCount = useAppSelector((state) => state.game.answeredCount);
   const players = useAppSelector((state) => state.game.players);
+  // A player who answered sees their time, not "time's up".
+  const myMs = useAppSelector(
+    (state) => state.game.myAnswerMs ?? state.game.you?.timeTakenMs ?? null,
+  );
+  const answered = !onNext && myMs !== null;
   return (
     <Slide
-      badge="Time's up"
-      title={question?.title ?? "Time's up!"}
+      badge={answered ? "Answer locked in" : "Time's up"}
+      title={
+        answered
+          ? `You answered within ${(myMs / 1000).toFixed(1)} seconds`
+          : (question?.title ?? "Time's up!")
+      }
       subtitle={
         onNext ? `${answeredCount} of ${players.length} answered` : undefined
       }

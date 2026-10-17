@@ -4,7 +4,7 @@ import clsx from "clsx";
 import Image from "next/image";
 import { DEFAULT_AVATAR } from "@/constants";
 import { useAppSelector } from "@/state/hooks";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import EndQuizButton from "@/components/Admin/EndQuizButton";
 import { useEndRoomMutation } from "@/lib/modules/game-sessions/hooks";
@@ -91,6 +91,9 @@ function PodiumSpot({
   );
 }
 
+/** Small games: how long the final podium shows before the editor. */
+const LEAVE_AFTER_MS = 6000;
+
 export default function LeaderBoard({
   roomId,
   quizTitle,
@@ -105,18 +108,26 @@ export default function LeaderBoard({
 }) {
   const router = useRouter();
   const endRoom = useEndRoomMutation();
-  const players = useAppSelector((state) => state.game.leaderboard.length);
+  // The roster, not the leaderboard: the final standings may not have
+  // arrived yet on the first render (an empty list closed every game).
+  const players = useAppSelector((state) => state.game.players.length);
   // A test run or a tiny game: no podium ceremony — save the result and go
   // back to the quiz editor (players keep their thank-you screen).
-  const leaving = Boolean(quizId) && players < 3;
+  const [stay, setStay] = useState(false);
+  const leaving = Boolean(quizId) && players < 3 && !stay;
   const left = useRef(false);
   useEffect(() => {
     if (!leaving || left.current) return;
-    left.current = true;
-    const back = () => router.push(`/admin/quiz/${quizId}`);
-    if (alreadyEnded) back();
-    else endRoom.mutate(roomId, { onSettled: back });
-  }, [leaving, alreadyEnded, endRoom, roomId, quizId, router]);
+    // A few seconds on the podium first; "Stay here" cancels.
+    const t = setTimeout(() => {
+      left.current = true;
+      const back = () => router.push(`/admin/quiz/${quizId}`);
+      if (alreadyEnded) back();
+      else endRoom.mutate(roomId, { onSettled: back });
+    }, LEAVE_AFTER_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leaving]);
 
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
   const qCount = useAppSelector((state) => state.game.qCount);
@@ -200,7 +211,19 @@ export default function LeaderBoard({
         </section>
       </div>
       {/* Same place as "Next question": the very bottom of the screen. */}
-      <div className="sticky bottom-0 z-10 flex justify-end py-3 bg-light-bg/90 dark:bg-dark-bg/90 backdrop-blur [&>button]:w-full md:[&>button]:w-auto md:[&>button]:min-w-80">
+      <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-3 py-3 bg-light-bg/90 dark:bg-dark-bg/90 backdrop-blur [&>button]:w-full md:[&>button]:w-auto md:[&>button]:min-w-80">
+        {leaving && (
+          <span className={clsx("text-sm", mutedText)}>
+            Small game — back to the quiz in a few seconds.{" "}
+            <button
+              type="button"
+              onClick={() => setStay(true)}
+              className="font-semibold text-lprimary dark:text-dprimary hover:underline cursor-pointer"
+            >
+              Stay here
+            </button>
+          </span>
+        )}
         <EndQuizButton
           roomId={roomId}
           redirectTo="/admin"

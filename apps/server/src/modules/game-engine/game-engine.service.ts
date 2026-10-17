@@ -615,7 +615,11 @@ export class GameEngineService
     if (question && !isScored(question.type)) {
       this.scheduleLiveSummary(gameCode);
     }
-    return { accepted: true, answer: judgement.stored.answer };
+    return {
+      accepted: true,
+      answer: judgement.stored.answer,
+      timeTakenMs: judgement.stored.timeTakenMs,
+    };
   }
 
   /**

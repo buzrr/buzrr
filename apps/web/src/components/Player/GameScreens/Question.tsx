@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAppSelector } from "@/state/hooks";
+import { useAppDispatch, useAppSelector } from "@/state/hooks";
+import { answerTimed } from "@/state/game/gameSlice";
 import { toast } from "react-toastify";
 import QuestionAndResult from "./QuesAndResult";
 import type { PublicQuestion, QuestionAnswer } from "@buzrr/contract";
@@ -59,6 +60,7 @@ const Question = (params: {
     unacked.current = null;
   }, [params.question.id]);
 
+  const dispatch = useAppDispatch();
   const send = useCallback(
     (picked: QuestionAnswer, opts?: { silent?: boolean }) => {
       const sentFor = liveQuestionId.current;
@@ -80,6 +82,9 @@ const Question = (params: {
           setPending(false);
           if (result.accepted) {
             unacked.current = null;
+            if (result.timeTakenMs !== undefined) {
+              dispatch(answerTimed(result.timeTakenMs));
+            }
             // The server sends back everything this player has sent so far.
             if (result.answer) setAnswer(result.answer);
             return;
@@ -99,7 +104,7 @@ const Question = (params: {
         },
       );
     },
-    [params.socket, qIndex, more],
+    [params.socket, qIndex, more, dispatch],
   );
 
   /**

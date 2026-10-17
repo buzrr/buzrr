@@ -502,6 +502,7 @@ Rules:
 - Keep each question concise: one sentence where possible, under about 150 characters.
 - Make the four options of a question similar in length and style so the correct one doesn't stand out.
 - Options are shuffled, so never use "All of the above", "None of the above" or answers that refer to other options.
+- No option may appear in its question: the question text must never contain, quote or paraphrase any of its four options (the correct one or a wrong one), so the question never gives an answer away.
 - Don't repeat questions.`;
 
     let raw: unknown;

@@ -72,6 +72,8 @@ export interface GameLiveState {
   waitingFor: number;
   /** Host, moderated "closed": how the room answered (answer still hidden). */
   closedSummary: QuestionEndPayload | null;
+  /** Player: how long their answer to the open question took (from the ack). */
+  myAnswerMs: number | null;
 }
 
 const initialState: GameLiveState = {
@@ -98,6 +100,7 @@ const initialState: GameLiveState = {
   moderation: null,
   preload: null,
   finalSoundKey: null,
+  myAnswerMs: null,
   waitingFor: 0,
   closedSummary: null,
 };
@@ -242,6 +245,10 @@ const gameSlice = createSlice({
       state.liveSummary = null;
       state.reveal = null;
       state.you = null;
+      state.myAnswerMs = null;
+    },
+    answerTimed: (state, action: PayloadAction<number>) => {
+      state.myAnswerMs = action.payload;
     },
     questionEnd: (state, action: PayloadAction<QuestionEndPayload>) => {
       state.phase = "reveal";
@@ -339,6 +346,7 @@ export const {
   questionStart,
   questionEnd,
   answerResult,
+  answerTimed,
   answerCount,
   liveSummary,
   leaderboardReceived,

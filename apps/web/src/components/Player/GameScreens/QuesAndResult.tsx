@@ -329,6 +329,12 @@ const QuestionAndResult = (params: {
                   ? "Not scored — thanks for answering"
                   : `+${params.points ?? 0} points`}
             </span>
+            {params.status !== "timesout" && you?.timeTakenMs != null && (
+              <span className={clsx("text-sm font-semibold", mutedText)}>
+                You answered within {(you.timeTakenMs / 1000).toFixed(1)}{" "}
+                seconds
+              </span>
+            )}
             <div className="mt-3 md:mt-[22px] flex flex-col gap-3 md:gap-4 w-full max-w-[420px] animate-fade-up [animation-delay:150ms]">
               <AnswerRow
                 label="Your answer"

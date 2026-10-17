@@ -172,6 +172,17 @@ export const questionEndSchema = z.object({
   avgTimeMs: z.number().nullable(),
   /** Decrypts the question sound's reveal clip (see `questionAudioSchema`). */
   audioRevealKey: z.string().optional(),
+  /** Scored questions: the (up to) three quickest right answers. */
+  fastest: z
+    .array(
+      z.object({
+        playerId: z.string(),
+        name: z.string(),
+        profilePic: z.string().nullable(),
+        timeMs: z.number(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -213,6 +224,8 @@ export const answerResultSchema = z.object({
   score: z.number(),
   totalScore: z.number(),
   rank: z.number().int().nullable(),
+  /** How long this player took to answer (server-measured), if they did. */
+  timeTakenMs: z.number().nullable().optional(),
 });
 
 export const leaderboardSchema = z.object({
@@ -340,6 +353,8 @@ export const submitAnswerAckSchema = z.object({
    * submissions this is everything they have sent so far.
    */
   answer: questionAnswerSchema.optional(),
+  /** Accepted first answers: how long the player took (server-measured). */
+  timeTakenMs: z.number().optional(),
 });
 
 /** A roster member as announced on join/leave/kick. */

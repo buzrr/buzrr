@@ -14,6 +14,7 @@ import QuesResult from "./QuesResult";
 import LeaderBoard from "./Leaderboard";
 import { ClosedSlide, ReadySlide } from "@/components/Game/ModeratedSteps";
 import { closedNextLabel } from "@/lib/moderation";
+import { isScoredType } from "@buzrr/contract";
 import { ReactionOverlay } from "@/components/Game/Flyers";
 import { GameSounds, LiveSounds, SoundToggle } from "@/lib/sound/director";
 
@@ -50,6 +51,7 @@ const GameLobby = (params: {
   const qCount = useAppSelector((state) => state.game.qCount);
   const moderation = useAppSelector((state) => state.game.moderation);
   const closedSummary = useAppSelector((state) => state.game.closedSummary);
+  const question = useAppSelector((state) => state.game.question);
   const roster = useAppSelector((state) => state.game.players);
 
   useEffect(() => {
@@ -156,7 +158,12 @@ const GameLobby = (params: {
             <ClosedSlide
               key={`closed-${qIndex}`}
               onNext={() => socket.emit("host-next")}
-              nextLabel={closedNextLabel(moderation, qIndex, qCount)}
+              nextLabel={closedNextLabel(
+                moderation,
+                qIndex,
+                qCount,
+                question ? isScoredType(question.type) : true,
+              )}
             />
           ) : phase === "reveal" || phase === "scores" ? (
             // "Show answer" keeps the tally on screen (same key as "closed"),

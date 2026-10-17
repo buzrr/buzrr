@@ -36,6 +36,7 @@ describe("buildAnswerResult", () => {
       score: 0,
       totalScore: 0,
       rank: null,
+      timeTakenMs: null,
     });
   });
 });
@@ -87,6 +88,7 @@ describe("buildSnapshot", () => {
       score: 0,
       totalScore: 600,
       rank: null,
+      timeTakenMs: 1000,
     });
   });
 

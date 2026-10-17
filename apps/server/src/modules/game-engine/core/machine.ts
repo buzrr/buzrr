@@ -1,3 +1,4 @@
+import { isScoredType } from "@buzrr/contract";
 import { ANSWER_GRACE_MS } from "../../../common/utils/answer-timing";
 import { planBotAnswer } from "../../../common/utils/duel-bot";
 import {
@@ -225,6 +226,12 @@ function start(
   };
 }
 
+/** Whether the open question awards points. */
+function currentScored(state: GameState): boolean {
+  const q = state.questions[state.meta.qIndex];
+  return q ? isScoredType(q.type) : true;
+}
+
 function hostNext(
   state: GameState,
   now: number,
@@ -245,10 +252,16 @@ function hostNext(
     case "closed":
       // "Show answer", or — with answers hidden — "Show scores" / next.
       if (mod?.showAnswer) return reveal(state, now, pacing);
-      if (mod?.showScores) return showScores(state, true);
+      if (mod?.showScores && currentScored(state)) {
+        return showScores(state, true);
+      }
       return advance(state, now, pacing, ctx);
     case "reveal":
-      if (scoresStepPending(mod)) return showScores(state, false);
+      // An unscored question (poll, word cloud, …) changes no score: no
+      // standings step after it.
+      if (scoresStepPending(mod) && currentScored(state)) {
+        return showScores(state, false);
+      }
       return advance(state, now, pacing, ctx);
     case "scores":
       return advance(state, now, pacing, ctx);
@@ -806,12 +819,11 @@ function waitForDownloads(state: GameState, now: number): Transition | null {
 function closedSummaryEffects(state: GameState): Effect[] {
   const question = state.questions[state.meta.qIndex];
   if (!question) return [];
-  const { audioRevealKey: _key, ...tally } = buildReveal(
-    question,
-    state.meta.qIndex,
-    state.answers,
-    state.roster,
-  );
+  const {
+    audioRevealKey: _key,
+    fastest: _fastest,
+    ...tally
+  } = buildReveal(question, state.meta.qIndex, state.answers, state.roster);
   void _key;
   return [
     {

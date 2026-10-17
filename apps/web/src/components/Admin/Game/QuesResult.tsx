@@ -98,9 +98,14 @@ export default function QuesResult(props: QuesResultProps) {
   const moderation = useAppSelector((state) => state.game.moderation);
   // Moderated: the answer and the standings can be separate steps.
   const showAnswerPanel = phase !== "scores" || reveal !== null;
+  // An unscored question changes no score: no standings after it.
+  const scoredQ = question ? isScoredType(question.type) : true;
   const showBoard =
-    !closed && (phase === "scores" || leaderboardWithReveal(moderation));
-  const nextIsScores = phase === "reveal" && scoresStepPending(moderation);
+    scoredQ &&
+    !closed &&
+    (phase === "scores" || leaderboardWithReveal(moderation));
+  const nextIsScores =
+    phase === "reveal" && scoresStepPending(moderation) && scoredQ;
   // The reveal cue plays when the answer is shown, until the host moves on.
   const sound = useGameSound();
   const audioHere = sound ? sound.questionAudioHere(question?.audio) : true;
@@ -276,6 +281,37 @@ export default function QuesResult(props: QuesResultProps) {
                 hideCorrect={closed}
               />
             )}
+            {!closed && reveal?.fastest && reveal.fastest.length > 0 && (
+              <div className="mt-auto pt-3 border-t border-lprimary/15 dark:border-white/10">
+                <span className={labelClass}>Fastest right answers</span>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  {reveal.fastest.map((f, i) => (
+                    <div
+                      key={f.playerId}
+                      className="flex items-center gap-2 min-w-0 rounded-xl px-2.5 py-2 bg-green-500/8 border border-green-500/30 animate-fade-up"
+                      style={{ animationDelay: `${300 + i * 150}ms` }}
+                    >
+                      <span className="text-lg shrink-0">
+                        {["🥇", "🥈", "🥉"][i]}
+                      </span>
+                      <Image
+                        src={f.profilePic || DEFAULT_AVATAR}
+                        width={28}
+                        height={28}
+                        alt=""
+                        className="size-7 shrink-0 rounded-full object-cover"
+                      />
+                      <span className="flex-1 min-w-0">
+                        <b className="block truncate text-[13.5px]">{f.name}</b>
+                        <span className={clsx("text-xs", mutedText)}>
+                          {(f.timeMs / 1000).toFixed(1)} s
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
 
@@ -392,7 +428,7 @@ export default function QuesResult(props: QuesResultProps) {
           className={clsx(primaryButtonClass, "w-full md:w-auto md:min-w-80")}
         >
           {closed
-            ? closedNextLabel(moderation, qIndex, qCount)
+            ? closedNextLabel(moderation, qIndex, qCount, scoredQ)
             : nextIsScores
               ? "Show scores"
               : isLastQuestion
