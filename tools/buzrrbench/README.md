@@ -32,12 +32,12 @@ python3 -m venv .venv
 .venv/bin/python buzrrbench.py --url https://quiz.woikn.de --code ABC123 --users 100 --ramp 20
 ```
 
-| Option            | Default   | What                                                                         |
-| ----------------- | --------- | ---------------------------------------------------------------------------- |
-| `--kbps N`        | unlimited | Download bandwidth per player (kbit/s), e.g. `2000` for a weak phone/Wi-Fi.  |
+| Option            | Default   | What                                                                          |
+| ----------------- | --------- | ----------------------------------------------------------------------------- |
+| `--kbps N`        | unlimited | Download bandwidth per player (kbit/s), e.g. `2000` for a weak phone/Wi-Fi.   |
 | `--sound-optin F` | `0.3`     | Share of players who switch sound on when the quiz plays it on the host only. |
-| `--no-assets`     |           | No downloads at all (sockets only, like before).                             |
-| `--no-reactions`  |           | Players send no reactions.                                                   |
+| `--no-assets`     |           | No downloads at all (sockets only, like before).                              |
+| `--no-reactions`  |           | Players send no reactions.                                                    |
 
 Host the quiz in the browser, start the bench, wait until the players appear in
 the lobby, then start the game. Ctrl+C stops early and still prints the summary.

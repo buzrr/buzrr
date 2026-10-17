@@ -98,16 +98,26 @@ const Lobby = (params: {
     Record<string, { hits: number; misses: number }>
   >({});
   // Last reaction per player (shown on their card for a few seconds).
+  // `bumpAt`: when the reaction last moved them up — at most once per
+  // BUMP_EVERY_MS each, so nobody can tap their way to the top constantly.
   const [lastReaction, setLastReaction] = useState<
-    Record<string, { emoji: string; at: number }>
+    Record<string, { emoji: string; at: number; bumpAt: number }>
   >({});
   useEffect(() => {
     if (!socket) return;
     const onReaction = (r: { playerId: string; emoji: string }) =>
-      setLastReaction((prev) => ({
-        ...prev,
-        [r.playerId]: { emoji: r.emoji, at: Date.now() },
-      }));
+      setLastReaction((prev) => {
+        const now = Date.now();
+        const before = prev[r.playerId]?.bumpAt ?? 0;
+        return {
+          ...prev,
+          [r.playerId]: {
+            emoji: r.emoji,
+            at: now,
+            bumpAt: now - before >= BUMP_EVERY_MS ? now : before,
+          },
+        };
+      });
     socket.on("reaction", onReaction);
     return () => {
       socket.off("reaction", onReaction);
@@ -242,8 +252,12 @@ const Lobby = (params: {
     )
     .map((p, i) => ({ p, i }))
     .sort((a, b) => {
-      const ra = fresh(a.p.id)?.at ?? 0;
-      const rb = fresh(b.p.id)?.at ?? 0;
+      const bumped = (id: string) => {
+        const at = lastReaction[id]?.bumpAt ?? 0;
+        return now - at < REACTION_SHOW_MS ? at : 0;
+      };
+      const ra = bumped(a.p.id);
+      const rb = bumped(b.p.id);
       if (ra !== rb) return rb - ra;
       const sa = bubbleScore(bubbles[a.p.id]);
       const sb = bubbleScore(bubbles[b.p.id]);
@@ -580,6 +594,8 @@ const Lobby = (params: {
 };
 
 const REACTION_SHOW_MS = 5000;
+/** A player's reactions move them to the top of the list at most this often. */
+const BUMP_EVERY_MS = 20_000;
 
 /** Bubble ranking: hits, scaled down by the share of taps that missed. */
 function bubbleScore(stats: { hits: number; misses: number } | undefined) {
