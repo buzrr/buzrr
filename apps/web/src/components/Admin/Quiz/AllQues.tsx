@@ -220,7 +220,7 @@ export default function AllQues(props: { quizId: string }) {
                                 )
                               }
                             >
-                              {ques.disabled ? "Enable" : "Disable"}
+                              {ques.disabled ? t("Enable") : t("Disable")}
                             </button>
                             <BasicModal
                               isEdit={true}
