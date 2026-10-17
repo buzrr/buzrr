@@ -40,6 +40,8 @@ export async function createAiQuiz(
     description: string;
     questions: number;
     time: number;
+    /** Language to write the quiz in (the UI language). */
+    language?: string;
   },
 ) {
   const { data } = await client.post<{ msg: string; quizId: string }>(

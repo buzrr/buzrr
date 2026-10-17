@@ -8,6 +8,7 @@ import type { PublicQuestion, QuestionAnswer } from "@buzrr/contract";
 import type { GameSocket } from "@/types/socket";
 import { acceptsMoreAnswers } from "@/components/QuestionTypes";
 import { useAudioSegment } from "@/lib/audio-cues";
+import { useT } from "@/lib/i18n/context";
 import { useGameSound } from "@/lib/sound/director";
 
 /**
@@ -24,6 +25,7 @@ const Question = (params: {
   hostName?: string | null;
   hostImage?: string | null;
 }) => {
+  const t = useT();
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const you = useAppSelector((state) => state.game.you);
   const deadline = useAppSelector((state) => state.game.deadline);
@@ -98,7 +100,7 @@ const Question = (params: {
             setAnswer(null);
           }
           if (!opts?.silent) {
-            toast.error(result.reason ?? "Answer was not accepted");
+            toast.error(result.reason ?? t("Answer was not accepted"));
           }
           params.socket.emit("request-sync");
         },

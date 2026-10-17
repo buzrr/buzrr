@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { LuPlay, LuSquare, LuTrash2 } from "react-icons/lu";
 import { playSegment } from "@/lib/audio-cues";
+import { useT } from "@/lib/i18n/context";
 import { mutedText, subtleCardClass } from "@/components/Game/GameUI";
 
 const BARS = 480;
@@ -68,6 +69,7 @@ export default function AudioCueEditor({
   onChange: (cues: { startMs: number; revealMs: number | null }) => void;
   onRemove: () => void;
 }) {
+  const t = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [wave, setWave] = useState<{
     peaks: number[];
@@ -87,7 +89,7 @@ export default function AudioCueEditor({
         setError(null);
       })
       .catch(() => {
-        if (alive) setError("Could not read this audio file");
+        if (alive) setError(t("Could not read this audio file"));
       });
     return () => {
       alive = false;
@@ -236,7 +238,7 @@ export default function AudioCueEditor({
         </span>
         <button
           type="button"
-          aria-label="Remove sound"
+          aria-label={t("Remove sound")}
           onClick={() => {
             stopRef.current?.();
             onRemove();
@@ -259,16 +261,18 @@ export default function AudioCueEditor({
             "w-full h-20 rounded-lg bg-light-bg dark:bg-card-dark touch-none select-none",
             wave ? "cursor-grab active:cursor-grabbing" : "animate-pulse",
           )}
-          aria-label="Waveform — drag the highlighted parts, or click to place the selected cue"
+          aria-label={t(
+            "Waveform — drag the highlighted parts, or click to place the selected cue",
+          )}
         />
       )}
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className={mutedText}>Click sets · drag moves:</span>
+        <span className={mutedText}>{t("Click sets · drag moves:")}</span>
         {modeButton("start", `Start ${formatMs(startMs)}`)}
         {modeButton(
           "reveal",
           revealMs === null
-            ? "Reveal cue (off)"
+            ? t("Reveal cue (off)")
             : `Reveal ${formatMs(revealMs)}`,
         )}
         {revealMs !== null && (
@@ -277,7 +281,7 @@ export default function AudioCueEditor({
             onClick={() => onChange({ startMs, revealMs: null })}
             className="underline cursor-pointer"
           >
-            no reveal sound
+            {t("no reveal sound")}
           </button>
         )}
         <span className="ml-auto flex gap-1.5">
@@ -291,7 +295,7 @@ export default function AudioCueEditor({
             ) : (
               <LuPlay size={12} />
             )}
-            Question
+            {t("Question")}
           </button>
           {revealMs !== null && (
             <button
@@ -304,14 +308,15 @@ export default function AudioCueEditor({
               ) : (
                 <LuPlay size={12} />
               )}
-              Reveal
+              {t("Reveal")}
             </button>
           )}
         </span>
       </div>
       <p className={clsx("text-[11.5px]", mutedText)}>
-        The highlighted part plays on your screen while the question is open (as
-        long as its time); the reveal cue plays when the answer is shown.
+        {t(
+          "The highlighted part plays on your screen while the question is open (as long as its time); the reveal cue plays when the answer is shown.",
+        )}
       </p>
     </div>
   );

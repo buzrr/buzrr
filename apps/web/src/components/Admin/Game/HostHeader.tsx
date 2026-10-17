@@ -33,13 +33,15 @@ export default function HostHeader({
   middle?: ReactNode;
 }) {
   return (
-    <header className="flex items-start gap-3 md:gap-5 pt-3 pb-2 md:pt-4 md:pb-3 shrink-0">
-      <div className="flex-1 min-w-0 flex items-center gap-3 md:gap-5 self-center">
+    <header className="flex items-center gap-3 md:gap-5 pt-3 pb-2 md:pt-4 md:pb-3 shrink-0">
+      <div className="flex-1 min-w-0 flex items-center gap-3 md:gap-5">
         <GameLogo logo={logo} size={64} />
         <h1 className="flex-1 min-w-0 text-xl md:text-2xl font-bold tracking-[-0.01em] truncate">
           {title}
         </h1>
-        {middle}
+        {middle && (
+          <div className="shrink-0 flex items-center gap-2">{middle}</div>
+        )}
       </div>
       <div className="flex flex-wrap justify-end items-center gap-2 shrink-0">
         <ConnectionStatusPill className={`!shadow-none ${headerPillClass}`} />

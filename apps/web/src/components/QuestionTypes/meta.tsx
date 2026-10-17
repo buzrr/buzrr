@@ -1,4 +1,5 @@
 import clsx from "clsx";
+import { tx } from "@/lib/i18n/context";
 import type { ReactNode, SVGProps } from "react";
 import type { QuestionType } from "@buzrr/contract";
 
@@ -146,7 +147,7 @@ export function QuestionTypePill({
       )}
     >
       <QuestionTypeIcon type={type} size={14} />
-      {QUESTION_TYPE_META[type].name}
+      {tx(QUESTION_TYPE_META[type].name)}
     </span>
   );
 }

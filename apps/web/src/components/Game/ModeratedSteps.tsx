@@ -13,6 +13,7 @@ import {
   panelClass,
   primaryButtonClass,
 } from "@/components/Game/GameUI";
+import { useT, currentLocale } from "@/lib/i18n/context";
 import { rankBadgeClass } from "@/components/Admin/Game/QuesResult";
 
 /**
@@ -106,20 +107,21 @@ function Slide({
 
 /** Before every question: the host starts it, then the countdown runs. */
 export function ReadySlide({ onNext }: { onNext?: () => void }) {
+  const t = useT();
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const qCount = useAppSelector((state) => state.game.qCount);
   return (
     <Slide
       badge={`Question ${qIndex + 1} of ${qCount}`}
-      title="Be prepared!"
+      title={t("Be prepared!")}
       subtitle={
         qIndex === 0
-          ? "The quiz is about to begin"
-          : "The next question is coming up"
+          ? t("The quiz is about to begin")
+          : t("The next question is coming up")
       }
       onNext={onNext}
-      nextLabel="Start question"
-      waitingFor="Waiting for the host to start"
+      nextLabel={t("Start question")}
+      waitingFor={t("Waiting for the host to start")}
     />
   );
 }
@@ -132,6 +134,7 @@ export function ClosedSlide({
   onNext?: () => void;
   nextLabel?: string;
 }) {
+  const t = useT();
   const question = useAppSelector((state) => state.game.question);
   const answeredCount = useAppSelector((state) => state.game.answeredCount);
   const players = useAppSelector((state) => state.game.players);
@@ -142,30 +145,38 @@ export function ClosedSlide({
   const answered = !onNext && myMs !== null;
   return (
     <Slide
-      badge={answered ? "Answer locked in" : "Time's up"}
+      badge={answered ? t("Answer locked in") : "Time's up"}
       title={
         answered
-          ? `You answered within ${(myMs / 1000).toFixed(1)} seconds`
-          : (question?.title ?? "Time's up!")
+          ? t("You answered within {s} seconds", {
+              s: (myMs / 1000).toLocaleString(currentLocale(), {
+                minimumFractionDigits: 1,
+                maximumFractionDigits: 1,
+              }),
+            })
+          : (question?.title ?? t("Time's up!"))
       }
       subtitle={
         onNext ? `${answeredCount} of ${players.length} answered` : undefined
       }
       onNext={onNext}
       nextLabel={nextLabel}
-      waitingFor="Waiting for the host"
+      waitingFor={t("Waiting for the host")}
     />
   );
 }
 
 /** Players' standings after a question (moderated "show scores"). */
 export function PlayerScores({ playerId }: { playerId: string }) {
+  const t = useT();
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
   const qIndex = useAppSelector((state) => state.game.qIndex);
   return (
     <div className="w-full max-w-xl mx-auto px-4 py-6 md:py-10 text-dark dark:text-white">
       <section className={clsx(panelClass, "flex flex-col gap-3 p-5 md:p-7")}>
-        <span className={labelClass}>Scores after question {qIndex + 1}</span>
+        <span className={labelClass}>
+          {t("Scores after question")} {qIndex + 1}
+        </span>
         <div className="flex flex-col gap-1.5">
           {leaderboard.map((e) => (
             <div

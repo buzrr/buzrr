@@ -7,6 +7,7 @@ import { MAX_SUBMISSIONS } from "@buzrr/contract";
 import { inputClass, mutedText } from "@/components/Game/GameUI";
 import { SubmitButton } from "./Inputs";
 import type { QuestionRenderer } from "./types";
+import { useT, tx } from "@/lib/i18n/context";
 import { WordCloudView } from "./Visuals";
 
 function WordChip({ word, onRemove }: { word: string; onRemove?: () => void }) {
@@ -17,7 +18,7 @@ function WordChip({ word, onRemove }: { word: string; onRemove?: () => void }) {
         <button
           type="button"
           onClick={onRemove}
-          aria-label={`Remove ${word}`}
+          aria-label={tx("Remove {word}", { word })}
           className="cursor-pointer opacity-70 hover:opacity-100"
         >
           <LuX size={14} strokeWidth={2.6} />
@@ -34,6 +35,7 @@ function RepeatInput({
   disabled,
   onSubmit,
 }: ComponentProps<QuestionRenderer<"word_cloud">["AnswerInput"]>) {
+  const t = useT();
   const [text, setText] = useState("");
   const sent = selected?.words ?? [];
   const full = sent.length >= MAX_SUBMISSIONS;
@@ -55,7 +57,7 @@ function RepeatInput({
       <input
         className={clsx(inputClass, sent.length > 0 ? "mt-3" : "mt-4 md:mt-7")}
         placeholder={
-          sent.length ? "Add another word" : "Type a word or short phrase"
+          sent.length ? t("Add another word") : t("Type a word or short phrase")
         }
         value={text}
         maxLength={question.maxLength}
@@ -69,13 +71,15 @@ function RepeatInput({
       />
       <span className={clsx("mt-3 text-[13.5px]", mutedText)}>
         {full
-          ? "That's the most words you can send"
+          ? t("That's the most words you can send")
           : sent.length
-            ? `Sent ${sent.length} · add as many as you like while time's left`
-            : "Send one word at a time — as many as you like"}
+            ? t("Sent {n} · add as many as you like while time's left", {
+                n: sent.length,
+              })
+            : t("Send one word at a time — as many as you like")}
       </span>
       <SubmitButton disabled={disabled || full || word === ""} onClick={send}>
-        {sent.length ? "Submit another" : "Submit"}
+        {sent.length ? t("Submit another") : "Submit"}
       </SubmitButton>
     </>
   );
@@ -88,6 +92,7 @@ function BatchInput({
   disabled,
   onSubmit,
 }: ComponentProps<QuestionRenderer<"word_cloud">["AnswerInput"]>) {
+  const t = useT();
   const [words, setWords] = useState<string[]>([]);
   const [text, setText] = useState("");
   const { maxAnswers, maxLength } = question;
@@ -125,7 +130,7 @@ function BatchInput({
       <div className="flex gap-2 mt-4 md:mt-7">
         <input
           className={inputClass}
-          placeholder="Type a word or short phrase"
+          placeholder={t("Type a word or short phrase")}
           value={text}
           maxLength={maxLength}
           disabled={disabled || (toSend.length >= maxAnswers && pending === "")}
@@ -143,7 +148,7 @@ function BatchInput({
             type="button"
             onClick={add}
             disabled={!canAdd}
-            aria-label="Add answer"
+            aria-label={t("Add answer")}
             className="shrink-0 rounded-[14px] px-4 border-[1.5px] border-lprimary/15 dark:border-white/10 text-lprimary dark:text-dprimary disabled:opacity-40 cursor-pointer disabled:cursor-default"
           >
             <LuPlus size={20} />
@@ -163,8 +168,11 @@ function BatchInput({
       )}
       <span className={clsx("mt-3 text-[13.5px]", mutedText)}>
         {maxAnswers === 1
-          ? `One answer · up to ${maxLength} characters`
-          : `You can add up to ${maxAnswers} answers · ${Math.max(0, left)} left`}
+          ? t("One answer · up to {n} characters", { n: maxLength })
+          : t("You can add up to {n} answers · {left} left", {
+              n: maxAnswers,
+              left: Math.max(0, left),
+            })}
       </span>
       <SubmitButton
         disabled={disabled || toSend.length === 0}

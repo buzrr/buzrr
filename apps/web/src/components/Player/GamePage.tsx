@@ -20,6 +20,7 @@ import { ReactionBar } from "@/components/Game/Flyers";
 import { GameSounds, SoundToggle } from "@/lib/sound/director";
 import { quizSettingsSchema } from "@buzrr/contract";
 import { playersApi } from "@/lib/modules/players/api";
+import { useT } from "@/lib/i18n/context";
 import { saveFinalResult } from "@/lib/final-result";
 
 interface GameSessionWithQuiz extends GameSession {
@@ -46,6 +47,7 @@ const GamePage = (params: {
   /** This room's avatar skin (the lobby lets the player switch). */
   avatars?: string[];
 }) => {
+  const t = useT();
   const game = params.game;
   const router = useRouter();
   const [showLeaveModal, setShowLeaveModal] = useState(false);
@@ -69,8 +71,8 @@ const GamePage = (params: {
     onRemoved: ({ banned }) => {
       toast.error(
         banned
-          ? "The host banned you from this room."
-          : "The host removed you from this game.",
+          ? t("The host banned you from this room.")
+          : t("The host removed you from this game."),
       );
       router.replace(`/player/joinRoom/${params.player.id}`);
     },
@@ -139,8 +141,10 @@ const GamePage = (params: {
         open={showLeaveModal}
         setOpen={setShowLeaveModal}
         onClick={confirmLeave}
-        desc="If you leave now you'll be removed from this game. Your name is saved — you can rejoin with the room code."
-        confirmLabel="Leave Game"
+        desc={t(
+          "If you leave now you'll be removed from this game. Your name is saved — you can rejoin with the room code.",
+        )}
+        confirmLabel={t("Leave Game")}
       />
       {phase === "idle" || phase === "lobby" ? (
         <WaitGameStart

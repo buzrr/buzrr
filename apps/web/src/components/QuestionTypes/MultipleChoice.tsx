@@ -2,6 +2,8 @@
 
 import clsx from "clsx";
 import {
+  useContext,
+  createContext,
   useState,
   type ComponentProps,
   type ReactNode,
@@ -18,6 +20,7 @@ import {
 import { Tooltip } from "@/components/ui/Tooltip";
 import { AnimatedNumber, useEntered } from "@/components/Game/motion";
 import { ChoiceList, SubmitButton, toggleChoice } from "./Inputs";
+import { useT } from "@/lib/i18n/context";
 import type { QuestionRenderer } from "./types";
 
 export function OptionLabel({
@@ -135,6 +138,13 @@ export function CorrectGlow({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * How tight the results view must be to fit its panel: 0 = normal, 1 =
+ * tighter, 2 = tightest (two columns from three options). Set by the host's
+ * results screen when its panel overflows.
+ */
+export const RevealDensity = createContext(0);
+
 export function OptionsReveal({
   options,
   counts,
@@ -146,16 +156,24 @@ export function OptionsReveal({
   correctOptionIds: string[];
   renderKey?: (index: number) => ReactNode;
 }) {
+  const t = useT();
+  const density = useContext(RevealDensity);
   // Bars share out the picks; with multi-select one player can count twice.
   const picks = counts.reduce((sum, c) => sum + c, 0);
   const maxCount = Math.max(1, ...counts);
-  // Every option has to fit on screen: from five options on, two columns.
-  const twoCols = options.length >= 5;
+  // Every option has to fit on screen: from five options on two columns —
+  // from three when the panel is short (e.g. a tablet, a two-line question).
+  const twoCols = options.length >= (density >= 2 ? 3 : 5);
   return (
     <div
       className={clsx(
         "flex-1 grid content-center",
-        twoCols ? "gap-x-5 gap-y-1.5 sm:grid-cols-2" : "gap-3.5",
+        twoCols
+          ? "gap-x-5 gap-y-1 sm:grid-cols-2"
+          : density >= 1
+            ? "gap-1.5"
+            : "gap-3.5",
+        density >= 1 && "[&_.reveal-row]:gap-1 [&_.reveal-label]:text-[14px]",
       )}
     >
       {options.map((opt, i) => {
@@ -163,10 +181,10 @@ export function OptionsReveal({
         const ok = correctOptionIds.includes(opt.id);
         const pct = picks > 0 ? Math.round((count / picks) * 100) : 0;
         const row = (
-          <div className="flex flex-col gap-[7px]">
+          <div className="reveal-row flex flex-col gap-[7px]">
             <div
               className={clsx(
-                "flex items-center gap-2.5 text-[15px] font-semibold",
+                "reveal-label flex items-center gap-2.5 text-[15px] font-semibold",
                 ok && "text-green-600 dark:text-green-500",
               )}
             >
@@ -180,7 +198,7 @@ export function OptionsReveal({
               {ok && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-green-500 px-2 py-0.5 text-[11.5px] font-bold tracking-[0.04em] uppercase text-white">
                   <LuCheck size={13} strokeWidth={3} />
-                  Correct
+                  {t("Correct")}
                 </span>
               )}
               <span className={clsx("text-sm font-medium", mutedText)}>
@@ -217,6 +235,7 @@ function MultiSelectInput({
   disabled,
   onSubmit,
 }: ComponentProps<QuestionRenderer<"multiple_choice">["AnswerInput"]>) {
+  const t = useT();
   const [draft, setDraft] = useState<string[]>([]);
   const sent =
     selected && "optionIds" in selected
@@ -228,7 +247,7 @@ function MultiSelectInput({
   return (
     <>
       <p className={clsx("mt-3 text-sm font-medium", mutedText)}>
-        Select all that apply.
+        {t("Select all that apply.")}
       </p>
       <ChoiceList
         options={question.options}
@@ -288,12 +307,13 @@ export const multipleChoiceRenderer: QuestionRenderer<"multiple_choice"> = {
   },
 
   HostPrompt({ question }) {
+    const t = useT();
     // Rows size to their content; the panel scrolls if it ever overflows.
     return (
       <>
         {question.multiSelect && (
           <p className={clsx("mt-3 text-sm font-medium", mutedText)}>
-            Players select all that apply
+            {t("Players select all that apply")}
           </p>
         )}
         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 md:auto-rows-fr gap-3.5 mt-7">

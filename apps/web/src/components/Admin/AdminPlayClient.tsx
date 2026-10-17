@@ -4,6 +4,7 @@ import Lobby from "@/components/Admin/Lobby";
 import Skeleton from "@/components/ui/Skeleton";
 import { useAdminLobbyQuery } from "@/lib/modules/game-sessions/hooks";
 import { isAxiosError } from "axios";
+import { useT } from "@/lib/i18n/context";
 import { notFound } from "next/navigation";
 
 export default function AdminPlayClient({
@@ -13,18 +14,21 @@ export default function AdminPlayClient({
   roomId: string;
   userId: string;
 }) {
+  const t = useT();
   const { data, isPending, isError, error } = useAdminLobbyQuery(roomId);
 
   if (isError) {
     if (isAxiosError(error)) {
       if (error.response?.status === 404) notFound();
       if (error.response?.status === 403) {
-        return <p className="p-6 text-dark dark:text-white">Unauthorized</p>;
+        return (
+          <p className="p-6 text-dark dark:text-white">{t("Unauthorized")}</p>
+        );
       }
     }
     return (
       <p className="p-6 text-dark dark:text-white">
-        Could not load this game. Try again later.
+        {t("Could not load this game. Try again later.")}
       </p>
     );
   }
@@ -40,7 +44,7 @@ export default function AdminPlayClient({
   if (!data) {
     return (
       <p className="p-6 text-dark dark:text-white">
-        Could not load this game. Try again later.
+        {t("Could not load this game. Try again later.")}
       </p>
     );
   }

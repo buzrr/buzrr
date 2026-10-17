@@ -11,6 +11,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { authClient } from "@/lib/auth-client";
+import { useT } from "@/lib/i18n/context";
 import type { AuthMethods } from "@/lib/auth-methods";
 
 /** Only allow same-origin relative paths — never forward an external URL. */
@@ -35,6 +36,7 @@ function EmailPasswordForm({
   callbackURL: string;
   allowSignUp: boolean;
 }) {
+  const t = useT();
   const router = useRouter();
   const [mode, setMode] = useState<"signIn" | "signUp">("signIn");
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +59,7 @@ function EmailPasswordForm({
           })
         : await authClient.signIn.email({ email, password, callbackURL });
     if (authError) {
-      setError(authError.message ?? "Sign in failed. Please try again.");
+      setError(authError.message ?? t("Sign in failed. Please try again."));
       setPending(false);
       return;
     }
@@ -72,7 +74,7 @@ function EmailPasswordForm({
           required
           maxLength={60}
           autoComplete="name"
-          placeholder="Your name"
+          placeholder={t("Your name")}
           className={inputClass}
         />
       )}
@@ -81,7 +83,7 @@ function EmailPasswordForm({
         type="email"
         required
         autoComplete="email"
-        placeholder="Email"
+        placeholder={t("Email")}
         className={inputClass}
       />
       <input
@@ -90,7 +92,7 @@ function EmailPasswordForm({
         required
         minLength={8}
         autoComplete={mode === "signUp" ? "new-password" : "current-password"}
-        placeholder="Password"
+        placeholder={t("Password")}
         className={inputClass}
       />
       {error && (
@@ -98,10 +100,10 @@ function EmailPasswordForm({
       )}
       <Button type="submit" fullWidth disabled={pending}>
         {pending
-          ? "Please wait…"
+          ? t("Please wait…")
           : mode === "signUp"
-            ? "Create account"
-            : "Sign in"}
+            ? t("Create account")
+            : t("Sign in")}
       </Button>
       {allowSignUp && (
         <button
@@ -113,8 +115,8 @@ function EmailPasswordForm({
           }}
         >
           {mode === "signIn"
-            ? "New here? Create an account"
-            : "Already have an account? Sign in"}
+            ? t("New here? Create an account")
+            : t("Already have an account? Sign in")}
         </button>
       )}
     </form>
@@ -122,6 +124,7 @@ function EmailPasswordForm({
 }
 
 const LoginForm = ({ methods }: { methods: AuthMethods }) => {
+  const t = useT();
   const searchParams = useSearchParams();
   const oauthError = searchParams.get("error");
   const callbackURL = sanitizeCallbackURL(searchParams.get("callbackURL"));
@@ -154,7 +157,7 @@ const LoginForm = ({ methods }: { methods: AuthMethods }) => {
     <div className="py-4 flex flex-col gap-4">
       {oauthError && (
         <p className="text-sm text-red-light dark:text-red-dark my-2">
-          Sign in was cancelled or failed. Please try again.
+          {t("Sign in was cancelled or failed. Please try again.")}
         </p>
       )}
       {methods.emailPassword && (
@@ -175,9 +178,11 @@ const LoginForm = ({ methods }: { methods: AuthMethods }) => {
             className="mr-2 inline"
             width={20}
             height={20}
-            alt="Google Logo"
+            alt={t("Google Logo")}
           />
-          {redirecting ? "Redirecting to Google…" : "Continue with Google"}
+          {redirecting
+            ? t("Redirecting to Google…")
+            : t("Continue with Google")}
         </Button>
       )}
     </div>

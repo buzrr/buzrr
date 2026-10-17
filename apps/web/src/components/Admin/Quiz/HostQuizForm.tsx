@@ -11,6 +11,7 @@ import { useAppDispatch } from "@/state/hooks";
 import { setPlayers } from "@/state/admin/playersSlice";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { hostQuizSchema } from "@/lib/modules/forms/schemas";
+import { useT } from "@/lib/i18n/context";
 import { useCreateGameSessionMutation } from "@/lib/modules/game-sessions/hooks";
 
 type HostQuizValues = z.infer<typeof hostQuizSchema>;
@@ -20,6 +21,7 @@ export default function HostQuizForm(props: {
   disabled?: boolean;
   className?: string;
 }) {
+  const t = useT();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const mutation = useCreateGameSessionMutation();
@@ -60,7 +62,7 @@ export default function HostQuizForm(props: {
         className="w-full flex items-center justify-center gap-2.5 rounded-[15px] p-4 text-[17px] font-bold text-white bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep shadow-[0_10px_26px_-10px_#8b5cf6] transition-[filter,transform] hover:brightness-107 active:translate-y-px cursor-pointer disabled:cursor-default disabled:bg-none disabled:bg-gray disabled:shadow-none disabled:hover:brightness-100"
       >
         <LuPlay size={18} className="fill-current" />
-        {mutation.isPending ? "Loading..." : "Host quiz"}
+        {mutation.isPending ? "Loading..." : t("Host quiz")}
       </button>
     </form>
   );

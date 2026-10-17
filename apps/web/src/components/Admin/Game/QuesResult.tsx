@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { LuBan, LuPlay, LuX } from "react-icons/lu";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -30,6 +30,7 @@ import {
 import { AnimatedNumber, useFlipReorder } from "@/components/Game/motion";
 import type { LeaderboardEntry } from "@buzrr/contract";
 import { useAudioSegment } from "@/lib/audio-cues";
+import { RevealDensity } from "@/components/QuestionTypes/MultipleChoice";
 import { useGameSound } from "@/lib/sound/director";
 import ConfettiBurst from "@/components/ConfettiBurst";
 import {
@@ -38,6 +39,7 @@ import {
   nextQuestionLabel,
   scoresStepPending,
 } from "@/lib/moderation";
+import { useT, pl, currentLocale } from "@/lib/i18n/context";
 import type { GameSocket } from "@/types/socket";
 
 /** Hold the old standings until the answer bars have mostly filled. */
@@ -82,6 +84,7 @@ export const rankBadgeClass = (rank: number) =>
  * banned (removed and blocked from rejoining this room).
  */
 export default function QuesResult(props: QuesResultProps) {
+  const t = useT();
   const { socket, roomId } = props;
   const dispatch = useAppDispatch();
   const question = useAppSelector((state) => state.game.question);
@@ -142,7 +145,7 @@ export default function QuesResult(props: QuesResultProps) {
     responses > 0 ? Math.round((correctResponses / responses) * 100) : 0;
   const avgTime =
     reveal?.avgTimeMs != null
-      ? `${(reveal.avgTimeMs / 1000).toFixed(1)}s`
+      ? `${(reveal.avgTimeMs / 1000).toLocaleString(currentLocale(), { maximumFractionDigits: 1, minimumFractionDigits: 1 })} s`
       : "—";
   const isLastQuestion = qIndex === qCount - 1;
   // Many options: a tighter panel, so all of them fit without scrolling.
@@ -166,6 +169,25 @@ export default function QuesResult(props: QuesResultProps) {
   // "Show answer": the whole question grows once, briefly, as the right
   // answer turns green.
   const answerRef = useRef<HTMLElement>(null);
+  // Every answer has to fit the panel (tablets, two-line questions): while
+  // it overflows, step down to a denser layout — per question, one way.
+  const [dense, setDense] = useState<{ id: string; level: number }>();
+  const qid = question?.id ?? "";
+  const density = dense?.id === qid ? dense.level : 0;
+  useLayoutEffect(() => {
+    const el = answerRef.current;
+    if (!el || !qid || density >= 2) return;
+    const check = () => {
+      if (window.innerWidth < 768) return; // phones scroll the page
+      if (el.scrollHeight > el.clientHeight + 1) {
+        setDense({ id: qid, level: density + 1 });
+      }
+    };
+    check();
+    const observer = new ResizeObserver(check);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [qid, density]);
   useEffect(() => {
     if (phase !== "reveal") return;
     answerRef.current?.animate(
@@ -200,10 +222,10 @@ export default function QuesResult(props: QuesResultProps) {
       {
         onSuccess: () => {
           dispatch(playerRemoved({ playerId }));
-          toast.success(`You have removed ${name}`);
+          toast.success(t("You have removed {name}", { name }));
         },
         onError: () =>
-          toast.error("Could not remove player. Please try again."),
+          toast.error(t("Could not remove player. Please try again.")),
       },
     );
   }
@@ -217,9 +239,10 @@ export default function QuesResult(props: QuesResultProps) {
         onSuccess: () => {
           dispatch(playerRemoved({ playerId }));
           setPlayerToBan(null);
-          toast.success(`You have banned ${name}`);
+          toast.success(t("You have banned {name}", { name }));
         },
-        onError: () => toast.error("Could not ban player. Please try again."),
+        onError: () =>
+          toast.error(t("Could not ban player. Please try again.")),
       },
     );
   }
@@ -240,21 +263,26 @@ export default function QuesResult(props: QuesResultProps) {
             className={clsx(
               panelClass,
               "flex flex-col p-5 md:px-[30px] md:min-h-0 md:overflow-y-auto [scrollbar-width:thin]",
-              manyOptions
-                ? "gap-3 md:gap-4 md:py-5"
+              manyOptions || density >= 1
+                ? "gap-3 md:gap-3.5 md:py-5"
                 : "gap-5 md:gap-[22px] md:py-7",
             )}
           >
             <div>
               <div className="flex flex-wrap items-center gap-2.5">
                 <span className={labelClass}>
-                  Question {qIndex + 1} results
+                  {t("Question {n} results", { n: qIndex + 1 })}
                 </span>
                 {question && !scored && (
                   <QuestionTypePill type={question.type} />
                 )}
               </div>
-              <h2 className="mt-2 text-lg md:text-[22px] font-bold leading-[1.3] tracking-[-0.01em] text-pretty wrap-break-word">
+              <h2
+                className={clsx(
+                  "mt-2 text-lg font-bold leading-[1.3] tracking-[-0.01em] text-pretty wrap-break-word",
+                  density >= 1 ? "md:text-[19px]" : "md:text-[22px]",
+                )}
+              >
                 {question?.title}
               </h2>
             </div>
@@ -267,23 +295,25 @@ export default function QuesResult(props: QuesResultProps) {
               <StatTile
                 value={responses}
                 suffix={` /${players.length}`}
-                label="Responses"
+                label={t("Responses")}
               />
               {scored && !closed && (
-                <StatTile value={`${correctPct}%`} label="Got it right" />
+                <StatTile value={`${correctPct}%`} label={t("Got it right")} />
               )}
-              <StatTile value={avgTime} label="Avg. answer time" />
+              <StatTile value={avgTime} label={t("Avg. answer time")} />
             </div>
             {question && reveal && (
-              <RevealBreakdown
-                question={question}
-                summary={reveal.summary}
-                hideCorrect={closed}
-              />
+              <RevealDensity.Provider value={density}>
+                <RevealBreakdown
+                  question={question}
+                  summary={reveal.summary}
+                  hideCorrect={closed}
+                />
+              </RevealDensity.Provider>
             )}
             {!closed && reveal?.fastest && reveal.fastest.length > 0 && (
               <div className="mt-auto pt-3 border-t border-lprimary/15 dark:border-white/10">
-                <span className={labelClass}>Fastest right answers</span>
+                <span className={labelClass}>{t("Fastest right answers")}</span>
                 <div className="mt-2 grid grid-cols-3 gap-2">
                   {reveal.fastest.map((f, i) => (
                     <div
@@ -323,9 +353,13 @@ export default function QuesResult(props: QuesResultProps) {
             )}
           >
             <div className="flex items-center justify-between px-5 md:px-[26px] pt-5 md:pt-6 pb-3.5">
-              <h3 className="text-xl md:text-[22px] font-bold">Leaderboard</h3>
+              <h3 className="text-xl md:text-[22px] font-bold">
+                {t("Leaderboard")}
+              </h3>
               <span className={clsx("text-[13.5px]", mutedText)}>
-                {leaderboard.length} player{leaderboard.length === 1 ? "" : "s"}
+                {t(pl(leaderboard.length, "{n} player", "{n} players"), {
+                  n: leaderboard.length,
+                })}
               </span>
             </div>
             <div
@@ -386,8 +420,10 @@ export default function QuesResult(props: QuesResultProps) {
                     <span className="flex gap-0.5 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
                       <button
                         type="button"
-                        aria-label={`Remove ${lead.name} from this game`}
-                        title="Kick — can rejoin with the room code"
+                        aria-label={t("Remove {name} from this game", {
+                          name: lead.name,
+                        })}
+                        title={t("Kick — can rejoin with the room code")}
                         disabled={removePlayerMutation.isPending}
                         onClick={() => handleKick(lead.playerId, lead.name)}
                         className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
@@ -396,8 +432,10 @@ export default function QuesResult(props: QuesResultProps) {
                       </button>
                       <button
                         type="button"
-                        aria-label={`Ban ${lead.name} from this room`}
-                        title="Ban — blocked from rejoining this room"
+                        aria-label={t("Ban {name} from this room", {
+                          name: lead.name,
+                        })}
+                        title={t("Ban — blocked from rejoining this room")}
                         onClick={() =>
                           setPlayerToBan({
                             playerId: lead.playerId,
@@ -430,9 +468,9 @@ export default function QuesResult(props: QuesResultProps) {
           {closed
             ? closedNextLabel(moderation, qIndex, qCount, scoredQ)
             : nextIsScores
-              ? "Show scores"
+              ? t("Show scores")
               : isLastQuestion
-                ? "Final leaderboard"
+                ? t("Final leaderboard")
                 : nextQuestionLabel(qIndex, qCount)}
           <LuPlay size={17} className="fill-current" />
         </button>
@@ -444,10 +482,13 @@ export default function QuesResult(props: QuesResultProps) {
           if (!open) setPlayerToBan(null);
         }}
         onClick={handleBan}
-        desc={`${playerToBan?.name ?? "This player"} will be removed and blocked from rejoining this room. The ban lasts until this room ends.`}
-        confirmLabel="Ban Player"
+        desc={t(
+          "{name} will be removed and blocked from rejoining this room. The ban lasts until this room ends.",
+          { name: playerToBan?.name ?? t("This player") },
+        )}
+        confirmLabel={t("Ban Player")}
         confirming={banPlayerMutation.isPending}
-        confirmingLabel="Banning…"
+        confirmingLabel={t("Banning…")}
       />
     </div>
   );

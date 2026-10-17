@@ -9,6 +9,7 @@ import { getApiErrorMessage } from "@/lib/api/errors";
 import { useDeleteResultsMutation } from "@/lib/modules/quizzes/hooks";
 import { DEFAULT_AVATAR } from "@/constants";
 import Skeleton from "@/components/ui/Skeleton";
+import { useT } from "@/lib/i18n/context";
 import { useResultQuery } from "@/lib/modules/game-sessions/hooks";
 
 function rankBadge(rank: number) {
@@ -30,6 +31,7 @@ export default function LeaderboardView({
   /** Shows a delete button; called once this run is deleted. */
   onDeleted?: () => void;
 }) {
+  const t = useT();
   const { data: result, isPending, isError } = useResultQuery(roomId);
   const del = useDeleteResultsMutation(result?.quizId ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -66,7 +68,7 @@ export default function LeaderboardView({
       <div className="flex flex-col w-full gap-4">
         {backButton}
         <p className="text-center text-dark dark:text-white py-8">
-          Could not load leaderboard.
+          {t("Could not load leaderboard.")}
         </p>
       </div>
     );
@@ -83,24 +85,24 @@ export default function LeaderboardView({
             className="inline-flex items-center gap-1.5 rounded-xl border-[1.5px] border-red-light dark:border-red-dark px-3 py-1.5 text-sm font-semibold text-red-light dark:text-red-dark hover:bg-red-light hover:text-white dark:hover:bg-red-dark dark:hover:text-dark cursor-pointer transition-colors"
           >
             <LuTrash2 size={15} />
-            Delete
+            {t("Delete")}
           </button>
         )}
       </div>
       <ConfirmationModal
         open={confirmDelete}
         setOpen={setConfirmDelete}
-        desc="Delete this game and its leaderboard? This can't be undone."
-        confirmLabel="Delete"
+        desc={t("Delete this game and its leaderboard? This can't be undone.")}
+        confirmLabel={t("Delete")}
         confirming={del.isPending}
-        confirmingLabel="Deleting…"
+        confirmingLabel={t("Deleting…")}
         onClick={() =>
           del.mutate(
             { resultId: roomId },
             {
               onSuccess: () => {
                 setConfirmDelete(false);
-                toast.success("Game deleted");
+                toast.success(t("Game deleted"));
                 onDeleted?.();
               },
               onError: (err) => toast.error(getApiErrorMessage(err)),
@@ -109,11 +111,13 @@ export default function LeaderboardView({
         }
       />
       <p className="text-2xl text-center font-black text-dark dark:text-white capitalize">
-        {result.quizTitle} — Leaderboard
+        {t("{title} — Leaderboard", { title: result.quizTitle })}
       </p>
       <p className="text-sm text-dark dark:text-white">
-        Played {new Date(result.endedAt).toLocaleString()} · Room{" "}
-        {result.gameCode}
+        {t("Played {date} · Room {code}", {
+          date: new Date(result.endedAt).toLocaleString(),
+          code: result.gameCode,
+        })}
       </p>
 
       <div className="flex flex-col gap-3 my-4 w-full max-w-2xl">
@@ -130,7 +134,7 @@ export default function LeaderboardView({
                   className="w-12 h-12 rounded-full shrink-0"
                   width={50}
                   height={50}
-                  alt="profile pic"
+                  alt={t("profile pic")}
                 />
                 <p className="truncate">{entry.playerName}</p>
               </div>
@@ -139,7 +143,7 @@ export default function LeaderboardView({
           ))
         ) : (
           <div className="border border-gray border-dashed rounded-lg p-6 text-center text-dark dark:text-white">
-            No players in this game.
+            {t("No players in this game.")}
           </div>
         )}
       </div>

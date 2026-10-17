@@ -15,9 +15,11 @@ import Skeleton from "@/components/ui/Skeleton";
 import { IconButton } from "@/components/ui/IconButton";
 import { useQuizDetailQuery } from "@/lib/modules/quizzes/hooks";
 import { isAxiosError } from "axios";
+import { useT } from "@/lib/i18n/context";
 import { notFound } from "next/navigation";
 
 export default function QuizDetailClient({ quizId }: { quizId: string }) {
+  const t = useT();
   const { data: quiz, isPending, isError, error } = useQuizDetailQuery(quizId);
   const [leaderboardId, setLeaderboardId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -28,7 +30,7 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
     }
     return (
       <div className="text-dark dark:text-white w-full h-full flex items-center justify-center p-8">
-        Could not load this quiz. Try again later.
+        {t("Could not load this quiz. Try again later.")}
       </div>
     );
   }
@@ -47,7 +49,7 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
   if (!quiz) {
     return (
       <div className="text-dark dark:text-white w-full h-full flex items-center justify-center p-8">
-        Could not load this quiz. Try again later.
+        {t("Could not load this quiz. Try again later.")}
       </div>
     );
   }
@@ -77,7 +79,7 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
         >
           <div className="flex justify-end">
             <IconButton
-              aria-label="Close quiz info"
+              aria-label={t("Close quiz info")}
               className="text-dark dark:text-white"
               onClick={() => setSidebarOpen(false)}
               icon={<RxCross2 size={22} />}
@@ -99,7 +101,7 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
               <LeaderboardView
                 roomId={leaderboardId}
                 onBack={() => setLeaderboardId(null)}
-                backLabel="Back to quiz details"
+                backLabel={t("Back to quiz details")}
                 onDeleted={() => setLeaderboardId(null)}
               />
             </div>
@@ -107,7 +109,7 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
             <>
               <div className="p-3 flex items-center gap-2 justify-start md:hidden">
                 <IconButton
-                  aria-label="Open quiz info"
+                  aria-label={t("Open quiz info")}
                   className="text-dark dark:text-white"
                   onClick={() => setSidebarOpen(true)}
                   icon={

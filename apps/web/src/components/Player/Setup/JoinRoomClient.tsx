@@ -12,6 +12,7 @@ import {
 } from "@/lib/modules/players/hooks";
 import { isAxiosError } from "axios";
 import { notFound, useRouter } from "next/navigation";
+import { useT } from "@/lib/i18n/context";
 import { useEffect, useState } from "react";
 
 function JoinRoomSkeleton() {
@@ -27,6 +28,7 @@ function JoinRoomSkeleton() {
 }
 
 export default function JoinRoomClient({ playerId }: { playerId: string }) {
+  const t = useT();
   const router = useRouter();
   const [sessionAllowed, setSessionAllowed] = useState(false);
   const {
@@ -65,7 +67,7 @@ export default function JoinRoomClient({ playerId }: { playerId: string }) {
     }
     return (
       <div className="p-8 text-center text-dark dark:text-white">
-        Could not load your player profile. Try again later.
+        {t("Could not load your player profile. Try again later.")}
       </div>
     );
   }

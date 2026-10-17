@@ -518,7 +518,7 @@ Quiz topic, as described by the host:
 ${dto.description}
 """
 
-Write exactly ${dto.questions} questions on that topic.
+Write exactly ${dto.questions} questions on that topic, in ${dto.language ?? "English"} (questions and all options).
 
 Rules:
 - Each question has exactly one correct answer and three plausible but clearly wrong answers.

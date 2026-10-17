@@ -22,6 +22,7 @@ import type { GameSocket } from "@/types/socket";
 import { soundSkinsApi } from "@/lib/modules/sound-skins/api";
 import { decryptClip, preloadClips } from "./preload";
 import { fadeOutAndPause } from "./fade";
+import { useT } from "@/lib/i18n/context";
 import {
   audioContext,
   isLoopSlot,
@@ -420,26 +421,27 @@ export function SoundToggle({
   /** Header pill with a label, styled like the "Live" status. */
   pill?: boolean;
 }) {
+  const t = useT();
   const s = useGameSound();
   if (!s?.allowed) return null;
   if (pill) {
     return (
       <button
         type="button"
-        aria-label={s.on ? "Mute sounds" : "Turn sounds on"}
+        aria-label={s.on ? t("Mute sounds") : t("Turn sounds on")}
+        title={s.on ? t("Mute sounds") : t("Turn sounds on")}
         onClick={() => s.setOn(!s.on)}
-        className="inline-flex items-center gap-2 rounded-full border border-lprimary/15 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-1.5 text-[13px] font-semibold text-dark dark:text-white cursor-pointer hover:border-dprimary"
+        className="inline-flex items-center justify-center rounded-full border border-lprimary/15 dark:border-white/10 bg-white dark:bg-white/5 h-[34px] w-[38px] text-dark dark:text-white cursor-pointer hover:border-dprimary"
       >
-        {s.on ? <LuVolume2 size={15} /> : <LuVolumeX size={15} />}
-        {s.on ? "Sound on" : "Sound off"}
+        {s.on ? <LuVolume2 size={17} /> : <LuVolumeX size={17} />}
       </button>
     );
   }
   return (
     <button
       type="button"
-      aria-label={s.on ? "Mute sounds" : "Turn sounds on"}
-      title={s.on ? "Mute sounds" : "Turn sounds on"}
+      aria-label={s.on ? t("Mute sounds") : t("Turn sounds on")}
+      title={s.on ? t("Mute sounds") : t("Turn sounds on")}
       onClick={() => s.setOn(!s.on)}
       className={
         className ??

@@ -16,6 +16,8 @@ import {
 } from "@/lib/seo/site";
 import { getInstanceConfig } from "@/lib/instance";
 import { InstanceProvider } from "@/lib/instance-context";
+import { I18nProvider } from "@/lib/i18n/context";
+import { getLocale } from "@/lib/i18n/server";
 
 // Instance options (TITLE, PRIVATE_BUZZ, …) come from the environment at
 // request time, so nothing is frozen at build.
@@ -91,27 +93,30 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
   return (
-    <html lang="en">
+    <html lang={locale}>
       <body
         className={clsx(
           sans.className,
           "bg-light-bg dark:bg-dark-bg h-fit overflow-x-hidden",
         )}
       >
-        <InstanceProvider config={getInstanceConfig()}>
-          <ReduxProvider>
-            <QueryProvider>
-              {children}
-              <ReactQueryDevtools
-                initialIsOpen={false}
-                buttonPosition="top-right"
-              />
-              <Footer />
-              <VersionWatcher />
-            </QueryProvider>
-          </ReduxProvider>
-        </InstanceProvider>
+        <I18nProvider locale={locale}>
+          <InstanceProvider config={getInstanceConfig()}>
+            <ReduxProvider>
+              <QueryProvider>
+                {children}
+                <ReactQueryDevtools
+                  initialIsOpen={false}
+                  buttonPosition="top-right"
+                />
+                <Footer />
+                <VersionWatcher />
+              </QueryProvider>
+            </ReduxProvider>
+          </InstanceProvider>
+        </I18nProvider>
         <Analytics />
       </body>
     </html>

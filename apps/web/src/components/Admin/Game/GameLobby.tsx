@@ -16,6 +16,7 @@ import { ClosedSlide, ReadySlide } from "@/components/Game/ModeratedSteps";
 import { closedNextLabel } from "@/lib/moderation";
 import { isScoredType } from "@buzrr/contract";
 import { ReactionOverlay } from "@/components/Game/Flyers";
+import { useT } from "@/lib/i18n/context";
 import { GameSounds, LiveSounds, SoundToggle } from "@/lib/sound/director";
 
 interface QuizQuestionItem {
@@ -45,6 +46,7 @@ const GameLobby = (params: {
   players: PlayerPayload[];
   quizQuestions: QuizQuestion;
 }) => {
+  const t = useT();
   const dispatch = useAppDispatch();
   const phase = useAppSelector((state) => state.game.phase);
   const qIndex = useAppSelector((state) => state.game.qIndex);
@@ -121,10 +123,10 @@ const GameLobby = (params: {
                   phase === "scores" ||
                   phase === "ready") && (
                   <span
-                    title="Game code"
+                    title={t("Game code")}
                     className={`hidden sm:inline-flex shrink-0 ${headerPillClass}`}
                   >
-                    <span className="font-medium opacity-60">Code</span>
+                    <span className="font-medium opacity-60">{t("Code")}</span>
                     <b className="font-extrabold tracking-[0.1em] text-lprimary dark:text-dprimary">
                       {params.gameCode}
                     </b>
@@ -135,6 +137,7 @@ const GameLobby = (params: {
                     qIndex={qIndex}
                     qCount={qCount}
                     final={showLeaderboard}
+                    compact
                   />
                 )}
               </>

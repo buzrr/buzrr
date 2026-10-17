@@ -15,6 +15,7 @@ import {
   subtleCardClass,
 } from "@/components/Game/GameUI";
 import type { LeaderboardEntry } from "@buzrr/contract";
+import { useT, pl } from "@/lib/i18n/context";
 import { rankBadgeClass } from "./QuesResult";
 
 const PODIUM = {
@@ -45,6 +46,7 @@ function PodiumSpot({
   entry: LeaderboardEntry | undefined;
   place: 1 | 2 | 3;
 }) {
+  const t = useT();
   const p = PODIUM[place];
   if (!entry) return <div />;
   return (
@@ -67,7 +69,7 @@ function PodiumSpot({
         {entry.name}
       </span>
       <span className={clsx("text-xs md:text-sm font-semibold", mutedText)}>
-        {entry.score.toLocaleString()} pts
+        {entry.score.toLocaleString()} {t("pts")}
       </span>
       <div
         className={clsx(
@@ -105,6 +107,7 @@ export default function LeaderBoard({
   /** Ending the game goes back to this quiz's editor. */
   quizId?: string;
 }) {
+  const t = useT();
   // The podium stays until the host ends the game: fireworks every few
   // seconds (the final music loops on its own).
   const [burst, setBurst] = useState(0);
@@ -128,13 +131,16 @@ export default function LeaderBoard({
           )}
         >
           <div>
-            <span className={labelClass}>Final results</span>
+            <span className={labelClass}>{t("Final results")}</span>
             <h2 className="mt-2 text-[26px] md:text-[34px] font-extrabold tracking-[-0.02em] leading-[1.1]">
-              Thank you for joining!
+              {t("Thank you for joining!")}
             </h2>
             <p className={clsx("mt-2 text-[15px]", mutedText)}>
-              {quizTitle} · {qCount} question{qCount === 1 ? "" : "s"} ·{" "}
-              {leaderboard.length} player{leaderboard.length === 1 ? "" : "s"}
+              {quizTitle} ·{" "}
+              {t(pl(qCount, "{n} question", "{n} questions"), { n: qCount })} ·{" "}
+              {t(pl(leaderboard.length, "{n} player", "{n} players"), {
+                n: leaderboard.length,
+              })}
             </p>
           </div>
           <div className="flex-1 grid grid-cols-[1fr_1.15fr_1fr] gap-3 items-end min-h-0">
@@ -151,9 +157,13 @@ export default function LeaderBoard({
           )}
         >
           <div className="flex items-center justify-between px-5 md:px-[26px] pt-5 md:pt-6 pb-3.5">
-            <h3 className="text-xl md:text-[22px] font-bold">Full rankings</h3>
+            <h3 className="text-xl md:text-[22px] font-bold">
+              {t("Full rankings")}
+            </h3>
             <span className={clsx("text-[13.5px]", mutedText)}>
-              {leaderboard.length} player{leaderboard.length === 1 ? "" : "s"}
+              {t(pl(leaderboard.length, "{n} player", "{n} players"), {
+                n: leaderboard.length,
+              })}
             </span>
           </div>
           <div className="md:flex-1 md:min-h-0 md:overflow-y-auto px-3 md:px-[18px] pb-4 flex flex-col gap-1.5">
@@ -188,8 +198,8 @@ export default function LeaderBoard({
             {rest.length === 0 && (
               <p className={clsx("text-center text-sm py-10", mutedText)}>
                 {leaderboard.length === 0
-                  ? "No players finished this quiz."
-                  : "Everyone made the podium!"}
+                  ? t("No players finished this quiz.")
+                  : t("Everyone made the podium!")}
               </p>
             )}
           </div>
@@ -201,7 +211,7 @@ export default function LeaderBoard({
           roomId={roomId}
           redirectTo={quizId ? `/admin/quiz/${quizId}` : "/admin"}
           alreadyEnded={alreadyEnded}
-          primaryLabel={alreadyEnded ? "Back to the quiz" : "End game"}
+          primaryLabel={alreadyEnded ? t("Back to the quiz") : t("End game")}
           danger={!alreadyEnded}
         />
       </div>

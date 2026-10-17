@@ -13,9 +13,11 @@ import { useAppSelector } from "@/state/hooks";
 import { useImportQuizMutation } from "@/lib/modules/quizzes/hooks";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { primaryButtonClass, mutedText } from "@/components/Game/GameUI";
+import { useT } from "@/lib/i18n/context";
 import { usePlanLimitPrompt } from "@/components/Billing/UpgradePrompt";
 
 export default function ImportQuizModal({ className }: { className?: string }) {
+  const t = useT();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"csv" | "excel">("excel");
@@ -40,12 +42,12 @@ export default function ImportQuizModal({ className }: { className?: string }) {
 
   const processData = (data: Record<string, unknown>[]) => {
     if (!data || data.length === 0) {
-      toast.error("File is empty or invalid format.");
+      toast.error(t("File is empty or invalid format."));
       return;
     }
 
     const title =
-      String(data[0]["Quiz Title"] ?? "Imported Quiz") || "Imported Quiz";
+      String(data[0]["Quiz Title"] ?? t("Imported Quiz")) || t("Imported Quiz");
     const description = String(data[0]["Quiz Description"] ?? "");
 
     let hasDataIntegrityIssues = false;
@@ -90,15 +92,15 @@ export default function ImportQuizModal({ className }: { className?: string }) {
         }
 
         return {
-          title: String(row["Question Title"] || "Untitled Question"),
+          title: String(row["Question Title"] || t("Untitled Question")),
           timeOut: Number(row["Time Limit (sec)"]) || 20,
           options,
         };
       })
-      .filter((q) => q.title && q.title.trim() !== "Untitled Question");
+      .filter((q) => q.title && q.title.trim() !== t("Untitled Question"));
 
     if (questions.length === 0) {
-      toast.error("Could not find any valid questions in the file.");
+      toast.error(t("Could not find any valid questions in the file."));
       return;
     }
 
@@ -108,11 +110,13 @@ export default function ImportQuizModal({ className }: { className?: string }) {
         onSuccess: (res) => {
           if (hasDataIntegrityIssues) {
             toast.warning(
-              "Quiz imported, but some questions had missing or multiple correct answers and were adjusted. Please cross-verify.",
+              t(
+                "Quiz imported, but some questions had missing or multiple correct answers and were adjusted. Please cross-verify.",
+              ),
               { autoClose: 6000 },
             );
           } else {
-            toast.success("Quiz imported successfully!");
+            toast.success(t("Quiz imported successfully!"));
           }
           close();
           router.push(`/admin/quiz/${res.quizId}`);
@@ -131,7 +135,7 @@ export default function ImportQuizModal({ className }: { className?: string }) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) {
-      toast.error("Please select a file to import.");
+      toast.error(t("Please select a file to import."));
       return;
     }
 
@@ -176,20 +180,22 @@ export default function ImportQuizModal({ className }: { className?: string }) {
             processData(json);
           } catch {
             toast.error(
-              "Failed to parse Excel file. Make sure it uses the correct template.",
+              t(
+                "Failed to parse Excel file. Make sure it uses the correct template.",
+              ),
             );
           } finally {
             setIsParsing(false);
           }
         };
         reader.onerror = () => {
-          toast.error("Error reading file.");
+          toast.error(t("Error reading file."));
           setIsParsing(false);
         };
         reader.readAsArrayBuffer(file);
       }
     } catch {
-      toast.error("An unexpected error occurred during parsing.");
+      toast.error(t("An unexpected error occurred during parsing."));
       setIsParsing(false);
     }
   };
@@ -202,8 +208,8 @@ export default function ImportQuizModal({ className }: { className?: string }) {
         view={view}
         onClick={() => setOpen(true)}
         icon={<LuDownload />}
-        title="Import an existing quiz"
-        subtitle="Upload via Excel or CSV"
+        title={t("Import an existing quiz")}
+        subtitle={t("Upload via Excel or CSV")}
         className={className}
       />
 
@@ -236,7 +242,7 @@ export default function ImportQuizModal({ className }: { className?: string }) {
                   id="import-quiz-title"
                   className="text-xl md:text-[22px] font-bold tracking-[-0.01em] leading-tight"
                 >
-                  Import a Quiz
+                  {t("Import a Quiz")}
                 </h2>
                 <p
                   className={clsx(
@@ -244,12 +250,12 @@ export default function ImportQuizModal({ className }: { className?: string }) {
                     mutedText,
                   )}
                 >
-                  Upload your questions using our template.
+                  {t("Upload your questions using our template.")}
                 </p>
               </div>
               <button
                 type="button"
-                aria-label="Close"
+                aria-label={t("Close")}
                 onClick={close}
                 disabled={isLoading}
                 className={clsx(
@@ -278,7 +284,7 @@ export default function ImportQuizModal({ className }: { className?: string }) {
                       : "text-dark/60 dark:text-white/60 hover:text-dark dark:hover:text-white",
                   )}
                 >
-                  <LuFileSpreadsheet size={16} /> Excel
+                  <LuFileSpreadsheet size={16} /> {t("Excel")}
                 </button>
                 <button
                   type="button"
@@ -294,13 +300,13 @@ export default function ImportQuizModal({ className }: { className?: string }) {
                       : "text-dark/60 dark:text-white/60 hover:text-dark dark:hover:text-white",
                   )}
                 >
-                  <LuFileJson size={16} /> CSV
+                  <LuFileJson size={16} /> {t("CSV")}
                 </button>
               </div>
 
               <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-lprimary/20 dark:border-white/10 rounded-2xl bg-lprimary/5 dark:bg-white/[0.02]">
                 <p className="text-sm font-medium mb-3 text-center">
-                  1. Download the template
+                  {t("1. Download the template")}
                 </p>
                 <a
                   href={`/sample-quiz.${tab === "excel" ? "xlsx" : "csv"}`}
@@ -308,13 +314,15 @@ export default function ImportQuizModal({ className }: { className?: string }) {
                   className="px-4 py-2 bg-white dark:bg-white/10 border border-lprimary/20 dark:border-white/20 rounded-xl text-sm font-semibold shadow-sm hover:bg-lprimary/5 dark:hover:bg-white/20 transition-colors flex items-center gap-2"
                 >
                   <LuDownload size={16} />
-                  Download {tab === "excel" ? "Excel" : "CSV"} Template
+                  {t("Download {kind} template", {
+                    kind: tab === "excel" ? "Excel" : "CSV",
+                  })}
                 </a>
               </div>
 
               <div className="mt-6 flex flex-col gap-2">
                 <label className="text-sm font-medium text-dark/80 dark:text-white/80">
-                  2. Upload filled document
+                  {t("2. Upload filled document")}
                 </label>
                 <input
                   ref={fileInputRef}
@@ -341,14 +349,14 @@ export default function ImportQuizModal({ className }: { className?: string }) {
                 disabled={isLoading}
                 className="px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
               >
-                Cancel
+                {t("Cancel")}
               </button>
               <button
                 type="submit"
                 disabled={!file || isLoading}
                 className={clsx(primaryButtonClass, "px-6 py-2.5 !w-auto")}
               >
-                {isLoading ? "Importing..." : "Import Quiz"}
+                {isLoading ? t("Importing…") : t("Import Quiz")}
               </button>
             </div>
           </form>

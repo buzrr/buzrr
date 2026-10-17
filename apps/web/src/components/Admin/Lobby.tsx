@@ -39,6 +39,7 @@ import type { PlayerPayload } from "@buzrr/contract";
 import ConfirmationModal from "@/components/Admin/ConfirmationModal";
 import { buildJoinUrl } from "@/lib/join-link";
 import EndQuizButton from "@/components/Admin/EndQuizButton";
+import { useT, pl, tx } from "@/lib/i18n/context";
 import { useInstance } from "@/lib/instance-context";
 
 const Lobby = (params: {
@@ -55,6 +56,7 @@ const Lobby = (params: {
   /** `Quiz.settings` — sounds. */
   quizSettings?: unknown;
 }) => {
+  const t = useT();
   const dispatch = useAppDispatch();
   const { billing } = useInstance();
   const players = useAppSelector((state) => state.player.players);
@@ -80,8 +82,12 @@ const Lobby = (params: {
     onPlayerRemoved: (player) => {
       toast.error(
         player.banned
-          ? `You have banned ${player.name ?? "the player"}`
-          : `You have removed ${player.name ?? "the player"}`,
+          ? tx("You have banned {name}", {
+              name: player.name ?? tx("the player"),
+            })
+          : tx("You have removed {name}", {
+              name: player.name ?? tx("the player"),
+            }),
       );
     },
     onGameStarted: handleGameStarted,
@@ -165,11 +171,15 @@ const Lobby = (params: {
           // locally in case ours is down (the reducer is idempotent).
           dispatch(removePlayer({ id: player.id }));
           if (!socket?.connected) {
-            toast.error(`You have removed ${player.name ?? "the player"}`);
+            toast.error(
+              t("You have removed {name}", {
+                name: player.name ?? t("the player"),
+              }),
+            );
           }
         },
         onError: () => {
-          toast.error("Could not remove player. Please try again.");
+          toast.error(t("Could not remove player. Please try again."));
         },
       },
     );
@@ -185,11 +195,15 @@ const Lobby = (params: {
           dispatch(removePlayer({ id: player.id }));
           setPlayerToBan(null);
           if (!socket?.connected) {
-            toast.error(`You have banned ${player.name ?? "the player"}`);
+            toast.error(
+              t("You have banned {name}", {
+                name: player.name ?? t("the player"),
+              }),
+            );
           }
         },
         onError: () => {
-          toast.error("Could not ban player. Please try again.");
+          toast.error(t("Could not ban player. Please try again."));
         },
       },
     );
@@ -197,7 +211,7 @@ const Lobby = (params: {
 
   function handleGameStart() {
     if (!socket?.connected) {
-      toast.error("Not connected to the game server yet. Please wait.");
+      toast.error(t("Not connected to the game server yet. Please wait."));
       return;
     }
     setLoad(true);
@@ -252,10 +266,10 @@ const Lobby = (params: {
   function copy(what: "code" | "link", text: string) {
     (
       navigator.clipboard?.writeText(text) ??
-      Promise.reject(new Error("Clipboard unavailable"))
+      Promise.reject(new Error(t("Clipboard unavailable")))
     )
       .then(() => setCopied(what))
-      .catch(() => toast.error("Failed to copy"));
+      .catch(() => toast.error(t("Failed to copy")));
   }
 
   // Starting with nobody in the room is fine (a rehearsal, a presentation).
@@ -278,7 +292,7 @@ const Lobby = (params: {
         <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3.5 md:gap-5 pb-0 md:pb-[18px]">
           <section className="rounded-3xl border bg-white dark:bg-dark border-lprimary/15 dark:border-white/5 flex flex-col gap-4 md:gap-3.5 [@media(min-height:900px)]:md:gap-5 p-[18px] md:p-[22px] [@media(min-height:900px)]:md:p-[26px] md:min-h-0 md:overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <span className="text-xs font-semibold tracking-[0.12em] uppercase text-[#8a8896] dark:text-muted-dark">
-              Room code
+              {t("Room code")}
             </span>
             <button
               type="button"
@@ -299,12 +313,12 @@ const Lobby = (params: {
                 {copied === "code" ? (
                   <>
                     <LuCheck size={16} />
-                    Code copied
+                    {t("Code copied")}
                   </>
                 ) : (
                   <>
                     <LuCopy size={16} />
-                    Click to copy
+                    {t("Click to copy")}
                   </>
                 )}
               </small>
@@ -321,11 +335,12 @@ const Lobby = (params: {
               </div>
               <div className="flex flex-col gap-1.5 min-w-0">
                 <span className="text-xs font-semibold tracking-[0.12em] uppercase text-[#8a8896] dark:text-muted-dark">
-                  Scan to join
+                  {t("Scan to join")}
                 </span>
                 <p className="text-[13.5px] leading-normal text-off-dark dark:text-muted-dark">
-                  Players can scan this with their phone camera, or open the
-                  link below.
+                  {t(
+                    "Players can scan this with their phone camera, or open the link below.",
+                  )}
                 </p>
               </div>
             </div>
@@ -356,7 +371,7 @@ const Lobby = (params: {
                 ) : (
                   <LuCopy size={16} />
                 )}
-                {copied === "link" ? "Copied" : "Copy link"}
+                {copied === "link" ? "Copied" : t("Copy link")}
               </button>
               {canShare && (
                 <button
@@ -367,14 +382,14 @@ const Lobby = (params: {
                   className="flex items-center justify-center gap-2 rounded-xl border-[1.5px] bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 hover:border-dprimary p-[11px] text-sm font-semibold cursor-pointer transition-colors"
                 >
                   <LuShare2 size={16} />
-                  Share
+                  {t("Share")}
                 </button>
               )}
             </div>
 
             <div className="md:mt-auto pt-[18px] md:pt-3.5 [@media(min-height:900px)]:md:pt-[18px] border-t border-lprimary/15 dark:border-white/10 flex flex-col gap-[9px]">
               <div className="flex justify-between items-baseline text-[13.5px] text-off-dark dark:text-muted-dark">
-                <span>Participants</span>
+                <span>{t("Participants")}</span>
                 <span>
                   <b
                     className={clsx(
@@ -401,7 +416,7 @@ const Lobby = (params: {
                 />
               </div>
               <p className="text-[12.5px] text-off-dark dark:text-muted-dark">
-                This room can hold up to {maxPlayers} players.
+                {t("This room can hold up to {n} players.", { n: maxPlayers })}
                 {billing && params.plan === "free" && (
                   <>
                     {" "}
@@ -409,9 +424,9 @@ const Lobby = (params: {
                       href="/pricing"
                       className="font-semibold text-lprimary dark:text-dprimary hover:underline"
                     >
-                      Upgrade to Pro
+                      {t("Upgrade to Pro")}
                     </Link>{" "}
-                    for rooms of up to 250.
+                    {t("for rooms of up to 250.")}
                   </>
                 )}
               </p>
@@ -421,7 +436,7 @@ const Lobby = (params: {
           <section className="rounded-3xl border bg-white dark:bg-dark border-lprimary/15 dark:border-white/5 flex flex-col md:min-h-0 md:overflow-hidden">
             <div className="flex flex-wrap items-center gap-3.5 p-4 md:px-[22px] md:pt-5 md:pb-4 border-b border-lprimary/15 dark:border-white/10">
               <h2 className="flex items-center gap-[7px] text-sm font-semibold">
-                Players
+                {t("Players")}
                 <span className="rounded-full px-2 py-px text-xs bg-lprimary/8 dark:bg-white/5 text-off-dark dark:text-muted-dark">
                   {players.length}
                 </span>
@@ -432,8 +447,8 @@ const Lobby = (params: {
                   type="search"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search players"
-                  aria-label="Search players"
+                  placeholder={t("Search players")}
+                  aria-label={t("Search players")}
                   className="flex-1 min-w-0 bg-transparent outline-none py-2.5 text-sm text-dark dark:text-white"
                 />
               </label>
@@ -480,8 +495,10 @@ const Lobby = (params: {
                   <span className="flex gap-0.5 shrink-0 md:opacity-55 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
                     <button
                       type="button"
-                      aria-label={`Ban ${player.name} from this room`}
-                      title="Ban (can't rejoin)"
+                      aria-label={t("Ban {name} from this room", {
+                        name: player.name ?? "",
+                      })}
+                      title={t("Ban (can't rejoin)")}
                       onClick={() => setPlayerToBan(player)}
                       className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
                     >
@@ -489,8 +506,10 @@ const Lobby = (params: {
                     </button>
                     <button
                       type="button"
-                      aria-label={`Remove ${player.name}`}
-                      title="Kick (can rejoin)"
+                      aria-label={t("Remove {name}", {
+                        name: player.name ?? "",
+                      })}
+                      title={t("Kick (can rejoin)")}
                       onClick={() => handlePlayerRemove(player)}
                       className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
                     >
@@ -502,17 +521,22 @@ const Lobby = (params: {
               {visiblePlayers.length === 0 && (
                 <div className="col-span-full text-center text-sm py-10 text-[#8a8896] dark:text-muted-dark">
                   {query.trim()
-                    ? "No players match your search."
-                    : "Waiting for players to join…"}
+                    ? t("No players match your search.")
+                    : t("Waiting for players to join…")}
                 </div>
               )}
             </div>
 
             <div className="sticky bottom-12 md:static flex flex-col md:flex-row items-stretch md:items-center gap-2.5 md:gap-4 px-4 py-3.5 md:px-[22px] md:py-4 border-t border-lprimary/15 dark:border-white/10 bg-white dark:bg-dark rounded-b-3xl">
               <p className="flex-1 text-[13.5px] text-off-dark dark:text-muted-dark">
-                {players.length}{" "}
-                {players.length === 1 ? "player is" : "players are"} ready. More
-                can join until you start.
+                {t(
+                  pl(
+                    players.length,
+                    "{n} player is ready. More can join until you start.",
+                    "{n} players are ready. More can join until you start.",
+                  ),
+                  { n: players.length },
+                )}
               </p>
               <button
                 type="button"
@@ -524,8 +548,8 @@ const Lobby = (params: {
                 {load
                   ? "Loading..."
                   : players.length === 0
-                    ? "Start without players"
-                    : "Start Game"}
+                    ? t("Start without players")
+                    : t("Start Game")}
               </button>
             </div>
           </section>
@@ -542,10 +566,13 @@ const Lobby = (params: {
             if (!open) setPlayerToBan(null);
           }}
           onClick={handlePlayerBan}
-          desc={`${playerToBan?.name ?? "This player"} will be removed and blocked from rejoining this room. The ban lasts until this room ends.`}
-          confirmLabel="Ban Player"
+          desc={t(
+            "{name} will be removed and blocked from rejoining this room. The ban lasts until this room ends.",
+            { name: playerToBan?.name ?? t("This player") },
+          )}
+          confirmLabel={t("Ban Player")}
           confirming={banPlayerMutation.isPending}
-          confirmingLabel="Banning…"
+          confirmingLabel={t("Banning…")}
         />
       </div>
     </GameSounds>
@@ -609,7 +636,8 @@ function BubbleLine({ stats }: { stats: { hits: number; misses: number } }) {
   return (
     <span className="text-xs text-off-dark dark:text-muted-dark tabular-nums">
       🫧 <AnimatedNumber value={stats.hits} />
-      {total > 0 && ` · ${Math.round((stats.hits / total) * 100)}% hits`}
+      {total > 0 &&
+        ` · ${tx("{n}% hits", { n: Math.round((stats.hits / total) * 100) })}`}
     </span>
   );
 }

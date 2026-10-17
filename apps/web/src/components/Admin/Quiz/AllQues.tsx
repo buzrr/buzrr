@@ -21,6 +21,7 @@ import { useAppSelector } from "@/state/hooks";
 import { HideQuestions } from "@/state/hideQuestionsSlice";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import type { QuestionWithOptions } from "@/lib/modules/questions/api";
+import { useT } from "@/lib/i18n/context";
 import {
   useDeleteQuestionMutation,
   useQuestionsQuery,
@@ -31,6 +32,7 @@ import {
 type QuestionRow = QuestionWithOptions;
 
 export default function AllQues(props: { quizId: string }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const { data, isPending, isError } = useQuestionsQuery(props.quizId);
   const reorderMutation = useReorderQuestionsMutation(props.quizId);
@@ -55,7 +57,7 @@ export default function AllQues(props: { quizId: string }) {
   function clientDltAction(quesId: string) {
     deleteMutation.mutate(quesId, {
       onSuccess: () => {
-        toast.success("Question deleted successfully");
+        toast.success(t("Question deleted successfully"));
         setDelQuesModalOpen(false);
       },
       onError: (err) => {
@@ -106,7 +108,7 @@ export default function AllQues(props: { quizId: string }) {
   if (isError) {
     return (
       <div className="p-4 text-red-500">
-        Failed to load questions. Try again.
+        {t("Failed to load questions. Try again.")}
       </div>
     );
   }
@@ -183,7 +185,7 @@ export default function AllQues(props: { quizId: string }) {
                                     <LuClock size={14} />
                                     {isUnlimitedTime(ques?.timeOut)
                                       ? "∞"
-                                      : `${ques?.timeOut} sec`}
+                                      : t("{n} sec", { n: ques?.timeOut ?? 0 })}
                                   </span>
                                 </div>
                               </div>
@@ -199,7 +201,7 @@ export default function AllQues(props: { quizId: string }) {
                                 setDelQuesModalOpen(true);
                               }}
                             >
-                              Delete
+                              {t("Delete")}
                             </button>
                             <button
                               type="button"
@@ -224,8 +226,11 @@ export default function AllQues(props: { quizId: string }) {
                               isEdit={true}
                               wide
                               confirmDismiss
-                              btnTitle="Edit Question"
-                              subtitle={`Question ${index + 1} · changes apply the next time you host.`}
+                              btnTitle={t("Edit Question")}
+                              subtitle={t(
+                                "Question {n} · changes apply the next time you host.",
+                                { n: index + 1 },
+                              )}
                               btnStyle="text-sm font-semibold text-lprimary dark:text-dprimary hover:underline cursor-pointer"
                             >
                               {(close) => (
@@ -238,7 +243,7 @@ export default function AllQues(props: { quizId: string }) {
                             </BasicModal>
                             {ques.disabled && (
                               <span className="ml-auto text-xs font-bold tracking-[0.06em] uppercase rounded-full px-2.5 py-0.5 bg-black/10 dark:bg-white/10 text-off-dark dark:text-muted-dark">
-                                Disabled · skipped
+                                {t("Disabled · skipped")}
                               </span>
                             )}
                             {ques.media && (
@@ -258,18 +263,18 @@ export default function AllQues(props: { quizId: string }) {
                   <div className="w-full py-2 flex justify-center">
                     <Image
                       src="/images/no-questions.svg"
-                      alt="no-questions"
+                      alt={t("no-questions")}
                       width={200}
                       height={200}
                     />
                   </div>
                   <div className="font-black text-lg">
-                    No Questions Added Yet!
+                    {t("No Questions Added Yet!")}
                   </div>
                   <div className="text-md w-[40%] text-center">
-                    It looks like there are no questions for this quiz. Start
-                    adding questions to engage your students and make learning
-                    fun!
+                    {t(
+                      "It looks like there are no questions for this quiz. Start adding questions to engage your students and make learning fun!",
+                    )}
                   </div>
                 </div>
               )}
@@ -284,7 +289,7 @@ export default function AllQues(props: { quizId: string }) {
         onClick={() => {
           clientDltAction(delQuesId);
         }}
-        desc="Are you sure you want to delete this question?"
+        desc={t("Are you sure you want to delete this question?")}
       />
     </>
   );

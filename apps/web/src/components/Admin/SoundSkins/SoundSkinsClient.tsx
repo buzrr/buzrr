@@ -28,6 +28,7 @@ import {
   type BuiltinSkinId,
   type SoundHandle,
 } from "@/lib/sound/synth";
+import { useT } from "@/lib/i18n/context";
 import {
   useClearSoundSlot,
   useCreateSoundSkin,
@@ -82,6 +83,7 @@ function fileHandle(url: string, loop: boolean): SoundHandle {
  * per moment. Admins can offer a skin to every user.
  */
 export default function SoundSkinsClient() {
+  const t = useT();
   const role = useCurrentRole();
   const isAdmin = role === "admin" || role === "superadmin";
   const query = useSoundSkinsQuery();
@@ -94,8 +96,9 @@ export default function SoundSkinsClient() {
   return (
     <div className="mt-4 flex flex-col gap-5 text-dark dark:text-white max-w-5xl">
       <p className={clsx("text-sm", mutedText)}>
-        Music and effects for your games. Your default applies to all your
-        quizzes; each quiz can pick another skin in its settings.
+        {t(
+          "Music and effects for your games. Your default applies to all your quizzes; each quiz can pick another skin in its settings.",
+        )}
       </p>
       {BUILTIN_SOUND_SKINS.map((id) => (
         <section
@@ -109,10 +112,10 @@ export default function SoundSkinsClient() {
           <div className="flex flex-wrap items-center gap-3">
             <div className="min-w-0">
               <h2 className="text-lg font-bold">
-                {BUILTIN_SKINS[id as BuiltinSkinId].name}
+                {t(BUILTIN_SKINS[id as BuiltinSkinId].name)}
               </h2>
               <p className={clsx("text-xs", mutedText)}>
-                Built in · synthesized in the browser
+                {t("Built in · synthesized in the browser")}
               </p>
             </div>
             <span className="ml-auto">
@@ -126,7 +129,7 @@ export default function SoundSkinsClient() {
                 <button
                   key={slot}
                   type="button"
-                  title={SLOT_LABELS[slot]}
+                  title={t(SLOT_LABELS[slot])}
                   onClick={() =>
                     preview.play(key, () =>
                       playBuiltin(id as BuiltinSkinId, slot, {
@@ -150,7 +153,7 @@ export default function SoundSkinsClient() {
       ))}
 
       <section className={clsx(panelClass, "p-5 flex flex-col gap-3")}>
-        <h2 className="text-lg font-bold">Your audio skins</h2>
+        <h2 className="text-lg font-bold">{t("Your audio skins")}</h2>
         <form
           className="flex gap-2 max-w-md"
           onSubmit={(e) => {
@@ -162,20 +165,20 @@ export default function SoundSkinsClient() {
           }}
         >
           <TextInput
-            placeholder="New audio skin name"
+            placeholder={t("New audio skin name")}
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={60}
             containerClassName="flex-1"
           />
           <Button size="sm" type="submit" disabled={create.isPending}>
-            Create
+            {t("Create")}
           </Button>
         </form>
         {query.isPending ? (
-          <p className={mutedText}>Loading…</p>
+          <p className={mutedText}>{t("Loading…")}</p>
         ) : (query.data ?? []).length === 0 ? (
-          <p className={mutedText}>No audio skins yet.</p>
+          <p className={mutedText}>{t("No audio skins yet.")}</p>
         ) : (
           (query.data ?? []).map((skin) => (
             <SkinCard
@@ -198,12 +201,13 @@ export const defaultBoxClass =
 
 /** "Default" badge, or the button that makes this skin the default. */
 export function DefaultSkinButton({ id }: { id: string }) {
+  const t = useT();
   const prefs = usePreferencesQuery();
   const update = useUpdatePreferences();
   if ((prefs.data?.defaultSoundSkin ?? "builtin:show") === id) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-dprimary/15 px-3 py-1 text-xs font-bold text-lprimary dark:text-dprimary">
-        <LuCheck size={13} /> Default
+        <LuCheck size={13} /> {t("Default")}
       </span>
     );
   }
@@ -215,14 +219,14 @@ export function DefaultSkinButton({ id }: { id: string }) {
         update.mutate(
           { defaultSoundSkin: id },
           {
-            onSuccess: () => toast.success("Default audio skin set"),
+            onSuccess: () => toast.success(t("Default audio skin set")),
             onError: (err) => toast.error(getApiErrorMessage(err)),
           },
         )
       }
       className="rounded-xl bg-lprimary dark:bg-dprimary px-3 py-1 text-xs font-bold text-white dark:text-dark cursor-pointer disabled:opacity-50"
     >
-      Make default
+      {t("Make default")}
     </button>
   );
 }
@@ -238,6 +242,7 @@ function SkinCard({
   preview: ReturnType<typeof usePreview>;
   isDefault: boolean;
 }) {
+  const t = useT();
   const update = useUpdateSoundSkin();
   const setSlot = useSetSoundSlot();
   const clearSlot = useClearSoundSlot();
@@ -255,7 +260,7 @@ function SkinCard({
         <input
           defaultValue={skin.name}
           maxLength={60}
-          aria-label="Audio skin name"
+          aria-label={t("Audio skin name")}
           onBlur={(e) =>
             e.target.value !== skin.name &&
             update.mutate({ id: skin.id, name: e.target.value }, { onError })
@@ -265,25 +270,25 @@ function SkinCard({
         {isAdmin ? (
           <label className="flex items-center gap-2 text-sm">
             <Switch
-              aria-label="For all users"
+              aria-label={t("For all users")}
               checked={skin.isGlobal}
               onCheckedChange={(checked) =>
                 update.mutate({ id: skin.id, isGlobal: checked }, { onError })
               }
             />
-            For all users
+            {t("For all users")}
           </label>
         ) : (
           skin.isGlobal && (
             <span className="text-xs rounded-full px-2 py-0.5 bg-lprimary/10">
-              For all users
+              {t("For all users")}
             </span>
           )
         )}
         <DefaultSkinButton id={skin.id} />
         <button
           type="button"
-          aria-label="Delete audio skin"
+          aria-label={t("Delete audio skin")}
           onClick={() => {
             if (window.confirm(`Delete "${skin.name}"?`)) {
               del.mutate(skin.id, { onError });
@@ -299,7 +304,7 @@ function SkinCard({
         const key = `${skin.id}:${slot}`;
         return (
           <div key={slot} className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="w-64 max-w-full">{SLOT_LABELS[slot]}</span>
+            <span className="w-64 max-w-full">{t(SLOT_LABELS[slot])}</span>
             {url ? (
               <>
                 <button
@@ -314,7 +319,7 @@ function SkinCard({
                   ) : (
                     <LuPlay size={11} />
                   )}
-                  Play
+                  {t("Play")}
                 </button>
                 <button
                   type="button"
@@ -323,11 +328,11 @@ function SkinCard({
                   }
                   className="text-xs underline cursor-pointer"
                 >
-                  remove
+                  {t("remove")}
                 </button>
               </>
             ) : (
-              <span className={clsx("text-xs", mutedText)}>silent</span>
+              <span className={clsx("text-xs", mutedText)}>{t("silent")}</span>
             )}
             <label className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold border border-dashed border-lprimary/30 cursor-pointer">
               <LuUpload size={11} />
@@ -343,7 +348,7 @@ function SkinCard({
                     setSlot.mutate(
                       { id: skin.id, slot, file },
                       {
-                        onSuccess: () => toast.success("Sound uploaded"),
+                        onSuccess: () => toast.success(t("Sound uploaded")),
                         onError,
                       },
                     );

@@ -3,6 +3,7 @@ import { useId } from "react";
 import { Box, Modal } from "@mui/material";
 import style from "@/utils/modalStyle";
 import ClientImage from "@/components/ClientImage";
+import { useT } from "@/lib/i18n/context";
 import ModalCloseButton from "@/components/ModalCloseButton";
 
 export default function ConfirmationModal({
@@ -24,6 +25,7 @@ export default function ConfirmationModal({
   confirming?: boolean;
   confirmingLabel?: string;
 }) {
+  const t = useT();
   const id = useId();
   const titleId = `${id}-title`;
   const descId = `${id}-desc`;
@@ -47,13 +49,13 @@ export default function ConfirmationModal({
           <ClientImage
             props={{
               src: "/images/endGame.svg",
-              alt: "End game",
+              alt: t("End game"),
               width: 140,
               height: 140,
             }}
           />
           <p id={titleId} className="text-xl font-bold mb-2 dark:text-white">
-            Are you sure?
+            {t("Are you sure?")}
           </p>
           <p
             id={descId}
@@ -67,7 +69,7 @@ export default function ConfirmationModal({
               disabled={confirming}
               className="text-white bg-red-light rounded-lg py-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Cancel
+              {t("Cancel")}
             </button>
             <button
               onClick={onClick}

@@ -1,5 +1,5 @@
 import { Type } from "class-transformer";
-import { IsInt, IsString, Min } from "class-validator";
+import { IsIn, IsInt, IsOptional, IsString, Min } from "class-validator";
 
 export class CreateAiQuizDto {
   @IsString()
@@ -17,4 +17,9 @@ export class CreateAiQuizDto {
   @IsInt()
   @Min(1)
   time!: number;
+
+  /** The language to write the quiz in (the host's UI language). */
+  @IsOptional()
+  @IsIn(["English", "German"])
+  language?: string;
 }
