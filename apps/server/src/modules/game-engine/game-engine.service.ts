@@ -411,7 +411,12 @@ export class GameEngineService
 
   async startGame(gameCode: string): Promise<void> {
     const state = await this.store.loadState(gameCode, PARTS_FOR.start);
-    if (!state || state.meta.phase !== "lobby") return;
+    if (!state || state.meta.phase !== "lobby") {
+      this.logger.warn(
+        `Start of ${gameCode} ignored: ${state ? `phase ${state.meta.phase}` : "no live state"}`,
+      );
+      return;
+    }
 
     const session = await this.prisma.db.gameSession.findUnique({
       where: { gameCode },

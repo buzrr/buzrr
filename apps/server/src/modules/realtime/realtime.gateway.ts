@@ -398,6 +398,7 @@ export class RealtimeGateway
     });
 
     socket.on("start-game", async () => {
+      this.logger.log(`Start requested for ${gameCode}`);
       try {
         await this.engine.startGame(gameCode);
       } catch (error) {

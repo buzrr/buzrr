@@ -1,5 +1,9 @@
 "use client";
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+/** How long the game screen waits for a "start" before returning to the lobby. */
+const LOBBY_BOUNCE_MS = 5000;
 import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import { setPlayers } from "@/state/admin/playersSlice";
 import type { Option } from "@/types/db";
@@ -49,6 +53,18 @@ const GameLobby = (params: {
   const t = useT();
   const dispatch = useAppDispatch();
   const phase = useAppSelector((state) => state.game.phase);
+  const router = useRouter();
+  // The game screen of a room that never started (the start got lost —
+  // e.g. a server restart): after a grace period for the start to land, the
+  // host goes back to the waiting room and its Start button.
+  useEffect(() => {
+    if (phase !== "lobby") return;
+    const tm = setTimeout(
+      () => router.replace(`/admin/play/${params.roomId}`),
+      LOBBY_BOUNCE_MS,
+    );
+    return () => clearTimeout(tm);
+  }, [phase, router, params.roomId]);
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const qCount = useAppSelector((state) => state.game.qCount);
   const moderation = useAppSelector((state) => state.game.moderation);
