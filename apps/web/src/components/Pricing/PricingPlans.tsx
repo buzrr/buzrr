@@ -58,7 +58,13 @@ export default function PricingPlans() {
   // its hook resolves a second React copy when this page is prerendered.
   const { data: session, isPending: sessionPending } = useQuery({
     queryKey: ["auth", "session"] as const,
-    queryFn: async () => (await authClient.getSession()).data ?? null,
+    // getSession() resolves with { error } instead of throwing; rethrow so a
+    // failed lookup is retried rather than read as "signed out".
+    queryFn: async () => {
+      const { data, error } = await authClient.getSession();
+      if (error) throw error;
+      return data ?? null;
+    },
   });
   const signedIn = Boolean(session?.user);
 

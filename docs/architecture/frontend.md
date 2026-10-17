@@ -224,7 +224,8 @@ the Prisma runtime out of the client bundle).
   from `GET /api/auth/methods` (`lib/auth-methods.ts` — Google when its
   credentials are set, email + password with `AUTH_EMAIL_PASSWORD=ON`), which
   reads runtime env so one image serves any configuration and is CDN-cached
-  (`s-maxage`) so it isn't a function call per visit. Google-only installs
+  for 5 minutes (`s-maxage=300`) so it isn't a function call per visit, short
+  enough that a self-host behind a caching proxy sees setting changes soon. Google-only installs
   still auto-redirect.
 - Vercel function cost: keep public pages static (no `headers()`/session reads
   in the server component — `/pricing` reads region and session in the

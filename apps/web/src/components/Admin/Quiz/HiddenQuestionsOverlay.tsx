@@ -107,8 +107,9 @@ export default function HiddenQuestionsOverlay({ quizId }: { quizId: string }) {
 
   return (
     // pointer-events-none: the panel's toolbar (add question, hide switch)
-    // stays usable under the overlay's empty area.
-    <div className="pointer-events-none absolute inset-0 z-20 px-4">
+    // stays usable under the overlay's empty area. z-[5]: above the list,
+    // below the mobile info drawer (z-20) and its backdrop (z-10).
+    <div className="pointer-events-none absolute inset-0 z-[5] px-4">
       {/* pt-16 leaves the sticky toolbar out of the centring. */}
       <div className="sticky top-0 h-full max-h-dvh pt-16 flex items-center justify-center">
         <div className="pointer-events-auto w-full max-w-md flex flex-col items-center gap-5 rounded-[26px] border border-lprimary/15 dark:border-white/5 bg-white/90 dark:bg-dark/90 backdrop-blur-sm px-8 py-10 text-center shadow-[0_24px_48px_-24px_rgba(0,0,0,0.45)] animate-pop-in">
