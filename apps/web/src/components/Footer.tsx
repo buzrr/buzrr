@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { LuMail } from "react-icons/lu";
 import ThemeToggle from "./ThemeToggle";
 import supportLinks from "@/data/support-links.json";
-import { CONTACT_EMAIL, PRIVATE_BUZZ } from "@/lib/instance";
+import { useInstance } from "@/lib/instance-context";
 import { authClient } from "@/lib/auth-client";
 
 // Routes that render their own full footer + theme toggle (landing & co).
@@ -72,7 +72,7 @@ const Links = [
  * On a private instance "Contact us" is the instance's own address
  * (CONTACT_EMAIL) — or left out when none is set.
  */
-function footerLinks() {
+function footerLinks(PRIVATE_BUZZ: boolean, CONTACT_EMAIL: string) {
   if (!PRIVATE_BUZZ) return Links;
   return Links.flatMap((l) =>
     l.name !== "Contact us"
@@ -85,6 +85,8 @@ function footerLinks() {
 
 const Footer = () => {
   const pathname = usePathname();
+  const { privateBuzz: PRIVATE_BUZZ, contactEmail: CONTACT_EMAIL } =
+    useInstance();
   // Checked after mount: authClient.useSession() breaks static prerendering.
   const [signedIn, setSignedIn] = useState(false);
   useEffect(() => {
@@ -109,7 +111,10 @@ const Footer = () => {
     <div className="fixed bottom-0 right-3 md:right-0 md:left-0 z-50 w-fit md:w-full md:bg-light-bg md:dark:bg-dark-bg">
       <div className="max-w-7xl mx-auto flex items-center justify-start p-2 px-4 sm:px-6 lg:px-8 text-sm text-[#94959c] dark:text-off-white">
         {/* Private instances: contact/donate/social links only for signed-in users. */}
-        {(PRIVATE_BUZZ && !signedIn ? [] : footerLinks()).map((link, index) => {
+        {(PRIVATE_BUZZ && !signedIn
+          ? []
+          : footerLinks(PRIVATE_BUZZ, CONTACT_EMAIL)
+        ).map((link, index) => {
           // New tab only for real external web links — never for mailto:, in-app
           // routes, or "#" placeholders.
           const isExternal =

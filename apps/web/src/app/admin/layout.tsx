@@ -7,7 +7,7 @@ import SupportNudge from "@/components/SupportNudge";
 import ToastViewport from "@/components/ToastViewport";
 import type { Metadata } from "next";
 import { NOINDEX_METADATA } from "@/lib/seo/metadata";
-import { PRIVATE_BUZZ } from "@/lib/instance";
+import { getInstanceConfig } from "@/lib/instance";
 
 import { auth } from "@/lib/auth";
 import { getUserRole } from "@/lib/get-current-role";
@@ -51,7 +51,7 @@ export default async function RootLayout({
         </div>
         {children}
         <ToastViewport />
-        {!PRIVATE_BUZZ && <SupportNudge />}
+        {!getInstanceConfig().privateBuzz && <SupportNudge />}
       </div>
     </SessionProvider>
   );

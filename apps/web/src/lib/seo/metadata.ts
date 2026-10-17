@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { SITE_NAME, absoluteUrl } from "./site";
+import { absoluteUrl, siteName } from "./site";
 
 export const OG_IMAGE_SIZE = { width: 1200, height: 630 } as const;
 
@@ -48,7 +48,7 @@ export function buildPageMetadata({
   noindex = false,
 }: PageMetadataInput): Metadata {
   const url = absoluteUrl(path);
-  const socialTitle = absoluteTitle ? title : `${title} | ${SITE_NAME}`;
+  const socialTitle = absoluteTitle ? title : `${title} | ${siteName()}`;
   const images = [
     ogImage
       ? {
@@ -69,7 +69,7 @@ export function buildPageMetadata({
     openGraph: {
       type: ogType,
       url,
-      siteName: SITE_NAME,
+      siteName: siteName(),
       locale: "en_US",
       title: socialTitle,
       description,

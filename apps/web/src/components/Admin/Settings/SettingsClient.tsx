@@ -19,7 +19,7 @@ import TextInput from "@/components/ui/TextInput";
 import { DEFAULT_AVATAR } from "@/constants";
 import { authClient } from "@/lib/auth-client";
 import { useEntitlementsQuery } from "@/lib/modules/billing/hooks";
-import { BILLING_ENABLED } from "@/lib/instance";
+import { useInstance } from "@/lib/instance-context";
 
 const accountSchema = z.object({
   name: z
@@ -250,6 +250,7 @@ function DangerZoneCard() {
 }
 
 export default function SettingsClient() {
+  const { billing } = useInstance();
   return (
     <div className="w-full p-4 md:p-6">
       <div className="flex items-center gap-2 mb-4">
@@ -263,7 +264,7 @@ export default function SettingsClient() {
       <div className="flex flex-col gap-6">
         <PreferencesCard />
         <AccountCard />
-        {BILLING_ENABLED && <PlanCard />}
+        {billing && <PlanCard />}
         <DangerZoneCard />
       </div>
     </div>

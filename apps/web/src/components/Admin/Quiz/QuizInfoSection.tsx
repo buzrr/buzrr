@@ -91,7 +91,7 @@ export function QuizInfoContent(props: {
         </div>
         <ModerationSettingsCard quiz={props.quiz} />
       </div>
-      <div className="flex-1 flex flex-col min-h-0 w-[90%] mx-auto text-dark dark:text-white">
+      <div className="flex flex-col w-[90%] mx-auto text-dark dark:text-white">
         <div className="flex items-center justify-between mt-6 mb-3">
           <h4 className="text-sm font-bold tracking-[0.04em] uppercase text-[#8a8896] dark:text-muted-dark">
             Previously used
@@ -100,8 +100,9 @@ export function QuizInfoContent(props: {
             {pastGames.length}
           </span>
         </div>
-        {/* Bottom room for the site footer and the floating "Host quiz". */}
-        <div className="overflow-auto flex-1 min-h-0 flex flex-col gap-2.5 pr-1 -mr-1 pb-32">
+        {/* Full length — the whole panel scrolls, like the question list.
+            Bottom room for the floating "Host quiz" button. */}
+        <div className="flex flex-col gap-2.5 pb-28">
           {pastGames.length > 0 ? (
             pastGames.map((result) => {
               const leaderboardClass =
@@ -169,7 +170,7 @@ export default function QuizInfoSection(props: {
   onShowLeaderboard?: (resultId: string) => void;
 }) {
   return (
-    <div className="md:w-2/5 lg:w-1/3 shrink-0 h-full bg-white dark:bg-dark rounded-xl p-4 hidden md:flex flex-col min-h-0">
+    <div className="md:w-2/5 lg:w-1/3 shrink-0 h-full bg-white dark:bg-dark rounded-xl p-4 hidden md:flex flex-col min-h-0 overflow-y-auto">
       <QuizInfoContent
         quiz={props.quiz}
         onShowLeaderboard={props.onShowLeaderboard}

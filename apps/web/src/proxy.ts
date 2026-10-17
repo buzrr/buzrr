@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { BILLING_ENABLED, PRIVATE_BUZZ } from "@/lib/instance";
+import { getInstanceConfig } from "@/lib/instance";
 
 /** Pricing and checkout only exist when billing is on. */
 const BILLING_ROUTES = ["/pricing", "/billing", "/refund-policy"];
@@ -24,6 +24,8 @@ const matches = (pathname: string, routes: string[]) =>
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const { billing: BILLING_ENABLED, privateBuzz: PRIVATE_BUZZ } =
+    getInstanceConfig();
   if (!BILLING_ENABLED && pathname.startsWith("/admin/billing")) {
     return NextResponse.redirect(new URL("/admin", request.url));
   }

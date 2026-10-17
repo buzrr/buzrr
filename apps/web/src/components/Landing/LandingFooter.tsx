@@ -18,13 +18,15 @@ import {
   LICENSE_LINK,
   YOUTUBE_LINK,
 } from "./links";
-import { BILLING_ENABLED } from "@/lib/instance";
+import { getInstanceConfig } from "@/lib/instance";
 
 const columns = [
   {
     title: "Product",
     links: [
-      ...(BILLING_ENABLED ? [{ name: "Pricing", href: "/pricing" }] : []),
+      ...(getInstanceConfig().billing
+        ? [{ name: "Pricing", href: "/pricing" }]
+        : []),
       { name: "Docs", href: "/docs" },
       { name: "Open-source quiz platform", href: "/open-source-quiz-platform" },
       { name: "Self-hosted quiz", href: "/self-hosted-quiz" },
@@ -68,7 +70,7 @@ const columns = [
       { name: "Contributing", href: CONTRIBUTING_LINK, external: true },
       { name: "License (AGPL-3.0)", href: LICENSE_LINK, external: true },
       ...LEGAL_PAGES.filter(
-        (page) => BILLING_ENABLED || page.path !== "/refund-policy",
+        (page) => getInstanceConfig().billing || page.path !== "/refund-policy",
       ).map((page) => ({ name: page.name, href: page.path })),
     ],
   },

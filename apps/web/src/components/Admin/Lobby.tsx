@@ -38,7 +38,7 @@ import type { PlayerPayload } from "@buzrr/contract";
 import ConfirmationModal from "@/components/Admin/ConfirmationModal";
 import { buildJoinUrl } from "@/lib/join-link";
 import EndQuizButton from "@/components/Admin/EndQuizButton";
-import { BILLING_ENABLED } from "@/lib/instance";
+import { useInstance } from "@/lib/instance-context";
 
 const Lobby = (params: {
   roomId: string;
@@ -54,6 +54,7 @@ const Lobby = (params: {
   quizSettings?: unknown;
 }) => {
   const dispatch = useAppDispatch();
+  const { billing } = useInstance();
   const players = useAppSelector((state) => state.player.players);
   const maxPlayers = params.maxPlayers ?? 50;
   const [load, setLoad] = useState(false);
@@ -256,7 +257,10 @@ const Lobby = (params: {
   }
 
   // Starting with nobody in the room is fine (a rehearsal, a presentation).
-  const startDisabled = load || !socket?.connected;
+  // `socket.connected` doesn't re-render when it flips; the slice's
+  // connection status does (with nobody joining, nothing else would).
+  const connection = useAppSelector((state) => state.game.connection);
+  const startDisabled = load || !socket || connection !== "connected";
 
   return (
     <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 pb-4 md:pb-0 md:h-[calc(100dvh-10rem)] text-dark dark:text-white">
@@ -401,7 +405,7 @@ const Lobby = (params: {
             </div>
             <p className="text-[12.5px] text-off-dark dark:text-muted-dark">
               This room can hold up to {maxPlayers} players.
-              {BILLING_ENABLED && params.plan === "free" && (
+              {billing && params.plan === "free" && (
                 <>
                   {" "}
                   <Link

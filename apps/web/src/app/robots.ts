@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { absoluteUrl } from "@/lib/seo/site";
-import { PRIVATE_BUZZ } from "@/lib/instance";
+import { getInstanceConfig } from "@/lib/instance";
 
 /**
  * Blocks only what crawlers can't use: API routes and the signed-in areas
@@ -9,8 +9,11 @@ import { PRIVATE_BUZZ } from "@/lib/instance";
  * page to see that. Join links get shared publicly, so disallowing them here
  * could leave bare URLs in the index.
  */
+// Read at request time (PRIVATE_BUZZ may change without a rebuild).
+export const dynamic = "force-dynamic";
+
 export default function robots(): MetadataRoute.Robots {
-  if (PRIVATE_BUZZ) {
+  if (getInstanceConfig().privateBuzz) {
     return { rules: [{ userAgent: "*", disallow: "/" }] };
   }
   return {

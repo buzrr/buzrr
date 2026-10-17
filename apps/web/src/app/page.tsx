@@ -33,15 +33,16 @@ import {
 } from "@/components/Marketing/product";
 import { siteGraph, webPageSchema } from "@/lib/seo/json-ld";
 import { buildPageMetadata } from "@/lib/seo/metadata";
-import { DEFAULT_TITLE, SITE_DESCRIPTION } from "@/lib/seo/site";
-import { PRIVATE_BUZZ } from "@/lib/instance";
+import { SITE_DESCRIPTION, defaultTitle } from "@/lib/seo/site";
+import { getInstanceConfig } from "@/lib/instance";
 
-export const metadata = buildPageMetadata({
-  title: DEFAULT_TITLE,
-  absoluteTitle: true,
-  description: SITE_DESCRIPTION,
-  path: "/",
-});
+export const generateMetadata = () =>
+  buildPageMetadata({
+    title: defaultTitle(),
+    absoluteTitle: true,
+    description: SITE_DESCRIPTION,
+    path: "/",
+  });
 
 const heroBadges = [
   { icon: <LuUsers size={13} />, label: "Contributors Welcome" },
@@ -130,7 +131,7 @@ function PrivateHome() {
 }
 
 export default async function Home() {
-  if (PRIVATE_BUZZ) return <PrivateHome />;
+  if (getInstanceConfig().privateBuzz) return <PrivateHome />;
   const stats = await getGithubStats();
 
   const statTiles = [
@@ -159,7 +160,7 @@ export default async function Home() {
           ...siteGraph(),
           webPageSchema({
             path: "/",
-            title: DEFAULT_TITLE,
+            title: defaultTitle(),
             description: SITE_DESCRIPTION,
           }),
         ]}

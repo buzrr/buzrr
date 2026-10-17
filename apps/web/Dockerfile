@@ -16,18 +16,11 @@ ARG PUBLIC_API_URL=http://localhost:3001
 ARG PUBLIC_WEB_URL=http://localhost:3000
 # Empty hides Knowledge Spaces (the optional apps/ai service).
 ARG PUBLIC_AI_API_URL=
-# Instance switches (apps/web/src/lib/instance.ts): ON | OFF.
-ARG BILLING=OFF
-ARG PRIVATE_BUZZ=OFF
-ARG TITLE=
-ARG CONTACT_EMAIL=
+# Instance options (BILLING, PRIVATE_BUZZ, TITLE, CONTACT_EMAIL) are runtime
+# environment variables of the web container — see apps/web/src/lib/instance.ts.
 # Unique per build (e.g. commit + time); open pages reload when it changes.
 ARG BUILD_ID=
-ENV NEXT_PUBLIC_BILLING=$BILLING \
-    NEXT_PUBLIC_PRIVATE_BUZZ=$PRIVATE_BUZZ \
-    NEXT_PUBLIC_TITLE=$TITLE \
-    NEXT_PUBLIC_CONTACT_EMAIL=$CONTACT_EMAIL \
-    NEXT_PUBLIC_BUILD_ID=$BUILD_ID \
+ENV NEXT_PUBLIC_BUILD_ID=$BUILD_ID \
     NEXT_PUBLIC_API_URL=$PUBLIC_API_URL \
     NEXT_PUBLIC_SOCKET_URL=$PUBLIC_API_URL \
     NEXT_PUBLIC_APP_URL=$PUBLIC_WEB_URL \

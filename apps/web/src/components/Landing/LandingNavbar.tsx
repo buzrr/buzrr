@@ -5,21 +5,21 @@ import Link from "next/link";
 import { LuGithub, LuMenu, LuX } from "react-icons/lu";
 import ClientImage from "@/components/ClientImage";
 import ThemeIconToggle from "./ThemeIconToggle";
-import { BILLING_ENABLED, PRIVATE_BUZZ } from "@/lib/instance";
+import { useInstance } from "@/lib/instance-context";
 import { GITHUB_LINK } from "./links";
-
-// A private instance shows only a login link; the hosted site's pages are gone.
-const navLinks = PRIVATE_BUZZ
-  ? [{ name: "Login", href: "/admin" }]
-  : [
-      ...(BILLING_ENABLED ? [{ name: "Pricing", href: "/pricing" }] : []),
-      { name: "Use cases", href: "/use-cases" },
-      { name: "Alternatives", href: "/alternatives" },
-      { name: "Docs", href: "/docs" },
-    ];
 
 const LandingNavbar = () => {
   const [open, setOpen] = useState(false);
+  const { billing: BILLING_ENABLED, privateBuzz: PRIVATE_BUZZ } = useInstance();
+  // A private instance shows only a login link; the hosted site's pages are gone.
+  const navLinks = PRIVATE_BUZZ
+    ? [{ name: "Login", href: "/admin" }]
+    : [
+        ...(BILLING_ENABLED ? [{ name: "Pricing", href: "/pricing" }] : []),
+        { name: "Use cases", href: "/use-cases" },
+        { name: "Alternatives", href: "/alternatives" },
+        { name: "Docs", href: "/docs" },
+      ];
 
   return (
     <header className="sticky top-0 z-40 bg-light-bg/90 dark:bg-dark-bg/90 backdrop-blur border-b border-card-light dark:border-card-dark">
