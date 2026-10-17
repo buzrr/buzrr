@@ -326,7 +326,8 @@ function advance(
   const { meta } = state;
   if (meta.qIndex + 1 < meta.qCount) {
     const mod = moderationOf(meta);
-    if (mod?.confirmNextQuestion) return enterReady(state, meta.qIndex + 1);
+    // The get-ready slide opens the round only (before question 1): after a
+    // host click on "Next question" another click would add nothing.
     // A question with sound always gets a countdown, so downloads can finish.
     // … unless it has no time limit: those open straight away.
     const nextQ = state.questions[meta.qIndex + 1];

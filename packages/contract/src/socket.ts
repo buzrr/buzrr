@@ -39,15 +39,21 @@ export const gamePhaseSchema = z.enum([
  */
 export const moderationSettingsSchema = z.object({
   enabled: z.boolean().default(false),
-  /** Reveal the correct answer after each question. */
-  showAnswer: z.boolean().default(true),
-  /** ...only when the host clicks "Show answer". */
+  /**
+   * The correct answer is always revealed (no longer an option): whatever an
+   * older quiz stored, this reads as true.
+   */
+  showAnswer: z
+    .boolean()
+    .default(true)
+    .transform(() => true as const),
+  /** The answer is revealed only when the host clicks "Show answer". */
   confirmShowAnswer: z.boolean().default(true),
   /** Show the standings after every question. */
   showScores: z.boolean().default(true),
   /** ...only when the host clicks "Show scores" (after the answer). */
   confirmShowScores: z.boolean().default(true),
-  /** A "get ready" slide before each question that the host starts. */
+  /** A "get ready" slide before the first question that the host starts. */
   confirmNextQuestion: z.boolean().default(true),
 });
 

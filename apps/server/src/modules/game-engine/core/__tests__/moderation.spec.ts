@@ -168,13 +168,13 @@ describe("moderated question flow", () => {
     ]);
   });
 
-  it("after the scores the next question gets its get-ready slide", () => {
+  it("after the scores the next question counts down (get-ready only opens the round)", () => {
     const scores = questionOpen(
       {},
       { phase: "scores", moderation: moderated() },
     );
     const { state: next } = step(scores, { type: "host-next" }, T0);
-    expect(next.meta).toMatchObject({ phase: "ready", qIndex: 1 });
+    expect(next.meta).toMatchObject({ phase: "starting", qIndex: 1 });
   });
 
   it("the last question's scores lead to the final leaderboard", () => {
@@ -197,16 +197,19 @@ describe("moderated question flow", () => {
     expect(events(open, { type: "deadline" }, now)).toContain("leaderboard");
   });
 
-  it("with answers hidden, 'closed' goes straight to the scores", () => {
+  it("an older quiz that hid the answer still reveals it", () => {
     const closed = questionOpen(
       {},
-      { phase: "closed", moderation: moderated({ showAnswer: false }) },
+      {
+        phase: "closed",
+        moderation: JSON.stringify({
+          ...JSON.parse(moderated()),
+          showAnswer: false,
+        }),
+      },
     );
-    const { state: next, effects } = step(closed, { type: "host-next" }, T0);
-    expect(next.meta.phase).toBe("scores");
-    // Players still get their personal result (it was never sent).
-    expect(emitted(effects).map((e) => e.event)).toContain("answer-result");
-    expect(emitted(effects).map((e) => e.event)).not.toContain("question-end");
+    const { state: next } = step(closed, { type: "host-next" }, T0);
+    expect(next.meta.phase).toBe("reveal");
   });
 
   it("host-paced steps park their deadline instead of advancing", () => {

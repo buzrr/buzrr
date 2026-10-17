@@ -934,4 +934,9 @@ export const DE: Record<string, string> = {
   "— Leaderboard": "– Bestenliste",
   "← Back to duel": "← Zurück zum Duell",
   "← Back to profile": "← Zurück zum Profil",
+  "Get-ready slide before the first question (you start the round)":
+    "„Mach dich bereit“-Folie vor der ersten Frage (du startest die Runde)",
+  "Show the answer on click (first how the room voted)":
+    "Auflösung per Klick (erst die Abstimmung zeigen)",
+  "Show the scores on click": "Punkte per Klick",
 };

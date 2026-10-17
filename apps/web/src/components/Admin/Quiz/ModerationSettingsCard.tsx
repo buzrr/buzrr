@@ -23,18 +23,16 @@ type SubKey = Exclude<keyof ModerationSettings, "enabled">;
 const SUB_OPTIONS: { key: SubKey; label: string; parent?: SubKey }[] = [
   {
     key: "confirmNextQuestion",
-    label: "Get-ready slide before each question (host starts it)",
+    label: "Get-ready slide before the first question (you start the round)",
   },
-  { key: "showAnswer", label: "Show answer" },
   {
     key: "confirmShowAnswer",
-    label: "Confirm show answer",
-    parent: "showAnswer",
+    label: "Show the answer on click (first how the room voted)",
   },
   { key: "showScores", label: "Show scores after every question" },
   {
     key: "confirmShowScores",
-    label: "Confirm show scores",
+    label: "Show the scores on click",
     parent: "showScores",
   },
 ];
