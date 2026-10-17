@@ -4,7 +4,10 @@ import clsx from "clsx";
 import Image from "next/image";
 import { DEFAULT_AVATAR } from "@/constants";
 import { useAppSelector } from "@/state/hooks";
+import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import EndQuizButton from "@/components/Admin/EndQuizButton";
+import { useEndRoomMutation } from "@/lib/modules/game-sessions/hooks";
 import {
   labelClass,
   mutedText,
@@ -92,11 +95,29 @@ export default function LeaderBoard({
   roomId,
   quizTitle,
   alreadyEnded,
+  quizId,
 }: {
   roomId: string;
   quizTitle: string;
   alreadyEnded: boolean;
+  /** With fewer than three players the host goes straight back here. */
+  quizId?: string;
 }) {
+  const router = useRouter();
+  const endRoom = useEndRoomMutation();
+  const players = useAppSelector((state) => state.game.leaderboard.length);
+  // A test run or a tiny game: no podium ceremony — save the result and go
+  // back to the quiz editor (players keep their thank-you screen).
+  const leaving = Boolean(quizId) && players < 3;
+  const left = useRef(false);
+  useEffect(() => {
+    if (!leaving || left.current) return;
+    left.current = true;
+    const back = () => router.push(`/admin/quiz/${quizId}`);
+    if (alreadyEnded) back();
+    else endRoom.mutate(roomId, { onSettled: back });
+  }, [leaving, alreadyEnded, endRoom, roomId, quizId, router]);
+
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
   const qCount = useAppSelector((state) => state.game.qCount);
   const rest = leaderboard.slice(3);

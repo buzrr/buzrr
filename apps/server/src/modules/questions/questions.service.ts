@@ -370,12 +370,12 @@ export class QuestionsService {
       // Only now, and only the question's own stored media — never a URL
       // the client sent (`file_link`), which could name anyone's upload.
       if (existing?.media && existing.media !== fileLink) {
-        await this.storage.remove(existing.media);
+        await this.removeUnused(existing.media);
       }
       if (existing?.audio && existing.audio !== audio) {
-        await this.storage.remove(existing.audio);
+        await this.removeUnused(existing.audio);
       }
-      for (const old of clips.replaced) await this.storage.remove(old);
+      for (const old of clips.replaced) await this.removeUnused(old);
     } else {
       await this.prisma.db.$transaction(async (tx) => {
         const count = await tx.question.count({ where: { quizId } });
@@ -556,5 +556,26 @@ export class QuestionsService {
     ]);
     const ids = rows.map((question) => question.id);
     return { created: ids.length, ids };
+  }
+
+  /**
+   * Removes an upload unless another question (or a quiz logo) still uses
+   * it — duplicated quizzes share their files with the original.
+   */
+  private async removeUnused(url: string): Promise<void> {
+    const [questions, quizzes] = await Promise.all([
+      this.prisma.db.question.count({
+        where: {
+          OR: [
+            { media: url },
+            { audio: url },
+            { audioClip: url },
+            { audioRevealClip: url },
+          ],
+        },
+      }),
+      this.prisma.db.quiz.count({ where: { logo: url } }),
+    ]);
+    if (questions + quizzes === 0) await this.storage.remove(url);
   }
 }

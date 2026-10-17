@@ -1,4 +1,5 @@
 import { importQuizSchema, type ImportQuiz } from "@buzrr/contract";
+import { FileInterceptor } from "@nestjs/platform-express";
 import {
   Body,
   Controller,
@@ -9,7 +10,9 @@ import {
   Param,
   Patch,
   Post,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from "@nestjs/common";
 import { CurrentAccountUser } from "../../common/decorators/current-user.decorator";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
@@ -81,6 +84,25 @@ export class QuizzesController {
     @Body(new ZodValidationPipe(importQuizSchema)) body: ImportQuiz,
   ) {
     return this.quizzes.importQuestions(user, body);
+  }
+
+  /** Sets (file) or clears (no file) the quiz's logo. */
+  @Post(":id/logo")
+  @UseInterceptors(
+    FileInterceptor("file", { limits: { fileSize: 5 * 1024 * 1024 } }),
+  )
+  setLogo(
+    @CurrentAccountUser() user: AuthUser,
+    @Param("id") id: string,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.quizzes.setLogo(user, id, file ?? null);
+  }
+
+  /** A copy of the quiz with all its questions (not its past games). */
+  @Post(":id/duplicate")
+  duplicate(@CurrentAccountUser() user: AuthUser, @Param("id") id: string) {
+    return this.quizzes.duplicate(user, id);
   }
 
   @Patch(":id")

@@ -113,6 +113,9 @@ model Quiz {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   thumbnail    String?
+  /// The quiz's own logo (an upload URL), shown on its game screens instead
+  /// of the site logo.
+  logo         String?
   /// Public quizzes feed the duel-mode question pool.
   isPublic     Boolean       @default(false)
   /// Quiz settings (`quizSettingsSchema` in @buzrr/contract), e.g. moderated mode.

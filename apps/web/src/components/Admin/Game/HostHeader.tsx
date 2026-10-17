@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import ClientImage from "@/components/ClientImage";
+import GameLogo from "@/components/Game/GameLogo";
 import ConnectionStatusPill from "@/components/ConnectionStatusPill";
 import EndQuizButton from "@/components/Admin/EndQuizButton";
 import { SoundToggle } from "@/lib/sound/director";
@@ -21,8 +21,11 @@ export default function HostHeader({
   endRedirect,
   alreadyEnded,
   middle,
+  logo,
 }: {
   title: string;
+  /** The quiz's own logo (replaces the site logo). */
+  logo?: string | null;
   roomId: string;
   endRedirect?: string;
   alreadyEnded?: boolean;
@@ -32,15 +35,7 @@ export default function HostHeader({
   return (
     <header className="flex items-start gap-3 md:gap-5 pt-3 pb-2 md:pt-4 md:pb-3 shrink-0">
       <div className="flex-1 min-w-0 flex items-center gap-3 md:gap-5 self-center">
-        <ClientImage
-          props={{
-            src: "/images/logo.svg",
-            darksrc: "/images/logo-dark.svg",
-            alt: "Logo",
-            width: 64,
-            height: 64,
-          }}
-        />
+        <GameLogo logo={logo} size={64} />
         <h1 className="flex-1 min-w-0 text-xl md:text-2xl font-bold tracking-[-0.01em] truncate">
           {title}
         </h1>

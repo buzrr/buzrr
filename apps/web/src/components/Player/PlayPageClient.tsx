@@ -4,7 +4,7 @@ import GamePage from "@/components/Player/GamePage";
 import { LeaderBoard } from "@/components/Player/GameScreens";
 import { loadFinalResult } from "@/lib/final-result";
 import ValidatePlayer from "@/components/Player/ValidatePlayer";
-import ClientImage from "@/components/ClientImage";
+import GameLogo from "@/components/Game/GameLogo";
 import Skeleton from "@/components/ui/Skeleton";
 import { usePlayerPlayQuery } from "@/lib/modules/game-sessions/hooks";
 import { isAxiosError } from "axios";
@@ -62,15 +62,7 @@ export default function PlayPageClient({ playerId }: { playerId: string }) {
     <>
       <ValidatePlayer playerId={player.id} />
       <div className="p-4 pb-2 flex justify-between">
-        <ClientImage
-          props={{
-            src: "/images/logo.svg",
-            darksrc: "/images/logo-dark.svg",
-            alt: "Buzrr Logo",
-            width: 80,
-            height: 80,
-          }}
-        />
+        <GameLogo logo={game.quiz?.logo} size={80} />
       </div>
       <GamePage player={player} game={game} />
     </>

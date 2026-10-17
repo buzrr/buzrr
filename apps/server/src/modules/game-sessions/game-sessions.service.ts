@@ -1,3 +1,4 @@
+import { signAssetUrl } from "../../common/storage/asset-signing";
 import {
   ForbiddenException,
   Injectable,
@@ -140,6 +141,30 @@ export class GameSessionsService {
       throw new ForbiddenException("Unauthorized");
     }
     return result;
+  }
+
+  /**
+   * Deletes past runs the user hosted: one (`resultId`) or all of a quiz's
+   * (`quizId`). Entries go with them (cascade). Only classic games — duel
+   * results belong to their players' ratings.
+   */
+  async deleteResults(
+    user: AuthUser,
+    where: { resultId: string } | { quizId: string },
+  ): Promise<void> {
+    const scope = {
+      hostId: user.userId,
+      mode: "classic" as const,
+      ...("resultId" in where
+        ? { id: where.resultId }
+        : { quizId: where.quizId }),
+    };
+    const { count } = await this.prisma.db.gameResult.deleteMany({
+      where: scope,
+    });
+    if ("resultId" in where && count === 0) {
+      throw new NotFoundException("Result not found");
+    }
   }
 
   /**
@@ -311,6 +336,9 @@ export class GameSessionsService {
       return { player, game: null };
     }
     const game = await this.loadGameForPlay(player.gameId);
+    // A public route: the quiz logo gets its signature here (players of
+    // this room are the ones who may see it).
+    if (game?.quiz?.logo) game.quiz.logo = signAssetUrl(game.quiz.logo);
     return { player, game };
   }
 
@@ -326,6 +354,7 @@ export class GameSessionsService {
             id: true,
             title: true,
             settings: true,
+            logo: true,
             questions: { select: { id: true } },
           },
         },

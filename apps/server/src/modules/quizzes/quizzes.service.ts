@@ -17,6 +17,11 @@ import {
   TextGenerator,
 } from "../../common/llm/text-generator";
 import { PrismaService } from "../../prisma/prisma.service";
+import {
+  MediaStorage,
+  MediaUnavailableError,
+  UnsupportedMediaError,
+} from "../../common/storage/media-storage";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
 import { EntitlementsService } from "../billing/entitlements.service";
 import {
@@ -87,7 +92,50 @@ export class QuizzesService {
     private readonly prisma: PrismaService,
     private readonly llm: TextGenerator,
     private readonly entitlements: EntitlementsService,
+    private readonly storage: MediaStorage,
   ) {}
+
+  async setLogo(
+    user: AuthUser,
+    quizId: string,
+    file: Express.Multer.File | null,
+  ): Promise<{ logo: string | null }> {
+    const quiz = await this.prisma.db.quiz.findFirst({
+      where: { id: quizId, userId: user.userId },
+      select: { logo: true },
+    });
+    if (!quiz) throw new NotFoundException("Unauthorized or quiz not found");
+    let logo: string | null = null;
+    if (file) {
+      if (!file.mimetype.startsWith("image/")) {
+        throw new BadRequestException("The logo must be an image");
+      }
+      try {
+        ({ url: logo } = await this.storage.upload(file.buffer, {
+          contentType: file.mimetype,
+          filename: file.originalname,
+          kind: "image",
+        }));
+      } catch (err) {
+        if (err instanceof UnsupportedMediaError) {
+          throw new BadRequestException(err.message);
+        }
+        if (err instanceof MediaUnavailableError) {
+          throw new ServiceUnavailableException(err.message);
+        }
+        throw err;
+      }
+    }
+    await this.prisma.db.quiz.update({ where: { id: quizId }, data: { logo } });
+    // The old file goes unless a copy of this quiz still shows it.
+    if (quiz.logo && quiz.logo !== logo) {
+      const users = await this.prisma.db.quiz.count({
+        where: { logo: quiz.logo },
+      });
+      if (users === 0) await this.storage.remove(quiz.logo);
+    }
+    return { logo };
+  }
 
   async create(
     user: AuthUser,
@@ -104,6 +152,63 @@ export class QuizzesService {
       });
     });
     return { quizId: quiz.id };
+  }
+
+  /**
+   * Copies a quiz the user owns: settings, logo and every question with its
+   * options and media (uploads are shared, not copied — they are never
+   * deleted while referenced). Duel moderation starts over (draft).
+   */
+  async duplicate(user: AuthUser, quizId: string): Promise<{ quizId: string }> {
+    const source = await this.prisma.db.quiz.findFirst({
+      where: { id: quizId, userId: user.userId },
+      include: {
+        questions: { include: { options: true }, orderBy: { order: "asc" } },
+      },
+    });
+    if (!source) {
+      throw new NotFoundException("Unauthorized or quiz not found");
+    }
+    const copy = await this.prisma.db.$transaction(async (tx) => {
+      await this.entitlements.assertQuizCapacity(tx, user.userId);
+      return tx.quiz.create({
+        data: {
+          title: `${source.title} (copy)`.slice(0, 200),
+          description: source.description,
+          userId: user.userId,
+          thumbnail: source.thumbnail,
+          logo: source.logo,
+          settings: source.settings ?? {},
+          questions: {
+            create: source.questions.map((q) => ({
+              title: q.title,
+              type: q.type,
+              config: q.config ?? {},
+              createdById: user.userId,
+              timeOut: q.timeOut,
+              media: q.media,
+              mediaType: q.mediaType,
+              audio: q.audio,
+              audioStartMs: q.audioStartMs,
+              audioRevealMs: q.audioRevealMs,
+              audioPlayOn: q.audioPlayOn,
+              audioClip: q.audioClip,
+              audioClipKey: q.audioClipKey,
+              audioRevealClip: q.audioRevealClip,
+              audioRevealKey: q.audioRevealKey,
+              order: q.order,
+              options: {
+                create: q.options.map((o) => ({
+                  title: o.title,
+                  isCorrect: o.isCorrect,
+                })),
+              },
+            })),
+          },
+        },
+      });
+    });
+    return { quizId: copy.id };
   }
 
   async update(

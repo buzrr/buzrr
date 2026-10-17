@@ -1,17 +1,196 @@
 "use client";
 
+import clsx from "clsx";
+import Image from "next/image";
 import Link from "next/link";
-import { LuChevronRight } from "react-icons/lu";
+import { useRef, useState } from "react";
+import {
+  LuCheck,
+  LuChevronRight,
+  LuImagePlus,
+  LuPencil,
+  LuTrash2,
+  LuX,
+} from "react-icons/lu";
+import ConfirmationModal from "@/components/Admin/ConfirmationModal";
+import { inputClass } from "@/components/Game/GameUI";
 import { toast } from "react-toastify";
 import Switch from "@/components/ui/Switch";
 import { getApiErrorMessage } from "@/lib/api/errors";
-import { useUpdateQuizMutation } from "@/lib/modules/quizzes/hooks";
+import {
+  useDeleteResultsMutation,
+  useQuizLogoMutation,
+  useUpdateQuizMutation,
+} from "@/lib/modules/quizzes/hooks";
 import type { QuizDetail } from "@/lib/modules/quizzes/api";
 import ModerationSettingsCard from "@/components/Admin/Quiz/ModerationSettingsCard";
 
 function formatSessionDate(createdAt: string | Date) {
   const d = typeof createdAt === "string" ? new Date(createdAt) : createdAt;
   return d.toLocaleString("en-US", { timeZoneName: "short" });
+}
+
+/** Title and description, editable in place (pencil → fields → save). */
+function EditableHeader({ quiz }: { quiz: QuizDetail }) {
+  const updateQuiz = useUpdateQuizMutation();
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(quiz.title);
+  const [description, setDescription] = useState(quiz.description ?? "");
+  const start = () => {
+    setTitle(quiz.title);
+    setDescription(quiz.description ?? "");
+    setEditing(true);
+  };
+  const save = () => {
+    const t = title.trim();
+    if (!t) {
+      toast.error("The quiz needs a title");
+      return;
+    }
+    updateQuiz.mutate(
+      { quizId: quiz.id, title: t, description: description.trim() },
+      {
+        onSuccess: () => setEditing(false),
+        onError: (err) => toast.error(getApiErrorMessage(err)),
+      },
+    );
+  };
+  if (!editing) {
+    return (
+      <div className="relative mt-3 mb-4 pr-10">
+        <h2 className="text-[26px] md:text-[32px] font-bold tracking-[-0.02em] leading-[1.05] mb-1 wrap-break-word">
+          {quiz.title}
+        </h2>
+        {quiz.description && (
+          <p className="text-[15px] text-off-dark dark:text-muted-dark wrap-break-word">
+            {quiz.description}
+          </p>
+        )}
+        <button
+          type="button"
+          aria-label="Edit title and description"
+          title="Edit title and description"
+          onClick={start}
+          className="absolute top-0 right-0 size-9 rounded-[10px] flex items-center justify-center text-lprimary dark:text-dprimary hover:bg-lprimary/10 dark:hover:bg-white/5 cursor-pointer"
+        >
+          <LuPencil size={18} />
+        </button>
+      </div>
+    );
+  }
+  return (
+    <form
+      className="mt-3 mb-4 flex flex-col gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save();
+      }}
+    >
+      <input
+        autoFocus
+        value={title}
+        maxLength={200}
+        onChange={(e) => setTitle(e.target.value)}
+        aria-label="Quiz title"
+        className={clsx(inputClass, "!py-2.5 text-lg font-bold")}
+      />
+      <textarea
+        value={description}
+        maxLength={1000}
+        rows={3}
+        onChange={(e) => setDescription(e.target.value)}
+        aria-label="Quiz description"
+        placeholder="Description (optional)"
+        className={clsx(inputClass, "!py-2.5 text-[15px] resize-none")}
+      />
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => setEditing(false)}
+          className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-semibold text-off-dark dark:text-muted-dark hover:bg-lprimary/8 dark:hover:bg-white/5 cursor-pointer"
+        >
+          <LuX size={15} />
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={updateQuiz.isPending}
+          className="inline-flex items-center gap-1.5 rounded-xl bg-lprimary dark:bg-dprimary px-3 py-1.5 text-sm font-bold text-white dark:text-dark cursor-pointer disabled:opacity-60"
+        >
+          <LuCheck size={15} />
+          {updateQuiz.isPending ? "Saving…" : "Save"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** The quiz's own logo: shown on its game screens instead of the site logo. */
+function LogoSetting({ quiz }: { quiz: QuizDetail }) {
+  const logoMutation = useQuizLogoMutation(quiz.id);
+  const input = useRef<HTMLInputElement>(null);
+  const logo = (quiz as QuizDetail & { logo?: string | null }).logo ?? null;
+  const upload = (file: File | null) =>
+    logoMutation.mutate(file, {
+      onSuccess: () => toast.success(file ? "Logo saved" : "Logo removed"),
+      onError: (err) => toast.error(getApiErrorMessage(err)),
+    });
+  return (
+    <div className="flex items-center gap-3 mt-3 mb-1">
+      <button
+        type="button"
+        onClick={() => input.current?.click()}
+        disabled={logoMutation.isPending}
+        title={logo ? "Change logo" : "Upload a logo"}
+        className="relative size-14 shrink-0 rounded-xl border-[1.5px] border-dashed border-lprimary/25 dark:border-white/15 bg-light-bg dark:bg-card-dark flex items-center justify-center overflow-hidden cursor-pointer hover:border-dprimary"
+      >
+        {logo ? (
+          <Image
+            src={logo}
+            alt="Quiz logo"
+            fill
+            sizes="56px"
+            className="object-contain p-1"
+            unoptimized
+          />
+        ) : (
+          <LuImagePlus size={22} className="text-lprimary dark:text-dprimary" />
+        )}
+      </button>
+      <div className="flex flex-col min-w-0">
+        <span className="text-sm font-semibold">Quiz logo</span>
+        <span className="text-xs text-off-dark dark:text-muted-dark">
+          {logoMutation.isPending
+            ? "Uploading…"
+            : logo
+              ? "Shown in the game instead of the site logo"
+              : "Optional · PNG, JPG, SVG or WebP"}
+        </span>
+      </div>
+      {logo && !logoMutation.isPending && (
+        <button
+          type="button"
+          aria-label="Remove logo"
+          title="Remove logo"
+          onClick={() => upload(null)}
+          className="ml-auto size-8 rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] cursor-pointer"
+        >
+          <LuTrash2 size={16} />
+        </button>
+      )}
+      <input
+        ref={input}
+        type="file"
+        accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif"
+        className="sr-only"
+        onChange={(e) => {
+          const f = e.target.files?.[0] ?? null;
+          e.target.value = "";
+          if (f) upload(f);
+        }}
+      />
+    </div>
+  );
 }
 
 /**
@@ -28,6 +207,8 @@ export function QuizInfoContent(props: {
   const pastGames = props.quiz.gameResults ?? [];
   const questionCount = props.quiz._count?.questions ?? 0;
   const updateQuiz = useUpdateQuizMutation();
+  const deleteResults = useDeleteResultsMutation(props.quiz.id);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
   return (
     <>
@@ -60,12 +241,7 @@ export function QuizInfoContent(props: {
               : props.quiz.title}
           </span>
         </nav>
-        <h2 className="text-[26px] md:text-[32px] font-bold tracking-[-0.02em] leading-[1.05] mt-3 mb-1 wrap-break-word">
-          {props.quiz.title}
-        </h2>
-        <p className="capitalize mb-4 text-[15px] text-off-dark dark:text-muted-dark">
-          {props.quiz.description}
-        </p>
+        <EditableHeader quiz={props.quiz} />
         <p className="w-fit my-1 inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-[7px] text-[13px] font-semibold bg-[#c4ee4f] text-[#2c3a08] dark:bg-[#b8e94a] dark:text-[#15200a]">
           Total number of questions :{" "}
           <b className="font-extrabold">{questionCount}</b>
@@ -89,6 +265,7 @@ export function QuizInfoContent(props: {
             appearing in 1v1 duels
           </span>
         </div>
+        <LogoSetting quiz={props.quiz} />
         <ModerationSettingsCard quiz={props.quiz} />
       </div>
       <div className="flex flex-col w-[90%] mx-auto text-dark dark:text-white">
@@ -104,49 +281,79 @@ export function QuizInfoContent(props: {
             Bottom room for the floating "Host quiz" button. */}
         <div className="flex flex-col gap-2.5 pb-28">
           {pastGames.length > 0 ? (
-            pastGames.map((result) => {
-              const leaderboardClass =
-                "flex-1 text-center rounded-[9px] p-[9px] text-[12.5px] font-semibold bg-[#ef7f4d] text-white transition-[filter] hover:brightness-106 cursor-pointer";
-              return (
-                <div
-                  key={result.id}
-                  className="rounded-[14px] p-3.5 border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 transition-[border-color,transform] hover:border-lprimary dark:hover:border-dprimary hover:-translate-y-px"
-                >
-                  <div className="flex items-center justify-between gap-2.5">
-                    <span className="text-[12.5px] font-medium text-off-dark dark:text-muted-dark">
-                      {formatSessionDate(result.endedAt)}
-                    </span>
-                    <span className="text-[13px] font-extrabold tracking-[0.06em] rounded-[7px] px-2 py-0.5 text-lprimary dark:text-dprimary bg-lprimary/10 dark:bg-white/5">
-                      {result.gameCode}
-                    </span>
+            <>
+              {pastGames.map((result) => {
+                const leaderboardClass =
+                  "flex-1 text-center rounded-[9px] p-[9px] text-[12.5px] font-semibold bg-[#ef7f4d] text-white transition-[filter] hover:brightness-106 cursor-pointer";
+                return (
+                  <div
+                    key={result.id}
+                    className="rounded-[14px] p-3.5 border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 transition-[border-color,transform] hover:border-lprimary dark:hover:border-dprimary hover:-translate-y-px"
+                  >
+                    <div className="flex items-center justify-between gap-2.5">
+                      <span className="text-[12.5px] font-medium text-off-dark dark:text-muted-dark">
+                        {formatSessionDate(result.endedAt)}
+                      </span>
+                      <span className="text-[13px] font-extrabold tracking-[0.06em] rounded-[7px] px-2 py-0.5 text-lprimary dark:text-dprimary bg-lprimary/10 dark:bg-white/5">
+                        {result.gameCode}
+                      </span>
+                    </div>
+                    <div className="text-xs mt-2 mb-[11px] text-off-dark dark:text-muted-dark">
+                      {result.playerCount} player
+                      {result.playerCount === 1 ? "" : "s"} ·{" "}
+                      {result.questionCount} question
+                      {result.questionCount === 1 ? "" : "s"}
+                    </div>
+                    <div className="flex gap-2">
+                      {props.onShowLeaderboard ? (
+                        <button
+                          type="button"
+                          className={leaderboardClass}
+                          onClick={() => props.onShowLeaderboard?.(result.id)}
+                        >
+                          See leaderboard
+                        </button>
+                      ) : (
+                        <Link
+                          href={`/admin/quiz/leaderboard/${result.id}`}
+                          className={leaderboardClass}
+                        >
+                          See leaderboard
+                        </Link>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-xs mt-2 mb-[11px] text-off-dark dark:text-muted-dark">
-                    {result.playerCount} player
-                    {result.playerCount === 1 ? "" : "s"} ·{" "}
-                    {result.questionCount} question
-                    {result.questionCount === 1 ? "" : "s"}
-                  </div>
-                  <div className="flex gap-2">
-                    {props.onShowLeaderboard ? (
-                      <button
-                        type="button"
-                        className={leaderboardClass}
-                        onClick={() => props.onShowLeaderboard?.(result.id)}
-                      >
-                        See leaderboard
-                      </button>
-                    ) : (
-                      <Link
-                        href={`/admin/quiz/leaderboard/${result.id}`}
-                        className={leaderboardClass}
-                      >
-                        See leaderboard
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              );
-            })
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteAll(true)}
+                className="mt-1 self-center inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[13px] font-semibold text-red-light dark:text-red-dark hover:bg-red-light/10 dark:hover:bg-red-dark/10 cursor-pointer"
+              >
+                <LuTrash2 size={14} />
+                Delete all
+              </button>
+              <ConfirmationModal
+                open={confirmDeleteAll}
+                setOpen={setConfirmDeleteAll}
+                desc={`Delete all ${pastGames.length} played games of this quiz and their leaderboards? This can't be undone.`}
+                confirmLabel="Delete all"
+                confirming={deleteResults.isPending}
+                confirmingLabel="Deleting…"
+                onClick={() =>
+                  deleteResults.mutate(
+                    { quizId: props.quiz.id },
+                    {
+                      onSuccess: () => {
+                        setConfirmDeleteAll(false);
+                        toast.success("Played games deleted");
+                      },
+                      onError: (err) => toast.error(getApiErrorMessage(err)),
+                    },
+                  )
+                }
+              />
+            </>
           ) : (
             <div className="h-fit border border-lprimary/25 dark:border-white/15 border-dashed rounded-[14px] p-4 text-dark dark:text-white">
               <div className="p-2 text-lg font-black text-center">

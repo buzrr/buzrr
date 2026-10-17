@@ -116,4 +116,30 @@ export const quizzesApi = {
   update: (quizId: string, body: Parameters<typeof updateQuiz>[2]) =>
     updateQuiz(getAuthApiClient(), quizId, body),
   delete: (quizId: string) => deleteQuiz(getAuthApiClient(), quizId),
+  /** A copy with all questions; returns the new quiz's id. */
+  duplicate: async (quizId: string) =>
+    (
+      await getAuthApiClient().post<{ quizId: string }>(
+        `/quizzes/${quizId}/duplicate`,
+      )
+    ).data,
+  /** Uploads (file) or removes (null) the quiz logo. */
+  setLogo: async (quizId: string, file: File | null) => {
+    const fd = new FormData();
+    if (file) fd.append("file", file);
+    return (
+      await getAuthApiClient().post<{ logo: string | null }>(
+        `/quizzes/${quizId}/logo`,
+        fd,
+      )
+    ).data;
+  },
+  /** Deletes one past run (`resultId`) or every past run of the quiz. */
+  deleteResults: async (target: { resultId: string } | { quizId: string }) => {
+    await getAuthApiClient().delete(
+      "resultId" in target
+        ? `/game-sessions/results/${target.resultId}`
+        : `/game-sessions/results/by-quiz/${target.quizId}`,
+    );
+  },
 };
