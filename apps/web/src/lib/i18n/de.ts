@@ -103,7 +103,7 @@ export const DE: Record<string, string> = {
   "Big party at the very end": "Große Party ganz am Ende",
   Both: "Beide",
   Breadcrumb: "Navigationspfad",
-  "Build from the ground up": "Von Grund auf erstellen",
+  "Build from the ground up": "Starte leeres Quiz",
   "Build quizzes.": "Quizze bauen.",
   "Built in · synthesized in the browser": "Eingebaut · im Browser erzeugt",
   "Buzrr home": "Buzrr-Startseite",
@@ -789,7 +789,7 @@ export const DE: Record<string, string> = {
   "Upload a logo": "Logo hochladen",
   "Upload a sound": "Ton hochladen",
   "Upload an image": "Bild hochladen",
-  "Upload via Excel or CSV": "Per Excel oder CSV hochladen",
+  "Upload via Excel or CSV": "Excel oder CSV hochladen",
   "Upload your questions using our template.":
     "Lade deine Fragen mit unserer Vorlage hoch.",
   "Use cases": "Anwendungsfälle",
