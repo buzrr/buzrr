@@ -91,10 +91,25 @@ const LandingFooter = () => {
               multiplayer rooms and AI-generated quizzes.
             </p>
             <a
+              href="https://www.producthunt.com/products/buzrr?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-buzrr"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 block w-fit"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1283224&theme=light&t=1792221342802"
+                alt="Buzrr - Build quizzes. Battle friends. | Product Hunt"
+                width="220"
+                height="48"
+                loading="lazy"
+              />
+            </a>
+            <a
               href="https://www.scrolllaunch.com/products/buzrr?ref=badge"
               target="_blank"
               rel="noopener"
-              className="mt-4 inline-block"
+              className="mt-2 inline-block"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img

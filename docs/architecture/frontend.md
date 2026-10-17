@@ -76,7 +76,8 @@ is invalid (missing token, mismatched id, profile gone).
   `getAuthApiClient()` (account JWT interceptor), `createPlayerAuthedApiClient()`
   (localStorage `playerToken`), `getPublicApiClient()`.
 - `get-access-token.ts` — in-memory cache of the 7d JWT from
-  `/api/auth/access-token` (see [auth.md](auth.md)).
+  `/api/auth/access-token` (see [auth.md](auth.md)); concurrent callers share
+  one in-flight request. Deliberately not persisted to web storage (XSS).
 - `errors.ts` — `getApiErrorMessage` for toasts; `getPlanLimitError` spots
   `code: "PLAN_LIMIT"` refusals (from Nest or Buzrr-AI) so callers open
   `Billing/UpgradePrompt` (`usePlanLimitPrompt`) instead of toasting.
@@ -219,10 +220,20 @@ the Prisma runtime out of the client bundle).
   optimizer to fetch private/loopback IPs; while on, `remotePatterns` is only
   those self-hosted origins (no https wildcard), so it can't be used as an
   SSRF path to internal hosts.
-- `/auth/login` is `force-dynamic`: it reads the enabled sign-in methods
-  (`lib/auth-methods.ts` — Google when its credentials are set, email +
-  password with `AUTH_EMAIL_PASSWORD=ON`) from runtime env, so one image
-  serves any configuration. Google-only installs still auto-redirect.
+- `/auth/login` is static; `LoginForm` fetches the enabled sign-in methods
+  from `GET /api/auth/methods` (`lib/auth-methods.ts` — Google when its
+  credentials are set, email + password with `AUTH_EMAIL_PASSWORD=ON`), which
+  reads runtime env so one image serves any configuration and is CDN-cached
+  (`s-maxage`) so it isn't a function call per visit. Google-only installs
+  still auto-redirect.
+- Vercel function cost: keep public pages static (no `headers()`/session reads
+  in the server component — `/pricing` reads region and session in the
+  browser), and admin navbar links use `prefetch={false}` since every admin
+  route renders per request. Don't call `authClient.useSession()` in a
+  component that is prerendered: `better-auth` is a `serverExternalPackages`
+  entry and its hook resolves a second React copy at build time (use
+  `authClient.getSession()` in a query instead). The client turns off Better
+  Auth's refetch-on-focus.
 - Two sources of "players in the room" exist for hosts: the REST lobby
   snapshot (React Query) and the live roster (`playersSlice` fed by
   `useAdminSocket`, plus `game.players` from sync). When touching rosters,
@@ -255,6 +266,6 @@ the Prisma runtime out of the client bundle).
   create/delete/import and AI generation. `/pricing` prices are display-only
   (`GET /api/billing/pricing`, quoted by Dodo's checkout preview, with
   `lib/pricing.ts` fallbacks; INR for India, USD elsewhere — region from the edge
-  country header, or the browser timezone/locale via `usePriceRegion` when there
-  is none); Dodo decides the
+  country header on `/billing/checkout`, the browser timezone/locale via
+  `usePriceRegion` on the static `/pricing` page); Dodo decides the
   charged amount from the billing country.

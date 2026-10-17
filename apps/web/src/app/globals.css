@@ -43,6 +43,17 @@
   --animate-pop: pop 0.25s ease-out;
   --animate-pop-in: pop-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   --animate-shake: shake 0.4s ease-in-out both;
+  --animate-fade-in: fade-in 0.3s ease-out both;
+  --animate-fade-up-fast: fade-up 0.35s ease-out both;
+  --animate-modal-in: modal-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* AI quiz generation loader (AiMagicLoader). */
+  --animate-ai-wand: ai-wand 1.6s ease-in-out infinite;
+  --animate-ai-sparkle: ai-sparkle 1.9s ease-out infinite both;
+  --animate-ai-glow: ai-glow 2.4s ease-in-out infinite;
+  --animate-ai-twinkle: ai-twinkle 3.2s ease-in-out infinite both;
+  --animate-ai-tip: ai-tip 1.6s ease-in-out infinite;
+  --animate-ai-shimmer-text: ai-shimmer-text 3s linear infinite;
+  --animate-ai-progress: ai-progress 1.5s ease-in-out infinite;
 
   @keyframes pop {
     0%,
@@ -108,6 +119,142 @@
       transform: translateY(0);
     }
   }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes modal-in {
+    from {
+      opacity: 0;
+      transform: translateY(24px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  /* Wand swings from its handle like it's casting. */
+  @keyframes ai-wand {
+    0%,
+    100% {
+      transform: rotate(-14deg);
+    }
+    50% {
+      transform: rotate(12deg);
+    }
+  }
+
+  /* Each sparkle pops, spins and drifts out along --dx/--dy, then fades. */
+  @keyframes ai-sparkle {
+    0% {
+      opacity: 0;
+      transform: translate(0, 0) scale(0) rotate(0deg);
+    }
+    20% {
+      opacity: 1;
+      transform: translate(calc(var(--dx) * 0.2), calc(var(--dy) * 0.2))
+        scale(1) rotate(45deg);
+    }
+    65% {
+      opacity: 0.9;
+      transform: translate(calc(var(--dx) * 0.65), calc(var(--dy) * 0.65))
+        scale(0.75) rotate(120deg);
+    }
+    100% {
+      opacity: 0;
+      transform: translate(var(--dx), var(--dy)) scale(0.2) rotate(180deg);
+    }
+  }
+
+  @keyframes ai-twinkle {
+    0%,
+    100% {
+      opacity: 0.25;
+      transform: scale(0.5) rotate(0deg);
+    }
+    50% {
+      opacity: 0.9;
+      transform: scale(1) rotate(90deg);
+    }
+  }
+
+  @keyframes ai-glow {
+    0%,
+    100% {
+      opacity: 0.65;
+      transform: scale(0.92);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.08);
+    }
+  }
+
+  @keyframes ai-tip {
+    0%,
+    100% {
+      transform: scale(0.9) rotate(0deg);
+    }
+    50% {
+      transform: scale(1.15) rotate(45deg);
+    }
+  }
+
+  @keyframes ai-shimmer-text {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+
+  @keyframes ai-progress {
+    from {
+      transform: translateX(-110%);
+    }
+    to {
+      transform: translateX(310%);
+    }
+  }
+}
+
+/* Spinning conic gradient clipped to a 2px ring — the modal's edge glows
+   while the AI works. @property lets the angle itself animate. */
+@property --ai-ring-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.ai-magic-ring {
+  padding: 2px;
+  background: conic-gradient(
+    from var(--ai-ring-angle),
+    transparent 0deg,
+    #9a6cf5 70deg,
+    #fbbf24 110deg,
+    #c084fc 150deg,
+    transparent 220deg
+  );
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: ai-ring-spin 2.8s linear infinite;
+}
+
+@keyframes ai-ring-spin {
+  to {
+    --ai-ring-angle: 360deg;
+  }
 }
 
 /* Temporary class toggled by withThemeTransition() to cross-fade theme changes */
@@ -129,8 +276,23 @@ html.theme-anim *::after {
   .animate-fade-up,
   .animate-pop,
   .animate-pop-in,
-  .animate-shake {
+  .animate-shake,
+  .animate-fade-in,
+  .animate-fade-up-fast,
+  .animate-modal-in,
+  .animate-ai-wand,
+  .animate-ai-glow,
+  .animate-ai-twinkle,
+  .animate-ai-tip,
+  .animate-ai-shimmer-text,
+  .animate-ai-progress,
+  .ai-magic-ring {
     animation: none;
+  }
+  /* Frozen mid-burst instead of hidden, so the scene still reads as magic. */
+  .animate-ai-sparkle {
+    animation: none;
+    opacity: 0.8;
   }
 }
 

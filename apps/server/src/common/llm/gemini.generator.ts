@@ -12,7 +12,7 @@ import {
   type JsonOutputSchema,
 } from "./text-generator";
 
-export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-flash-lite-latest";
 
 /** JSON Schema keywords Gemini's `responseSchema` rejects. */
 const UNSUPPORTED_KEYS = new Set(["$schema", "additionalProperties"]);
