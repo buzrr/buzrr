@@ -11,6 +11,8 @@ export type StorageDriver = "cloudinary" | "s3" | "local" | "none";
 export interface UploadMeta {
   contentType: string;
   filename?: string;
+  /** What the upload must be (sniffed accordingly); default "image". */
+  kind?: "image" | "audio";
 }
 
 /**

@@ -2,6 +2,7 @@ import type {
   AuthoredOption,
   PublicQuestion,
   QuestionAnswer,
+  QuestionAudio,
   QuestionConfig,
   QuestionType,
   RevealSummary,
@@ -29,6 +30,8 @@ export interface LiveQuestion<T extends QuestionType = QuestionType> {
   timeOut: number;
   options: LiveOption[];
   config: QuestionConfig<T>;
+  /** Optional sound for the host screen (see `questionAudioSchema`). */
+  audio?: QuestionAudio | null;
 }
 
 /** A submitted answer that made sense for its question, and its verdict. */

@@ -189,6 +189,7 @@ export class QuestionsService {
     quizId: string,
     body: MultipartBody,
     file: Express.Multer.File | undefined,
+    audioFile?: Express.Multer.File,
   ): Promise<void> {
     const quiz = await this.assertQuizOwned(quizId, user.userId);
 
@@ -222,7 +223,7 @@ export class QuestionsService {
 
     // Ownership first: the old media we may delete below is the edited
     // question's own, read from the database.
-    let existing: { media: string | null } | null = null;
+    let existing: { media: string | null; audio: string | null } | null = null;
     if (quesId) {
       const question = await this.prisma.db.question.findUnique({
         where: { id: quesId },
@@ -243,12 +244,15 @@ export class QuestionsService {
     let fileLink = "";
     let mediaType = "";
 
-    if (file && file.size > 0) {
-      let uploaded;
+    const store = async (
+      upload: Express.Multer.File,
+      kind: "image" | "audio",
+    ) => {
       try {
-        uploaded = await this.storage.upload(file.buffer, {
-          contentType: file.mimetype,
-          filename: file.originalname,
+        return await this.storage.upload(upload.buffer, {
+          contentType: upload.mimetype,
+          filename: upload.originalname,
+          kind,
         });
       } catch (err) {
         if (err instanceof UnsupportedMediaError) {
@@ -259,6 +263,28 @@ export class QuestionsService {
         }
         throw err;
       }
+    };
+
+    // Sound: a new upload replaces it, `audio_link` keeps a URL (normally the
+    // stored one), neither means the question has none.
+    let audio: string | null = null;
+    if (audioFile && audioFile.size > 0) {
+      audio = (await store(audioFile, "audio")).url;
+    } else if (body.audio_link && /^https?:\/\//.test(body.audio_link)) {
+      audio = body.audio_link;
+    }
+    const cueMs = (raw: string | undefined) => {
+      const n = parseInt(raw ?? "", 10);
+      return Number.isFinite(n) && n >= 0 ? Math.min(n, 86_400_000) : null;
+    };
+    const audioFields = {
+      audio,
+      audioStartMs: audio ? (cueMs(body.audio_start_ms) ?? 0) : null,
+      audioRevealMs: audio ? cueMs(body.audio_reveal_ms) : null,
+    };
+
+    if (file && file.size > 0) {
+      const uploaded = await store(file, "image");
       fileLink = uploaded.url;
       mediaType = uploaded.mediaType;
     } else if (file_link) {
@@ -290,6 +316,7 @@ export class QuestionsService {
             timeOut,
             media: fileLink || null,
             mediaType: mediaType || null,
+            ...audioFields,
             moderationStatus,
             reportCount: 0,
           },
@@ -309,6 +336,9 @@ export class QuestionsService {
       if (existing?.media && existing.media !== fileLink) {
         await this.storage.remove(existing.media);
       }
+      if (existing?.audio && existing.audio !== audio) {
+        await this.storage.remove(existing.audio);
+      }
     } else {
       await this.prisma.db.$transaction(async (tx) => {
         const count = await tx.question.count({ where: { quizId } });
@@ -322,6 +352,7 @@ export class QuestionsService {
             timeOut,
             media: fileLink || null,
             mediaType: mediaType || null,
+            ...audioFields,
             order: count + 1,
             moderationStatus,
             createdById: user.userId,

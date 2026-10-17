@@ -29,6 +29,7 @@ import {
 } from "@/components/Game/GameUI";
 import { AnimatedNumber, useFlipReorder } from "@/components/Game/motion";
 import type { LeaderboardEntry } from "@buzrr/contract";
+import { useAudioSegment } from "@/lib/audio-cues";
 import {
   leaderboardWithReveal,
   nextQuestionLabel,
@@ -92,6 +93,13 @@ export default function QuesResult(props: QuesResultProps) {
   const showAnswerPanel = phase !== "scores" || reveal !== null;
   const showBoard = phase === "scores" || leaderboardWithReveal(moderation);
   const nextIsScores = phase === "reveal" && scoresStepPending(moderation);
+  // The reveal cue plays when the answer is shown, until the host moves on.
+  useAudioSegment(
+    phase === "reveal" ? question?.audio?.url : null,
+    question?.audio?.revealMs,
+    null,
+    question?.id,
+  );
   const [advancing, setAdvancing] = useState(false);
   const [playerToBan, setPlayerToBan] = useState<{
     playerId: string;

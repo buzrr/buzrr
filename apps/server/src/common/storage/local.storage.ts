@@ -1,7 +1,7 @@
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { nanoid } from "nanoid";
-import { sniffImage } from "./image-sniff";
+import { sniffAudio, sniffImage } from "./image-sniff";
 import {
   MediaStorage,
   type StoredMedia,
@@ -28,12 +28,16 @@ export class LocalStorage extends MediaStorage {
     this.publicUrl = config.publicUrl.replace(/\/+$/, "");
   }
 
-  async upload(buffer: Buffer, _meta?: UploadMeta): Promise<StoredMedia> {
-    const { ext } = sniffImage(buffer);
+  async upload(buffer: Buffer, meta?: UploadMeta): Promise<StoredMedia> {
+    const audio = meta?.kind === "audio";
+    const { ext } = audio ? sniffAudio(buffer) : sniffImage(buffer);
     const key = `${nanoid(21)}.${ext}`;
     await mkdir(this.dir, { recursive: true });
     await writeFile(join(this.dir, key), buffer, { flag: "wx" });
-    return { url: `${this.publicUrl}/${key}`, mediaType: "image" };
+    return {
+      url: `${this.publicUrl}/${key}`,
+      mediaType: audio ? "audio" : "image",
+    };
   }
 
   async remove(url: string): Promise<void> {

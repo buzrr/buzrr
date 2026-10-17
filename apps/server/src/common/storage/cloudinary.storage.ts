@@ -47,10 +47,13 @@ export class CloudinaryStorage extends MediaStorage {
     });
   }
 
-  async upload(buffer: Buffer, _meta?: UploadMeta): Promise<StoredMedia> {
+  async upload(buffer: Buffer, meta?: UploadMeta): Promise<StoredMedia> {
+    // Cloudinary files audio under its "video" resource type.
+    const options =
+      meta?.kind === "audio" ? { resource_type: "video" as const } : {};
     return new Promise((resolve, reject) => {
       cloudinary.uploader
-        .upload_stream({}, (error, result) => {
+        .upload_stream(options, (error, result) => {
           if (error) {
             reject(error);
             return;

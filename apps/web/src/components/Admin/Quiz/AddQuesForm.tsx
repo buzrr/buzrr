@@ -8,7 +8,15 @@ import type { Resolver } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { LuCheck, LuImagePlus, LuPlus, LuTrash2, LuX } from "react-icons/lu";
+import {
+  LuCheck,
+  LuImagePlus,
+  LuMusic,
+  LuPlus,
+  LuTrash2,
+  LuX,
+} from "react-icons/lu";
+import AudioCueEditor from "@/components/Admin/Quiz/AudioCueEditor";
 import Image from "next/image";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
@@ -66,6 +74,9 @@ interface Question {
   timeOut?: number;
   media?: string | null;
   mediaType?: string | null;
+  audio?: string | null;
+  audioStartMs?: number | null;
+  audioRevealMs?: number | null;
   options?: Option[];
 }
 
@@ -349,6 +360,18 @@ const AddQuesForm = (props: {
   );
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Optional sound (MP3) with its two cue points (ms).
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioLink, setAudioLink] = useState(question?.audio ?? "");
+  const [audioPreview, setAudioPreview] = useState<string | null>(null);
+  const [audioCues, setAudioCues] = useState<{
+    startMs: number;
+    revealMs: number | null;
+  }>({
+    startMs: question?.audioStartMs ?? 0,
+    revealMs: question?.audioRevealMs ?? null,
+  });
+  const audioInputRef = useRef<HTMLInputElement>(null);
   const [customTime, setCustomTime] = useState(
     !isSliderTime(
       question?.type && isQuestionType(question.type)
@@ -385,7 +408,33 @@ const AddQuesForm = (props: {
       ),
     );
     if (fileInputRef.current) fileInputRef.current.value = "";
+    setAudioFile(null);
+    setAudioLink(question?.audio ?? "");
+    setAudioCues({
+      startMs: question?.audioStartMs ?? 0,
+      revealMs: question?.audioRevealMs ?? null,
+    });
+    if (audioInputRef.current) audioInputRef.current.value = "";
   }, [question, initialType, reset]);
+
+  useEffect(() => {
+    if (!audioFile) {
+      setAudioPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(audioFile);
+    setAudioPreview(url);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [audioFile]);
+
+  function removeAudio() {
+    setAudioFile(null);
+    setAudioLink("");
+    setAudioCues({ startMs: 0, revealMs: null });
+    if (audioInputRef.current) audioInputRef.current.value = "";
+  }
 
   useEffect(() => {
     if (!file) {
@@ -527,6 +576,14 @@ const AddQuesForm = (props: {
     fd.append("media_type", file ? "" : (question?.mediaType ?? ""));
     if (question?.id) fd.append("ques_id", question.id);
     if (file) fd.append("file", file);
+    if (audioFile) fd.append("audio", audioFile);
+    else if (audioLink) fd.append("audio_link", audioLink);
+    if (audioFile || audioLink) {
+      fd.append("audio_start_ms", String(audioCues.startMs));
+      if (audioCues.revealMs !== null) {
+        fd.append("audio_reveal_ms", String(audioCues.revealMs));
+      }
+    }
 
     mutation.mutate(fd, {
       onSuccess: () => {
@@ -538,6 +595,7 @@ const AddQuesForm = (props: {
           reset(valuesFor(undefined, data.type));
           setCustomTime(false);
           deleteFile();
+          removeAudio();
         }
       },
       onError: (err) => {
@@ -676,6 +734,53 @@ const AddQuesForm = (props: {
                     className="sr-only"
                     ref={fileInputRef}
                     onChange={handleFile}
+                  />
+                </label>
+              )}
+            </div>
+            <div className="mt-3 flex flex-col gap-2">
+              <span className={fieldLabelClass}>
+                Sound
+                <span className={counterClass}>
+                  Optional · plays on your screen
+                </span>
+              </span>
+              {audioPreview || audioLink ? (
+                <AudioCueEditor
+                  src={audioPreview ?? audioLink}
+                  name={audioFile?.name ?? "Current sound"}
+                  questionMs={
+                    (Number(values.time) || DEFAULT_QUESTION_TIMEOUT) * 1000
+                  }
+                  startMs={audioCues.startMs}
+                  revealMs={audioCues.revealMs}
+                  onChange={setAudioCues}
+                  onRemove={removeAudio}
+                />
+              ) : (
+                <label className="flex items-center gap-3.5 rounded-2xl border-[1.5px] border-dashed px-4 py-3 cursor-pointer transition-colors border-lprimary/25 dark:border-white/15 hover:border-dprimary bg-light-bg dark:bg-card-dark">
+                  <span className="size-10 shrink-0 rounded-xl flex items-center justify-center bg-lprimary/10 dark:bg-white/5 text-lprimary dark:text-dprimary">
+                    <LuMusic size={20} />
+                  </span>
+                  <span className="flex flex-col">
+                    <span className="text-sm font-semibold">
+                      Upload a sound
+                    </span>
+                    <span className={clsx("text-[12.5px]", mutedText)}>
+                      MP3 under 20MB
+                    </span>
+                  </span>
+                  <input
+                    type="file"
+                    accept="audio/mpeg,.mp3"
+                    name="audio"
+                    className="sr-only"
+                    ref={audioInputRef}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null;
+                      setAudioFile(f);
+                      setAudioCues({ startMs: 0, revealMs: null });
+                    }}
                   />
                 </label>
               )}
@@ -1125,6 +1230,8 @@ const AddQuesForm = (props: {
                   !values.title?.trim() &&
                   !file &&
                   !fileLink &&
+                  !audioFile &&
+                  !audioLink &&
                   (values.type === "true_false" ||
                     (values.options ?? []).every((o) => !o.title.trim()));
                 if (blank) {

@@ -52,3 +52,17 @@ export function sniffImage(buffer: Buffer): { type: string; ext: string } {
   }
   return { type: match.type, ext: match.ext };
 }
+
+/**
+ * MP3 — the one audio format questions take. Recognised by an ID3v2 tag or an
+ * MPEG audio frame sync at the start of the file.
+ */
+export function sniffAudio(buffer: Buffer): { type: string; ext: string } {
+  const id3 = buffer.toString("ascii", 0, 3) === "ID3";
+  const frameSync =
+    buffer.length > 1 && buffer[0] === 0xff && (buffer[1]! & 0xe0) === 0xe0;
+  if (!id3 && !frameSync) {
+    throw new UnsupportedMediaError("Only MP3 audio can be uploaded");
+  }
+  return { type: "audio/mpeg", ext: "mp3" };
+}

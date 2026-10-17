@@ -141,6 +141,11 @@ model Question {
   timeOut          Int                @default(15)
   media            String?
   mediaType        String?
+  /// Optional sound (MP3) played on the host screen: from `audioStartMs` for
+  /// the question's time while it is open, from `audioRevealMs` at the reveal.
+  audio            String?
+  audioStartMs     Int?
+  audioRevealMs    Int?
   order            Int                @default(1)
   /// Per-question moderation gate for the duel pool; the quiz's `isPublic`
   /// flag alone no longer decides eligibility.

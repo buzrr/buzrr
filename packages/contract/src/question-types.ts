@@ -25,6 +25,18 @@ export const MAX_OPTIONS = 8;
 export const MIN_TIME_OUT = 5;
 export const DEFAULT_TIME_OUT = 15;
 
+/**
+ * A question's optional sound, played on the host screen: from `startMs` for
+ * the question's time while it is open, and from `revealMs` (if set) at the
+ * reveal.
+ */
+export const questionAudioSchema = z.object({
+  url: z.string(),
+  startMs: z.number().int().nonnegative(),
+  revealMs: z.number().int().nonnegative().nullable(),
+});
+export type QuestionAudio = z.infer<typeof questionAudioSchema>;
+
 const publicBase = z.object({
   id: z.string(),
   title: z.string(),
@@ -32,6 +44,7 @@ const publicBase = z.object({
   mediaType: z.string().nullable(),
   /** Seconds to answer. */
   timeOut: z.number().int().positive(),
+  audio: questionAudioSchema.nullable().optional(),
 });
 
 export const publicOptionSchema = z.object({

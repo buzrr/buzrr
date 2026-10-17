@@ -72,7 +72,12 @@ export function scoreAnswer(
 }
 
 export function toPublicQuestion(question: LiveQuestion): PublicQuestion {
-  return handlerFor(question.type).toPublic(question);
+  // The sound is the same for every type, so it is added here rather than in
+  // each handler's `toPublic`.
+  return {
+    ...handlerFor(question.type).toPublic(question),
+    audio: question.audio ?? null,
+  };
 }
 
 /** `entries` oldest first — types that list answers show the newest first. */
@@ -142,6 +147,9 @@ export interface QuestionRecord {
   timeOut: number;
   config: unknown;
   options: LiveOption[];
+  audio?: string | null;
+  audioStartMs?: number | null;
+  audioRevealMs?: number | null;
 }
 
 type LiveOption = LiveQuestion["options"][number];
@@ -172,6 +180,13 @@ export function toLiveQuestion(row: QuestionRecord): LiveQuestion | null {
         isCorrect: o.isCorrect,
       })),
       config,
+      audio: row.audio
+        ? {
+            url: row.audio,
+            startMs: row.audioStartMs ?? 0,
+            revealMs: row.audioRevealMs ?? null,
+          }
+        : null,
     };
   } catch (err) {
     if (err instanceof QuestionDefinitionError) return null;

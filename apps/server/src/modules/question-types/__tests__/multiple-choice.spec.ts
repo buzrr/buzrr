@@ -144,6 +144,7 @@ describe("multiple choice: play", () => {
         { id: "c", title: "Nice" },
       ],
       multiSelect: false,
+      audio: null,
     });
   });
 
@@ -272,10 +273,27 @@ describe("toLiveQuestion", () => {
     options: live.options,
   };
 
+  it("carries the question's sound and its cues", () => {
+    const withAudio = {
+      ...row,
+      audio: "https://x/a.mp3",
+      audioStartMs: 1500,
+      audioRevealMs: null,
+    };
+    const q = toLiveQuestion(withAudio)!;
+    expect(q.audio).toEqual({
+      url: "https://x/a.mp3",
+      startMs: 1500,
+      revealMs: null,
+    });
+    expect(toPublicQuestion(q).audio).toEqual(q.audio);
+  });
+
   it("loads a playable row, settling its settings", () => {
     expect(toLiveQuestion(row)).toEqual({
       ...live,
       config: { multiSelect: false },
+      audio: null,
     });
   });
 
