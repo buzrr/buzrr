@@ -19,6 +19,8 @@ const SUBTITLES: Record<QuestionType, string> = {
   true_false: "Write a statement and mark whether it's true or false.",
   poll: "Ask for opinions — there's no right answer and nothing is scored.",
   word_cloud: "Players answer in a word or two; the most common grow biggest.",
+  type_answer:
+    "Players type the answer; fast and exact scores best, typos can be forgiven.",
   rating: "Players rate on a scale; you see the average and the spread.",
   open_text: "Players write freely; answers appear on a wall.",
 };

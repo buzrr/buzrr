@@ -114,7 +114,13 @@ export default function QuesResult(props: QuesResultProps) {
     question?.id,
     a?.revealUrl ? reveal?.audioRevealKey : null,
   );
+  // Re-armed on every step: "Show answer" keeps this screen mounted.
   const [advancing, setAdvancing] = useState(false);
+  const [armedPhase, setArmedPhase] = useState(phase);
+  if (armedPhase !== phase) {
+    setArmedPhase(phase);
+    setAdvancing(false);
+  }
   const [playerToBan, setPlayerToBan] = useState<{
     playerId: string;
     name: string;

@@ -94,7 +94,7 @@ export function QuizInfoContent(props: {
       <div className="flex flex-col w-[90%] mx-auto text-dark dark:text-white">
         <div className="flex items-center justify-between mt-6 mb-3">
           <h4 className="text-sm font-bold tracking-[0.04em] uppercase text-[#8a8896] dark:text-muted-dark">
-            Previously used
+            Previously played
           </h4>
           <span className="rounded-full px-2.5 py-0.5 text-xs bg-lprimary/10 dark:bg-white/5 text-off-dark dark:text-muted-dark">
             {pastGames.length}

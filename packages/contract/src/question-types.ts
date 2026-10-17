@@ -312,11 +312,136 @@ export const openText = {
   }),
 } as const;
 
+// -- type_answer ---------------------------------------------------------------------
+// Players type the answer. The author sets up to `MAX_ACCEPTED_ANSWERS`
+// accepted answers (stored as options, all correct); matching ignores case,
+// accents, punctuation and extra spaces, and with `ignoreTypos` a few typos
+// too. Scored: the closer the match, the more points.
+
+export const MAX_ACCEPTED_ANSWERS = 8;
+export const TYPE_ANSWER_MAX_LENGTH = 100;
+/** Most distinct answers the reveal lists. */
+export const TYPE_ANSWER_LIMIT = 20;
+
+const guessAnswer = z
+  .object({ guess: z.string().trim().min(1).max(TYPE_ANSWER_MAX_LENGTH) })
+  .strict();
+
+export const typeAnswer = {
+  type: "type_answer",
+  config: z.object({
+    ignoreTypos: z.boolean().default(true),
+    /**
+     * One accepted answer whose length players see as boxes, one per
+     * character, with the gaps between words ("_______ _______").
+     */
+    fixedLength: z.boolean().default(false),
+  }),
+  answer: guessAnswer,
+  publicQuestion: publicBase.extend({
+    type: z.literal("type_answer"),
+    maxLength: z.number().int(),
+    /** Fixed length: characters per word of the answer; null otherwise. */
+    pattern: z.array(z.number().int().positive()).nullable(),
+  }),
+  summary: z.object({
+    type: z.literal("type_answer"),
+    /** The accepted answers. */
+    accepted: z.array(z.string()),
+    /** What players typed, grouped (as matched), most common first. */
+    answers: z.array(
+      z.object({
+        text: z.string(),
+        count: z.number().int().positive(),
+        correct: z.boolean(),
+        /** 1 = exact, less = accepted with typos, 0 = wrong. */
+        precision: z.number().min(0).max(1),
+      }),
+    ),
+    responses: z.number().int().nonnegative(),
+    correct: z.number().int().nonnegative(),
+  }),
+} as const;
+
+/** Characters per word, for fixed-length answers ("Michael Jackson" → [7, 7]). */
+export function answerPattern(answer: string): number[] {
+  return answer
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => Array.from(w).length);
+}
+
+/** Lower case, no accents, no punctuation, single spaces. */
+export function normalizeTypedAnswer(text: string): string {
+  return text
+    .normalize("NFKD")
+    .replace(/\p{M}+/gu, "")
+    .toLowerCase()
+    .replace(/ß/g, "ss")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+function editDistance(a: string, b: string): number {
+  const row = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let diag = row[0]!;
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const up = row[j]!;
+      row[j] = Math.min(
+        up + 1,
+        row[j - 1]! + 1,
+        diag + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+      diag = up;
+    }
+  }
+  return row[b.length]!;
+}
+
+/** Typos forgiven for an answer of this length. */
+function allowedTypos(length: number): number {
+  if (length <= 3) return 0;
+  if (length <= 6) return 1;
+  if (length <= 12) return 2;
+  return Math.floor(length * 0.2);
+}
+
+/**
+ * How well `guess` matches the best of the accepted answers: precision 1 is
+ * exact (after normalising), less is a forgiven typo, 0 is wrong.
+ */
+export function matchTypedAnswer(
+  guess: string,
+  accepted: readonly string[],
+  ignoreTypos: boolean,
+): { correct: boolean; precision: number; matched: string | null } {
+  const g = normalizeTypedAnswer(guess);
+  let best = { correct: false, precision: 0, matched: null as string | null };
+  if (!g) return best;
+  for (const answer of accepted) {
+    const a = normalizeTypedAnswer(answer);
+    if (!a) continue;
+    if (a === g) return { correct: true, precision: 1, matched: answer };
+    if (!ignoreTypos) continue;
+    const d = editDistance(a, g);
+    if (d > allowedTypos(a.length)) continue;
+    const precision = Math.max(0, 1 - d / Math.max(a.length, g.length));
+    if (precision > best.precision) {
+      best = { correct: true, precision, matched: answer };
+    }
+  }
+  return best;
+}
+
 // -- registry -------------------------------------------------------------------
 
 export const QUESTION_TYPES = [
   multipleChoice.type,
   trueFalse.type,
+  typeAnswer.type,
   poll.type,
   wordCloud.type,
   rating.type,
@@ -329,6 +454,7 @@ export type QuestionType = z.infer<typeof questionTypeSchema>;
 export const SCORED_TYPES: readonly QuestionType[] = [
   "multiple_choice",
   "true_false",
+  "type_answer",
 ];
 
 export function isScoredType(type: QuestionType): boolean {
@@ -341,6 +467,7 @@ export const DEFAULT_QUESTION_TYPE: QuestionType = "multiple_choice";
 export const publicQuestionSchema = z.discriminatedUnion("type", [
   multipleChoice.publicQuestion,
   trueFalse.publicQuestion,
+  typeAnswer.publicQuestion,
   poll.publicQuestion,
   wordCloud.publicQuestion,
   rating.publicQuestion,
@@ -349,6 +476,7 @@ export const publicQuestionSchema = z.discriminatedUnion("type", [
 export const revealSummarySchema = z.discriminatedUnion("type", [
   multipleChoice.summary,
   trueFalse.summary,
+  typeAnswer.summary,
   poll.summary,
   wordCloud.summary,
   rating.summary,
@@ -365,6 +493,7 @@ export const questionAnswerSchema = z.union([
   ratingAnswer,
   textAnswer,
   textsAnswer,
+  guessAnswer,
 ]);
 
 type Shapes<
@@ -385,6 +514,7 @@ type Shapes<
 export interface QuestionTypeMap {
   multiple_choice: Shapes<typeof multipleChoice>;
   true_false: Shapes<typeof trueFalse>;
+  type_answer: Shapes<typeof typeAnswer>;
   poll: Shapes<typeof poll>;
   word_cloud: Shapes<typeof wordCloud>;
   rating: Shapes<typeof rating>;

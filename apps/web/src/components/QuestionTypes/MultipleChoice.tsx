@@ -38,7 +38,7 @@ export function OptionLabel({
 const BAR_MS = 900;
 
 /** A reveal bar that grows from empty, its percentage counting up alongside. */
-function ResultBar({
+export function ResultBar({
   fill,
   pct,
   correct,
@@ -92,7 +92,7 @@ function optionTextClass(options: { title: string }[]) {
  * Shared by the scored option types.
  */
 /** The right answer lights up: green border and a light green fill. */
-function CorrectGlow({ children }: { children: ReactNode }) {
+export function CorrectGlow({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     ref.current?.animate(

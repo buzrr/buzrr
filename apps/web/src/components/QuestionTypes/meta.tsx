@@ -17,6 +17,11 @@ export const QUESTION_TYPE_META: Record<
     description: "Quick two-option check",
     scored: true,
   },
+  type_answer: {
+    name: "Ask for answer",
+    description: "Players type it; up to 8 accepted answers, typos forgiven",
+    scored: true,
+  },
   poll: {
     name: "Poll",
     description: "Collect opinions, no right answer",
@@ -43,6 +48,7 @@ export const QUESTION_TYPE_META: Record<
 export const QUESTION_TYPE_ORDER: QuestionType[] = [
   "multiple_choice",
   "true_false",
+  "type_answer",
   "poll",
   "word_cloud",
   "rating",
@@ -67,6 +73,15 @@ const ICONS: Record<QuestionType, { width: number; paths: ReactNode }> = {
       <>
         <path d="m3.5 12 3 3 5-6" />
         <path d="M14.5 8.5l6 6M20.5 8.5l-6 6" />
+      </>
+    ),
+  },
+  type_answer: {
+    width: 2,
+    paths: (
+      <>
+        <rect x="3" y="6" width="18" height="12" rx="2" />
+        <path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10" />
       </>
     ),
   },

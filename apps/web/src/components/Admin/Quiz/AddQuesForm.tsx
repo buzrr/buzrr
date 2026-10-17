@@ -21,8 +21,11 @@ import Image from "next/image";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   DEFAULT_QUESTION_TYPE,
+  MAX_ACCEPTED_ANSWERS,
   MAX_OPTIONS,
   MAX_POLL_OPTIONS,
+  TYPE_ANSWER_MAX_LENGTH,
+  answerPattern,
   MIN_OPTIONS,
   MIN_POLL_OPTIONS,
   RATING_LABEL_MAX,
@@ -31,6 +34,7 @@ import {
   openText,
   poll,
   rating,
+  typeAnswer,
   wordCloud,
   type QuestionType,
 } from "@buzrr/contract";
@@ -91,7 +95,7 @@ const MCQ_OPTIONS = 4;
  * so word cloud and open text get a longer range and default.
  */
 function timeRangeFor(type: QuestionType) {
-  return type === "word_cloud" || type === "open_text"
+  return type === "word_cloud" || type === "open_text" || type === "type_answer"
     ? {
         min: 15,
         max: 75,
@@ -156,6 +160,15 @@ function optionsFor(type: QuestionType, from: AuthoredOption[]) {
       })),
     );
   }
+  if (type === "type_answer") {
+    // Accepted answers: carry over the right ones, else one empty row.
+    const right = kept.filter((o) => o.isCorrect && o.title.trim());
+    const rows = (right.length ? right : [{ title: "" }]).slice(
+      0,
+      MAX_ACCEPTED_ANSWERS,
+    );
+    return rows.map((o) => ({ title: o.title, isCorrect: true }));
+  }
   if (type === "poll") {
     const n = Math.min(
       MAX_POLL_OPTIONS,
@@ -192,6 +205,7 @@ function valuesFor(
   const r = configOf(rating.config, config, type === "rating");
   const o = configOf(openText.config, config, type === "open_text");
   const m = configOf(multipleChoice.config, config, type === "multiple_choice");
+  const t = configOf(typeAnswer.config, config, type === "type_answer");
   const stored = (question?.options ?? []).map((opt) => ({
     title: opt.title ?? "",
     isCorrect: Boolean(opt.isCorrect),
@@ -217,6 +231,8 @@ function valuesFor(
     allowAnonymous: o.allowAnonymous,
     multipleSubmissions:
       type === "word_cloud" ? w.multipleSubmissions : o.multipleSubmissions,
+    ignoreTypos: t.ignoreTypos,
+    fixedLength: t.fixedLength,
   };
 }
 
@@ -239,6 +255,8 @@ function configFor(v: FormValues): Record<string, unknown> {
         lowLabel: v.lowLabel.trim(),
         highLabel: v.highLabel.trim(),
       };
+    case "type_answer":
+      return { ignoreTypos: v.ignoreTypos, fixedLength: v.fixedLength };
     case "open_text":
       return {
         maxLength: v.textMaxLength,
@@ -275,6 +293,19 @@ function summaryOf(v: FormValues): ReactNode {
           {strong(v.options.find((o) => o.isCorrect)?.title ?? "—")} · {secs}
         </>
       );
+    case "type_answer": {
+      const n = v.options.filter((o) => o.title.trim()).length;
+      return (
+        <>
+          {strong(
+            v.fixedLength
+              ? "Fixed length"
+              : `${n} accepted ${n === 1 ? "answer" : "answers"}`,
+          )}
+          {v.ignoreTypos ? " · typos forgiven" : " · exact match"} · {secs}
+        </>
+      );
+    }
     case "poll":
       return (
         <>
@@ -561,12 +592,17 @@ const AddQuesForm = (props: {
     fd.append(
       "options",
       JSON.stringify(
-        OPTION_TYPES.includes(data.type)
-          ? data.options.map((o) => ({
-              title: o.title.trim(),
-              isCorrect: data.type === "poll" ? false : o.isCorrect,
-            }))
-          : [],
+        data.type === "type_answer"
+          ? data.options
+              .map((o) => ({ title: o.title.trim(), isCorrect: true }))
+              .filter((o) => o.title !== "")
+              .slice(0, data.fixedLength ? 1 : MAX_ACCEPTED_ANSWERS)
+          : OPTION_TYPES.includes(data.type)
+            ? data.options.map((o) => ({
+                title: o.title.trim(),
+                isCorrect: data.type === "poll" ? false : o.isCorrect,
+              }))
+            : [],
       ),
     );
     fd.append(
@@ -1016,6 +1052,140 @@ const AddQuesForm = (props: {
                           {optionsError}
                         </span>
                       )}
+                    </div>
+                  );
+                }}
+              />
+            )}
+
+            {type === "type_answer" && (
+              <Controller
+                name="options"
+                control={control}
+                render={({ field }) => {
+                  const fixed = values.fixedLength;
+                  const rows = fixed ? field.value.slice(0, 1) : field.value;
+                  const set = (next: AuthoredOption[]) => field.onChange(next);
+                  const pattern =
+                    fixed && rows[0]?.title.trim()
+                      ? answerPattern(rows[0].title)
+                      : null;
+                  return (
+                    <div className="flex flex-col gap-2">
+                      <span className={fieldLabelClass}>
+                        {fixed ? "Answer" : "Accepted answers"}
+                        <span className={counterClass}>
+                          {fixed
+                            ? "Players see one box per letter"
+                            : `${rows.length} / ${MAX_ACCEPTED_ANSWERS} · case and accents don't matter`}
+                        </span>
+                      </span>
+                      {rows.map((o, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-2.5 rounded-[14px] border-[1.5px] p-1.5 pl-3 pr-3 border-green-500 bg-green-500/8"
+                        >
+                          <LuCheck
+                            size={16}
+                            strokeWidth={3}
+                            className="shrink-0 text-green-600 dark:text-green-500"
+                          />
+                          <input
+                            type="text"
+                            value={o.title}
+                            onChange={(e) =>
+                              set(
+                                rows.map((x, j) =>
+                                  j === i
+                                    ? { title: e.target.value, isCorrect: true }
+                                    : x,
+                                ),
+                              )
+                            }
+                            maxLength={TYPE_ANSWER_MAX_LENGTH}
+                            autoComplete="off"
+                            placeholder={
+                              i === 0 ? "The answer" : "Also accepted"
+                            }
+                            aria-label={`Accepted answer ${i + 1}`}
+                            className="flex-1 min-w-0 bg-transparent outline-none py-1.5 text-[15px] font-medium placeholder:text-[#8a8896] dark:placeholder:text-muted-dark"
+                          />
+                          {rows.length > 1 && (
+                            <button
+                              type="button"
+                              aria-label={`Remove accepted answer ${i + 1}`}
+                              onClick={() =>
+                                set(rows.filter((_, j) => j !== i))
+                              }
+                              className="shrink-0 text-[#8a8896] dark:text-muted-dark hover:text-[#e5544e] cursor-pointer"
+                            >
+                              <LuX size={16} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {pattern && (
+                        <p
+                          aria-label="What players see"
+                          className="font-mono text-lg font-bold tracking-[0.25em] text-center py-1"
+                        >
+                          {pattern.map((n) => "_".repeat(n)).join(" ")}
+                        </p>
+                      )}
+                      {!fixed && rows.length < MAX_ACCEPTED_ANSWERS && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            set([...rows, { title: "", isCorrect: true }])
+                          }
+                          className="flex items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-lprimary/25 dark:border-white/15 p-2.5 text-sm font-bold text-lprimary dark:text-dprimary cursor-pointer hover:border-dprimary"
+                        >
+                          <LuPlus size={16} />
+                          Add accepted answer
+                        </button>
+                      )}
+                      {optionsError && (
+                        <span className="text-xs text-red-light dark:text-red-dark">
+                          {optionsError}
+                        </span>
+                      )}
+                      <div className={settingsBoxClass}>
+                        <SettingRow
+                          label="Fixed length"
+                          hint="One answer; players see its letters as boxes"
+                        >
+                          <Controller
+                            name="fixedLength"
+                            control={control}
+                            render={({ field: f }) => (
+                              <Switch
+                                checked={f.value}
+                                onCheckedChange={(on) => {
+                                  f.onChange(on);
+                                  if (on) set(field.value.slice(0, 1));
+                                }}
+                                aria-label="Fixed length"
+                              />
+                            )}
+                          />
+                        </SettingRow>
+                        <SettingRow
+                          label="Ignore typos"
+                          hint="Close answers count, but score less"
+                        >
+                          <Controller
+                            name="ignoreTypos"
+                            control={control}
+                            render={({ field: f }) => (
+                              <Switch
+                                checked={f.value}
+                                onCheckedChange={f.onChange}
+                                aria-label="Ignore typos"
+                              />
+                            )}
+                          />
+                        </SettingRow>
+                      </div>
                     </div>
                   );
                 }}

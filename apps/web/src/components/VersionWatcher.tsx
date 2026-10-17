@@ -32,10 +32,17 @@ export default function VersionWatcher() {
       }
     };
     const timer = setInterval(check, EVERY_MS);
+    // Safari restores tabs from its back/forward cache with the old bundle
+    // still running: check on load and on every restore, too.
+    void check();
     document.addEventListener("visibilitychange", check);
+    window.addEventListener("pageshow", check);
+    window.addEventListener("focus", check);
     return () => {
       clearInterval(timer);
       document.removeEventListener("visibilitychange", check);
+      window.removeEventListener("pageshow", check);
+      window.removeEventListener("focus", check);
     };
   }, []);
   return null;
