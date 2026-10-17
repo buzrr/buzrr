@@ -89,6 +89,23 @@ export async function importQuiz(
 
 export const quizzesApi = {
   list: () => listQuizzes(getAuthApiClient()),
+  /** Admins: every quiz with its owner. */
+  listAll: async () =>
+    (
+      await getAuthApiClient().get<
+        (QuizListItem & {
+          user: { id: string; name: string | null; email: string };
+        })[]
+      >("/quizzes/all")
+    ).data,
+  /** Admins: move a quiz to the user with this email. */
+  changeOwner: async (quizId: string, email: string) =>
+    (
+      await getAuthApiClient().patch<{
+        quizId: string;
+        owner: { id: string; name: string | null; email: string };
+      }>(`/quizzes/${quizId}/owner`, { email })
+    ).data,
   getById: (quizId: string) => getQuizById(getAuthApiClient(), quizId),
   create: (body: Parameters<typeof createQuiz>[1]) =>
     createQuiz(getAuthApiClient(), body),

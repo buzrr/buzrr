@@ -86,12 +86,12 @@ export const trueFalseRenderer: QuestionRenderer<"true_false"> = {
     );
   },
 
-  RevealBreakdown({ question, summary }) {
+  RevealBreakdown({ question, summary, hideCorrect }) {
     return (
       <OptionsReveal
         options={question.options}
         counts={summary.counts}
-        correctOptionIds={summary.correctOptionIds}
+        correctOptionIds={hideCorrect ? [] : summary.correctOptionIds}
         renderKey={() => null}
       />
     );

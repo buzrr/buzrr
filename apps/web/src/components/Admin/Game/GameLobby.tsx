@@ -48,6 +48,7 @@ const GameLobby = (params: {
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const qCount = useAppSelector((state) => state.game.qCount);
   const moderation = useAppSelector((state) => state.game.moderation);
+  const closedSummary = useAppSelector((state) => state.game.closedSummary);
   const roster = useAppSelector((state) => state.game.players);
 
   useEffect(() => {
@@ -84,7 +85,14 @@ const GameLobby = (params: {
           socket={socket}
           nameOf={(id) => roster.find((p) => p.id === id)?.name}
         />
-        <GetReady title={title} />
+        <GetReady
+          title={title}
+          onSkip={
+            roster.some((p) => p.connected)
+              ? undefined
+              : () => socket.emit("host-next")
+          }
+        />
       </GameSounds>
     );
   }
@@ -92,7 +100,9 @@ const GameLobby = (params: {
   return (
     <GameSounds role="host" quizSettings={params.quizQuestions?.settings}>
       <SoundToggle />
-      <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 pb-4 md:pb-0 md:h-[calc(100dvh-10rem)] text-dark dark:text-white">
+      {/* No site footer here: the game uses the full height (the admin
+          layout's footer padding is taken back with -mb-12). */}
+      <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 -mb-12 min-h-[calc(100dvh-1rem)] md:min-h-0 md:h-[calc(100dvh-6rem)] text-dark dark:text-white">
         <ConnectionBanner />
         <ReactionOverlay
           socket={socket}
@@ -122,6 +132,13 @@ const GameLobby = (params: {
           <ReadySlide
             key={`ready-${qIndex}`}
             onNext={() => socket.emit("host-next")}
+          />
+        ) : phase === "closed" && closedSummary ? (
+          // How the room answered; "Show answer" then marks the right one.
+          <QuesResult
+            key={`closed-${qIndex}`}
+            socket={socket}
+            roomId={params.roomId}
           />
         ) : phase === "closed" ? (
           <ClosedSlide

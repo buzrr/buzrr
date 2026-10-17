@@ -149,8 +149,6 @@ export function buildSnapshot(
   if (meta.phase === "starting") {
     // Lets a client that (re)connects mid-countdown show the real time left.
     payload.remainingMs = Math.max(0, meta.qDeadline - now);
-    const coming = state.questions[meta.qIndex];
-    if (coming) payload.preview = { title: coming.title };
   }
   const mod = moderationOf(meta);
   if (mod) payload.moderation = mod;
@@ -199,6 +197,18 @@ export function buildSnapshot(
       roster,
       inReveal || inScores ? answers : undefined,
     );
+  }
+
+  // A host reconnecting in "closed" gets the tally its screen shows.
+  if (!playerId && meta.phase === "closed" && question) {
+    const { audioRevealKey: _key, ...tally } = buildReveal(
+      question,
+      meta.qIndex,
+      answers,
+      roster,
+    );
+    void _key;
+    payload.closedSummary = tally;
   }
 
   if (

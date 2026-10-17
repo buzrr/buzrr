@@ -18,12 +18,15 @@ import {
   type SoundSlot,
 } from "@buzrr/contract";
 import { useAppSelector } from "@/state/hooks";
+import type { GameSocket } from "@/types/socket";
 import { soundSkinsApi } from "@/lib/modules/sound-skins/api";
 import { decryptClip, preloadClips } from "./preload";
+import { fadeOutAndPause } from "./fade";
 import {
   audioContext,
   isLoopSlot,
   playBuiltin,
+  playPing,
   type BuiltinSkinId,
   type SoundHandle,
 } from "./synth";
@@ -138,13 +141,7 @@ function playFile(url: string, loop: boolean, volume: number): SoundHandle {
   return {
     stop: () => {
       window.removeEventListener("pointerdown", start);
-      const fade = setInterval(() => {
-        a.volume = Math.max(0, a.volume - 0.1);
-        if (a.volume <= 0.01) {
-          clearInterval(fade);
-          a.pause();
-        }
-      }, 40);
+      fadeOutAndPause(a);
     },
   };
 }
@@ -336,6 +333,21 @@ export function GameSounds({
       {children}
     </SoundCtx.Provider>
   );
+}
+
+/** Host waiting room: a ping for every player who joins (if sound is on here). */
+export function JoinPing({ socket }: { socket: GameSocket | null }) {
+  const s = useGameSound();
+  const on = Boolean(s?.on);
+  useEffect(() => {
+    if (!socket || !on) return;
+    const ping = () => playPing();
+    socket.on("player-joined", ping);
+    return () => {
+      socket.off("player-joined", ping);
+    };
+  }, [socket, on]);
+  return null;
 }
 
 /** Speaker switch for this device (hidden when sound can't play here). */

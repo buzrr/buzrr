@@ -234,7 +234,7 @@ export default function QuestionScreen(props: QuestionScreenProps) {
           question={question}
           live={live?.index === qIndex ? live.summary : null}
         />
-        <div className="flex flex-wrap md:flex-nowrap items-center gap-3.5 mt-[22px] pt-5 border-t border-lprimary/15 dark:border-white/10">
+        <div className="sticky bottom-0 z-10 flex flex-wrap md:flex-nowrap items-center gap-3.5 mt-[22px] pt-5 pb-3 border-t border-lprimary/15 dark:border-white/10 bg-white dark:bg-dark">
           <p
             className={clsx(
               "basis-full md:basis-auto flex-1 text-sm",
@@ -250,7 +250,8 @@ export default function QuestionScreen(props: QuestionScreenProps) {
             onClick={() => socket.emit("host-next")}
             className={clsx(primaryButtonClass, "flex-1 md:flex-none")}
           >
-            Next
+            {/* Nobody playing: nothing to wait for — skip the timer. */}
+            {players.some((p) => p.connected) ? "Next" : "Skip"}
             <LuPlay size={17} className="fill-current" />
           </button>
         </div>

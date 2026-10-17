@@ -11,6 +11,7 @@ import {
   gameStarted,
   phaseChange,
   preloadHint,
+  closedSummaryReceived,
   leaderboardReceived,
   playerConnection,
   playerRemoved,
@@ -120,6 +121,9 @@ export function useGameSocket({
     conn.on("game-started", (payload) => dispatch(gameStarted(payload)));
     conn.on("phase-change", (payload) => dispatch(phaseChange(payload)));
     conn.on("preload", (payload) => dispatch(preloadHint(payload)));
+    conn.on("closed-summary", (payload) =>
+      dispatch(closedSummaryReceived(payload)),
+    );
     // Report downloads of the next question's sound (throttled; "done" always).
     let lastReport = 0;
     const offProgress = onPreloadProgress((r) => {

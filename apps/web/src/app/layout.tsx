@@ -6,6 +6,7 @@ import QueryProvider from "@/providers/QueryProvider";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { Analytics } from "@vercel/analytics/next";
 import Footer from "@/components/Footer";
+import VersionWatcher from "@/components/VersionWatcher";
 import {
   DEFAULT_TITLE,
   REPO_URL,
@@ -96,6 +97,7 @@ export default async function RootLayout({
               buttonPosition="top-right"
             />
             <Footer />
+            <VersionWatcher />
           </QueryProvider>
         </ReduxProvider>
         <Analytics />

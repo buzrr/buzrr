@@ -84,6 +84,7 @@ export function HostPrompt({
 export function RevealBreakdown(props: {
   question: PublicQuestion;
   summary: RevealSummary;
+  hideCorrect?: boolean;
 }) {
   // The reveal belongs to the question on screen; a mismatch can only be a
   // snapshot caught mid-transition, so render nothing rather than nonsense.

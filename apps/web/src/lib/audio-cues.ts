@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { decryptClip } from "@/lib/sound/preload";
+import { fadeOutAndPause } from "@/lib/sound/fade";
 
 /**
  * Plays `url` from `startMs` for `durationMs` (or until the caller unmounts
@@ -17,20 +18,14 @@ export function playSegment(
   audio.preload = "auto";
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
-  let fade: ReturnType<typeof setInterval> | null = null;
 
   const stop = () => {
     if (stopped) return;
     stopped = true;
     if (timer) clearTimeout(timer);
-    // Short fade-out, then pause.
-    fade = setInterval(() => {
-      audio.volume = Math.max(0, audio.volume - 0.15);
-      if (audio.volume <= 0.01) {
-        if (fade) clearInterval(fade);
-        audio.pause();
-      }
-    }, 40);
+    // Short fade-out, then pause (the pause doesn't wait on the fade: iOS
+    // ignores volume changes).
+    fadeOutAndPause(audio);
   };
 
   const start = () => {

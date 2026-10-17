@@ -14,6 +14,7 @@ import {
 } from "./moderation";
 import { pacingFor, type PacingStrategy } from "./pacing";
 import {
+  HOST,
   ROOM,
   withMeta,
   type Effect,
@@ -216,7 +217,6 @@ function start(
           event: "game-started",
           deadline: firstQuestionAt,
           ...(mod ? { moderation: mod } : {}),
-          preview: previewOf({ ...state, questions: event.questions }, 0),
         },
       },
       ...preloadEffects({ ...state, questions: event.questions }, 0),
@@ -236,6 +236,10 @@ function hostNext(
   switch (state.meta.phase) {
     case "ready":
       return startCountdown(state, state.meta.qIndex, now);
+    case "starting":
+      // Skip the countdown (and any wait for downloads): e.g. a host running
+      // the quiz with nobody playing.
+      return openQuestion(state, state.meta.qIndex, now, ctx);
     case "question":
       return closeQuestion(state, now, pacing);
     case "closed":
@@ -363,7 +367,6 @@ function startCountdown(
           payload: {
             phase: "starting",
             qIndex: index,
-            preview: previewOf(state, index),
           },
           deadline: at,
         },
@@ -407,6 +410,8 @@ function closeQuestion(
           payload: { phase: "closed", qIndex: state.meta.qIndex },
         },
       },
+      // The host screen shows how the room answered before the answer.
+      ...closedSummaryEffects(state),
       ...preloadEffects(state, state.meta.qIndex + 1),
     ],
   };
@@ -747,12 +752,6 @@ function preloadEffects(state: GameState, index: number): Effect[] {
     : [];
 }
 
-/** The coming question's text for the countdown (no options, no media). */
-function previewOf(state: GameState, index: number) {
-  const q = state.questions[index];
-  return q ? { title: q.title } : undefined;
-}
-
 /** A device is ignored once its download stops moving this long. */
 export const DOWNLOAD_STALL_MS = 4_000;
 /** The countdown never waits longer than this for downloads. */
@@ -793,7 +792,6 @@ function waitForDownloads(state: GameState, now: number): Transition | null {
           payload: {
             phase: "starting",
             qIndex: meta.qIndex,
-            preview: previewOf(state, meta.qIndex),
             waitingFor: pending,
           },
           deadline: at,
@@ -802,4 +800,24 @@ function waitForDownloads(state: GameState, now: number): Transition | null {
       { kind: "arm-timer", at },
     ],
   };
+}
+
+/** Host only: the tally of the question that just closed (no reveal key). */
+function closedSummaryEffects(state: GameState): Effect[] {
+  const question = state.questions[state.meta.qIndex];
+  if (!question) return [];
+  const { audioRevealKey: _key, ...tally } = buildReveal(
+    question,
+    state.meta.qIndex,
+    state.answers,
+    state.roster,
+  );
+  void _key;
+  return [
+    {
+      kind: "emit",
+      to: HOST,
+      message: { event: "closed-summary", payload: tally },
+    },
+  ];
 }

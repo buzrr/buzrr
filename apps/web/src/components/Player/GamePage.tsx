@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppSelector } from "@/state/hooks";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
@@ -20,6 +20,7 @@ import { ReactionBar } from "@/components/Game/Flyers";
 import { GameSounds, SoundToggle } from "@/lib/sound/director";
 import { quizSettingsSchema } from "@buzrr/contract";
 import { playersApi } from "@/lib/modules/players/api";
+import { saveFinalResult } from "@/lib/final-result";
 
 interface GameSessionWithQuiz extends GameSession {
   quiz: {
@@ -48,6 +49,12 @@ const GamePage = (params: {
   const [showLeaveModal, setShowLeaveModal] = useState(false);
 
   const phase = useAppSelector((state) => state.game.phase);
+  const phaseRef = useRef(phase);
+  useEffect(() => {
+    phaseRef.current = phase;
+  });
+  const leaderboard = useAppSelector((state) => state.game.leaderboard);
+  const mine = leaderboard.find((e) => e.playerId === params.player.id);
   const question = useAppSelector((state) => state.game.question);
   const you = useAppSelector((state) => state.game.you);
 
@@ -65,9 +72,27 @@ const GamePage = (params: {
       );
       router.replace(`/player/joinRoom/${params.player.id}`);
     },
-    onSessionEnded: () =>
-      router.replace(`/player/joinRoom/${params.player.id}`),
+    // After the final leaderboard the thank-you screen stays put when the
+    // host closes the room; only a room that ends earlier sends players back.
+    onSessionEnded: () => {
+      if (phaseRef.current !== "final" && phaseRef.current !== "ended") {
+        router.replace(`/player/joinRoom/${params.player.id}`);
+      }
+    },
   });
+
+  // Keep the final result for the thank-you screen (survives the room).
+  useEffect(() => {
+    if ((phase === "final" || phase === "ended") && leaderboard.length > 0) {
+      saveFinalResult({
+        playerId: params.player.id,
+        quizTitle: game.quiz.title ?? "",
+        position: mine?.rank ?? you?.rank ?? null,
+        score: mine?.score ?? you?.totalScore ?? 0,
+        players: leaderboard.length,
+      });
+    }
+  }, [phase, leaderboard, mine, you, params.player.id, game.quiz.title]);
 
   // Guard the browser/hardware back button: leaving the game is confirmed via
   // a modal instead of silently dropping the player on the previous screen.
@@ -157,8 +182,10 @@ const GamePage = (params: {
       ) : phase === "final" || phase === "ended" ? (
         <LeaderBoard
           playerId={params.player.id}
-          position={you?.rank ?? null}
-          score={you?.totalScore ?? 0}
+          position={mine?.rank ?? you?.rank ?? null}
+          score={mine?.score ?? you?.totalScore ?? 0}
+          quizTitle={game.quiz.title ?? undefined}
+          players={leaderboard.length}
         />
       ) : (
         // "starting" — the pre-question countdown

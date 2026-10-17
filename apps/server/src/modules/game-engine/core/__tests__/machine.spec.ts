@@ -50,7 +50,6 @@ describe("start", () => {
       {
         event: "game-started",
         deadline: T0 + START_COUNTDOWN_MS,
-        preview: { title: "Question q1" },
       },
     ]);
   });

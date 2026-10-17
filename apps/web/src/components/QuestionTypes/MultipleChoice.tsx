@@ -1,7 +1,13 @@
 "use client";
 
 import clsx from "clsx";
-import { useState, type ComponentProps, type ReactNode } from "react";
+import {
+  useState,
+  type ComponentProps,
+  type ReactNode,
+  useEffect,
+  useRef,
+} from "react";
 import { LuCheck } from "react-icons/lu";
 import {
   OPTION_KEYS,
@@ -85,6 +91,42 @@ function optionTextClass(options: { title: string }[]) {
  * How the room answered an option question, the right option(s) flagged.
  * Shared by the scored option types.
  */
+/** The right answer lights up: green border and a light green fill. */
+function CorrectGlow({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.animate(
+      [
+        {
+          borderColor: "rgba(34,197,94,0)",
+          backgroundColor: "rgba(34,197,94,0)",
+          transform: "scale(1)",
+        },
+        {
+          borderColor: "rgba(34,197,94,1)",
+          backgroundColor: "rgba(34,197,94,0.22)",
+          transform: "scale(1.03)",
+          offset: 0.55,
+        },
+        {
+          borderColor: "rgba(34,197,94,1)",
+          backgroundColor: "rgba(34,197,94,0.12)",
+          transform: "scale(1)",
+        },
+      ],
+      { duration: 900, easing: "cubic-bezier(.2,.8,.2,1)", fill: "forwards" },
+    );
+  }, []);
+  return (
+    <div
+      ref={ref}
+      className="-mx-2.5 rounded-xl border-2 border-transparent px-2.5 py-1.5"
+    >
+      {children}
+    </div>
+  );
+}
+
 export function OptionsReveal({
   options,
   counts,
@@ -105,8 +147,8 @@ export function OptionsReveal({
         const count = counts[i] ?? 0;
         const ok = correctOptionIds.includes(opt.id);
         const pct = picks > 0 ? Math.round((count / picks) * 100) : 0;
-        return (
-          <div key={opt.id} className="flex flex-col gap-[7px]">
+        const row = (
+          <div className="flex flex-col gap-[7px]">
             <div
               className={clsx(
                 "flex items-center gap-2.5 text-[15px] font-semibold",
@@ -136,6 +178,16 @@ export function OptionsReveal({
               correct={ok}
               delayMs={i * 90}
             />
+          </div>
+        );
+        return ok ? (
+          <CorrectGlow key={opt.id}>{row}</CorrectGlow>
+        ) : (
+          <div
+            key={opt.id}
+            className="-mx-2.5 px-2.5 py-1.5 border-2 border-transparent"
+          >
+            {row}
           </div>
         );
       })}
@@ -248,12 +300,12 @@ export const multipleChoiceRenderer: QuestionRenderer<"multiple_choice"> = {
     );
   },
 
-  RevealBreakdown({ question, summary }) {
+  RevealBreakdown({ question, summary, hideCorrect }) {
     return (
       <OptionsReveal
         options={question.options}
         counts={summary.counts}
-        correctOptionIds={summary.correctOptionIds}
+        correctOptionIds={hideCorrect ? [] : summary.correctOptionIds}
       />
     );
   },

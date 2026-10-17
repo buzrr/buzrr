@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { LuChevronRight } from "react-icons/lu";
 import { toast } from "react-toastify";
-import HostQuizForm from "@/components/Admin/Quiz/HostQuizForm";
 import Switch from "@/components/ui/Switch";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { useUpdateQuizMutation } from "@/lib/modules/quizzes/hooks";
@@ -22,13 +21,13 @@ function formatSessionDate(createdAt: string | Date) {
  */
 export function QuizInfoContent(props: {
   quiz: QuizDetail;
+  /** Unused: "Host quiz" is a floating button on the quiz page now. */
   showHostForm?: boolean;
   onShowLeaderboard?: (resultId: string) => void;
 }) {
   const pastGames = props.quiz.gameResults ?? [];
   const questionCount = props.quiz._count?.questions ?? 0;
   const updateQuiz = useUpdateQuizMutation();
-  const showHostForm = props.showHostForm ?? true;
 
   return (
     <>
@@ -91,15 +90,6 @@ export function QuizInfoContent(props: {
           </span>
         </div>
         <ModerationSettingsCard quiz={props.quiz} />
-        {showHostForm && (
-          <div className="w-full mt-[18px]">
-            <HostQuizForm
-              quizId={props.quiz.id}
-              disabled={questionCount === 0}
-              className="w-full"
-            />
-          </div>
-        )}
       </div>
       <div className="flex-1 flex flex-col min-h-0 w-[90%] mx-auto text-dark dark:text-white">
         <div className="flex items-center justify-between mt-6 mb-3">
@@ -110,7 +100,8 @@ export function QuizInfoContent(props: {
             {pastGames.length}
           </span>
         </div>
-        <div className="overflow-auto flex-1 min-h-0 flex flex-col gap-2.5 pr-1 -mr-1">
+        {/* Bottom room for the site footer and the floating "Host quiz". */}
+        <div className="overflow-auto flex-1 min-h-0 flex flex-col gap-2.5 pr-1 -mr-1 pb-32">
           {pastGames.length > 0 ? (
             pastGames.map((result) => {
               const leaderboardClass =

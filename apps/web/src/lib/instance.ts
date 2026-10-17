@@ -17,3 +17,10 @@ export const PRIVATE_BUZZ =
   process.env.NEXT_PUBLIC_PRIVATE_BUZZ?.toUpperCase() === "ON";
 
 export const INSTANCE_TITLE = process.env.NEXT_PUBLIC_TITLE?.trim() || "";
+
+/**
+ * NEXT_PUBLIC_CONTACT_EMAIL: the instance's contact address. On a private
+ * instance "Contact us" points here, and is left out when it isn't set.
+ */
+export const CONTACT_EMAIL =
+  process.env.NEXT_PUBLIC_CONTACT_EMAIL?.trim() || "";

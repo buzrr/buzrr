@@ -140,7 +140,12 @@ describe("moderated question flow", () => {
     const now = open.meta.qDeadline + ANSWER_GRACE_MS;
     const { state: next } = step(open, { type: "deadline" }, now);
     expect(next.meta.phase).toBe("closed");
-    expect(events(open, { type: "deadline" }, now)).toEqual(["phase-change"]);
+    // The room only learns the step; the tally goes to the host alone.
+    const out = emitted(step(open, { type: "deadline" }, now).effects);
+    expect(out.map((e) => e.event)).toEqual(["phase-change", "closed-summary"]);
+    expect(out.find((e) => e.event === "closed-summary")?.to).toEqual({
+      host: true,
+    });
   });
 
   it("'show answer' reveals without the standings, 'show scores' sends them", () => {
@@ -242,7 +247,7 @@ describe("moderated snapshots", () => {
   });
 });
 
-describe("sound clips and the countdown preview", () => {
+describe("sound clips", () => {
   const withClip = (id: string) => ({
     ...question(id),
     audio: {
@@ -280,20 +285,6 @@ describe("sound clips and the countdown preview", () => {
     const snap = buildSnapshot(open, "p1", T0);
     expect(JSON.stringify(snap)).not.toContain("q1-rkey");
     expect(snap.question?.audio).toMatchObject({ key: "q1-qkey" });
-  });
-
-  it("the countdown shows the coming question's text, not its options", () => {
-    const counting = state({
-      meta: {
-        ...state().meta,
-        phase: "starting",
-        qIndex: 1,
-        qDeadline: T0 + 3000,
-      },
-    });
-    const snap = buildSnapshot(counting, null, T0);
-    expect(snap.preview).toEqual({ title: "Question q2" });
-    expect(snap.question).toBeUndefined();
   });
 });
 
@@ -376,5 +367,38 @@ describe("the countdown waits for sound downloads", () => {
     expect(step(plain, { type: "deadline" }, T0).state.meta.phase).toBe(
       "question",
     );
+  });
+});
+
+describe("the countdown before a question", () => {
+  it("doesn't reveal the coming question", () => {
+    const counting = state({
+      meta: {
+        ...state().meta,
+        phase: "starting",
+        qIndex: 1,
+        qDeadline: T0 + 3000,
+      },
+    });
+    const snap = buildSnapshot(counting, null, T0);
+    expect(snap.question).toBeUndefined();
+    expect(JSON.stringify(snap)).not.toContain("Question q2");
+  });
+});
+
+describe("playing without players", () => {
+  it("host-next skips the countdown into the question", () => {
+    const counting = state({
+      roster: [],
+      meta: {
+        ...state().meta,
+        phase: "starting",
+        qIndex: 0,
+        qCount: 2,
+        qDeadline: T0 + 4000,
+      },
+    });
+    const { state: next } = step(counting, { type: "host-next" }, T0);
+    expect(next.meta).toMatchObject({ phase: "question", qIndex: 0 });
   });
 });

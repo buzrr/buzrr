@@ -353,3 +353,16 @@ export function playBuiltin(
     },
   };
 }
+
+/** A short, bright two-note "ping" (a player joined the waiting room). */
+export function playPing(volume = 0.35) {
+  const ctx = audioContext();
+  if (!ctx) return;
+  const bus = ctx.createGain();
+  bus.gain.value = volume;
+  bus.connect(ctx.destination);
+  const t = ctx.currentTime + 0.01;
+  tone(ctx, bus, t, hz(15), 0.18, "sine", 0.5, 9000); // C6
+  tone(ctx, bus, t + 0.09, hz(22), 0.35, "sine", 0.45, 9000); // G6
+  setTimeout(() => bus.disconnect(), 800);
+}

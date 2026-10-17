@@ -16,7 +16,7 @@ import { useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { AnimatedNumber } from "@/components/Game/motion";
 import { ReactionOverlay, useFlyers } from "@/components/Game/Flyers";
-import { GameSounds, SoundToggle } from "@/lib/sound/director";
+import { GameSounds, JoinPing, SoundToggle } from "@/lib/sound/director";
 import {
   LuBan,
   LuCheck,
@@ -255,7 +255,8 @@ const Lobby = (params: {
       .catch(() => toast.error("Failed to copy"));
   }
 
-  const startDisabled = players.length === 0 || load || !socket?.connected;
+  // Starting with nobody in the room is fine (a rehearsal, a presentation).
+  const startDisabled = load || !socket?.connected;
 
   return (
     <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 pb-4 md:pb-0 md:h-[calc(100dvh-10rem)] text-dark dark:text-white">
@@ -519,7 +520,11 @@ const Lobby = (params: {
               className="flex items-center justify-center gap-2.5 whitespace-nowrap rounded-[14px] px-[30px] py-3.5 text-base font-bold text-white bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep shadow-[0_10px_24px_-10px_#7c4ddb] transition-[filter,transform] hover:brightness-108 active:translate-y-px cursor-pointer disabled:opacity-50 disabled:cursor-default disabled:hover:brightness-100"
             >
               <LuPlay size={17} className="fill-current" />
-              {load ? "Loading..." : "Start Game"}
+              {load
+                ? "Loading..."
+                : players.length === 0
+                  ? "Start without players"
+                  : "Start Game"}
             </button>
           </div>
         </section>
@@ -528,6 +533,7 @@ const Lobby = (params: {
       {bubbleLayer}
       <GameSounds role="host" quizSettings={params.quizSettings}>
         <SoundToggle />
+        <JoinPing socket={socket} />
       </GameSounds>
       <ReactionOverlay
         socket={socket}

@@ -39,12 +39,13 @@ function Slide({
 }) {
   const [advancing, setAdvancing] = useState(false);
   return (
-    <div className="w-full max-w-3xl mx-auto flex flex-col justify-center px-4 py-6 md:py-10 min-h-[calc(100dvh-12rem)] text-dark dark:text-white">
+    <div className="w-full max-w-3xl mx-auto flex flex-col px-4 pt-6 md:pt-10 min-h-[calc(100dvh-12rem)] text-dark dark:text-white">
       <section
         aria-live="polite"
         className={clsx(
           panelClass,
-          "relative overflow-hidden flex flex-col items-center text-center gap-5 md:gap-6 px-6 py-9 md:px-12 md:py-12",
+          // Centered in the space above the host's bottom bar.
+          "my-auto relative overflow-hidden flex flex-col items-center text-center gap-5 md:gap-6 px-6 py-9 md:px-12 md:py-12",
         )}
       >
         <div
@@ -67,25 +68,29 @@ function Slide({
             {subtitle}
           </p>
         )}
-        <div className="relative min-h-6 flex items-center justify-center">
-          {onNext ? (
-            <button
-              type="button"
-              disabled={advancing}
-              onClick={() => {
-                setAdvancing(true);
-                onNext();
-              }}
-              className={clsx(primaryButtonClass, "px-8")}
-            >
-              {nextLabel}
-              <LuPlay size={17} className="fill-current" />
-            </button>
-          ) : (
+        {!onNext && (
+          <div className="relative min-h-6 flex items-center justify-center">
             <WaitingDots>{waitingFor}</WaitingDots>
-          )}
-        </div>
+          </div>
+        )}
       </section>
+      {onNext && (
+        // The host's next step sits at the bottom, like on the results screen.
+        <div className="sticky bottom-0 z-10 flex justify-end py-3 bg-light-bg/90 dark:bg-dark-bg/90 backdrop-blur">
+          <button
+            type="button"
+            disabled={advancing}
+            onClick={() => {
+              setAdvancing(true);
+              onNext();
+            }}
+            className={clsx(primaryButtonClass, "w-full md:w-auto md:min-w-80")}
+          >
+            {nextLabel}
+            <LuPlay size={17} className="fill-current" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -97,7 +102,7 @@ export function ReadySlide({ onNext }: { onNext?: () => void }) {
   return (
     <Slide
       badge={`Question ${qIndex + 1} of ${qCount}`}
-      title="Get ready!"
+      title="Be prepared!"
       subtitle={
         qIndex === 0
           ? "The quiz is about to begin"

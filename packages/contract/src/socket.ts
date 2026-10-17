@@ -128,15 +128,11 @@ export const playerReactionSchema = reactionSchema.extend({
 });
 
 /** A moderated game moved to a phase that has no payload event of its own. */
-/** "starting": the coming question's text — readable during the countdown; options and media wait for the question. */
-export const questionPreviewSchema = z.object({ title: z.string() });
-
 export const phaseChangeSchema = z.object({
   phase: gamePhaseSchema,
   qIndex: z.number().int(),
   /** "starting": time until the question opens (display only). */
   remainingMs: z.number().optional(),
-  preview: questionPreviewSchema.optional(),
   /** "starting", countdown over: devices still downloading the question's sound. */
   waitingFor: z.number().int().optional(),
 });
@@ -325,10 +321,10 @@ export const stateSyncSchema = z.object({
   you: answerResultSchema.optional(),
   /** Present for moderated games. */
   moderation: moderationSettingsSchema.optional(),
-  /** Present while phase is "starting": the coming question's text. */
-  preview: questionPreviewSchema.optional(),
   /** Present on the final leaderboard: decrypts the skin's final song. */
   finalSoundKey: z.string().optional(),
+  /** Host connections in "closed": the answers so far (see `closed-summary`). */
+  closedSummary: questionEndSchema.optional(),
 });
 
 export const submitAnswerSchema = z.object({
@@ -385,7 +381,6 @@ export type SoundSkin = z.infer<typeof soundSkinSchema>;
 export type PhaseChangePayload = z.infer<typeof phaseChangeSchema>;
 export type PreloadPayload = z.infer<typeof preloadSchema>;
 export type PreloadStatusPayload = z.infer<typeof preloadStatusSchema>;
-export type QuestionPreview = z.infer<typeof questionPreviewSchema>;
 export type BubbleStatsPayload = z.infer<typeof bubbleStatsSchema>;
 export type ReactionPayload = z.infer<typeof reactionSchema>;
 export type PlayerReactionPayload = z.infer<typeof playerReactionSchema>;
@@ -428,6 +423,11 @@ export interface ServerToClientEvents {
   "phase-change": (payload: PhaseChangePayload) => void;
   /** Download the next question's (encrypted) sound clips now. */
   preload: (payload: PreloadPayload) => void;
+  /**
+   * Host only, moderated "closed" step: how the room answered, before the
+   * answer is shown (the host screen keeps the correct one hidden).
+   */
+  "closed-summary": (payload: QuestionEndPayload) => void;
   /** Host only: a waiting player's bubble mini-game totals. */
   "bubble-stats": (payload: PlayerBubbleStatsPayload) => void;
   /** Host only: one live reaction from a player (one per tap). */
@@ -451,8 +451,6 @@ export interface ServerToClientEvents {
   "game-started": (payload: {
     remainingMs: number;
     moderation?: ModerationSettings;
-    /** Question 1's text, readable during the countdown. */
-    preview?: QuestionPreview;
   }) => void;
   /** Terminal signal for players: the room is gone, stop rendering it. */
   "game-session-ended": () => void;

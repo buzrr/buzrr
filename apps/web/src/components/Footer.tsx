@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { LuMail } from "react-icons/lu";
 import ThemeToggle from "./ThemeToggle";
 import supportLinks from "@/data/support-links.json";
-import { PRIVATE_BUZZ } from "@/lib/instance";
+import { CONTACT_EMAIL, PRIVATE_BUZZ } from "@/lib/instance";
 import { authClient } from "@/lib/auth-client";
 
 // Routes that render their own full footer + theme toggle (landing & co).
@@ -16,6 +16,8 @@ const ROUTES_WITH_OWN_FOOTER = ["/", "/docs", "/support", "/pricing"];
 // Route prefixes where the bar is hidden on every subpage: the checkout flow,
 // and the marketing + legal pages in app/(marketing), which render LandingFooter.
 const PREFIXES_WITHOUT_FOOTER = [
+  // The host's game screen uses the full height (no footer, no theme toggle).
+  "/admin/game/",
   "/billing/",
   "/alternatives",
   "/compare/",
@@ -66,6 +68,21 @@ const Links = [
   },
 ];
 
+/**
+ * On a private instance "Contact us" is the instance's own address
+ * (CONTACT_EMAIL) — or left out when none is set.
+ */
+function footerLinks() {
+  if (!PRIVATE_BUZZ) return Links;
+  return Links.flatMap((l) =>
+    l.name !== "Contact us"
+      ? [l]
+      : CONTACT_EMAIL
+        ? [{ ...l, link: `mailto:${CONTACT_EMAIL}` }]
+        : [],
+  );
+}
+
 const Footer = () => {
   const pathname = usePathname();
   // Checked after mount: authClient.useSession() breaks static prerendering.
@@ -92,7 +109,7 @@ const Footer = () => {
     <div className="fixed bottom-0 right-3 md:right-0 md:left-0 z-50 w-fit md:w-full md:bg-light-bg md:dark:bg-dark-bg">
       <div className="max-w-7xl mx-auto flex items-center justify-start p-2 px-4 sm:px-6 lg:px-8 text-sm text-[#94959c] dark:text-off-white">
         {/* Private instances: contact/donate/social links only for signed-in users. */}
-        {(PRIVATE_BUZZ && !signedIn ? [] : Links).map((link, index) => {
+        {(PRIVATE_BUZZ && !signedIn ? [] : footerLinks()).map((link, index) => {
           // New tab only for real external web links — never for mailto:, in-app
           // routes, or "#" placeholders.
           const isExternal =

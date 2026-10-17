@@ -10,12 +10,18 @@ import { WaitingDots, mutedText, panelClass } from "@/components/Game/GameUI";
  * as the fallback while a question is on its way. Counts down when the slice
  * has a start deadline; otherwise just says what it's waiting for.
  */
-export default function GetReady({ title }: { title?: string }) {
+export default function GetReady({
+  title,
+  onSkip,
+}: {
+  title?: string;
+  /** Host with nobody playing: skip the countdown. */
+  onSkip?: () => void;
+}) {
   const phase = useAppSelector((state) => state.game.phase);
   const deadline = useAppSelector((state) => state.game.deadline);
   const countdownMs = useAppSelector((state) => state.game.countdownMs);
   const qIndex = useAppSelector((state) => state.game.qIndex);
-  const preview = useAppSelector((state) => state.game.preview);
   const waitingFor = useAppSelector((state) => state.game.waitingFor);
   const remaining = useServerCountdown(phase === "starting" ? deadline : 0);
   const seconds = Math.ceil(remaining);
@@ -37,7 +43,7 @@ export default function GetReady({ title }: { title?: string }) {
         />
 
         <span className="relative text-[12.5px] font-bold tracking-[0.08em] uppercase rounded-full px-3 py-1.5 text-lprimary dark:text-dprimary bg-lprimary/8 dark:bg-white/5">
-          Get ready
+          Be prepared
         </span>
         {title && (
           <h1 className="relative max-w-full text-2xl md:text-4xl font-bold tracking-[-0.02em] leading-tight text-pretty wrap-break-word">
@@ -52,12 +58,6 @@ export default function GetReady({ title }: { title?: string }) {
           total={countdownMs / 1000}
         />
 
-        {/* The question's text may be read during the countdown; options and media come with the question. */}
-        {(counting || waitingFor > 0) && preview && (
-          <p className="relative max-w-2xl text-xl md:text-3xl font-bold leading-snug text-pretty wrap-break-word animate-fade-up">
-            {preview.title}
-          </p>
-        )}
         <div className="relative min-h-6 flex items-center justify-center">
           {counting ? (
             <p className={clsx("text-base md:text-lg font-medium", mutedText)}>
@@ -74,6 +74,17 @@ export default function GetReady({ title }: { title?: string }) {
           )}
         </div>
       </section>
+      {onSkip && phase === "starting" && (
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={onSkip}
+            className="rounded-[14px] border-2 border-lprimary dark:border-dprimary px-6 py-2.5 font-bold text-lprimary dark:text-dprimary cursor-pointer hover:bg-lprimary/10 dark:hover:bg-dprimary/10"
+          >
+            Skip
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -93,7 +104,8 @@ function Countdown({
   const c = 2 * Math.PI * r;
   const frac =
     counting && total > 0 ? Math.max(0, Math.min(1, remaining / total)) : 0;
-  const label = !counting ? null : seconds > 0 ? seconds : "Go!";
+  // Counts down to 1; at zero the question simply appears.
+  const label = !counting || seconds <= 0 ? null : seconds;
   return (
     <div className="relative size-[150px] md:size-[190px]">
       <svg viewBox="0 0 100 100" className="block size-full -rotate-90">
@@ -135,9 +147,7 @@ function Countdown({
             key={label}
             className={clsx(
               "font-extrabold leading-none tracking-[-0.03em] tabular-nums animate-pop-in",
-              label === "Go!"
-                ? "text-4xl md:text-5xl text-lprimary dark:text-dprimary"
-                : "text-6xl md:text-7xl",
+              "text-6xl md:text-7xl",
             )}
           >
             {label}

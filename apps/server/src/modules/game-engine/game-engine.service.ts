@@ -238,14 +238,20 @@ export class GameEngineService
     }
     // Per-player rooms work cross-instance via the redis adapter.
     const target =
-      "player" in to ? this.io.to(`player:${to.player}`) : this.io.to(gameCode);
+      "player" in to
+        ? this.io.to(`player:${to.player}`)
+        : "host" in to
+          ? this.io.to(`host:${gameCode}`)
+          : this.io.to(gameCode);
     switch (message.event) {
       case "game-started":
         target.emit("game-started", {
           remainingMs: Math.max(0, message.deadline - Date.now()),
           ...(message.moderation ? { moderation: message.moderation } : {}),
-          ...(message.preview ? { preview: message.preview } : {}),
         });
+        break;
+      case "closed-summary":
+        target.emit("closed-summary", message.payload);
         break;
       case "preload":
         // Encrypted clips only; signed so the room can fetch them.
