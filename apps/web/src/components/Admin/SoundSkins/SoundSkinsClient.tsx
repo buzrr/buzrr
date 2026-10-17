@@ -3,7 +3,7 @@
 import clsx from "clsx";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
-import { LuPlay, LuSquare, LuTrash2, LuUpload } from "react-icons/lu";
+import { LuCheck, LuPlay, LuSquare, LuTrash2, LuUpload } from "react-icons/lu";
 import {
   BUILTIN_SOUND_SKINS,
   soundSlotSchema,
@@ -16,6 +16,10 @@ import { Button } from "@/components/ui/Button";
 import { Switch } from "@/components/ui/Switch";
 import { TextInput } from "@/components/ui/TextInput";
 import { mutedText, panelClass } from "@/components/Game/GameUI";
+import {
+  usePreferencesQuery,
+  useUpdatePreferences,
+} from "@/lib/modules/preferences/hooks";
 import {
   BUILTIN_SKINS,
   audioContext,
@@ -90,12 +94,16 @@ export default function SoundSkinsClient() {
       <section className={clsx(panelClass, "p-5 flex flex-col gap-3")}>
         <h2 className="text-lg font-bold">Built-in audio skins</h2>
         <p className={clsx("text-sm", mutedText)}>
-          Synthesized in the browser. Pick one per quiz in its settings.
+          Synthesized in the browser. Your default applies to all your quizzes;
+          each quiz can pick another skin in its settings.
         </p>
         {BUILTIN_SOUND_SKINS.map((id) => (
           <div key={id} className="flex flex-wrap items-center gap-1.5">
             <span className="w-32 font-semibold">
               {BUILTIN_SKINS[id as BuiltinSkinId].name}
+            </span>
+            <span className="w-28">
+              <DefaultSkinButton id={id} />
             </span>
             {SLOTS.map((slot) => {
               const key = `${id}:${slot}`;
@@ -168,6 +176,37 @@ export default function SoundSkinsClient() {
   );
 }
 
+/** "Default" badge, or the button that makes this skin the default. */
+export function DefaultSkinButton({ id }: { id: string }) {
+  const prefs = usePreferencesQuery();
+  const update = useUpdatePreferences();
+  if ((prefs.data?.defaultSoundSkin ?? "builtin:show") === id) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-dprimary/15 px-3 py-1 text-xs font-bold text-lprimary dark:text-dprimary">
+        <LuCheck size={13} /> Default
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      disabled={update.isPending || !prefs.data}
+      onClick={() =>
+        update.mutate(
+          { defaultSoundSkin: id },
+          {
+            onSuccess: () => toast.success("Default audio skin set"),
+            onError: (err) => toast.error(getApiErrorMessage(err)),
+          },
+        )
+      }
+      className="rounded-xl bg-lprimary dark:bg-dprimary px-3 py-1 text-xs font-bold text-white dark:text-dark cursor-pointer disabled:opacity-50"
+    >
+      Make default
+    </button>
+  );
+}
+
 function SkinCard({
   skin,
   isAdmin,
@@ -214,6 +253,7 @@ function SkinCard({
             </span>
           )
         )}
+        <DefaultSkinButton id={skin.id} />
         <button
           type="button"
           aria-label="Delete audio skin"

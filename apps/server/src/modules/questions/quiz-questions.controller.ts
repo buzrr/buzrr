@@ -35,19 +35,20 @@ export class QuizQuestionsController {
       { limits: { fileSize: 20 * 1024 * 1024 } },
     ),
   )
-  upsert(
+  async upsert(
     @CurrentAccountUser() user: AuthUser,
     @Param("quizId") quizId: string,
     @Body() body: Record<string, string>,
     @UploadedFiles()
     files?: { file?: Express.Multer.File[]; audio?: Express.Multer.File[] },
   ) {
-    return this.questions.upsertFromMultipart(
+    await this.questions.upsertFromMultipart(
       user,
       quizId,
       body,
       files?.file?.[0],
       files?.audio?.[0],
     );
+    await this.questions.touchQuiz(quizId);
   }
 }

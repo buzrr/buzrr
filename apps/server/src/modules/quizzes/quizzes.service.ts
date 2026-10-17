@@ -95,6 +95,10 @@ export class QuizzesService {
     private readonly storage: MediaStorage,
   ) {}
 
+  aiAvailable(): boolean {
+    return this.llm.configured;
+  }
+
   async setLogo(
     user: AuthUser,
     quizId: string,
@@ -301,10 +305,20 @@ export class QuizzesService {
   }
 
   async findAllForUser(user: AuthUser) {
-    return this.prisma.db.quiz.findMany({
+    const quizzes = await this.prisma.db.quiz.findMany({
       where: { userId: user.userId },
       orderBy: { createdAt: "desc" },
       include: {
+        gameSessions: {
+          select: { createdAt: true },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+        gameResults: {
+          select: { endedAt: true },
+          orderBy: { endedAt: "desc" },
+          take: 1,
+        },
         _count: {
           select: {
             questions: { where: { disabled: false } },
@@ -313,6 +327,16 @@ export class QuizzesService {
         },
       },
     });
+    // Newest first by whichever happened last: an edit or a game hosted.
+    const activity = (q: (typeof quizzes)[number]) =>
+      Math.max(
+        q.updatedAt.getTime(),
+        q.gameSessions[0]?.createdAt.getTime() ?? 0,
+        q.gameResults[0]?.endedAt.getTime() ?? 0,
+      );
+    return quizzes
+      .sort((a, b) => activity(b) - activity(a))
+      .map(({ gameSessions: _s, gameResults: _r, ...q }) => q);
   }
 
   /** Every quiz with its owner (admin overview). */

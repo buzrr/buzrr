@@ -82,6 +82,14 @@ export function useDeleteQuizMutation() {
   });
 }
 
+export function useAiStatusQuery() {
+  return useQuery({
+    queryKey: ["quizzes", "ai-status"],
+    queryFn: quizzesApi.aiStatus,
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useDuplicateQuizMutation() {
   const queryClient = useQueryClient();
   return useMutation({

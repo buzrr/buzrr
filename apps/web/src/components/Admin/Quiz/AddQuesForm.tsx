@@ -1406,6 +1406,10 @@ const AddQuesForm = (props: {
                               )
                             }
                             ticks={[...range.ticks, "∞"]}
+                            tickValues={[
+                              ...range.ticks.map((tk) => parseInt(tk, 10)),
+                              range.max + SLIDER_UNLIMITED_STEP,
+                            ]}
                           />
                           {isUnlimitedTime(t) && (
                             <span className={clsx("text-xs", mutedText)}>

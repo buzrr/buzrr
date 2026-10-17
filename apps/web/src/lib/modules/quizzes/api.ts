@@ -116,6 +116,10 @@ export const quizzesApi = {
   update: (quizId: string, body: Parameters<typeof updateQuiz>[2]) =>
     updateQuiz(getAuthApiClient(), quizId, body),
   delete: (quizId: string) => deleteQuiz(getAuthApiClient(), quizId),
+  /** Whether the server has an AI model configured for quiz generation. */
+  aiStatus: async () =>
+    (await getAuthApiClient().get<{ available: boolean }>("/quizzes/ai/status"))
+      .data,
   /** A copy with all questions; returns the new quiz's id. */
   duplicate: async (quizId: string) =>
     (

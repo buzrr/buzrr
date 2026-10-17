@@ -184,6 +184,7 @@ export class QuestionsService {
       where: { id: quesId },
       data: { disabled },
     });
+    await this.touchQuiz(question.quizId);
     return { id: quesId, disabled };
   }
 
@@ -211,6 +212,15 @@ export class QuestionsService {
         data: { order: { decrement: 1 } },
       }),
     ]);
+    await this.touchQuiz(quizId);
+  }
+
+  /** A question changed: the quiz counts as updated (quiz list order). */
+  async touchQuiz(quizId: string | null | undefined): Promise<void> {
+    if (!quizId) return;
+    await this.prisma.db.quiz
+      .update({ where: { id: quizId }, data: { updatedAt: new Date() } })
+      .catch(() => undefined);
   }
 
   async upsertFromMultipart(
