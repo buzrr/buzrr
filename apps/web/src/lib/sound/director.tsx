@@ -107,7 +107,7 @@ function useUnlockAudio() {
 }
 
 /** Loads a user skin (null for built-in ones). */
-function useSkin(id: string): SoundSkin | null {
+function useSkin(id: string, role: Role): SoundSkin | null {
   const [skin, setSkin] = useState<SoundSkin | null>(null);
   useEffect(() => {
     if ((BUILTIN_SOUND_SKINS as readonly string[]).includes(id)) {
@@ -116,13 +116,13 @@ function useSkin(id: string): SoundSkin | null {
     }
     let alive = true;
     soundSkinsApi
-      .get(id)
+      .get(id, role === "player" ? "player" : "account")
       .then((s) => alive && setSkin(s))
       .catch(() => alive && setSkin(null));
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [id, role]);
   return skin;
 }
 
@@ -196,7 +196,7 @@ export function GameSounds({
     if (v) void audioContext()?.resume();
   };
 
-  const skin = useSkin(settings.skin);
+  const skin = useSkin(settings.skin, role);
   const phase = useAppSelector((s) => s.game.phase);
   const qIndex = useAppSelector((s) => s.game.qIndex);
   const deadline = useAppSelector((s) => s.game.deadline);

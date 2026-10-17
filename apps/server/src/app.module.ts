@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
-import { APP_GUARD } from "@nestjs/core";
+import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
+import { SignAssetsInterceptor } from "./common/interceptors/sign-assets.interceptor";
 import { AuthModule } from "./modules/auth/auth.module";
 import { CommonModule } from "./common/common.module";
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
@@ -46,6 +47,8 @@ import { SoundSkinsModule } from "./modules/sound-skins/sound-skins.module";
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
+    // Uploaded media links in responses are signed for authenticated callers.
+    { provide: APP_INTERCEPTOR, useClass: SignAssetsInterceptor },
   ],
 })
 export class AppModule {}

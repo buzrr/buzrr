@@ -17,7 +17,12 @@ import {
   UnsupportedMediaError,
 } from "../../common/storage/media-storage";
 import { toMp3 } from "../../common/storage/audio-transcode";
-import type { AuthUser } from "../../common/decorators/current-user.decorator";
+import {
+  isPlayerAuthUser,
+  type AuthUser,
+  type JwtRequestUser,
+} from "../../common/decorators/current-user.decorator";
+import { quizSettingsSchema } from "@buzrr/contract";
 
 type SkinRow = {
   id: string;
@@ -87,10 +92,32 @@ export class SoundSkinsService {
     return rows.map(toSkin);
   }
 
-  /** Public: what a game needs to play a skin (players have no account). */
-  async get(id: string): Promise<SoundSkin> {
+  /**
+   * A skin for a game: its owner, anyone signed in for a global one, admins,
+   * and players whose current game's quiz plays it. Nobody else learns its
+   * files.
+   */
+  async get(user: JwtRequestUser, id: string): Promise<SoundSkin> {
     const row = await this.prisma.db.soundSkin.findUnique({ where: { id } });
     if (!row) throw new NotFoundException("Sound skin not found");
+    if (isPlayerAuthUser(user)) {
+      const player = await this.prisma.db.player.findUnique({
+        where: { id: user.playerId },
+        select: { game: { select: { quiz: { select: { settings: true } } } } },
+      });
+      const settings = quizSettingsSchema.safeParse(
+        player?.game?.quiz.settings ?? {},
+      );
+      if (!settings.success || settings.data.sound.skin !== id) {
+        throw new NotFoundException("Sound skin not found");
+      }
+    } else if (
+      row.userId !== user.userId &&
+      !row.isGlobal &&
+      !(await this.isAdmin(user.userId))
+    ) {
+      throw new NotFoundException("Sound skin not found");
+    }
     return toSkin(row);
   }
 

@@ -1,16 +1,19 @@
 import type { SoundSkin, SoundSlot } from "@buzrr/contract";
-import { getAuthApiClient, getPublicApiClient } from "@/lib/api/client";
+import {
+  createPlayerAuthedApiClient,
+  getAuthApiClient,
+} from "@/lib/api/client";
 
 export const soundSkinsApi = {
   /** The user's own skins plus every global one. */
   list: async () =>
     (await getAuthApiClient().get<SoundSkin[]>("/sound-skins")).data,
-  /** Public: a game's skin, also for players without an account. */
-  get: async (id: string) =>
+  /** A game's skin — players load it with their player token. */
+  get: async (id: string, as: "account" | "player" = "account") =>
     (
-      await getPublicApiClient().get<SoundSkin>(
-        `/sound-skins/${encodeURIComponent(id)}`,
-      )
+      await (
+        as === "player" ? createPlayerAuthedApiClient() : getAuthApiClient()
+      ).get<SoundSkin>(`/sound-skins/${encodeURIComponent(id)}`)
     ).data,
   create: async (name: string) =>
     (await getAuthApiClient().post<SoundSkin>("/sound-skins", { name })).data,

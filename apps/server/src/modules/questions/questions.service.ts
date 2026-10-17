@@ -19,6 +19,7 @@ import {
   UnsupportedMediaError,
 } from "../../common/storage/media-storage";
 import { toMp3 } from "../../common/storage/audio-transcode";
+import { stripAssetSignature } from "../../common/storage/asset-signing";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
 import {
@@ -197,7 +198,10 @@ export class QuestionsService {
     const title = body.title?.trim();
     const time = body.time;
     const quesId = body.ques_id?.trim() || undefined;
-    const file_link = body.file_link;
+    // Links sent back by the editor are signed; the database keeps them bare.
+    const file_link = body.file_link
+      ? stripAssetSignature(body.file_link)
+      : body.file_link;
     const file_type = body.media_type;
     const type = body.type?.trim() || DEFAULT_QUESTION_TYPE;
 
@@ -274,7 +278,7 @@ export class QuestionsService {
     if (audioFile && audioFile.size > 0) {
       audio = (await store(audioFile, "audio")).url;
     } else if (body.audio_link && /^https?:\/\//.test(body.audio_link)) {
-      audio = body.audio_link;
+      audio = stripAssetSignature(body.audio_link);
     }
     const cueMs = (raw: string | undefined) => {
       const n = parseInt(raw ?? "", 10);

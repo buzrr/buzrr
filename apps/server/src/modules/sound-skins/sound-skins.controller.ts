@@ -15,9 +15,14 @@ import {
 import { FileInterceptor } from "@nestjs/platform-express";
 import type { Express } from "express";
 import { z } from "zod";
-import { CurrentAccountUser } from "../../common/decorators/current-user.decorator";
-import type { AuthUser } from "../../common/decorators/current-user.decorator";
-import { Public } from "../../common/decorators/public.decorator";
+import {
+  CurrentAccountUser,
+  CurrentUser,
+} from "../../common/decorators/current-user.decorator";
+import type {
+  AuthUser,
+  JwtRequestUser,
+} from "../../common/decorators/current-user.decorator";
 import { RateLimitGuard } from "../../common/guards/rate-limit.guard";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { SoundSkinsService } from "./sound-skins.service";
@@ -37,12 +42,14 @@ export class SoundSkinsController {
     return this.skins.list(user);
   }
 
-  /** Public so players' devices can load the quiz's skin. */
-  @Public()
+  /**
+   * A signed-in user (own, global or as admin) or a player whose current game
+   * uses this skin; the files' links are signed for them.
+   */
   @UseGuards(RateLimitGuard)
   @Get(":id")
-  get(@Param("id") id: string) {
-    return this.skins.get(id);
+  get(@CurrentUser() user: JwtRequestUser, @Param("id") id: string) {
+    return this.skins.get(user, id);
   }
 
   @Post()
