@@ -31,7 +31,7 @@ const NavLinks = [
   ...(BILLING_ENABLED
     ? [{ href: "/admin/billing", label: "Plan & Billing", icon: LuCrown }]
     : []),
-  { href: "/admin/sound-skins", label: "Sound Skins", icon: LuMusic },
+  { href: "/admin/audio-skins", label: "Audio Skins", icon: LuMusic },
   { href: "/admin/settings", label: "Settings", icon: LuSettings },
 ];
 

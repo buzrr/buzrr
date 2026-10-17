@@ -88,7 +88,7 @@ export default function SoundSkinsClient() {
   return (
     <div className="mt-4 flex flex-col gap-6 text-dark dark:text-white max-w-4xl">
       <section className={clsx(panelClass, "p-5 flex flex-col gap-3")}>
-        <h2 className="text-lg font-bold">Built-in skins</h2>
+        <h2 className="text-lg font-bold">Built-in audio skins</h2>
         <p className={clsx("text-sm", mutedText)}>
           Synthesized in the browser. Pick one per quiz in its settings.
         </p>
@@ -127,7 +127,7 @@ export default function SoundSkinsClient() {
       </section>
 
       <section className={clsx(panelClass, "p-5 flex flex-col gap-3")}>
-        <h2 className="text-lg font-bold">Your skins</h2>
+        <h2 className="text-lg font-bold">Your audio skins</h2>
         <form
           className="flex gap-2 max-w-md"
           onSubmit={(e) => {
@@ -139,7 +139,7 @@ export default function SoundSkinsClient() {
           }}
         >
           <TextInput
-            placeholder="New skin name"
+            placeholder="New audio skin name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={60}
@@ -152,7 +152,7 @@ export default function SoundSkinsClient() {
         {query.isPending ? (
           <p className={mutedText}>Loading…</p>
         ) : (query.data ?? []).length === 0 ? (
-          <p className={mutedText}>No skins yet.</p>
+          <p className={mutedText}>No audio skins yet.</p>
         ) : (
           (query.data ?? []).map((skin) => (
             <SkinCard
@@ -189,7 +189,7 @@ function SkinCard({
         <input
           defaultValue={skin.name}
           maxLength={60}
-          aria-label="Skin name"
+          aria-label="Audio skin name"
           onBlur={(e) =>
             e.target.value !== skin.name &&
             update.mutate({ id: skin.id, name: e.target.value }, { onError })
@@ -216,7 +216,7 @@ function SkinCard({
         )}
         <button
           type="button"
-          aria-label="Delete skin"
+          aria-label="Delete audio skin"
           onClick={() => {
             if (window.confirm(`Delete "${skin.name}"?`)) {
               del.mutate(skin.id, { onError });

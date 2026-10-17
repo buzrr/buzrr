@@ -57,8 +57,9 @@ export default function ModerationSettingsCard({ quiz }: { quiz: QuizDetail }) {
       },
       { onError: (err) => toast.error(getApiErrorMessage(err)) },
     );
+  // Same width for every sound selector, so they line up.
   const selectClass =
-    "rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent dark:bg-dark px-2 py-1 text-[13px]";
+    "w-44 rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent dark:bg-dark px-2 py-1 text-[13px]";
 
   const save = (patch: Partial<ModerationSettings>) =>
     updateQuiz.mutate(
@@ -74,7 +75,7 @@ export default function ModerationSettingsCard({ quiz }: { quiz: QuizDetail }) {
       <div className="flex flex-col gap-1.5 text-sm">
         <span className="font-semibold">Sounds</span>
         <label className="flex items-center gap-2">
-          <span className="w-16 text-[13px]">Play on</span>
+          <span className="w-20 shrink-0 text-[13px]">Play on</span>
           <select
             aria-label="Where sounds play"
             value={settings.sound.playOn}
@@ -92,9 +93,9 @@ export default function ModerationSettingsCard({ quiz }: { quiz: QuizDetail }) {
         </label>
         {settings.sound.playOn !== "off" && (
           <label className="flex items-center gap-2">
-            <span className="w-16 text-[13px]">Skin</span>
+            <span className="w-20 shrink-0 text-[13px]">Audio skin</span>
             <select
-              aria-label="Sound skin"
+              aria-label="Audio skin"
               value={settings.sound.skin}
               disabled={updateQuiz.isPending}
               onChange={(e) => saveSound({ skin: e.target.value })}

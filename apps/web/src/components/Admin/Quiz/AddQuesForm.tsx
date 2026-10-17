@@ -771,7 +771,7 @@ const AddQuesForm = (props: {
                     aria-label="Where the sound plays"
                     value={audioPlayOn}
                     onChange={(e) => setAudioPlayOn(e.target.value)}
-                    className="rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent dark:bg-dark px-2 py-1"
+                    className="w-44 rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent dark:bg-dark px-2 py-1"
                   >
                     <option value="quiz">Like the quiz</option>
                     <option value="host">Your screen</option>
