@@ -14,6 +14,7 @@ import QuesResult from "./QuesResult";
 import LeaderBoard from "./Leaderboard";
 import { ClosedSlide, ReadySlide } from "@/components/Game/ModeratedSteps";
 import { closedNextLabel } from "@/lib/moderation";
+import { ReactionOverlay } from "@/components/Game/Flyers";
 
 interface QuizQuestionItem {
   title?: string;
@@ -45,6 +46,7 @@ const GameLobby = (params: {
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const qCount = useAppSelector((state) => state.game.qCount);
   const moderation = useAppSelector((state) => state.game.moderation);
+  const roster = useAppSelector((state) => state.game.players);
 
   useEffect(() => {
     dispatch(setPlayers(params.players));
@@ -75,6 +77,10 @@ const GameLobby = (params: {
     return (
       <>
         <ConnectionBanner />
+        <ReactionOverlay
+          socket={socket}
+          nameOf={(id) => roster.find((p) => p.id === id)?.name}
+        />
         <GetReady title={title} />
       </>
     );
@@ -83,6 +89,10 @@ const GameLobby = (params: {
   return (
     <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 pb-4 md:pb-0 md:h-[calc(100dvh-10rem)] text-dark dark:text-white">
       <ConnectionBanner />
+      <ReactionOverlay
+        socket={socket}
+        nameOf={(id) => roster.find((p) => p.id === id)?.name}
+      />
       <GameTopBar
         title={title}
         qIndex={qIndex}

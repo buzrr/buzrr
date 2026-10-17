@@ -1,6 +1,7 @@
 import {
   bubbleStatsSchema,
   duelQueueSchema,
+  reactionSchema,
   submitAnswerSchema,
 } from "@buzrr/contract";
 import { Logger } from "@nestjs/common";
@@ -392,6 +393,29 @@ export class RealtimeGateway
     // Lobby bubble game: relayed to the host as-is, nothing is stored. At most
     // one update per ~800ms per socket gets through.
     let lastBubbleStats = 0;
+    // Live reactions: one event per tap, relayed to the host. A token bucket
+    // lets a burst of taps through (10 quick hearts = 10 hearts) but caps a
+    // flood at ~8 per second.
+    let reactionTokens = 12;
+    let reactionRefill = Date.now();
+    socket.on("reaction", (payload) => {
+      const playerId = socket.data.playerId;
+      if (!playerId) return;
+      const now = Date.now();
+      reactionTokens = Math.min(
+        12,
+        reactionTokens + ((now - reactionRefill) / 1000) * 8,
+      );
+      reactionRefill = now;
+      if (reactionTokens < 1) return;
+      const parsed = reactionSchema.safeParse(payload);
+      if (!parsed.success) return;
+      reactionTokens -= 1;
+      this.server
+        .to(`host:${gameCode}`)
+        .emit("reaction", { playerId, kind: parsed.data.kind });
+    });
+
     socket.on("bubble-stats", (payload) => {
       const playerId = socket.data.playerId;
       const now = Date.now();

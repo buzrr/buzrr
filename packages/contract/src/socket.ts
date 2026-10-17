@@ -54,6 +54,15 @@ export const moderationSettingsSchema = z.object({
 /** `Quiz.settings`. Unknown/missing keys fall back to the defaults. */
 export const quizSettingsSchema = z.object({
   moderation: moderationSettingsSchema.prefault({}),
+  /** Players can send live reactions (👍 ❤️ 😂) that fly across the host screen. */
+  reactions: z.boolean().default(true),
+});
+
+/** Live reactions a player can send (see `reaction` events). */
+export const reactionKindSchema = z.enum(["thumbs", "heart", "laugh"]);
+export const reactionSchema = z.object({ kind: reactionKindSchema });
+export const playerReactionSchema = reactionSchema.extend({
+  playerId: z.string(),
 });
 
 /** A moderated game moved to a phase that has no payload event of its own. */
@@ -275,6 +284,9 @@ export type ModerationSettings = z.infer<typeof moderationSettingsSchema>;
 export type QuizSettings = z.infer<typeof quizSettingsSchema>;
 export type PhaseChangePayload = z.infer<typeof phaseChangeSchema>;
 export type BubbleStatsPayload = z.infer<typeof bubbleStatsSchema>;
+export type ReactionKind = z.infer<typeof reactionKindSchema>;
+export type ReactionPayload = z.infer<typeof reactionSchema>;
+export type PlayerReactionPayload = z.infer<typeof playerReactionSchema>;
 export type PlayerBubbleStatsPayload = z.infer<typeof playerBubbleStatsSchema>;
 export type GameMode = z.infer<typeof gameModeSchema>;
 export type LeaderboardEntry = z.infer<typeof leaderboardEntrySchema>;
@@ -314,6 +326,8 @@ export interface ServerToClientEvents {
   "phase-change": (payload: PhaseChangePayload) => void;
   /** Host only: a waiting player's bubble mini-game totals. */
   "bubble-stats": (payload: PlayerBubbleStatsPayload) => void;
+  /** Host only: one live reaction from a player (one per tap). */
+  reaction: (payload: PlayerReactionPayload) => void;
   "player-connection": (payload: PlayerConnectionPayload) => void;
   // -- duel matchmaking --
   "duel:matched": (payload: DuelMatchedPayload) => void;
@@ -361,6 +375,8 @@ export interface ClientToServerEvents {
   "leave-room": () => void;
   /** A waiting player's bubble mini-game totals (about once a second). */
   "bubble-stats": (payload: BubbleStatsPayload) => void;
+  /** One tap on a reaction button (rate limited server-side). */
+  reaction: (payload: ReactionPayload) => void;
   // -- host intents (the server decides what each one means) --
   "remove-player": (player: { id: string }, gameCode?: string) => void;
   "start-game": (gameCode?: string) => void;

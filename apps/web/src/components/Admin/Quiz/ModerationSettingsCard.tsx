@@ -46,6 +46,22 @@ export default function ModerationSettingsCard({ quiz }: { quiz: QuizDetail }) {
     <div className="mt-3 mb-1 flex flex-col gap-2">
       <div className="flex items-center gap-2">
         <Switch
+          aria-label="Live reactions"
+          checked={settings.reactions}
+          disabled={updateQuiz.isPending}
+          onCheckedChange={(checked) =>
+            updateQuiz.mutate(
+              { quizId: quiz.id, settings: { ...settings, reactions: checked } },
+              { onError: (err) => toast.error(getApiErrorMessage(err)) },
+            )
+          }
+        />
+        <span className="text-sm max-w-[250px]">
+          Live reactions — players can send 👍 ❤️ 😂 to your screen
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Switch
           aria-label="Moderated mode"
           checked={mod.enabled}
           disabled={updateQuiz.isPending}

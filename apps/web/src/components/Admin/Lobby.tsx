@@ -1,7 +1,7 @@
 "use client";
 import clsx from "clsx";
 import { DEFAULT_AVATAR } from "@/constants";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import { removePlayer, setPlayers } from "@/state/admin/playersSlice";
 import Image from "next/image";
@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { AnimatedNumber } from "@/components/Game/motion";
+import { ReactionOverlay, useFlyers } from "@/components/Game/Flyers";
 import {
   LuBan,
   LuCheck,
@@ -78,13 +79,42 @@ const Lobby = (params: {
   const [bubbles, setBubbles] = useState<
     Record<string, { hits: number; misses: number }>
   >({});
+  // Every newly popped bubble rises out of that player's card, so the host
+  // sees the lobby is live.
+  const { spawn: spawnBubble, layer: bubbleLayer } = useFlyers();
+  const lastHits = useRef<Record<string, number>>({});
   useEffect(() => {
     if (!socket) return;
-    const onStats = (s: { playerId: string; hits: number; misses: number }) =>
+    const onStats = (s: { playerId: string; hits: number; misses: number }) => {
+      const before = lastHits.current[s.playerId] ?? s.hits;
+      lastHits.current[s.playerId] = s.hits;
+      const card = document.querySelector<HTMLElement>(
+        `[data-player-card="${CSS.escape(s.playerId)}"]`,
+      );
+      const fresh = Math.min(10, Math.max(0, s.hits - before));
+      if (card && fresh > 0) {
+        const r = card.getBoundingClientRect();
+        for (let i = 0; i < fresh; i++) {
+          setTimeout(
+            () =>
+              spawnBubble({
+                emoji: "🫧",
+                x: r.left + 24 + Math.random() * Math.max(0, r.width - 48),
+                y: r.top,
+                dx: (Math.random() - 0.5) * 80,
+                rise: 160 + Math.random() * 140,
+                size: 20 + Math.random() * 12,
+                duration: 1800 + Math.random() * 900,
+              }),
+            (i * 900) / fresh,
+          );
+        }
+      }
       setBubbles((prev) => ({
         ...prev,
         [s.playerId]: { hits: s.hits, misses: s.misses },
       }));
+    };
     socket.on("bubble-stats", onStats);
     return () => {
       socket.off("bubble-stats", onStats);
@@ -365,6 +395,7 @@ const Lobby = (params: {
             {visiblePlayers.map((player) => (
               <div
                 key={player.id}
+                data-player-card={player.id}
                 className="group flex items-center gap-[11px] min-w-0 rounded-[14px] border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 hover:border-dprimary py-2 pr-2 pl-[9px] transition-colors animate-pop-in"
               >
                 <Image
@@ -435,6 +466,11 @@ const Lobby = (params: {
         </section>
       </div>
 
+      {bubbleLayer}
+      <ReactionOverlay
+        socket={socket}
+        nameOf={(id) => players.find((p) => p.id === id)?.name ?? undefined}
+      />
       <ConfirmationModal
         open={playerToBan !== null}
         setOpen={(open) => {

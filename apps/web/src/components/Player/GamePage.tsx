@@ -16,11 +16,14 @@ import {
 import ConnectionStatusPill from "@/components/ConnectionStatusPill";
 import ConfirmationModal from "@/components/Admin/ConfirmationModal";
 import { usePlayerSocket } from "@/hooks/usePlayerSocket";
+import { ReactionBar } from "@/components/Game/Flyers";
+import { quizSettingsSchema } from "@buzrr/contract";
 import { playersApi } from "@/lib/modules/players/api";
 
 interface GameSessionWithQuiz extends GameSession {
   quiz: {
     title?: string;
+    settings?: unknown;
     questions: {
       id: string;
       title?: string;
@@ -90,9 +93,13 @@ const GamePage = (params: {
     router.replace(`/player/joinRoom/${params.player.id}`);
   };
 
+  const settings = quizSettingsSchema.safeParse(game.quiz.settings ?? {});
+  const reactionsOn = settings.success ? settings.data.reactions : true;
+
   return (
     <>
       <ConnectionBanner />
+      {reactionsOn && phase !== "ended" && <ReactionBar socket={socket} />}
       {phase !== "question" && phase !== "reveal" && phase !== "closed" && (
         <ConnectionStatusPill className="fixed left-3 bottom-3 z-40" />
       )}
