@@ -8,20 +8,24 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import type { ReactionKind } from "@buzrr/contract";
+import clsx from "clsx";
+import Modal from "@mui/material/Modal";
+import Box from "@mui/material/Box";
+import { LuPencil } from "react-icons/lu";
+import modalStyle from "@/utils/modalStyle";
 import type { GameSocket } from "@/types/socket";
+import {
+  DEFAULT_REACTION_EMOJIS,
+  REACTION_EMOJI_CHOICES,
+  loadReactionEmojis,
+  saveReactionEmojis,
+} from "@/lib/player-prefs";
 
 /**
  * Emojis that float up the screen and fade out: reactions on the host's
  * screens and the bubbles players pop in the lobby. Each flyer animates
  * itself with the Web Animations API and is removed when done.
  */
-
-export const REACTION_EMOJI: Record<ReactionKind, string> = {
-  thumbs: "👍",
-  heart: "❤️",
-  laugh: "😂",
-};
 
 interface Flyer {
   id: number;
@@ -114,11 +118,11 @@ export function ReactionOverlay({
   nameRef.current = nameOf;
   useEffect(() => {
     if (!socket) return;
-    const onReaction = (r: { playerId: string; kind: ReactionKind }) => {
+    const onReaction = (r: { playerId: string; emoji: string }) => {
       const w = window.innerWidth;
       const h = window.innerHeight;
       spawn({
-        emoji: REACTION_EMOJI[r.kind] ?? "❤️",
+        emoji: r.emoji,
         x: w - 40 - Math.random() * Math.min(220, w * 0.25),
         y: h - 70,
         dx: (Math.random() - 0.5) * 120,
@@ -136,14 +140,31 @@ export function ReactionOverlay({
   return <>{layer}</>;
 }
 
-/** Player screens: the three reaction buttons (each tap = one reaction). */
-export function ReactionBar({ socket }: { socket: GameSocket | null }) {
+/**
+ * Player screens: the player's three reaction emojis (each tap = one
+ * reaction) and a pencil to pick other ones; the choice is remembered in
+ * localStorage for the whole game and the next ones. `inline` lays them out
+ * in a row in the page flow (lobby, under the bubble field); otherwise they
+ * float at the screen edge — a row along the bottom on phones.
+ */
+export function ReactionBar({
+  socket,
+  inline = false,
+}: {
+  socket: GameSocket | null;
+  inline?: boolean;
+}) {
   const { spawn, layer } = useFlyers();
-  const send = (kind: ReactionKind, e: PointerEvent<HTMLButtonElement>) => {
-    if (socket?.connected) socket.emit("reaction", { kind });
+  const [emojis, setEmojis] = useState<string[]>(DEFAULT_REACTION_EMOJIS);
+  const [picking, setPicking] = useState(false);
+  // localStorage isn't readable during SSR; pick up the saved set on mount.
+  useEffect(() => setEmojis(loadReactionEmojis()), []);
+
+  const send = (emoji: string, e: PointerEvent<HTMLButtonElement>) => {
+    if (socket?.connected) socket.emit("reaction", { emoji });
     const r = e.currentTarget.getBoundingClientRect();
     spawn({
-      emoji: REACTION_EMOJI[kind],
+      emoji,
       x: r.left + r.width / 2,
       y: r.top,
       dx: (Math.random() - 0.5) * 50,
@@ -152,22 +173,132 @@ export function ReactionBar({ socket }: { socket: GameSocket | null }) {
       duration: 1100,
     });
   };
+
   return (
     <>
-      <div className="fixed right-2 bottom-16 md:bottom-14 z-40 flex flex-col gap-1.5 rounded-full bg-white/85 dark:bg-dark/85 p-1.5 shadow-lg backdrop-blur border border-lprimary/15 dark:border-white/10">
-        {(Object.keys(REACTION_EMOJI) as ReactionKind[]).map((kind) => (
+      <div
+        className={clsx(
+          "flex gap-1.5 rounded-full bg-white/85 dark:bg-dark/85 p-1.5 border border-lprimary/15 dark:border-white/10",
+          inline
+            ? "mx-auto mt-2 w-fit flex-row"
+            : "fixed z-40 shadow-lg backdrop-blur flex-row bottom-14 left-1/2 -translate-x-1/2 md:flex-col md:left-auto md:translate-x-0 md:right-2 md:bottom-14",
+        )}
+      >
+        {emojis.map((emoji, i) => (
           <button
-            key={kind}
+            key={`${emoji}-${i}`}
             type="button"
-            aria-label={`Send ${kind}`}
-            onPointerDown={(e) => send(kind, e)}
+            aria-label={`Send ${emoji}`}
+            onPointerDown={(e) => send(emoji, e)}
             className="size-10 rounded-full text-xl flex items-center justify-center cursor-pointer active:scale-90 transition-transform hover:bg-lprimary/10 dark:hover:bg-white/10 touch-manipulation"
           >
-            {REACTION_EMOJI[kind]}
+            {emoji}
           </button>
         ))}
+        <button
+          type="button"
+          aria-label="Choose your reaction emojis"
+          onClick={() => setPicking(true)}
+          className="size-10 rounded-full flex items-center justify-center cursor-pointer text-off-dark dark:text-muted-dark hover:bg-lprimary/10 dark:hover:bg-white/10"
+        >
+          <LuPencil size={16} />
+        </button>
       </div>
+      <EmojiPicker
+        open={picking}
+        current={emojis}
+        onClose={() => setPicking(false)}
+        onSave={(next) => {
+          setEmojis(next);
+          saveReactionEmojis(next);
+          setPicking(false);
+        }}
+      />
       {layer}
     </>
+  );
+}
+
+/** Pick exactly three reaction emojis (tap order = button order). */
+function EmojiPicker({
+  open,
+  current,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  current: string[];
+  onClose: () => void;
+  onSave: (emojis: string[]) => void;
+}) {
+  const [picked, setPicked] = useState<string[]>(current);
+  useEffect(() => {
+    if (open) setPicked(current);
+  }, [open, current]);
+  const toggle = (emoji: string) =>
+    setPicked((prev) =>
+      prev.includes(emoji)
+        ? prev.filter((x) => x !== emoji)
+        : prev.length < 3
+          ? [...prev, emoji]
+          : [...prev.slice(1), emoji],
+    );
+  return (
+    <Modal open={open} onClose={onClose} aria-labelledby="emoji-picker-title">
+      <Box
+        sx={modalStyle}
+        className="bg-light-bg dark:bg-dark-bg rounded-2xl w-[92vw] max-w-[400px] p-5"
+      >
+        <h2
+          id="emoji-picker-title"
+          className="text-lg font-black text-dark dark:text-white text-center"
+        >
+          Pick your 3 reactions
+        </h2>
+        <div className="mt-4 grid grid-cols-8 gap-1">
+          {REACTION_EMOJI_CHOICES.map((emoji) => {
+            const pos = picked.indexOf(emoji);
+            return (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => toggle(emoji)}
+                aria-pressed={pos >= 0}
+                className={clsx(
+                  "relative aspect-square rounded-xl text-2xl flex items-center justify-center cursor-pointer",
+                  pos >= 0
+                    ? "bg-lprimary/20 dark:bg-dprimary/25 ring-2 ring-lprimary dark:ring-dprimary"
+                    : "hover:bg-lprimary/10 dark:hover:bg-white/10",
+                )}
+              >
+                {emoji}
+                {pos >= 0 && (
+                  <span className="absolute -top-1 -right-1 size-4 rounded-full bg-lprimary dark:bg-dprimary text-[10px] font-bold text-white dark:text-dark flex items-center justify-center">
+                    {pos + 1}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-5 flex gap-2 justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl font-bold text-dark dark:text-white hover:bg-card-light dark:hover:bg-card-dark cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={picked.length !== 3}
+            onClick={() => onSave(picked)}
+            className="px-4 py-2 rounded-xl font-bold bg-lprimary dark:bg-dprimary text-white dark:text-dark disabled:opacity-50 cursor-pointer"
+          >
+            Save
+          </button>
+        </div>
+      </Box>
+    </Modal>
   );
 }

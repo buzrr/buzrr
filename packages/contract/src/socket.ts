@@ -58,9 +58,19 @@ export const quizSettingsSchema = z.object({
   reactions: z.boolean().default(true),
 });
 
-/** Live reactions a player can send (see `reaction` events). */
-export const reactionKindSchema = z.enum(["thumbs", "heart", "laugh"]);
-export const reactionSchema = z.object({ kind: reactionKindSchema });
+/**
+ * A live reaction: one emoji (the player picks their three; defaults
+ * 👍 ❤️ 😂). Only emoji characters (incl. ZWJ sequences, skin tones,
+ * variation selectors) are accepted, so it can't carry text.
+ */
+export const reactionSchema = z.object({
+  emoji: z
+    .string()
+    .min(1)
+    .max(16)
+    .regex(/^[\p{Extended_Pictographic}\p{Emoji_Component}\u200d\ufe0f]+$/u)
+    .refine((s) => /\p{Extended_Pictographic}/u.test(s), "Not an emoji"),
+});
 export const playerReactionSchema = reactionSchema.extend({
   playerId: z.string(),
 });
@@ -284,7 +294,6 @@ export type ModerationSettings = z.infer<typeof moderationSettingsSchema>;
 export type QuizSettings = z.infer<typeof quizSettingsSchema>;
 export type PhaseChangePayload = z.infer<typeof phaseChangeSchema>;
 export type BubbleStatsPayload = z.infer<typeof bubbleStatsSchema>;
-export type ReactionKind = z.infer<typeof reactionKindSchema>;
 export type ReactionPayload = z.infer<typeof reactionSchema>;
 export type PlayerReactionPayload = z.infer<typeof playerReactionSchema>;
 export type PlayerBubbleStatsPayload = z.infer<typeof playerBubbleStatsSchema>;

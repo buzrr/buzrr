@@ -286,10 +286,10 @@ class Bot:
         while True:
             await asyncio.sleep(random.uniform(2, 8))
             burst = random.randint(3, 10) if random.random() < 0.2 else 1
-            kind = random.choice(["thumbs", "heart", "laugh"])
+            emoji = random.choice(["👍", "❤️", "😂", "🔥", "🎉"])
             for _ in range(burst):
                 try:
-                    await self.sio.emit("reaction", {"kind": kind})
+                    await self.sio.emit("reaction", {"emoji": emoji})
                     M.counts["reactions sent"] += 1
                 except Exception:  # noqa: BLE001
                     M.err("reaction emit failed")

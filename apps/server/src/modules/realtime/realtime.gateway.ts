@@ -413,7 +413,7 @@ export class RealtimeGateway
       reactionTokens -= 1;
       this.server
         .to(`host:${gameCode}`)
-        .emit("reaction", { playerId, kind: parsed.data.kind });
+        .emit("reaction", { playerId, emoji: parsed.data.emoji });
     });
 
     socket.on("bubble-stats", (payload) => {

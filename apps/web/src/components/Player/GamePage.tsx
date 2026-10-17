@@ -99,7 +99,10 @@ const GamePage = (params: {
   return (
     <>
       <ConnectionBanner />
-      {reactionsOn && phase !== "ended" && <ReactionBar socket={socket} />}
+      {reactionsOn &&
+        phase !== "ended" &&
+        phase !== "idle" &&
+        phase !== "lobby" && <ReactionBar socket={socket} />}
       {phase !== "question" && phase !== "reveal" && phase !== "closed" && (
         <ConnectionStatusPill className="fixed left-3 bottom-3 z-40" />
       )}
@@ -118,6 +121,9 @@ const GamePage = (params: {
           onBubbleStats={(stats) => {
             if (socket?.connected) socket.emit("bubble-stats", stats);
           }}
+          reactionBar={
+            reactionsOn ? <ReactionBar socket={socket} inline /> : undefined
+          }
         />
       ) : phase === "question" ? (
         question && socket ? (
