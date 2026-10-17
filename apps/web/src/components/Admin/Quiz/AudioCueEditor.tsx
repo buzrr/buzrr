@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { LuPlay, LuSquare, LuTrash2 } from "react-icons/lu";
 import { playSegment } from "@/lib/audio-cues";
 import { mutedText, subtleCardClass } from "@/components/Game/GameUI";
@@ -125,20 +125,73 @@ export default function AudioCueEditor({
     ctx.fillStyle = "#7c4ddb";
     ctx.fillRect(winFrom - 1, 0, 2, h);
     if (revealMs !== null) {
+      // The reveal part (as previewed), tinted, with its cue line.
+      const rFrom = x(revealMs);
+      const rTo = x(Math.min(wave.durationMs, revealMs + REVEAL_PREVIEW_MS));
+      ctx.fillStyle = "rgba(224, 160, 32, 0.16)";
+      ctx.fillRect(rFrom, 0, rTo - rFrom, h);
       ctx.fillStyle = "#e0a020";
-      ctx.fillRect(x(revealMs) - 1, 0, 2, h);
+      ctx.fillRect(rFrom - 1, 0, 2, h);
     }
   }, [wave, startMs, revealMs, questionMs]);
 
-  const onCanvasClick = (e: MouseEvent<HTMLCanvasElement>) => {
-    if (!wave) return;
+  // Drag: grabbing inside the question window (or the reveal part) moves
+  // it — and switches to that cue, whichever was selected. Elsewhere a press
+  // puts the selected cue there and keeps dragging it.
+  const drag = useRef<{ cue: "start" | "reveal"; offsetMs: number } | null>(
+    null,
+  );
+  const msAt = (e: PointerEvent<HTMLCanvasElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
-    const ms = Math.round(
+    return (
       Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) *
-        wave.durationMs,
+      (wave?.durationMs ?? 0)
     );
-    if (mode === "start") onChange({ startMs: ms, revealMs });
-    else onChange({ startMs, revealMs: ms });
+  };
+  const place = (cue: "start" | "reveal", ms: number) => {
+    if (!wave) return;
+    const max =
+      cue === "start"
+        ? Math.max(0, wave.durationMs - Math.min(questionMs, wave.durationMs))
+        : wave.durationMs;
+    const v = Math.round(Math.max(0, Math.min(max, ms)));
+    if (cue === "start") onChange({ startMs: v, revealMs });
+    else onChange({ startMs, revealMs: v });
+  };
+  const onPointerDown = (e: PointerEvent<HTMLCanvasElement>) => {
+    if (!wave) return;
+    const ms = msAt(e);
+    const inStart = ms >= startMs && ms <= startMs + questionMs;
+    const inReveal =
+      revealMs !== null && ms >= revealMs && ms <= revealMs + REVEAL_PREVIEW_MS;
+    // Both overlap: the selected cue wins.
+    const cue: "start" | "reveal" | null =
+      inStart && inReveal
+        ? mode
+        : inStart
+          ? "start"
+          : inReveal
+            ? "reveal"
+            : null;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    if (cue) {
+      if (cue !== mode) setMode(cue);
+      drag.current = {
+        cue,
+        offsetMs: ms - (cue === "start" ? startMs : revealMs!),
+      };
+      return;
+    }
+    drag.current = { cue: mode, offsetMs: 0 };
+    place(mode, ms);
+  };
+  const onPointerMove = (e: PointerEvent<HTMLCanvasElement>) => {
+    const d = drag.current;
+    if (!d || !wave) return;
+    place(d.cue, msAt(e) - d.offsetMs);
+  };
+  const endDrag = () => {
+    drag.current = null;
   };
 
   const preview = (which: "question" | "reveal") => {
@@ -198,16 +251,19 @@ export default function AudioCueEditor({
       ) : (
         <canvas
           ref={canvasRef}
-          onClick={onCanvasClick}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
           className={clsx(
-            "w-full h-20 rounded-lg bg-light-bg dark:bg-card-dark",
-            wave ? "cursor-crosshair" : "animate-pulse",
+            "w-full h-20 rounded-lg bg-light-bg dark:bg-card-dark touch-none select-none",
+            wave ? "cursor-grab active:cursor-grabbing" : "animate-pulse",
           )}
-          aria-label="Waveform — click to set the selected cue"
+          aria-label="Waveform — drag the highlighted parts, or click to place the selected cue"
         />
       )}
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className={mutedText}>Click sets:</span>
+        <span className={mutedText}>Click sets · drag moves:</span>
         {modeButton("start", `Start ${formatMs(startMs)}`)}
         {modeButton(
           "reveal",

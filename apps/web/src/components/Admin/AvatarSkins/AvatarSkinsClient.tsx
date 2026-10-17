@@ -22,6 +22,7 @@ export const AVATAR_SKIN_NAMES: Record<AvatarSkin, string> = {
   original: "Original",
   comic: "Variant 1 · Comic",
   crazy: "Variant 2 · Crazy food",
+  faces: "Variant 3 · Funny faces",
   custom: "Your skin",
 };
 
@@ -29,6 +30,7 @@ const DESCRIPTIONS: Record<AvatarSkin, string> = {
   original: "The classic Buzrr avatars.",
   comic: "Colourful comic characters.",
   crazy: "Googly-eyed pizza, donuts, tacos & friends.",
+  faces: "Friendly flat-style faces: all kinds of people, all smiling.",
   custom: `Your own pictures — up to ${MAX_CUSTOM_AVATARS}, cropped to a square automatically.`,
 };
 
@@ -86,7 +88,7 @@ export default function AvatarSkinsClient() {
     }
   };
 
-  const skins: AvatarSkin[] = ["original", "comic", "crazy", "custom"];
+  const skins: AvatarSkin[] = ["original", "comic", "crazy", "faces", "custom"];
   return (
     <div className="mt-4 flex flex-col gap-5 max-w-5xl">
       <p className={clsx("text-sm", mutedText)}>

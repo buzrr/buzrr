@@ -106,10 +106,16 @@ export const soundSkinSchema = z.object({
 });
 
 // -- avatar skins ---------------------------------------------------------------
-// The pictures players pick from. Three built-in sets (files under the web
+// The pictures players pick from. Four built-in sets (files under the web
 // app's /images) and "custom": the quiz owner's own uploads (up to 20).
 
-export const AVATAR_SKINS = ["original", "comic", "crazy", "custom"] as const;
+export const AVATAR_SKINS = [
+  "original",
+  "comic",
+  "crazy",
+  "faces",
+  "custom",
+] as const;
 export const avatarSkinSchema = z.enum(AVATAR_SKINS);
 export type AvatarSkin = z.infer<typeof avatarSkinSchema>;
 export const MAX_CUSTOM_AVATARS = 20;
@@ -141,6 +147,7 @@ export const BUILTIN_AVATARS: Record<
   ],
   comic: numbered("comic", "comic", 12),
   crazy: numbered("crazy", "crazy", 12),
+  faces: numbered("faces", "faces", 15),
 };
 
 /** A user's defaults for their quizzes (Settings page). */
