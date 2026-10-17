@@ -613,3 +613,65 @@ export function playPling(volume = 0.35 * SOFT) {
   tone(ctx, bus, t, f * 2, 0.15, "sine", 0.15, 12000);
   setTimeout(() => bus.disconnect(), 600);
 }
+
+// -- 8-bit effects (Arcade skin) -------------------------------------------------
+// Square-wave chirps like an old console's pickups: short, bright, rising.
+
+/** One 8-bit note: square wave, hard attack, quick decay. */
+function chip(
+  ctx: AudioContext,
+  out: AudioNode,
+  t: number,
+  freq: number,
+  dur: number,
+  level: number,
+) {
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = "square";
+  o.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(level, t);
+  g.gain.setValueAtTime(level, t + dur * 0.6);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(out);
+  o.start(t);
+  o.stop(t + dur + 0.02);
+}
+
+function chipBus(volume: number) {
+  const ctx = audioContext();
+  if (!ctx) return null;
+  const bus = ctx.createGain();
+  bus.gain.value = volume;
+  bus.connect(ctx.destination);
+  setTimeout(() => bus.disconnect(), 1200);
+  return { ctx, bus, t: ctx.currentTime + 0.01 };
+}
+
+/** Arcade join: a pickup "pling-pling" — two quick notes, then one ringing a fifth up. */
+export function playArcadeJoin(volume = 0.16) {
+  const c = chipBus(volume);
+  if (!c) return;
+  chip(c.ctx, c.bus, c.t, hz(15), 0.05, 0.5); // C6
+  chip(c.ctx, c.bus, c.t + 0.06, hz(15), 0.05, 0.5); // C6
+  chip(c.ctx, c.bus, c.t + 0.12, hz(22), 0.28, 0.5); // G6
+}
+
+/** Arcade bubble: a tiny blip that jumps up. */
+export function playArcadeBlopp(volume = 0.08) {
+  const c = chipBus(volume);
+  if (!c) return;
+  const base = 10 + Math.floor(Math.random() * 4);
+  chip(c.ctx, c.bus, c.t, hz(base), 0.035, 0.5);
+  chip(c.ctx, c.bus, c.t + 0.035, hz(base + 12), 0.05, 0.4);
+}
+
+/** Arcade reaction: a quick rising three-note arpeggio. */
+export function playArcadePling(volume = 0.09) {
+  const c = chipBus(volume);
+  if (!c) return;
+  const root = 19 + Math.floor(Math.random() * 3) * 2;
+  [0, 4, 7].forEach((step, i) =>
+    chip(c.ctx, c.bus, c.t + i * 0.045, hz(root + step), 0.07, 0.45),
+  );
+}

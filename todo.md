@@ -59,31 +59,14 @@ no real client creates, and one Python process may be its own bottleneck.
 **Done when:** a 510-bot run with `--procs 4` finishes on its own, and the
 summary shows the same sections as before plus `bots without game end`.
 
-## 5. Spread the question-sound downloads
+## 5. Verify the sound downloads at 500 (code done)
 
-`apps/web/src/lib/sound/director.tsx`: `preloadClips(preload.urls,
-preload.qIndex)` runs as soon as the `preload` hint arrives, on every device
-at once. That was about 490 files (94 MB) at 250 players and 806 files
-(155 MB) at 510, with timeouts and connection errors.
-
-1. Start each device's preload after a random delay, at most 3 s or 25 % of
-   the time left before the question, whichever is smaller. Report
-   `preload-status` with `loaded: 0` right away, so the countdown's wait
-   (`waitForDownloads`, `DOWNLOAD_STALL_MS`) doesn't treat the device as
-   stalled.
-2. Clip size: `CLIP_BITRATE = "96k"` in
-   `apps/server/src/common/storage/audio-transcode.ts`.
-   - Try `"64k"` (mono, music stays acceptable). That cuts download volume
-     by a third.
-   - Existing clips are re-encoded on next upload only. Decide whether a
-     one-off re-encode is worth it.
-3. Check the server's or proxy's limits for parallel connections and
-   bandwidth to `/uploads`. The `ClientConnectorError` and
-   `ConnectionTimeoutError` failures may come from there, or from the
-   bench's single uplink (see item 2).
-
-**Done when:** at 500 bots (with `--procs`), download failures are under 1 %
-and `question sound still loading when it opened` is under 5 % of devices.
+Done in code: preloads start after a random pause of up to 3 s (a `loaded 0`
+report goes out at once), new clips are 64 kbit/s, and the ingress has no
+connection or rate limits for quiz.woikn.de (only Bitwarden has some).
+Still open: a 500-bot run with `--procs` to see whether the remaining
+download failures came from the bench's single uplink or from the API
+serving `/uploads` itself.
 
 ---
 

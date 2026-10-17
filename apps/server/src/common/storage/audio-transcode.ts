@@ -73,7 +73,9 @@ export async function toMp3(buffer: Buffer): Promise<Buffer> {
 }
 
 /** Bit rate of the clips devices load (mono). */
-const CLIP_BITRATE = "96k";
+// Mono clips at 64 kbit/s: music stays fine, and a full room downloads a third
+// less than at 96k (existing clips keep their rate until re-uploaded).
+const CLIP_BITRATE = "64k";
 
 /**
  * The `durationMs` from `startMs` of an MP3, re-encoded small (mono,

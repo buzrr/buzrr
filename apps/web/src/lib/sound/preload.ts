@@ -102,16 +102,29 @@ export function onPreloadProgress(listener: (r: Report) => void) {
   return () => void listeners.delete(listener);
 }
 
+/** The longest random pause before a device starts its question preload. */
+const PRELOAD_SPREAD_MS = 3000;
+
 /**
  * Start downloading clips; with `qIndex` their progress is reported (the
- * server's countdown waits for devices that are downloading).
+ * server's countdown waits for devices that are downloading). A question's
+ * clips start after a random pause of up to PRELOAD_SPREAD_MS, so a full
+ * room doesn't hit the server in the same second — the "loaded 0" report
+ * goes out at once, so the countdown counts the device as downloading
+ * (under the server's 4 s stall limit) rather than as done or stalled.
  */
 export function preloadClips(urls: string[], qIndex?: number) {
-  if (qIndex !== undefined) {
-    tracked = { qIndex, keys: urls.map(bare) };
+  const start = () => {
+    for (const u of urls) void fetchClip(u).catch(() => undefined);
+    notify();
+  };
+  if (qIndex === undefined) {
+    start();
+    return;
   }
-  for (const u of urls) void fetchClip(u).catch(() => undefined);
+  tracked = { qIndex, keys: urls.map(bare) };
   notify();
+  setTimeout(start, Math.random() * PRELOAD_SPREAD_MS);
 }
 
 /** Decrypts a clip (12-byte IV, AES-256-GCM ciphertext + tag) to an object URL. */

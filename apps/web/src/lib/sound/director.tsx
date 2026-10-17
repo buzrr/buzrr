@@ -27,6 +27,9 @@ import {
   audioContext,
   isLoopSlot,
   playBuiltin,
+  playArcadeBlopp,
+  playArcadeJoin,
+  playArcadePling,
   playBlopp,
   playPing,
   playPling,
@@ -387,8 +390,11 @@ export function LiveSounds({ socket }: { socket: GameSocket | null }) {
       play();
     };
     const hits: Record<string, number> = {};
-    const ping = () => playPing();
-    const onReaction = () => limited("pling", 90, () => playPling());
+    // The Arcade skin has its own 8-bit pickups.
+    const arcade = s?.settings.skin === "builtin:arcade";
+    const ping = () => (arcade ? playArcadeJoin() : playPing());
+    const onReaction = () =>
+      limited("pling", 90, () => (arcade ? playArcadePling() : playPling()));
     // One batch a second: the room's new pops spread over that second
     // (at most 12 blopps — a full room shouldn't drone).
     const onStats = ({
@@ -405,7 +411,10 @@ export function LiveSounds({ socket }: { socket: GameSocket | null }) {
       fresh = Math.min(12, fresh);
       for (let i = 0; i < fresh; i++) {
         setTimeout(
-          () => limited("blopp", 70, () => playBlopp()),
+          () =>
+            limited("blopp", 70, () =>
+              arcade ? playArcadeBlopp() : playBlopp(),
+            ),
           (i * 900) / fresh,
         );
       }
@@ -418,7 +427,7 @@ export function LiveSounds({ socket }: { socket: GameSocket | null }) {
       socket.off("reaction", onReaction);
       socket.off("bubble-stats-batch", onStats);
     };
-  }, [socket, on]);
+  }, [socket, on, s?.settings.skin]);
   return null;
 }
 
