@@ -59,27 +59,6 @@ no real client creates, and one Python process may be its own bottleneck.
 **Done when:** a 510-bot run with `--procs 4` finishes on its own, and the
 summary shows the same sections as before plus `bots without game end`.
 
-## 4. Bundle lobby `bubble-stats` for the host
-
-`apps/server/src/modules/realtime/realtime.gateway.ts`,
-`socket.on("bubble-stats")`.
-
-- Every player socket may relay one update per 800 ms to `host:{code}`. At
-  418 players that is about 500 events a second into the host's browser
-  (80 000 in one run).
-- Collect the latest totals per player in a per-room map on the server and
-  flush it to the host once a second as one event, e.g.
-  `bubble-stats-batch: { players: { [playerId]: { hits, misses } } }`.
-  Only players that changed since the last flush. Use one timer per room;
-  stop it when the lobby ends.
-- The host lobby (`apps/web/src/components/Admin/Lobby.tsx` and the
-  `bubble-stats` handler) applies the batch.
-- Keep the old single event for one release, or migrate both sides in the
-  same change (see `realtime.md` § Changing the socket contract).
-
-**Done when:** at 500 bots in the lobby the host receives about 1
-bubble-stats event a second, and the lobby ranking still updates.
-
 ## 5. Spread the question-sound downloads
 
 `apps/web/src/lib/sound/director.tsx`: `preloadClips(preload.urls,

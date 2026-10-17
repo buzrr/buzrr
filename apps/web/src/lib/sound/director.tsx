@@ -389,10 +389,20 @@ export function LiveSounds({ socket }: { socket: GameSocket | null }) {
     const hits: Record<string, number> = {};
     const ping = () => playPing();
     const onReaction = () => limited("pling", 90, () => playPling());
-    const onStats = (b: { playerId: string; hits: number }) => {
-      const before = hits[b.playerId];
-      hits[b.playerId] = b.hits;
-      const fresh = before === undefined ? 0 : Math.min(5, b.hits - before);
+    // One batch a second: the room's new pops spread over that second
+    // (at most 12 blopps — a full room shouldn't drone).
+    const onStats = ({
+      players,
+    }: {
+      players: Record<string, { hits: number }>;
+    }) => {
+      let fresh = 0;
+      for (const [id, b] of Object.entries(players)) {
+        const before = hits[id];
+        hits[id] = b.hits;
+        if (before !== undefined) fresh += Math.max(0, b.hits - before);
+      }
+      fresh = Math.min(12, fresh);
       for (let i = 0; i < fresh; i++) {
         setTimeout(
           () => limited("blopp", 70, () => playBlopp()),
@@ -402,11 +412,11 @@ export function LiveSounds({ socket }: { socket: GameSocket | null }) {
     };
     socket.on("player-joined", ping);
     socket.on("reaction", onReaction);
-    socket.on("bubble-stats", onStats);
+    socket.on("bubble-stats-batch", onStats);
     return () => {
       socket.off("player-joined", ping);
       socket.off("reaction", onReaction);
-      socket.off("bubble-stats", onStats);
+      socket.off("bubble-stats-batch", onStats);
     };
   }, [socket, on]);
   return null;

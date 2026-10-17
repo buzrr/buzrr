@@ -149,23 +149,22 @@ const Lobby = (params: {
   });
   useEffect(() => {
     if (!socket) return;
-    let pending: Record<string, { hits: number; misses: number }> = {};
-    const flush = setInterval(() => {
-      const batch = pending;
-      if (Object.keys(batch).length === 0) return;
-      pending = {};
-      setBubbles((prev) => ({ ...prev, ...batch }));
-    }, FLUSH_MS * 2);
-    const onStats = (s: { playerId: string; hits: number; misses: number }) => {
-      const before = lastHits.current[s.playerId] ?? s.hits;
-      lastHits.current[s.playerId] = s.hits;
-      pending[s.playerId] = { hits: s.hits, misses: s.misses };
-      if (playerCount.current > FLYER_PLAYER_LIMIT) return;
-      const card = document.querySelector<HTMLElement>(
-        `[data-player-card="${CSS.escape(s.playerId)}"]`,
-      );
-      const fresh = Math.min(10, Math.max(0, s.hits - before));
-      if (card && fresh > 0) {
+    // The server sends the changed totals once a second as one batch.
+    const onBatch = ({
+      players: batch,
+    }: {
+      players: Record<string, { hits: number; misses: number }>;
+    }) => {
+      const flyers = playerCount.current <= FLYER_PLAYER_LIMIT;
+      for (const [playerId, st] of Object.entries(batch)) {
+        const before = lastHits.current[playerId] ?? st.hits;
+        lastHits.current[playerId] = st.hits;
+        if (!flyers) continue;
+        const card = document.querySelector<HTMLElement>(
+          `[data-player-card="${CSS.escape(playerId)}"]`,
+        );
+        const fresh = Math.min(10, Math.max(0, st.hits - before));
+        if (!card || fresh === 0) continue;
         const r = card.getBoundingClientRect();
         for (let i = 0; i < fresh; i++) {
           setTimeout(
@@ -183,11 +182,11 @@ const Lobby = (params: {
           );
         }
       }
+      setBubbles((prev) => ({ ...prev, ...batch }));
     };
-    socket.on("bubble-stats", onStats);
+    socket.on("bubble-stats-batch", onBatch);
     return () => {
-      clearInterval(flush);
-      socket.off("bubble-stats", onStats);
+      socket.off("bubble-stats-batch", onBatch);
     };
   }, [socket, spawnBubble]);
 

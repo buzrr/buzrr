@@ -283,6 +283,23 @@ masked until the reveal (`buildSnapshot`).
   exactly what the current client speaks. Adding a compat alias "just in case"
   reintroduces the drift this removal cleared.
 
+## Lobby extras: bubbles and reactions
+
+- **Bubble game:** players send `bubble-stats` (their running hits/misses,
+  about once a second). The gateway keeps the latest totals per player in a
+  per-room map and sends the host one `bubble-stats-batch` a second with the
+  players that changed (`players: { [playerId]: { hits, misses } }`). A room
+  quiet for 10 batches stops its timer. At 500 players that is one event a
+  second into the host's browser instead of about 500.
+- **Reactions:** relayed to `host:{code}` one by one, but each player may
+  send `REACTIONS_PER_WINDOW` (5) per `REACTION_WINDOW_MS` (20 s); the
+  player's buttons rest until the oldest tap leaves the window. Above
+  `ROOM_REACTIONS_PER_S` (40) in a room within one second, only each
+  player's first reaction of that second passes.
+- **Host lobby:** applies reactions in batches (every 500 ms) and joins every
+  250 ms; above 60 players no bubbles rise out of the cards, above 120 no
+  reorder animation.
+
 ## Changing the socket contract — touch list
 
 The contract is defined once, in `@buzrr/contract`; both apps compile against

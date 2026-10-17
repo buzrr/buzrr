@@ -34,6 +34,8 @@ type DuelInviteAck = (result: DuelInviteAcceptAck) => void;
 
 /** How often a player socket's heartbeat is checked. */
 const HEARTBEAT_CHECK_MS = 5_000;
+/** Lobby bubble totals go to the host this often (one batch per room). */
+const BUBBLE_BATCH_MS = 1000;
 /** Above this many reactions a second in a room, one per player and second. */
 const ROOM_REACTIONS_PER_S = 40;
 /** A disconnected lobby player keeps their place at least this long. */
@@ -370,6 +372,54 @@ export class RealtimeGateway
     }
   }
 
+  /** Per room: bubble totals waiting for the next batch, and its timer. */
+  private readonly bubbleBatches = new Map<
+    string,
+    {
+      pending: Map<string, { hits: number; misses: number }>;
+      timer: ReturnType<typeof setInterval>;
+      idle: number;
+    }
+  >();
+
+  /**
+   * Lobby bubble totals reach the host as one `bubble-stats-batch` a second
+   * per room (only players that changed), instead of one event per player
+   * and update: 500 players would be ~500 events a second otherwise. A room
+   * quiet for 10 batches stops its timer.
+   */
+  private queueBubbleStats(
+    gameCode: string,
+    playerId: string,
+    stats: { hits: number; misses: number },
+  ) {
+    let batch = this.bubbleBatches.get(gameCode);
+    if (!batch) {
+      const pending = new Map<string, { hits: number; misses: number }>();
+      const timer = setInterval(() => {
+        const b = this.bubbleBatches.get(gameCode);
+        if (!b) return;
+        if (b.pending.size === 0) {
+          if (++b.idle >= 10) {
+            clearInterval(b.timer);
+            this.bubbleBatches.delete(gameCode);
+          }
+          return;
+        }
+        b.idle = 0;
+        const players = Object.fromEntries(b.pending);
+        b.pending.clear();
+        this.server
+          .to(`host:${gameCode}`)
+          .emit("bubble-stats-batch", { players });
+      }, BUBBLE_BATCH_MS);
+      timer.unref();
+      batch = { pending, timer, idle: 0 };
+      this.bubbleBatches.set(gameCode, batch);
+    }
+    batch.pending.set(playerId, stats);
+  }
+
   /** Per room, the current second's reactions: count and who sent one. */
   private readonly reactionSeconds = new Map<
     string,
@@ -510,11 +560,8 @@ export class RealtimeGateway
     if (socket.data.playerId) {
       this.registerPreloadStatus(socket, gameCode, socket.data.playerId);
     }
-    // Lobby bubble game: relayed to the host as-is, nothing is stored. A
-    // socket's update gets through at most every ~800 ms — less often in big
-    // rooms (8 ms per player: 500 players → every 4 s), so the host screen
-    // isn't flooded.
-    let lastBubbleStats = 0;
+    // Lobby bubble game: the latest totals per player are collected per room
+    // and go to the host once a second as one batch (bubbleBatches).
     // Live reactions: at most REACTIONS_PER_WINDOW per player within
     // REACTION_WINDOW_MS, then blocked until the window moves on. When the
     // whole room floods (over ROOM_REACTIONS_PER_S in a second), only each
@@ -537,17 +584,10 @@ export class RealtimeGateway
 
     socket.on("bubble-stats", (payload) => {
       const playerId = socket.data.playerId;
-      const now = Date.now();
-      const roomSize =
-        this.server.sockets.adapter.rooms.get(gameCode)?.size ?? 1;
-      const every = Math.max(800, roomSize * 8);
-      if (!playerId || now - lastBubbleStats < every) return;
+      if (!playerId) return;
       const parsed = bubbleStatsSchema.safeParse(payload);
       if (!parsed.success) return;
-      lastBubbleStats = now;
-      this.server
-        .to(`host:${gameCode}`)
-        .emit("bubble-stats", { playerId, ...parsed.data });
+      this.queueBubbleStats(gameCode, playerId, parsed.data);
     });
 
     // Lobby only: switch to another of the room's avatars.

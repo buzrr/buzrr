@@ -497,6 +497,9 @@ export type BubbleStatsPayload = z.infer<typeof bubbleStatsSchema>;
 export type ReactionPayload = z.infer<typeof reactionSchema>;
 export type PlayerReactionPayload = z.infer<typeof playerReactionSchema>;
 export type PlayerBubbleStatsPayload = z.infer<typeof playerBubbleStatsSchema>;
+export type BubbleStatsBatchPayload = {
+  players: Record<string, BubbleStatsPayload>;
+};
 export type GameMode = z.infer<typeof gameModeSchema>;
 export type LeaderboardEntry = z.infer<typeof leaderboardEntrySchema>;
 export type QuestionStartPayload = z.infer<typeof questionStartSchema>;
@@ -541,7 +544,11 @@ export interface ServerToClientEvents {
    */
   "closed-summary": (payload: QuestionEndPayload) => void;
   /** Host only: a waiting player's bubble mini-game totals. */
-  "bubble-stats": (payload: PlayerBubbleStatsPayload) => void;
+  /**
+   * Host only: the bubble totals of every player that changed since the
+   * last batch — at most one event a second per room.
+   */
+  "bubble-stats-batch": (payload: BubbleStatsBatchPayload) => void;
   /** Host only: one live reaction from a player (one per tap). */
   reaction: (payload: PlayerReactionPayload) => void;
   "player-connection": (payload: PlayerConnectionPayload) => void;
