@@ -221,7 +221,10 @@ export function GameSounds({
   children?: ReactNode;
 }) {
   useUnlockAudio();
-  const settings = soundSettingsOf(quizSettings);
+  const raw = soundSettingsOf(quizSettings);
+  // Normally resolved by the server; a stray "default" plays the first skin.
+  const settings =
+    raw.skin === "default" ? { ...raw, skin: "builtin:show" } : raw;
   const { allowed, defaultOn } = placement(
     settings.playOn,
     role,
@@ -283,7 +286,8 @@ export function GameSounds({
     deadlineRef.current = deadline;
   });
   const ownAudio = phase === "question" && questionAudioHere(question?.audio);
-  const bedSlot = on && !ownAudio ? bedFor(phase) : null;
+  // "No music": effects (countdown, tusch, reveal, pings) only.
+  const bedSlot = on && !ownAudio && settings.music ? bedFor(phase) : null;
   const bedKey = bedSlot
     ? `${bedSlot}:${settings.skin}:${skin?.id ?? ""}:${bedSlot === "question" ? qIndex : ""}:${bedSlot === "final" ? (finalSoundKey ?? "") : ""}`
     : "";
@@ -322,7 +326,7 @@ export function GameSounds({
   const finalUrl = skin?.finalClipUrl ?? null;
   const gameRunning = phase !== "idle" && phase !== "lobby";
   useEffect(() => {
-    if (!on || !gameRunning || !finalUrl) return;
+    if (!on || !settings.music || !gameRunning || !finalUrl) return;
     const t = setTimeout(
       () => preloadClips([finalUrl]),
       Math.random() * 60_000,

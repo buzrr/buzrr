@@ -81,10 +81,13 @@ export const BUILTIN_SOUND_SKINS = [
 
 /** A quiz's game sounds. `skin`: a built-in id or a SoundSkin id. */
 export const soundSettingsSchema = z.object({
-  skin: z.string().min(1).max(64).default("builtin:show"),
+  /** "default" = the quiz owner's default audio skin (their settings). */
+  skin: z.string().min(1).max(64).default("default"),
   playOn: soundPlayOnSchema.default("host"),
   /** With sounds on the host only: players may switch them on for themselves. */
   playerOptIn: z.boolean().default(true),
+  /** Background music (lobby, question, scores, final). Off: effects only. */
+  music: z.boolean().default(true),
 });
 
 /** A user's sound skin: an uploaded MP3 per slot (missing slots stay silent). */
@@ -102,13 +105,67 @@ export const soundSkinSchema = z.object({
   finalClipUrl: z.string().nullable().optional(),
 });
 
+// -- avatar skins ---------------------------------------------------------------
+// The pictures players pick from. Three built-in sets (files under the web
+// app's /images) and "custom": the quiz owner's own uploads (up to 20).
+
+export const AVATAR_SKINS = ["original", "comic", "crazy", "custom"] as const;
+export const avatarSkinSchema = z.enum(AVATAR_SKINS);
+export type AvatarSkin = z.infer<typeof avatarSkinSchema>;
+export const MAX_CUSTOM_AVATARS = 20;
+
+const numbered = (dir: string, prefix: string, n: number) =>
+  Array.from(
+    { length: n },
+    (_, i) =>
+      `/images/avatars/${dir}/${prefix}${String(i + 1).padStart(2, "0")}.svg`,
+  );
+
+/** The built-in sets' files (web public paths). */
+export const BUILTIN_AVATARS: Record<
+  Exclude<AvatarSkin, "custom">,
+  string[]
+> = {
+  original: [
+    "/images/player_profile/profile1.png",
+    "/images/player_profile/profile2.png",
+    "/images/player_profile/profile3.png",
+    "/images/player_profile/profile4.png",
+    "/images/player_profile/profile5.jpg",
+    "/images/player_profile/profile6.png",
+    "/images/player_profile/profile7.jpg",
+    "/images/player_profile/profile9.jpg",
+    "/images/player_profile/profile10.jpg",
+    "/images/player_profile/profile11.jpg",
+    "/images/player_profile/profile12.png",
+  ],
+  comic: numbered("comic", "comic", 12),
+  crazy: numbered("crazy", "crazy", 12),
+};
+
+/** A user's defaults for their quizzes (Settings page). */
+export const userPreferencesSchema = z.object({
+  /** Shown on game screens of quizzes without a logo of their own. */
+  defaultLogo: z.string().nullable().default(null),
+  defaultSoundSkin: z.string().min(1).max(64).default("builtin:show"),
+  defaultAvatarSkin: avatarSkinSchema.default("original"),
+  /** The "custom" avatar skin: own uploads, square, resized on upload. */
+  customAvatars: z.array(z.string()).max(MAX_CUSTOM_AVATARS).default([]),
+});
+export type UserPreferences = z.infer<typeof userPreferencesSchema>;
+
 /** `Quiz.settings`. Unknown/missing keys fall back to the defaults. */
 export const quizSettingsSchema = z.object({
   sound: soundSettingsSchema.prefault({}),
   moderation: moderationSettingsSchema.prefault({}),
   /** Players can send live reactions (👍 ❤️ 😂) that fly across the host screen. */
   reactions: z.boolean().default(true),
+  /** The avatars players pick from; "default" = the owner's default. */
+  avatarSkin: z.enum(["default", ...AVATAR_SKINS]).default("default"),
 });
+
+/** Player in a room's lobby: switch to another of the room's avatars. */
+export const setAvatarSchema = z.object({ profilePic: z.string().max(500) });
 
 /**
  * A live reaction: one emoji (the player picks their three; defaults
@@ -496,6 +553,8 @@ export interface ClientToServerEvents {
   "bubble-stats": (payload: BubbleStatsPayload) => void;
   /** One tap on a reaction button (rate limited server-side). */
   reaction: (payload: ReactionPayload) => void;
+  /** Lobby only: pick another of this room's avatars. */
+  "set-avatar": (payload: { profilePic: string }) => void;
   /** Download progress of the next question's sound (see `preload`). */
   "preload-status": (payload: PreloadStatusPayload) => void;
   // -- host intents (the server decides what each one means) --

@@ -18,10 +18,10 @@ const playerSlice = createSlice({
   initialState,
   reducers: {
     addPlayer: (state, action: PayloadAction<PlayerPayload>) => {
-      const exists = state.players.some((p) => p.id === action.payload.id);
-      if (!exists) {
-        state.players.push(action.payload);
-      }
+      // Upsert: a player who switches avatar in the lobby is announced again.
+      const i = state.players.findIndex((p) => p.id === action.payload.id);
+      if (i === -1) state.players.push(action.payload);
+      else state.players[i] = action.payload;
     },
     removePlayer: (state, action: PayloadAction<{ id: string }>) => {
       state.players = state.players.filter(

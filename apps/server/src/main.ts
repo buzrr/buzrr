@@ -4,7 +4,10 @@ import { NestExpressApplication } from "@nestjs/platform-express";
 import { AppModule } from "./app.module";
 import { AllExceptionsFilter } from "./common/filters/http-exception.filter";
 import { LOCAL_UPLOADS_ROUTE } from "./common/storage/local.storage";
-import { verifyAssetSignature } from "./common/storage/asset-signing";
+import {
+  isPublicAvatarKey,
+  verifyAssetSignature,
+} from "./common/storage/asset-signing";
 import {
   localStorageConfig,
   resolveStorageDriver,
@@ -62,7 +65,10 @@ async function bootstrap() {
         next: () => void,
       ) => {
         const key = req.path.replace(/^\/+/, "");
-        if (!verifyAssetSignature(key, req.query.sig)) {
+        if (
+          !isPublicAvatarKey(key) &&
+          !verifyAssetSignature(key, req.query.sig)
+        ) {
           res.status(403).end();
           return;
         }

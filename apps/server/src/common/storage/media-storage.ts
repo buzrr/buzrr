@@ -16,7 +16,7 @@ export interface UploadMeta {
    * "encrypted" is for server-made blobs (encrypted audio clips) — never for
    * anything a client sent.
    */
-  kind?: "image" | "audio" | "encrypted";
+  kind?: "image" | "audio" | "encrypted" | "avatar";
 }
 
 /**

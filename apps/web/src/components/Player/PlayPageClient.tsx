@@ -64,7 +64,7 @@ export default function PlayPageClient({ playerId }: { playerId: string }) {
       <div className="p-4 pb-2 flex justify-between">
         <GameLogo logo={game.quiz?.logo} size={80} />
       </div>
-      <GamePage player={player} game={game} />
+      <GamePage player={player} game={game} avatars={data.avatars} />
     </>
   );
 }

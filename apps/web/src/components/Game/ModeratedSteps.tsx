@@ -41,9 +41,12 @@ function Slide({
   return (
     <div
       className={clsx(
-        "w-full max-w-3xl mx-auto flex flex-col px-4 pt-6 md:pt-10 text-dark dark:text-white",
-        // Host: fills the game screen, so the button sits at the very bottom.
-        onNext ? "flex-1 min-h-0" : "min-h-[calc(100dvh-12rem)]",
+        "w-full flex flex-col pt-6 md:pt-10 text-dark dark:text-white",
+        // Host: fills the game screen, the bar spans its full width (the
+        // next step always bottom right).
+        onNext
+          ? "flex-1 min-h-0"
+          : "max-w-3xl mx-auto px-4 min-h-[calc(100dvh-12rem)]",
       )}
     >
       <section
@@ -51,7 +54,7 @@ function Slide({
         className={clsx(
           panelClass,
           // Centered in the space above the host's bottom bar.
-          "my-auto relative overflow-hidden flex flex-col items-center text-center gap-5 md:gap-6 px-6 py-9 md:px-12 md:py-12",
+          "w-full max-w-3xl mx-auto my-auto relative overflow-hidden flex flex-col items-center text-center gap-5 md:gap-6 px-6 py-9 md:px-12 md:py-12",
         )}
       >
         <div

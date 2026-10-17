@@ -36,7 +36,9 @@ export class LocalStorage extends MediaStorage {
         : audio
           ? sniffAudio(buffer)
           : sniffImage(buffer);
-    const key = `${nanoid(21)}.${ext}`;
+    // Avatars are shown to everyone in a room (rosters, leaderboards): served
+    // without a signature, recognisable by their prefix.
+    const key = `${meta?.kind === "avatar" ? "avatar-" : ""}${nanoid(21)}.${ext}`;
     await mkdir(this.dir, { recursive: true });
     await writeFile(join(this.dir, key), buffer, { flag: "wx" });
     return {

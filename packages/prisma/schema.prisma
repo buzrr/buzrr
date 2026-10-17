@@ -57,6 +57,9 @@ model User {
   /// max(plan cap, hostSizeLimit) — see billing/entitlements.service.ts.
   hostSizeLimit       Int                  @default(50) @map("host_size_limit")
   role                Role                 @default(user)
+  /// `userPreferencesSchema` in @buzrr/contract: default logo / audio skin /
+  /// avatar skin, own avatar pictures.
+  preferences         Json                 @default("{}")
   /// Dodo Payments customer, set by the first verified billing webhook.
   dodoCustomerId      String?              @unique @map("dodo_customer_id")
   /// Lifetime Free-plan AI generations spent (never refills).

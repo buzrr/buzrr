@@ -305,11 +305,8 @@ function summaryOf(v: FormValues): ReactNode {
       const n = v.options.filter((o) => o.title.trim()).length;
       return (
         <>
-          {strong(
-            v.fixedLength
-              ? "Fixed length"
-              : `${n} accepted ${n === 1 ? "answer" : "answers"}`,
-          )}
+          {strong(`${n} accepted ${n === 1 ? "answer" : "answers"}`)}
+          {v.fixedLength ? " · fixed length" : ""}
           {v.ignoreTypos ? " · typos forgiven" : " · exact match"} · {secs}
         </>
       );
@@ -604,7 +601,7 @@ const AddQuesForm = (props: {
           ? data.options
               .map((o) => ({ title: o.title.trim(), isCorrect: true }))
               .filter((o) => o.title !== "")
-              .slice(0, data.fixedLength ? 1 : MAX_ACCEPTED_ANSWERS)
+              .slice(0, MAX_ACCEPTED_ANSWERS)
           : OPTION_TYPES.includes(data.type)
             ? data.options.map((o) => ({
                 title: o.title.trim(),
@@ -1072,19 +1069,25 @@ const AddQuesForm = (props: {
                 control={control}
                 render={({ field }) => {
                   const fixed = values.fixedLength;
-                  const rows = fixed ? field.value.slice(0, 1) : field.value;
+                  const rows = field.value;
                   const set = (next: AuthoredOption[]) => field.onChange(next);
+                  const filled = rows.filter((o) => o.title.trim());
                   const pattern =
-                    fixed && rows[0]?.title.trim()
-                      ? answerPattern(rows[0].title)
-                      : null;
+                    fixed && filled[0] ? answerPattern(filled[0].title) : null;
+                  // Fixed length: every answer must fit the same boxes.
+                  const misfit =
+                    pattern !== null &&
+                    filled.some(
+                      (o) =>
+                        answerPattern(o.title).join(" ") !== pattern.join(" "),
+                    );
                   return (
                     <div className="flex flex-col gap-2">
                       <span className={fieldLabelClass}>
-                        {fixed ? "Answer" : "Accepted answers"}
+                        Accepted answers
                         <span className={counterClass}>
                           {fixed
-                            ? "Players see one box per letter"
+                            ? `${rows.length} / ${MAX_ACCEPTED_ANSWERS} · same length each, players see one box per letter`
                             : `${rows.length} / ${MAX_ACCEPTED_ANSWERS} · case and accents don't matter`}
                         </span>
                       </span>
@@ -1140,7 +1143,13 @@ const AddQuesForm = (props: {
                           {pattern.map((n) => "_".repeat(n)).join(" ")}
                         </p>
                       )}
-                      {!fixed && rows.length < MAX_ACCEPTED_ANSWERS && (
+                      {misfit && (
+                        <span className="text-xs text-red-light dark:text-red-dark">
+                          All answers need the same length per word as the first
+                          ({pattern!.join(" + ")} letters).
+                        </span>
+                      )}
+                      {rows.length < MAX_ACCEPTED_ANSWERS && (
                         <button
                           type="button"
                           onClick={() =>
@@ -1160,7 +1169,7 @@ const AddQuesForm = (props: {
                       <div className={settingsBoxClass}>
                         <SettingRow
                           label="Fixed length"
-                          hint="One answer; players see its letters as boxes"
+                          hint="Players see the answer's letters as boxes"
                         >
                           <Controller
                             name="fixedLength"
@@ -1168,10 +1177,7 @@ const AddQuesForm = (props: {
                             render={({ field: f }) => (
                               <Switch
                                 checked={f.value}
-                                onCheckedChange={(on) => {
-                                  f.onChange(on);
-                                  if (on) set(field.value.slice(0, 1));
-                                }}
+                                onCheckedChange={f.onChange}
                                 aria-label="Fixed length"
                               />
                             )}

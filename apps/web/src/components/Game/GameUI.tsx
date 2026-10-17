@@ -37,6 +37,10 @@ export const counterClass =
 export const primaryButtonClass =
   "flex items-center justify-center gap-2.5 whitespace-nowrap rounded-[14px] px-[30px] py-3.5 text-base font-bold text-white bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep shadow-[0_10px_24px_-10px_#7c4ddb] transition-[filter,transform] hover:brightness-108 active:translate-y-px cursor-pointer disabled:opacity-50 disabled:cursor-default disabled:hover:brightness-100";
 
+/** Host bar's red action (skip / end), same shape as the primary button. */
+export const dangerButtonClass =
+  "flex items-center justify-center gap-2.5 whitespace-nowrap rounded-[14px] px-[26px] py-3.5 text-base font-bold text-white bg-red-light dark:bg-red-dark dark:text-dark shadow-[0_10px_24px_-10px_#e5544e] transition-[filter,transform] hover:brightness-108 active:translate-y-px cursor-pointer disabled:opacity-50 disabled:cursor-default";
+
 export function OptionKey({
   index,
   className,

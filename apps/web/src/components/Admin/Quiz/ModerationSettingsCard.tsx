@@ -9,6 +9,8 @@ import {
   type SoundSettings,
 } from "@buzrr/contract";
 import { useSoundSkinsQuery } from "@/lib/modules/sound-skins/hooks";
+import type { AvatarSkin } from "@buzrr/contract";
+import { AVATAR_SKIN_NAMES } from "@/components/Admin/AvatarSkins/AvatarSkinsClient";
 import { BUILTIN_SKINS, type BuiltinSkinId } from "@/lib/sound/synth";
 import Switch from "@/components/ui/Switch";
 import { getApiErrorMessage } from "@/lib/api/errors";
@@ -72,6 +74,34 @@ export default function ModerationSettingsCard({ quiz }: { quiz: QuizDetail }) {
 
   return (
     <div className="mt-3 mb-1 flex flex-col gap-2">
+      <label className="flex items-center gap-2 text-sm">
+        <span className="w-20 shrink-0 text-[13px] font-semibold">Avatars</span>
+        <select
+          aria-label="Avatar skin"
+          value={settings.avatarSkin}
+          disabled={updateQuiz.isPending}
+          onChange={(e) =>
+            updateQuiz.mutate(
+              {
+                quizId: quiz.id,
+                settings: {
+                  ...settings,
+                  avatarSkin: e.target.value as QuizSettings["avatarSkin"],
+                },
+              },
+              { onError: (err) => toast.error(getApiErrorMessage(err)) },
+            )
+          }
+          className={selectClass}
+        >
+          <option value="default">Default (your settings)</option>
+          {(Object.keys(AVATAR_SKIN_NAMES) as AvatarSkin[]).map((k) => (
+            <option key={k} value={k}>
+              {AVATAR_SKIN_NAMES[k]}
+            </option>
+          ))}
+        </select>
+      </label>
       <div className="flex flex-col gap-1.5 text-sm">
         <span className="font-semibold">Sounds</span>
         <label className="flex items-center gap-2">
@@ -101,6 +131,7 @@ export default function ModerationSettingsCard({ quiz }: { quiz: QuizDetail }) {
               onChange={(e) => saveSound({ skin: e.target.value })}
               className={selectClass}
             >
+              <option value="default">Default (your settings)</option>
               {BUILTIN_SOUND_SKINS.map((id) => (
                 <option key={id} value={id}>
                   {BUILTIN_SKINS[id as BuiltinSkinId].name}
@@ -112,6 +143,21 @@ export default function ModerationSettingsCard({ quiz }: { quiz: QuizDetail }) {
                   {s.isGlobal ? " (shared)" : ""}
                 </option>
               ))}
+            </select>
+          </label>
+        )}
+        {settings.sound.playOn !== "off" && (
+          <label className="flex items-center gap-2">
+            <span className="w-20 shrink-0 text-[13px]">Music</span>
+            <select
+              aria-label="Music"
+              value={settings.sound.music ? "on" : "off"}
+              disabled={updateQuiz.isPending}
+              onChange={(e) => saveSound({ music: e.target.value === "on" })}
+              className={selectClass}
+            >
+              <option value="on">Music</option>
+              <option value="off">No music (effects only)</option>
             </select>
           </label>
         )}

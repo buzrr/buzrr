@@ -3,7 +3,13 @@
 import clsx from "clsx";
 import { useAppSelector } from "@/state/hooks";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
-import { WaitingDots, mutedText, panelClass } from "@/components/Game/GameUI";
+import { LuSkipForward } from "react-icons/lu";
+import {
+  WaitingDots,
+  dangerButtonClass,
+  mutedText,
+  panelClass,
+} from "@/components/Game/GameUI";
 
 /**
  * Shown between "start game" and the first question (host and players), and
@@ -75,12 +81,10 @@ export default function GetReady({
         </div>
       </section>
       {onSkip && phase === "starting" && (
-        <div className="mt-4 flex justify-end">
-          <button
-            type="button"
-            onClick={onSkip}
-            className="rounded-[14px] border-2 border-lprimary dark:border-dprimary px-6 py-2.5 font-bold text-lprimary dark:text-dprimary cursor-pointer hover:bg-lprimary/10 dark:hover:bg-dprimary/10"
-          >
+        // Skip sits bottom left, like on the question screen.
+        <div className="fixed bottom-4 left-4 md:left-8 z-20">
+          <button type="button" onClick={onSkip} className={dangerButtonClass}>
+            <LuSkipForward size={17} />
             Skip
           </button>
         </div>

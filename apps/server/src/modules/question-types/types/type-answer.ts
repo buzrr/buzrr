@@ -48,10 +48,14 @@ export const typeAnswerHandler: QuestionTypeHandler<"type_answer"> = {
       );
     }
     const parsed = parseConfig(typeAnswer.config, config, "ask for answer");
-    if (parsed.fixedLength && accepted.length !== 1) {
-      throw new QuestionDefinitionError(
-        "A fixed-length answer takes exactly one accepted answer",
-      );
+    if (parsed.fixedLength) {
+      // Players see one set of boxes: every accepted answer must fit it.
+      const shape = answerPattern(accepted[0]!).join(" ");
+      if (accepted.some((a) => answerPattern(a).join(" ") !== shape)) {
+        throw new QuestionDefinitionError(
+          "With a fixed length, all accepted answers need the same length (letters per word)",
+        );
+      }
     }
     return {
       options: accepted.map((title) => ({ title, isCorrect: true })),

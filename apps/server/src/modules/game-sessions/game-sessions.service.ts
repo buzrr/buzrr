@@ -1,5 +1,9 @@
 import { signAssetUrl } from "../../common/storage/asset-signing";
 import {
+  assignAvatar,
+  resolveGameLook,
+} from "../../common/game-look/game-look";
+import {
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
@@ -30,6 +34,15 @@ export class GameSessionsService {
   ): Promise<{ roomId: string; playerId: string }> {
     const game = await this.prisma.db.gameSession.findUnique({
       where: { gameCode: dto.gameCode },
+      include: {
+        quiz: {
+          select: {
+            settings: true,
+            logo: true,
+            user: { select: { preferences: true } },
+          },
+        },
+      },
     });
     if (!game) {
       throw new NotFoundException("Game not found");
@@ -66,9 +79,17 @@ export class GameSessionsService {
             );
           }
         }
+        // A picture from this room's avatar skin (kept when it already is).
+        const { avatars } = resolveGameLook(
+          game.quiz,
+          game.quiz.user?.preferences,
+        );
+        const profilePic = avatars.includes(player.profilePic ?? "")
+          ? undefined
+          : assignAvatar(avatars, playerId);
         await tx.player.update({
           where: { id: playerId },
-          data: { gameId: game.id },
+          data: { gameId: game.id, ...(profilePic ? { profilePic } : {}) },
         });
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -315,6 +336,7 @@ export class GameSessionsService {
             where: { disabled: false },
             include: { options: true },
           },
+          user: { select: { preferences: true } },
         },
       }),
       this.entitlements.maxPlayersFor(room.creatorId),
@@ -323,7 +345,17 @@ export class GameSessionsService {
     if (!quiz) {
       throw new NotFoundException("Quiz not found");
     }
-    return { room, players, quiz, maxPlayers, plan };
+    // The owner's defaults filled in (audio / avatar skin, logo).
+    const { user: owner, ...rest } = quiz;
+    const look = resolveGameLook(quiz, owner?.preferences);
+    return {
+      room,
+      players,
+      quiz: { ...rest, settings: look.settings, logo: look.logo },
+      avatars: look.avatars,
+      maxPlayers,
+      plan,
+    };
   }
 
   async getPlayerPlayContext(playerId: string) {
@@ -336,11 +368,21 @@ export class GameSessionsService {
     if (!player.gameId) {
       return { player, game: null };
     }
-    const game = await this.loadGameForPlay(player.gameId);
-    // A public route: the quiz logo gets its signature here (players of
-    // this room are the ones who may see it).
-    if (game?.quiz?.logo) game.quiz.logo = signAssetUrl(game.quiz.logo);
-    return { player, game };
+    const loaded = await this.loadGameForPlay(player.gameId);
+    if (!loaded) return { player, game: null };
+    const { user: owner, ...quiz } = loaded.quiz;
+    const look = resolveGameLook(quiz, owner?.preferences);
+    // A public route: the logo gets its signature here (players of this room
+    // are the ones who may see it).
+    const game = {
+      ...loaded,
+      quiz: {
+        ...quiz,
+        settings: look.settings,
+        logo: look.logo ? signAssetUrl(look.logo) : null,
+      },
+    };
+    return { player, game, avatars: look.avatars };
   }
 
   private async loadGameForPlay(gameSessionId: string) {
@@ -357,6 +399,7 @@ export class GameSessionsService {
             settings: true,
             logo: true,
             questions: { where: { disabled: false }, select: { id: true } },
+            user: { select: { preferences: true } },
           },
         },
         creator: {

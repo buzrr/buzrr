@@ -340,8 +340,9 @@ export const typeAnswer = {
   config: z.object({
     ignoreTypos: z.boolean().default(true),
     /**
-     * One accepted answer whose length players see as boxes, one per
-     * character, with the gaps between words ("_______ _______").
+     * Players see the answer's length as boxes, one per character, with the
+     * gaps between words ("_______ _______"). Every accepted answer has the
+     * same length per word.
      */
     fixedLength: z.boolean().default(false),
   }),
