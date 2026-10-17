@@ -5,20 +5,21 @@ import {
   useEffect,
   useRef,
   useState,
-  type PointerEvent,
   type ReactNode,
 } from "react";
 import clsx from "clsx";
 import Modal from "@mui/material/Modal";
 import Box from "@mui/material/Box";
-import { LuPencil } from "react-icons/lu";
+import { LuPlus } from "react-icons/lu";
+import { toast } from "react-toastify";
 import modalStyle from "@/utils/modalStyle";
 import type { GameSocket } from "@/types/socket";
 import {
-  DEFAULT_REACTION_EMOJIS,
+  BASE_REACTION_EMOJIS,
+  MAX_CUSTOM_REACTIONS,
   REACTION_EMOJI_CHOICES,
-  loadReactionEmojis,
-  saveReactionEmojis,
+  loadCustomReactions,
+  saveCustomReactions,
 } from "@/lib/player-prefs";
 
 /**
@@ -165,12 +166,72 @@ export function ReactionOverlay({
   return <>{layer}</>;
 }
 
+const LONG_PRESS_MS = 500;
+
 /**
- * Player screens: the player's three reaction emojis (each tap = one
- * reaction) and a pencil to pick other ones; the choice is remembered in
- * localStorage for the whole game and the next ones. `inline` lays them out
- * in a row in the page flow (lobby, under the bubble field); otherwise they
- * float at the screen edge — a row along the bottom on phones.
+ * Tap sends, a long press does something else (change the emoji). Pointer
+ * based, so it works the same with touch and mouse.
+ */
+function useTapOrLongPress(onTap: () => void, onLong: () => void) {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const long = useRef(false);
+  const clear = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+  };
+  return {
+    onPointerDown: () => {
+      long.current = false;
+      clear();
+      timer.current = setTimeout(() => {
+        long.current = true;
+        onLong();
+      }, LONG_PRESS_MS);
+    },
+    onPointerUp: () => {
+      clear();
+      if (!long.current) onTap();
+    },
+    onPointerLeave: clear,
+    onPointerCancel: clear,
+    onContextMenu: (e: { preventDefault: () => void }) => e.preventDefault(),
+  };
+}
+
+function ReactionButton({
+  emoji,
+  onSend,
+  onLongPress,
+}: {
+  emoji: string;
+  onSend: (emoji: string, el: HTMLElement) => void;
+  onLongPress: () => void;
+}) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const handlers = useTapOrLongPress(
+    () => ref.current && onSend(emoji, ref.current),
+    onLongPress,
+  );
+  return (
+    <button
+      ref={ref}
+      type="button"
+      aria-label={`Send ${emoji}`}
+      {...handlers}
+      className="size-10 rounded-full text-xl flex items-center justify-center cursor-pointer select-none active:scale-90 transition-transform hover:bg-lprimary/10 dark:hover:bg-white/10 touch-manipulation [-webkit-touch-callout:none]"
+    >
+      {emoji}
+    </button>
+  );
+}
+
+/**
+ * Player screens: the reaction buttons (each tap = one reaction). The three
+ * base reactions are fixed; a "+" slot adds own ones (up to four, so seven
+ * in all), and a long press on an own one changes or removes it. Own ones
+ * are remembered in localStorage. `inline` lays them out in a row in the
+ * page flow (lobby, under the bubble field); otherwise they float at the
+ * screen edge — a row along the bottom on phones.
  */
 export function ReactionBar({
   socket,
@@ -180,14 +241,15 @@ export function ReactionBar({
   inline?: boolean;
 }) {
   const { spawn, layer } = useFlyers();
-  const [emojis, setEmojis] = useState<string[]>(DEFAULT_REACTION_EMOJIS);
-  const [picking, setPicking] = useState(false);
+  const [custom, setCustom] = useState<string[]>([]);
+  // null = closed; "add" = new slot; number = editing that own reaction.
+  const [editing, setEditing] = useState<"add" | number | null>(null);
   // localStorage isn't readable during SSR; pick up the saved set on mount.
-  useEffect(() => setEmojis(loadReactionEmojis()), []);
+  useEffect(() => setCustom(loadCustomReactions()), []);
 
-  const send = (emoji: string, e: PointerEvent<HTMLButtonElement>) => {
+  const send = (emoji: string, el: HTMLElement) => {
     if (socket?.connected) socket.emit("reaction", { emoji });
-    const r = e.currentTarget.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
     spawn({
       emoji,
       x: r.left + r.width / 2,
@@ -198,74 +260,90 @@ export function ReactionBar({
     });
   };
 
+  const update = (next: string[]) => {
+    setCustom(next);
+    saveCustomReactions(next);
+  };
+
   return (
     <>
       <div
         className={clsx(
-          "flex gap-1.5 rounded-full bg-white/85 dark:bg-dark/85 p-1.5 border border-lprimary/15 dark:border-white/10",
+          "flex gap-1 rounded-full bg-white/85 dark:bg-dark/85 p-1.5 border border-lprimary/15 dark:border-white/10",
           inline
-            ? "mx-auto mt-2 w-fit flex-row"
+            ? "mx-auto mt-2 w-fit max-w-full flex-row flex-wrap justify-center"
             : "fixed z-40 shadow-lg backdrop-blur flex-row bottom-14 left-1/2 -translate-x-1/2 md:flex-col md:left-auto md:translate-x-0 md:right-2 md:bottom-14",
         )}
       >
-        {emojis.map((emoji, i) => (
-          <button
-            key={`${emoji}-${i}`}
-            type="button"
-            aria-label={`Send ${emoji}`}
-            onPointerDown={(e) => send(emoji, e)}
-            className="size-10 rounded-full text-xl flex items-center justify-center cursor-pointer active:scale-90 transition-transform hover:bg-lprimary/10 dark:hover:bg-white/10 touch-manipulation"
-          >
-            {emoji}
-          </button>
+        {BASE_REACTION_EMOJIS.map((emoji) => (
+          <ReactionButton
+            key={emoji}
+            emoji={emoji}
+            onSend={send}
+            onLongPress={() => toast.info("Base smileys cannot be changed")}
+          />
         ))}
-        <button
-          type="button"
-          aria-label="Choose your reaction emojis"
-          onClick={() => setPicking(true)}
-          className="size-10 rounded-full flex items-center justify-center cursor-pointer text-off-dark dark:text-muted-dark hover:bg-lprimary/10 dark:hover:bg-white/10"
-        >
-          <LuPencil size={16} />
-        </button>
+        {custom.map((emoji, i) => (
+          <ReactionButton
+            key={`${emoji}-${i}`}
+            emoji={emoji}
+            onSend={send}
+            onLongPress={() => setEditing(i)}
+          />
+        ))}
+        {custom.length < MAX_CUSTOM_REACTIONS && (
+          <button
+            type="button"
+            aria-label="Add a reaction"
+            onClick={() => setEditing("add")}
+            className="size-10 rounded-full flex items-center justify-center cursor-pointer border-2 border-dashed border-lprimary/30 dark:border-white/20 text-off-dark dark:text-muted-dark hover:bg-lprimary/10 dark:hover:bg-white/10"
+          >
+            <LuPlus size={16} />
+          </button>
+        )}
       </div>
       <EmojiPicker
-        // Remount on open so the picker starts from the current set.
-        key={picking ? "open" : "closed"}
-        open={picking}
-        current={emojis}
-        onClose={() => setPicking(false)}
-        onSave={(next) => {
-          setEmojis(next);
-          saveReactionEmojis(next);
-          setPicking(false);
+        open={editing !== null}
+        current={typeof editing === "number" ? custom[editing] : undefined}
+        taken={[...BASE_REACTION_EMOJIS, ...custom]}
+        onClose={() => setEditing(null)}
+        onPick={(emoji) => {
+          if (editing === "add") update([...custom, emoji]);
+          else if (typeof editing === "number")
+            update(custom.map((e, i) => (i === editing ? emoji : e)));
+          setEditing(null);
         }}
+        onRemove={
+          typeof editing === "number"
+            ? () => {
+                update(custom.filter((_, i) => i !== editing));
+                setEditing(null);
+              }
+            : undefined
+        }
       />
       {layer}
     </>
   );
 }
 
-/** Pick exactly three reaction emojis (tap order = button order). */
+/** Pick one emoji for an own reaction slot (tap = done). */
 function EmojiPicker({
   open,
   current,
+  taken,
   onClose,
-  onSave,
+  onPick,
+  onRemove,
 }: {
   open: boolean;
-  current: string[];
+  current?: string;
+  /** Already on the bar (shown greyed out, except the one being changed). */
+  taken: string[];
   onClose: () => void;
-  onSave: (emojis: string[]) => void;
+  onPick: (emoji: string) => void;
+  onRemove?: () => void;
 }) {
-  const [picked, setPicked] = useState<string[]>(current);
-  const toggle = (emoji: string) =>
-    setPicked((prev) =>
-      prev.includes(emoji)
-        ? prev.filter((x) => x !== emoji)
-        : prev.length < 3
-          ? [...prev, emoji]
-          : [...prev.slice(1), emoji],
-    );
   return (
     <Modal open={open} onClose={onClose} aria-labelledby="emoji-picker-title">
       <Box
@@ -276,49 +354,47 @@ function EmojiPicker({
           id="emoji-picker-title"
           className="text-lg font-black text-dark dark:text-white text-center"
         >
-          Pick your 3 reactions
+          {current ? "Change your reaction" : "Add a reaction"}
         </h2>
         <div className="mt-4 grid grid-cols-8 gap-1">
           {REACTION_EMOJI_CHOICES.map((emoji) => {
-            const pos = picked.indexOf(emoji);
+            const isCurrent = emoji === current;
+            const used = !isCurrent && taken.includes(emoji);
             return (
               <button
                 key={emoji}
                 type="button"
-                onClick={() => toggle(emoji)}
-                aria-pressed={pos >= 0}
+                disabled={used}
+                onClick={() => onPick(emoji)}
+                aria-pressed={isCurrent}
                 className={clsx(
-                  "relative aspect-square rounded-xl text-2xl flex items-center justify-center cursor-pointer",
-                  pos >= 0
+                  "aspect-square rounded-xl text-2xl flex items-center justify-center cursor-pointer disabled:opacity-25 disabled:cursor-default",
+                  isCurrent
                     ? "bg-lprimary/20 dark:bg-dprimary/25 ring-2 ring-lprimary dark:ring-dprimary"
                     : "hover:bg-lprimary/10 dark:hover:bg-white/10",
                 )}
               >
                 {emoji}
-                {pos >= 0 && (
-                  <span className="absolute -top-1 -right-1 size-4 rounded-full bg-lprimary dark:bg-dprimary text-[10px] font-bold text-white dark:text-dark flex items-center justify-center">
-                    {pos + 1}
-                  </span>
-                )}
               </button>
             );
           })}
         </div>
         <div className="mt-5 flex gap-2 justify-end">
+          {onRemove && (
+            <button
+              type="button"
+              onClick={onRemove}
+              className="mr-auto px-4 py-2 rounded-xl font-bold text-red-light dark:text-red-dark hover:bg-red-light/10 cursor-pointer"
+            >
+              Remove
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
             className="px-4 py-2 rounded-xl font-bold text-dark dark:text-white hover:bg-card-light dark:hover:bg-card-dark cursor-pointer"
           >
             Cancel
-          </button>
-          <button
-            type="button"
-            disabled={picked.length !== 3}
-            onClick={() => onSave(picked)}
-            className="px-4 py-2 rounded-xl font-bold bg-lprimary dark:bg-dprimary text-white dark:text-dark disabled:opacity-50 cursor-pointer"
-          >
-            Save
           </button>
         </div>
       </Box>

@@ -1,13 +1,16 @@
 /**
  * What a player picked last time, kept in localStorage so the next game
- * starts with it: name + avatar for the profile form, and the three reaction
- * emojis. Browser only; every read tolerates missing or broken values.
+ * starts with it: name + avatar for the profile form, and the player's own
+ * reaction emojis. Browser only; every read tolerates missing or broken values.
  */
 
 const PROFILE_KEY = "buzrr:player-profile";
-const EMOJI_KEY = "buzrr:reaction-emojis";
+const EMOJI_KEY = "buzrr:custom-reactions";
 
-export const DEFAULT_REACTION_EMOJIS = ["👍", "❤️", "😂"];
+/** The fixed reactions every player has. */
+export const BASE_REACTION_EMOJIS = ["👍", "❤️", "😂"];
+/** How many own reactions a player can add next to the base ones. */
+export const MAX_CUSTOM_REACTIONS = 4;
 
 /** Emojis offered in the reaction picker. */
 export const REACTION_EMOJI_CHOICES = [
@@ -75,15 +78,19 @@ export function savePlayerProfile(profile: { name: string; image: string }) {
   write(PROFILE_KEY, profile);
 }
 
-export function loadReactionEmojis(): string[] {
+/** The player's own reactions (0–4), shown after the base ones. */
+export function loadCustomReactions(): string[] {
   const e = read<unknown>(EMOJI_KEY);
-  return Array.isArray(e) &&
-    e.length === 3 &&
-    e.every((x) => typeof x === "string" && x.length > 0 && x.length <= 16)
-    ? (e as string[])
-    : DEFAULT_REACTION_EMOJIS;
+  return Array.isArray(e)
+    ? e
+        .filter(
+          (x): x is string =>
+            typeof x === "string" && x.length > 0 && x.length <= 16,
+        )
+        .slice(0, MAX_CUSTOM_REACTIONS)
+    : [];
 }
 
-export function saveReactionEmojis(emojis: string[]) {
-  write(EMOJI_KEY, emojis.slice(0, 3));
+export function saveCustomReactions(emojis: string[]) {
+  write(EMOJI_KEY, emojis.slice(0, MAX_CUSTOM_REACTIONS));
 }
