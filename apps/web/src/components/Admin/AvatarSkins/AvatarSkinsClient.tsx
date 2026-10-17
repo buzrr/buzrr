@@ -102,7 +102,8 @@ export default function AvatarSkinsClient() {
             className={clsx(
               panelClass,
               "p-5 flex flex-col gap-3 text-dark dark:text-white",
-              isDefault && "ring-2 ring-dprimary",
+              isDefault &&
+                "ring-2 ring-dprimary !bg-dprimary/8 dark:!bg-dprimary/10",
             )}
           >
             <div className="flex flex-wrap items-center gap-3">

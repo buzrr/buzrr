@@ -16,12 +16,10 @@ ARG PUBLIC_API_URL=http://localhost:3001
 ARG PUBLIC_WEB_URL=http://localhost:3000
 # Empty hides Knowledge Spaces (the optional apps/ai service).
 ARG PUBLIC_AI_API_URL=
-# Instance options (BILLING, PRIVATE_BUZZ, TITLE, CONTACT_EMAIL) are runtime
-# environment variables of the web container — see apps/web/src/lib/instance.ts.
-# Unique per build (e.g. commit + time); open pages reload when it changes.
-ARG BUILD_ID=
-ENV NEXT_PUBLIC_BUILD_ID=$BUILD_ID \
-    NEXT_PUBLIC_API_URL=$PUBLIC_API_URL \
+# Instance options (BILLING, PRIVATE_BUZZ, TITLE, CONTACT_EMAIL, DUELS) are
+# runtime environment variables of the web container — see
+# apps/web/src/lib/instance.ts.
+ENV NEXT_PUBLIC_API_URL=$PUBLIC_API_URL \
     NEXT_PUBLIC_SOCKET_URL=$PUBLIC_API_URL \
     NEXT_PUBLIC_APP_URL=$PUBLIC_WEB_URL \
     NEXT_PUBLIC_AI_API_URL=$PUBLIC_AI_API_URL \
@@ -38,10 +36,18 @@ COPY package.json yarn.lock .yarnrc.yml tsconfig.json prisma.config.ts ./
 COPY .yarn/releases ./.yarn/releases
 COPY packages ./packages
 COPY apps/web/package.json ./apps/web/
-RUN yarn workspaces focus web @buzrr/prisma @buzrr/contract
+# The package cache survives between builds (BuildKit cache mount).
+RUN --mount=type=cache,target=/root/.yarn/berry/cache \
+    yarn workspaces focus web @buzrr/prisma @buzrr/contract
 
 COPY apps/web ./apps/web
-RUN yarn workspace @buzrr/contract build \
+# Unique per build (e.g. commit + time); open pages reload when it changes.
+# Declared this late so it doesn't invalidate the dependency layers above.
+ARG BUILD_ID=
+ENV NEXT_PUBLIC_BUILD_ID=$BUILD_ID
+# Next's build cache is kept between builds too (incremental compiles).
+RUN --mount=type=cache,target=/app/apps/web/.next/cache \
+    yarn workspace @buzrr/contract build \
  && yarn workspace @buzrr/prisma build \
  && yarn workspace web build
 

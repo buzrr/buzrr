@@ -88,23 +88,38 @@ export default function SoundSkinsClient() {
   const create = useCreateSoundSkin();
   const [name, setName] = useState("");
   const preview = usePreview();
+  const prefs = usePreferencesQuery();
+  const defaultId = prefs.data?.defaultSoundSkin ?? "builtin:show";
 
   return (
-    <div className="mt-4 flex flex-col gap-6 text-dark dark:text-white max-w-4xl">
-      <section className={clsx(panelClass, "p-5 flex flex-col gap-3")}>
-        <h2 className="text-lg font-bold">Built-in audio skins</h2>
-        <p className={clsx("text-sm", mutedText)}>
-          Synthesized in the browser. Your default applies to all your quizzes;
-          each quiz can pick another skin in its settings.
-        </p>
-        {BUILTIN_SOUND_SKINS.map((id) => (
-          <div key={id} className="flex flex-wrap items-center gap-1.5">
-            <span className="w-32 font-semibold">
-              {BUILTIN_SKINS[id as BuiltinSkinId].name}
-            </span>
-            <span className="w-28">
+    <div className="mt-4 flex flex-col gap-5 text-dark dark:text-white max-w-5xl">
+      <p className={clsx("text-sm", mutedText)}>
+        Music and effects for your games. Your default applies to all your
+        quizzes; each quiz can pick another skin in its settings.
+      </p>
+      {BUILTIN_SOUND_SKINS.map((id) => (
+        <section
+          key={id}
+          className={clsx(
+            panelClass,
+            "p-5 flex flex-col gap-3",
+            defaultId === id && defaultBoxClass,
+          )}
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold">
+                {BUILTIN_SKINS[id as BuiltinSkinId].name}
+              </h2>
+              <p className={clsx("text-xs", mutedText)}>
+                Built in · synthesized in the browser
+              </p>
+            </div>
+            <span className="ml-auto">
               <DefaultSkinButton id={id} />
             </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
             {SLOTS.map((slot) => {
               const key = `${id}:${slot}`;
               return (
@@ -131,8 +146,8 @@ export default function SoundSkinsClient() {
               );
             })}
           </div>
-        ))}
-      </section>
+        </section>
+      ))}
 
       <section className={clsx(panelClass, "p-5 flex flex-col gap-3")}>
         <h2 className="text-lg font-bold">Your audio skins</h2>
@@ -168,6 +183,7 @@ export default function SoundSkinsClient() {
               skin={skin}
               isAdmin={isAdmin}
               preview={preview}
+              isDefault={defaultId === skin.id}
             />
           ))
         )}
@@ -175,6 +191,10 @@ export default function SoundSkinsClient() {
     </div>
   );
 }
+
+/** The default skin's box: tinted and ringed, like on Avatar Skins. */
+export const defaultBoxClass =
+  "ring-2 ring-dprimary !bg-dprimary/8 dark:!bg-dprimary/10";
 
 /** "Default" badge, or the button that makes this skin the default. */
 export function DefaultSkinButton({ id }: { id: string }) {
@@ -211,10 +231,12 @@ function SkinCard({
   skin,
   isAdmin,
   preview,
+  isDefault,
 }: {
   skin: SoundSkin;
   isAdmin: boolean;
   preview: ReturnType<typeof usePreview>;
+  isDefault: boolean;
 }) {
   const update = useUpdateSoundSkin();
   const setSlot = useSetSoundSlot();
@@ -223,7 +245,12 @@ function SkinCard({
   const onError = (err: unknown) => toast.error(getApiErrorMessage(err));
 
   return (
-    <div className="rounded-2xl border border-lprimary/15 dark:border-white/10 p-4 flex flex-col gap-2">
+    <div
+      className={clsx(
+        "rounded-2xl border border-lprimary/15 dark:border-white/10 p-4 flex flex-col gap-2",
+        isDefault && defaultBoxClass,
+      )}
+    >
       <div className="flex flex-wrap items-center gap-3">
         <input
           defaultValue={skin.name}
