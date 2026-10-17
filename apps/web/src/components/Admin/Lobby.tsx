@@ -119,7 +119,7 @@ const Lobby = (params: {
     return () => {
       socket.off("bubble-stats", onStats);
     };
-  }, [socket]);
+  }, [socket, spawnBubble]);
 
   const removePlayerMutation = useRemoveRoomPlayerMutation();
   const banPlayerMutation = useBanRoomPlayerMutation();

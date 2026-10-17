@@ -35,7 +35,8 @@ export async function createUserAction(input: {
   const name = input.name.trim();
   const email = input.email.trim().toLowerCase();
   if (!name) return { ok: false, error: "Name is required" };
-  if (!EMAIL_RE.test(email)) return { ok: false, error: "Invalid email address" };
+  if (!EMAIL_RE.test(email))
+    return { ok: false, error: "Invalid email address" };
   if (input.password.length < MIN_PASSWORD_LENGTH) {
     return {
       ok: false,
@@ -45,7 +46,9 @@ export async function createUserAction(input: {
   if (input.role !== "user" && input.role !== "admin") {
     return { ok: false, error: "Invalid role" };
   }
-  if (await prisma.user.findUnique({ where: { email }, select: { id: true } })) {
+  if (
+    await prisma.user.findUnique({ where: { email }, select: { id: true } })
+  ) {
     return { ok: false, error: "A user with this email already exists" };
   }
 

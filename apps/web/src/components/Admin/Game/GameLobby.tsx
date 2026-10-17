@@ -114,7 +114,10 @@ const GameLobby = (params: {
       {phase === "question" ? (
         <QuestionScreen socket={socket} gameCode={params.gameCode} />
       ) : phase === "ready" ? (
-        <ReadySlide key={`ready-${qIndex}`} onNext={() => socket.emit("host-next")} />
+        <ReadySlide
+          key={`ready-${qIndex}`}
+          onNext={() => socket.emit("host-next")}
+        />
       ) : phase === "closed" ? (
         <ClosedSlide
           key={`closed-${qIndex}`}

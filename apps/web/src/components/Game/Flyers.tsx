@@ -50,11 +50,26 @@ function FlyerItem({ f, onDone }: { f: Flyer; onDone: (id: number) => void }) {
     const anim = el.animate(
       [
         { transform: "translate(-50%, 0) scale(0.4)", opacity: 0 },
-        { transform: `translate(calc(-50% + ${f.dx * 0.3}px), ${-f.rise * 0.15}px) scale(1.1)`, opacity: 1, offset: 0.12 },
-        { transform: `translate(calc(-50% + ${-f.dx * 0.4}px), ${-f.rise * 0.6}px) scale(1)`, opacity: 0.9, offset: 0.6 },
-        { transform: `translate(calc(-50% + ${f.dx}px), ${-f.rise}px) scale(0.9)`, opacity: 0 },
+        {
+          transform: `translate(calc(-50% + ${f.dx * 0.3}px), ${-f.rise * 0.15}px) scale(1.1)`,
+          opacity: 1,
+          offset: 0.12,
+        },
+        {
+          transform: `translate(calc(-50% + ${-f.dx * 0.4}px), ${-f.rise * 0.6}px) scale(1)`,
+          opacity: 0.9,
+          offset: 0.6,
+        },
+        {
+          transform: `translate(calc(-50% + ${f.dx}px), ${-f.rise}px) scale(0.9)`,
+          opacity: 0,
+        },
       ],
-      { duration: f.duration, easing: "cubic-bezier(.2,.6,.4,1)", fill: "forwards" },
+      {
+        duration: f.duration,
+        easing: "cubic-bezier(.2,.6,.4,1)",
+        fill: "forwards",
+      },
     );
     anim.onfinish = () => onDone(f.id);
     return () => anim.cancel();
@@ -75,6 +90,11 @@ function FlyerItem({ f, onDone }: { f: Flyer; onDone: (id: number) => void }) {
   );
 }
 
+/** Random drift and rise for a reaction tapped by the player. */
+function tapJitter() {
+  return { dx: (Math.random() - 0.5) * 50, rise: 140 + Math.random() * 60 };
+}
+
 /** `spawn` adds a flyer at viewport coordinates; render `layer` once. */
 export function useFlyers(): {
   spawn: (f: Omit<Flyer, "id">) => void;
@@ -93,7 +113,10 @@ export function useFlyers(): {
     [],
   );
   const layer = (
-    <div aria-hidden className="pointer-events-none fixed inset-0 z-50 overflow-hidden">
+    <div
+      aria-hidden
+      className="pointer-events-none fixed inset-0 z-50 overflow-hidden"
+    >
       {flyers.map((f) => (
         <FlyerItem key={f.id} f={f} onDone={done} />
       ))}
@@ -115,7 +138,9 @@ export function ReactionOverlay({
 }) {
   const { spawn, layer } = useFlyers();
   const nameRef = useRef(nameOf);
-  nameRef.current = nameOf;
+  useEffect(() => {
+    nameRef.current = nameOf;
+  });
   useEffect(() => {
     if (!socket) return;
     const onReaction = (r: { playerId: string; emoji: string }) => {
@@ -167,8 +192,7 @@ export function ReactionBar({
       emoji,
       x: r.left + r.width / 2,
       y: r.top,
-      dx: (Math.random() - 0.5) * 50,
-      rise: 140 + Math.random() * 60,
+      ...tapJitter(),
       size: 26,
       duration: 1100,
     });
@@ -205,6 +229,8 @@ export function ReactionBar({
         </button>
       </div>
       <EmojiPicker
+        // Remount on open so the picker starts from the current set.
+        key={picking ? "open" : "closed"}
         open={picking}
         current={emojis}
         onClose={() => setPicking(false)}
@@ -232,9 +258,6 @@ function EmojiPicker({
   onSave: (emojis: string[]) => void;
 }) {
   const [picked, setPicked] = useState<string[]>(current);
-  useEffect(() => {
-    if (open) setPicked(current);
-  }, [open, current]);
   const toggle = (emoji: string) =>
     setPicked((prev) =>
       prev.includes(emoji)

@@ -176,168 +176,170 @@ export default function QuesResult(props: QuesResultProps) {
       )}
     >
       {showAnswerPanel && (
-      <section
-        className={clsx(
-          panelClass,
-          "flex flex-col gap-5 md:gap-[22px] p-5 md:px-[30px] md:py-7 md:min-h-0 md:overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-        )}
-      >
-        <div>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span className={labelClass}>Question {qIndex + 1} results</span>
-            {question && !scored && <QuestionTypePill type={question.type} />}
-          </div>
-          <h2 className="mt-2 text-lg md:text-[22px] font-bold leading-[1.3] tracking-[-0.01em] text-pretty wrap-break-word">
-            {question?.title}
-          </h2>
-        </div>
-        <div
+        <section
           className={clsx(
-            "grid gap-2 md:gap-3",
-            scored ? "grid-cols-3" : "grid-cols-2",
+            panelClass,
+            "flex flex-col gap-5 md:gap-[22px] p-5 md:px-[30px] md:py-7 md:min-h-0 md:overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           )}
         >
-          <StatTile
-            value={responses}
-            suffix={` /${players.length}`}
-            label="Responses"
-          />
-          {scored && <StatTile value={`${correctPct}%`} label="Got it right" />}
-          <StatTile value={avgTime} label="Avg. answer time" />
-        </div>
-        {question && reveal && (
-          <RevealBreakdown question={question} summary={reveal.summary} />
-        )}
-        {!showBoard && (
-          <NextButton
-            advancing={advancing}
-            onClick={() => {
-              setAdvancing(true);
-              socket.emit("host-next");
-            }}
-            label={
-              nextIsScores ? "Show scores" : nextQuestionLabel(qIndex, qCount)
-            }
-          />
-        )}
-      </section>
+          <div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className={labelClass}>Question {qIndex + 1} results</span>
+              {question && !scored && <QuestionTypePill type={question.type} />}
+            </div>
+            <h2 className="mt-2 text-lg md:text-[22px] font-bold leading-[1.3] tracking-[-0.01em] text-pretty wrap-break-word">
+              {question?.title}
+            </h2>
+          </div>
+          <div
+            className={clsx(
+              "grid gap-2 md:gap-3",
+              scored ? "grid-cols-3" : "grid-cols-2",
+            )}
+          >
+            <StatTile
+              value={responses}
+              suffix={` /${players.length}`}
+              label="Responses"
+            />
+            {scored && (
+              <StatTile value={`${correctPct}%`} label="Got it right" />
+            )}
+            <StatTile value={avgTime} label="Avg. answer time" />
+          </div>
+          {question && reveal && (
+            <RevealBreakdown question={question} summary={reveal.summary} />
+          )}
+          {!showBoard && (
+            <NextButton
+              advancing={advancing}
+              onClick={() => {
+                setAdvancing(true);
+                socket.emit("host-next");
+              }}
+              label={
+                nextIsScores ? "Show scores" : nextQuestionLabel(qIndex, qCount)
+              }
+            />
+          )}
+        </section>
       )}
 
       {showBoard && (
-      <section
-        className={clsx(
-          panelClass,
-          "flex flex-col md:min-h-0 md:overflow-hidden",
-        )}
-      >
-        <div className="flex items-center justify-between px-5 md:px-[26px] pt-5 md:pt-6 pb-3.5">
-          <h3 className="text-xl md:text-[22px] font-bold">Leaderboard</h3>
-          <span className={clsx("text-[13.5px]", mutedText)}>
-            {leaderboard.length} player{leaderboard.length === 1 ? "" : "s"}
-          </span>
-        </div>
-        <div
-          ref={listRef}
-          className="md:flex-1 md:min-h-0 md:overflow-y-auto px-3 md:px-[18px] pb-2.5 flex flex-col gap-1.5"
+        <section
+          className={clsx(
+            panelClass,
+            "flex flex-col md:min-h-0 md:overflow-hidden",
+          )}
         >
-          {rows.map((lead) => {
-            const connected = connectedById.get(lead.playerId);
-            return (
-              <div
-                key={lead.playerId}
-                data-flip-id={lead.playerId}
-                className="group relative bg-white dark:bg-dark flex items-center gap-3 md:gap-[13px] rounded-[14px] border border-transparent px-2.5 py-[9px] transition-colors hover:bg-light-bg dark:hover:bg-card-dark hover:border-lprimary/15 dark:hover:border-white/5"
-              >
-                <span
-                  className={clsx(
-                    "size-[30px] shrink-0 rounded-[9px] flex items-center justify-center text-sm font-bold transition-colors duration-500",
-                    rankBadgeClass(lead.shownRank),
-                  )}
-                >
-                  {lead.shownRank}
-                </span>
-                <span className="relative shrink-0">
-                  <Image
-                    src={lead.profilePic || DEFAULT_AVATAR}
-                    className="size-9 rounded-full object-cover"
-                    width={36}
-                    height={36}
-                    alt=""
-                  />
-                  <span
-                    title={connected ? "Connected" : "Disconnected"}
-                    className={clsx(
-                      "absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-white dark:border-dark",
-                      connected ? "bg-green-500" : "bg-gray",
-                    )}
-                  />
-                </span>
-                <span className="flex-1 min-w-0 truncate text-[15px] font-semibold">
-                  {lead.name}
-                </span>
-                {lead.delta !== undefined && (
-                  <span
-                    className={clsx(
-                      "min-w-11 text-right text-[12.5px]",
-                      lead.delta > 0
-                        ? "font-bold text-green-600 dark:text-green-500"
-                        : "font-medium text-[#8a8896] dark:text-muted-dark",
-                      settled && lead.delta > 0 && "animate-pop",
-                    )}
-                  >
-                    +{lead.delta}
-                  </span>
-                )}
-                <span className="min-w-[52px] text-right text-base font-bold tabular-nums">
-                  <AnimatedNumber value={lead.shownScore} />
-                </span>
-                <span className="flex gap-0.5 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
-                  <button
-                    type="button"
-                    aria-label={`Remove ${lead.name} from this game`}
-                    title="Kick — can rejoin with the room code"
-                    disabled={removePlayerMutation.isPending}
-                    onClick={() => handleKick(lead.playerId, lead.name)}
-                    className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
-                  >
-                    <LuX size={17} />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Ban ${lead.name} from this room`}
-                    title="Ban — blocked from rejoining this room"
-                    onClick={() =>
-                      setPlayerToBan({
-                        playerId: lead.playerId,
-                        name: lead.name,
-                      })
-                    }
-                    className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
-                  >
-                    <LuBan size={17} />
-                  </button>
-                </span>
-              </div>
-            );
-          })}
-        </div>
-        <div className="sticky bottom-12 md:static px-4 md:px-[22px] py-4 border-t border-lprimary/15 dark:border-white/10 bg-white dark:bg-dark rounded-b-3xl">
-          <button
-            type="button"
-            disabled={advancing}
-            onClick={() => {
-              setAdvancing(true);
-              socket.emit("host-next");
-            }}
-            className={clsx(primaryButtonClass, "w-full")}
+          <div className="flex items-center justify-between px-5 md:px-[26px] pt-5 md:pt-6 pb-3.5">
+            <h3 className="text-xl md:text-[22px] font-bold">Leaderboard</h3>
+            <span className={clsx("text-[13.5px]", mutedText)}>
+              {leaderboard.length} player{leaderboard.length === 1 ? "" : "s"}
+            </span>
+          </div>
+          <div
+            ref={listRef}
+            className="md:flex-1 md:min-h-0 md:overflow-y-auto px-3 md:px-[18px] pb-2.5 flex flex-col gap-1.5"
           >
-            {isLastQuestion
-              ? "Final leaderboard"
-              : `Next question · ${qIndex + 2} of ${qCount}`}
-            <LuPlay size={17} className="fill-current" />
-          </button>
-        </div>
-      </section>
+            {rows.map((lead) => {
+              const connected = connectedById.get(lead.playerId);
+              return (
+                <div
+                  key={lead.playerId}
+                  data-flip-id={lead.playerId}
+                  className="group relative bg-white dark:bg-dark flex items-center gap-3 md:gap-[13px] rounded-[14px] border border-transparent px-2.5 py-[9px] transition-colors hover:bg-light-bg dark:hover:bg-card-dark hover:border-lprimary/15 dark:hover:border-white/5"
+                >
+                  <span
+                    className={clsx(
+                      "size-[30px] shrink-0 rounded-[9px] flex items-center justify-center text-sm font-bold transition-colors duration-500",
+                      rankBadgeClass(lead.shownRank),
+                    )}
+                  >
+                    {lead.shownRank}
+                  </span>
+                  <span className="relative shrink-0">
+                    <Image
+                      src={lead.profilePic || DEFAULT_AVATAR}
+                      className="size-9 rounded-full object-cover"
+                      width={36}
+                      height={36}
+                      alt=""
+                    />
+                    <span
+                      title={connected ? "Connected" : "Disconnected"}
+                      className={clsx(
+                        "absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-white dark:border-dark",
+                        connected ? "bg-green-500" : "bg-gray",
+                      )}
+                    />
+                  </span>
+                  <span className="flex-1 min-w-0 truncate text-[15px] font-semibold">
+                    {lead.name}
+                  </span>
+                  {lead.delta !== undefined && (
+                    <span
+                      className={clsx(
+                        "min-w-11 text-right text-[12.5px]",
+                        lead.delta > 0
+                          ? "font-bold text-green-600 dark:text-green-500"
+                          : "font-medium text-[#8a8896] dark:text-muted-dark",
+                        settled && lead.delta > 0 && "animate-pop",
+                      )}
+                    >
+                      +{lead.delta}
+                    </span>
+                  )}
+                  <span className="min-w-[52px] text-right text-base font-bold tabular-nums">
+                    <AnimatedNumber value={lead.shownScore} />
+                  </span>
+                  <span className="flex gap-0.5 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      aria-label={`Remove ${lead.name} from this game`}
+                      title="Kick — can rejoin with the room code"
+                      disabled={removePlayerMutation.isPending}
+                      onClick={() => handleKick(lead.playerId, lead.name)}
+                      className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
+                    >
+                      <LuX size={17} />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Ban ${lead.name} from this room`}
+                      title="Ban — blocked from rejoining this room"
+                      onClick={() =>
+                        setPlayerToBan({
+                          playerId: lead.playerId,
+                          name: lead.name,
+                        })
+                      }
+                      className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
+                    >
+                      <LuBan size={17} />
+                    </button>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="sticky bottom-12 md:static px-4 md:px-[22px] py-4 border-t border-lprimary/15 dark:border-white/10 bg-white dark:bg-dark rounded-b-3xl">
+            <button
+              type="button"
+              disabled={advancing}
+              onClick={() => {
+                setAdvancing(true);
+                socket.emit("host-next");
+              }}
+              className={clsx(primaryButtonClass, "w-full")}
+            >
+              {isLastQuestion
+                ? "Final leaderboard"
+                : `Next question · ${qIndex + 2} of ${qCount}`}
+              <LuPlay size={17} className="fill-current" />
+            </button>
+          </div>
+        </section>
       )}
 
       <ConfirmationModal

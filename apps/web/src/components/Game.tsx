@@ -80,7 +80,9 @@ const Game = ({ onStats }: { onStats?: (stats: BubbleStats) => void }) => {
   const [misses, setMisses] = useState(0);
   const missesRef = useRef(0);
   const onStatsRef = useRef(onStats);
-  onStatsRef.current = onStats;
+  useEffect(() => {
+    onStatsRef.current = onStats;
+  });
 
   // Report the running totals once a second (the host's lobby shows them).
   useEffect(() => {

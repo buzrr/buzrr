@@ -14,11 +14,22 @@ import type { QuizDetail } from "@/lib/modules/quizzes/api";
 type SubKey = Exclude<keyof ModerationSettings, "enabled">;
 
 const SUB_OPTIONS: { key: SubKey; label: string; parent?: SubKey }[] = [
-  { key: "confirmNextQuestion", label: "Get-ready slide before each question (host starts it)" },
+  {
+    key: "confirmNextQuestion",
+    label: "Get-ready slide before each question (host starts it)",
+  },
   { key: "showAnswer", label: "Show answer" },
-  { key: "confirmShowAnswer", label: "Confirm show answer", parent: "showAnswer" },
+  {
+    key: "confirmShowAnswer",
+    label: "Confirm show answer",
+    parent: "showAnswer",
+  },
   { key: "showScores", label: "Show scores after every question" },
-  { key: "confirmShowScores", label: "Confirm show scores", parent: "showScores" },
+  {
+    key: "confirmShowScores",
+    label: "Confirm show scores",
+    parent: "showScores",
+  },
 ];
 
 /**
@@ -51,7 +62,10 @@ export default function ModerationSettingsCard({ quiz }: { quiz: QuizDetail }) {
           disabled={updateQuiz.isPending}
           onCheckedChange={(checked) =>
             updateQuiz.mutate(
-              { quizId: quiz.id, settings: { ...settings, reactions: checked } },
+              {
+                quizId: quiz.id,
+                settings: { ...settings, reactions: checked },
+              },
               { onError: (err) => toast.error(getApiErrorMessage(err)) },
             )
           }

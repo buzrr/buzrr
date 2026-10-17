@@ -58,7 +58,12 @@ function Slide({
           {title}
         </h1>
         {subtitle && (
-          <p className={clsx("relative text-base md:text-lg font-medium", mutedText)}>
+          <p
+            className={clsx(
+              "relative text-base md:text-lg font-medium",
+              mutedText,
+            )}
+          >
             {subtitle}
           </p>
         )}
@@ -94,7 +99,9 @@ export function ReadySlide({ onNext }: { onNext?: () => void }) {
       badge={`Question ${qIndex + 1} of ${qCount}`}
       title="Get ready!"
       subtitle={
-        qIndex === 0 ? "The quiz is about to begin" : "The next question is coming up"
+        qIndex === 0
+          ? "The quiz is about to begin"
+          : "The next question is coming up"
       }
       onNext={onNext}
       nextLabel="Start question"
@@ -162,7 +169,9 @@ export function PlayerScores({ playerId }: { playerId: string }) {
                 height={32}
                 className="rounded-full shrink-0"
               />
-              <span className="flex-1 min-w-0 truncate font-semibold">{e.name}</span>
+              <span className="flex-1 min-w-0 truncate font-semibold">
+                {e.name}
+              </span>
               {e.delta ? (
                 <span className="text-sm font-bold text-green-600 dark:text-green-400">
                   +{e.delta}

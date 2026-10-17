@@ -136,10 +136,7 @@ function optionsFor(type: QuestionType, from: AuthoredOption[]) {
   const titles = kept.map((o) => o.title);
   if (type === "multiple_choice") {
     // Single choice is the default: one correct option, A until picked.
-    const n = Math.min(
-      MAX_OPTIONS,
-      Math.max(MCQ_OPTIONS, titles.length),
-    );
+    const n = Math.min(MAX_OPTIONS, Math.max(MCQ_OPTIONS, titles.length));
     return singleCorrect(
       blankOptions(n).map((o, i) => ({
         title: titles[i] ?? "",
@@ -857,7 +854,9 @@ const AddQuesForm = (props: {
                                     const rest = opts.filter((_, j) => j !== i);
                                     // Single choice must keep one correct option.
                                     field.onChange(
-                                      !isPoll && !multi ? singleCorrect(rest) : rest,
+                                      !isPoll && !multi
+                                        ? singleCorrect(rest)
+                                        : rest,
                                     );
                                   }}
                                   className="shrink-0 text-[#8a8896] dark:text-muted-dark hover:text-[#e5544e] cursor-pointer"

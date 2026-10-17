@@ -92,7 +92,9 @@ export default function AdminsListClient() {
         containerClassName="max-w-md mt-6"
       />
       <p className="mt-1 text-xs text-off-dark dark:text-off-white">
-        {search ? "Showing search results across all users." : "Showing all users."}
+        {search
+          ? "Showing search results across all users."
+          : "Showing all users."}
       </p>
 
       {query.isPending ? (
@@ -135,8 +137,7 @@ export default function AdminsListClient() {
                     pending={
                       (promote.isPending &&
                         promote.variables?.userId === item.id) ||
-                      (demote.isPending &&
-                        demote.variables?.userId === item.id)
+                      (demote.isPending && demote.variables?.userId === item.id)
                     }
                     onPromote={() => handlePromote(item.id)}
                     onDemote={() => handleDemote(item.id)}
@@ -198,7 +199,12 @@ function AdminRow({
           </Button>
         )}
         {item.role === "admin" && (
-          <Button size="sm" variant="outline" disabled={pending} onClick={onDemote}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={pending}
+            onClick={onDemote}
+          >
             Demote to user
           </Button>
         )}
@@ -312,13 +318,20 @@ function ResetPasswordModal({
   }
 
   return (
-    <Modal open={user !== null} onClose={close} aria-labelledby="reset-pw-title">
+    <Modal
+      open={user !== null}
+      onClose={close}
+      aria-labelledby="reset-pw-title"
+    >
       <Box
         sx={modalStyle}
         className="bg-light-bg dark:bg-dark-bg rounded-2xl w-[90vw] max-w-[430px] p-6"
       >
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
-          <h2 id="reset-pw-title" className="text-lg font-black text-dark dark:text-white">
+          <h2
+            id="reset-pw-title"
+            className="text-lg font-black text-dark dark:text-white"
+          >
             Reset password
           </h2>
           <p className="text-sm text-dark/80 dark:text-gray">

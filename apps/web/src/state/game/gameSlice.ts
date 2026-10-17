@@ -177,7 +177,13 @@ const gameSlice = createSlice({
     /** Moderated games: ready / starting / closed / scores. */
     phaseChange: (state, action: PayloadAction<PhaseChangePayload>) => {
       const p = action.payload;
-      if (gameProgress(p.phase, p.qIndex) < gameProgress(state.phase === "idle" ? "lobby" : state.phase, state.qIndex)) {
+      if (
+        gameProgress(p.phase, p.qIndex) <
+        gameProgress(
+          state.phase === "idle" ? "lobby" : state.phase,
+          state.qIndex,
+        )
+      ) {
         return;
       }
       state.phase = p.phase;

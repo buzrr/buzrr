@@ -308,7 +308,10 @@ function enterReady(state: GameState, index: number): Transition {
       {
         kind: "emit",
         to: ROOM,
-        message: { event: "phase-change", payload: { phase: "ready", qIndex: index } },
+        message: {
+          event: "phase-change",
+          payload: { phase: "ready", qIndex: index },
+        },
       },
     ],
   };

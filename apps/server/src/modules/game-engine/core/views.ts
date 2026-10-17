@@ -205,14 +205,14 @@ export function buildSnapshot(
     // answer (or the scores) are shown.
     const masked = meta.phase === "question" || meta.phase === "closed";
     payload.you = masked
-        ? {
-            ...you,
-            isCorrect: false,
-            score: 0,
-            totalScore: you.totalScore - you.score,
-            rank: null,
-          }
-        : you;
+      ? {
+          ...you,
+          isCorrect: false,
+          score: 0,
+          totalScore: you.totalScore - you.score,
+          rank: null,
+        }
+      : you;
   }
   return payload;
 }

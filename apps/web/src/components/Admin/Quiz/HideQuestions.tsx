@@ -8,7 +8,11 @@ import {
 import { Switch } from "@/components/ui/Switch";
 
 /** `defaultHidden`: initial state on mount (shown when there's nothing to hide). */
-const HideQuestions = ({ defaultHidden = true }: { defaultHidden?: boolean }) => {
+const HideQuestions = ({
+  defaultHidden = true,
+}: {
+  defaultHidden?: boolean;
+}) => {
   const dispatch = useAppDispatch();
 
   const visibility = useAppSelector((state) => state.hideQuestions.visibility);

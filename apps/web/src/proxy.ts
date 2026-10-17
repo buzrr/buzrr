@@ -18,7 +18,9 @@ const PUBLIC_SITE_ROUTES = [
 ];
 
 const matches = (pathname: string, routes: string[]) =>
-  routes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+  routes.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  );
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

@@ -52,7 +52,9 @@ export default function GetReady({ title }: { title?: string }) {
         <div className="relative min-h-6 flex items-center justify-center">
           {counting ? (
             <p className={clsx("text-base md:text-lg font-medium", mutedText)}>
-              {qIndex > 0 ? `Question ${qIndex + 1} coming up` : "First question coming up"}
+              {qIndex > 0
+                ? `Question ${qIndex + 1} coming up`
+                : "First question coming up"}
             </p>
           ) : (
             <WaitingDots>Waiting for the question</WaitingDots>
