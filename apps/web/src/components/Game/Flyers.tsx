@@ -14,6 +14,7 @@ import { LuPlus } from "react-icons/lu";
 import { toast } from "react-toastify";
 import modalStyle from "@/utils/modalStyle";
 import type { GameSocket } from "@/types/socket";
+import { REACTIONS_PER_WINDOW, REACTION_WINDOW_MS } from "@buzrr/contract";
 import { useT } from "@/lib/i18n/context";
 import {
   BASE_REACTION_EMOJIS,
@@ -249,7 +250,34 @@ export function ReactionBar({
   // localStorage isn't readable during SSR; pick up the saved set on mount.
   useEffect(() => setCustom(loadCustomReactions()), []);
 
+  // Same limit as the server: REACTIONS_PER_WINDOW per REACTION_WINDOW_MS,
+  // then the buttons rest until the oldest tap drops out of the window.
+  const taps = useRef<number[]>([]);
+  const [blockedUntil, setBlockedUntil] = useState(0);
+  // Seconds left of the pause (updated by a timer, not read during render).
+  const [blockedFor, setBlockedFor] = useState(0);
+  useEffect(() => {
+    if (!blockedUntil) return;
+    const tick = () => {
+      const left = Math.ceil((blockedUntil - Date.now()) / 1000);
+      if (left <= 0) {
+        setBlockedUntil(0);
+        setBlockedFor(0);
+      } else setBlockedFor(left);
+    };
+    tick();
+    const tm = setInterval(tick, 500);
+    return () => clearInterval(tm);
+  }, [blockedUntil]);
+
   const send = (emoji: string, el: HTMLElement) => {
+    const now = Date.now();
+    taps.current = taps.current.filter((at) => now - at < REACTION_WINDOW_MS);
+    if (taps.current.length >= REACTIONS_PER_WINDOW) return;
+    taps.current.push(now);
+    if (taps.current.length >= REACTIONS_PER_WINDOW) {
+      setBlockedUntil(taps.current[0]! + REACTION_WINDOW_MS);
+    }
     if (socket?.connected) socket.emit("reaction", { emoji });
     const r = el.getBoundingClientRect();
     spawn({
@@ -275,6 +303,7 @@ export function ReactionBar({
           inline
             ? "mx-auto mt-2 w-fit max-w-full flex-row flex-wrap justify-center"
             : "fixed z-40 shadow-lg backdrop-blur flex-row bottom-14 left-1/2 -translate-x-1/2 md:flex-col md:left-auto md:translate-x-0 md:right-2 md:bottom-14",
+          blockedFor > 0 && "opacity-45 pointer-events-none",
         )}
       >
         {BASE_REACTION_EMOJIS.map((emoji) => (
@@ -304,6 +333,16 @@ export function ReactionBar({
           </button>
         )}
       </div>
+      {blockedFor > 0 && (
+        <p
+          className={clsx(
+            "text-center text-xs font-medium text-off-dark dark:text-muted-dark",
+            !inline && "fixed z-40 bottom-[7.5rem] left-1/2 -translate-x-1/2",
+          )}
+        >
+          {t("Reactions again in {s} s", { s: blockedFor })}
+        </p>
+      )}
       <EmojiPicker
         open={editing !== null}
         current={typeof editing === "number" ? custom[editing] : undefined}

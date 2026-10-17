@@ -1,6 +1,8 @@
 import { signAssetsDeep } from "../../common/storage/asset-signing";
 import {
   HEARTBEAT_TIMEOUT_MS,
+  REACTIONS_PER_WINDOW,
+  REACTION_WINDOW_MS,
   bubbleStatsSchema,
   duelQueueSchema,
   preloadStatusSchema,
@@ -32,6 +34,8 @@ type DuelInviteAck = (result: DuelInviteAcceptAck) => void;
 
 /** How often a player socket's heartbeat is checked. */
 const HEARTBEAT_CHECK_MS = 5_000;
+/** Above this many reactions a second in a room, one per player and second. */
+const ROOM_REACTIONS_PER_S = 40;
 /** A disconnected lobby player keeps their place at least this long. */
 const REJOIN_GRACE_MS = 10_000;
 
@@ -366,6 +370,35 @@ export class RealtimeGateway
     }
   }
 
+  /** Per room, the current second's reactions: count and who sent one. */
+  private readonly reactionSeconds = new Map<
+    string,
+    { second: number; count: number; senders: Set<string> }
+  >();
+
+  /**
+   * Room-wide flood control for reactions: below ROOM_REACTIONS_PER_S per
+   * second everything passes; above, a player's first reaction of the second
+   * still does, any further one is dropped.
+   */
+  private roomAdmitsReaction(
+    gameCode: string,
+    playerId: string,
+    now: number,
+  ): boolean {
+    const second = Math.floor(now / 1000);
+    let cur = this.reactionSeconds.get(gameCode);
+    if (!cur || cur.second !== second) {
+      cur = { second, count: 0, senders: new Set() };
+      this.reactionSeconds.set(gameCode, cur);
+    }
+    const first = !cur.senders.has(playerId);
+    if (cur.count >= ROOM_REACTIONS_PER_S && !first) return false;
+    cur.count++;
+    cur.senders.add(playerId);
+    return true;
+  }
+
   /**
    * Players' devices beat every `HEARTBEAT_INTERVAL_MS`. A socket that has
    * beaten once and then misses three beats (`HEARTBEAT_TIMEOUT_MS`) is
@@ -477,27 +510,26 @@ export class RealtimeGateway
     if (socket.data.playerId) {
       this.registerPreloadStatus(socket, gameCode, socket.data.playerId);
     }
-    // Lobby bubble game: relayed to the host as-is, nothing is stored. At most
-    // one update per ~800ms per socket gets through.
+    // Lobby bubble game: relayed to the host as-is, nothing is stored. A
+    // socket's update gets through at most every ~800 ms — less often in big
+    // rooms (8 ms per player: 500 players → every 4 s), so the host screen
+    // isn't flooded.
     let lastBubbleStats = 0;
-    // Live reactions: one event per tap, relayed to the host. A token bucket
-    // lets a burst of taps through (10 quick hearts = 10 hearts) but caps a
-    // flood at ~8 per second.
-    let reactionTokens = 12;
-    let reactionRefill = Date.now();
+    // Live reactions: at most REACTIONS_PER_WINDOW per player within
+    // REACTION_WINDOW_MS, then blocked until the window moves on. When the
+    // whole room floods (over ROOM_REACTIONS_PER_S in a second), only each
+    // player's first reaction of that second goes through.
+    const sent: number[] = [];
     socket.on("reaction", (payload) => {
       const playerId = socket.data.playerId;
       if (!playerId) return;
       const now = Date.now();
-      reactionTokens = Math.min(
-        12,
-        reactionTokens + ((now - reactionRefill) / 1000) * 8,
-      );
-      reactionRefill = now;
-      if (reactionTokens < 1) return;
+      while (sent.length && now - sent[0]! >= REACTION_WINDOW_MS) sent.shift();
+      if (sent.length >= REACTIONS_PER_WINDOW) return;
       const parsed = reactionSchema.safeParse(payload);
       if (!parsed.success) return;
-      reactionTokens -= 1;
+      if (!this.roomAdmitsReaction(gameCode, playerId, now)) return;
+      sent.push(now);
       this.server
         .to(`host:${gameCode}`)
         .emit("reaction", { playerId, emoji: parsed.data.emoji });
@@ -506,7 +538,10 @@ export class RealtimeGateway
     socket.on("bubble-stats", (payload) => {
       const playerId = socket.data.playerId;
       const now = Date.now();
-      if (!playerId || now - lastBubbleStats < 800) return;
+      const roomSize =
+        this.server.sockets.adapter.rooms.get(gameCode)?.size ?? 1;
+      const every = Math.max(800, roomSize * 8);
+      if (!playerId || now - lastBubbleStats < every) return;
       const parsed = bubbleStatsSchema.safeParse(payload);
       if (!parsed.success) return;
       lastBubbleStats = now;

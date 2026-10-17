@@ -193,6 +193,10 @@ export const reactionSchema = z.object({
     .regex(/^[\p{Extended_Pictographic}\p{Emoji_Component}\u200d\ufe0f]+$/u)
     .refine((s) => /\p{Extended_Pictographic}/u.test(s), "Not an emoji"),
 });
+/** A player may send this many reactions within REACTION_WINDOW_MS, then waits. */
+export const REACTIONS_PER_WINDOW = 5;
+export const REACTION_WINDOW_MS = 20_000;
+
 export const playerReactionSchema = reactionSchema.extend({
   playerId: z.string(),
 });

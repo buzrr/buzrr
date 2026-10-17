@@ -23,6 +23,17 @@ const playerSlice = createSlice({
       if (i === -1) state.players.push(action.payload);
       else state.players[i] = action.payload;
     },
+    /** Many joins at once, applied in one go. */
+    addPlayers: (state, action: PayloadAction<PlayerPayload[]>) => {
+      const index = new Map(state.players.map((p, i) => [p.id, i]));
+      for (const p of action.payload) {
+        const i = index.get(p.id);
+        if (i === undefined) {
+          index.set(p.id, state.players.length);
+          state.players.push(p);
+        } else state.players[i] = p;
+      }
+    },
     removePlayer: (state, action: PayloadAction<{ id: string }>) => {
       state.players = state.players.filter(
         (player) => player.id !== action.payload.id,
@@ -34,6 +45,7 @@ const playerSlice = createSlice({
   },
 });
 
-export const { addPlayer, removePlayer, setPlayers } = playerSlice.actions;
+export const { addPlayer, addPlayers, removePlayer, setPlayers } =
+  playerSlice.actions;
 
 export default playerSlice.reducer;

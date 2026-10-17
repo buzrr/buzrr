@@ -105,23 +105,34 @@ const Lobby = (params: {
   const [lastReaction, setLastReaction] = useState<
     Record<string, { emoji: string; at: number; bumpAt: number }>
   >({});
+  // Busy rooms send many of these: they are collected and applied together
+  // (one render per FLUSH_MS, not one per event).
   useEffect(() => {
     if (!socket) return;
-    const onReaction = (r: { playerId: string; emoji: string }) =>
+    let pending: { playerId: string; emoji: string; at: number }[] = [];
+    const onReaction = (r: { playerId: string; emoji: string }) => {
+      pending.push({ ...r, at: Date.now() });
+    };
+    const flush = setInterval(() => {
+      if (pending.length === 0) return;
+      const batch = pending;
+      pending = [];
       setLastReaction((prev) => {
-        const now = Date.now();
-        const before = prev[r.playerId]?.bumpAt ?? 0;
-        return {
-          ...prev,
-          [r.playerId]: {
+        const next = { ...prev };
+        for (const r of batch) {
+          const before = next[r.playerId]?.bumpAt ?? 0;
+          next[r.playerId] = {
             emoji: r.emoji,
-            at: now,
-            bumpAt: now - before >= BUMP_EVERY_MS ? now : before,
-          },
-        };
+            at: r.at,
+            bumpAt: r.at - before >= BUMP_EVERY_MS ? r.at : before,
+          };
+        }
+        return next;
       });
+    }, FLUSH_MS);
     socket.on("reaction", onReaction);
     return () => {
+      clearInterval(flush);
       socket.off("reaction", onReaction);
     };
   }, [socket]);
@@ -130,11 +141,26 @@ const Lobby = (params: {
   // sees the lobby is live.
   const { spawn: spawnBubble, layer: bubbleLayer } = useFlyers();
   const lastHits = useRef<Record<string, number>>({});
+  // Big rooms show less: no bubbles rising out of each card, no reorder
+  // animation, plain numbers.
+  const playerCount = useRef(0);
+  useEffect(() => {
+    playerCount.current = players.length;
+  });
   useEffect(() => {
     if (!socket) return;
+    let pending: Record<string, { hits: number; misses: number }> = {};
+    const flush = setInterval(() => {
+      const batch = pending;
+      if (Object.keys(batch).length === 0) return;
+      pending = {};
+      setBubbles((prev) => ({ ...prev, ...batch }));
+    }, FLUSH_MS * 2);
     const onStats = (s: { playerId: string; hits: number; misses: number }) => {
       const before = lastHits.current[s.playerId] ?? s.hits;
       lastHits.current[s.playerId] = s.hits;
+      pending[s.playerId] = { hits: s.hits, misses: s.misses };
+      if (playerCount.current > FLYER_PLAYER_LIMIT) return;
       const card = document.querySelector<HTMLElement>(
         `[data-player-card="${CSS.escape(s.playerId)}"]`,
       );
@@ -157,13 +183,10 @@ const Lobby = (params: {
           );
         }
       }
-      setBubbles((prev) => ({
-        ...prev,
-        [s.playerId]: { hits: s.hits, misses: s.misses },
-      }));
     };
     socket.on("bubble-stats", onStats);
     return () => {
+      clearInterval(flush);
       socket.off("bubble-stats", onStats);
     };
   }, [socket, spawnBubble]);
@@ -284,7 +307,8 @@ const Lobby = (params: {
   const byId = new Map(sortedPlayers.map((p) => [p.id, p]));
   const visiblePlayers = ids.map((id) => byId.get(id)!);
   const listRef = useRef<HTMLDivElement>(null);
-  useFlip2d(listRef, visiblePlayers.map((p) => p.id).join());
+  const crowded = players.length > CROWD_LIMIT;
+  useFlip2d(listRef, crowded ? "" : visiblePlayers.map((p) => p.id).join());
 
   useEffect(() => {
     setCanShare(typeof navigator.share === "function");
@@ -514,7 +538,7 @@ const Lobby = (params: {
                     </span>
                     {/* Always one line, so the card's height never changes. */}
                     {bubbles[player.id] ? (
-                      <BubbleLine stats={bubbles[player.id]!} />
+                      <BubbleLine stats={bubbles[player.id]!} plain={crowded} />
                     ) : (
                       <span className="text-xs">&nbsp;</span>
                     )}
@@ -616,6 +640,12 @@ const Lobby = (params: {
 };
 
 const REACTION_SHOW_MS = 5000;
+/** Busy-room events (reactions, bubble stats) are applied this often. */
+const FLUSH_MS = 500;
+/** Above this many players no bubbles rise out of the cards. */
+const FLYER_PLAYER_LIMIT = 60;
+/** Above this many players: no reorder animation, plain numbers. */
+const CROWD_LIMIT = 120;
 /** The waiting list re-sorts (bubble score, reactions) at most this often. */
 const REORDER_EVERY_MS = 5000;
 /** A player's reactions move them to the top of the list at most this often. */
@@ -671,11 +701,18 @@ function useFlip2d(
 }
 
 /** "🫧 12 · 80% hits" — the tally ticks up as the server relays new totals. */
-function BubbleLine({ stats }: { stats: { hits: number; misses: number } }) {
+function BubbleLine({
+  stats,
+  plain = false,
+}: {
+  stats: { hits: number; misses: number };
+  /** No count-up animation (big rooms). */
+  plain?: boolean;
+}) {
   const total = stats.hits + stats.misses;
   return (
     <span className="text-xs text-off-dark dark:text-muted-dark tabular-nums">
-      🫧 <AnimatedNumber value={stats.hits} />
+      🫧 {plain ? stats.hits : <AnimatedNumber value={stats.hits} />}
       {total > 0 &&
         ` · ${tx("{n}% hits", { n: Math.round((stats.hits / total) * 100) })}`}
     </span>

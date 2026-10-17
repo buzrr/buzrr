@@ -939,4 +939,5 @@ export const DE: Record<string, string> = {
   "Show the answer on click (first how the room voted)":
     "Auflösung nach Klick (erst die Abstimmung zeigen)",
   "Show the scores on click": "Punkte nach Klick",
+  "Reactions again in {s} s": "Reaktionen wieder in {s} s",
 };

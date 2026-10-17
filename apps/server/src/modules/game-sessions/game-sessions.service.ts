@@ -73,22 +73,31 @@ export class GameSessionsService {
         "The host has banned you from this room. You can still join other rooms.",
       );
     }
-    // Serializable so concurrent joins can't both pass the count and
-    // overshoot the cap. A crowd joining at once (a QR code on the screen)
-    // makes Postgres abort some of them with a serialization conflict
-    // (P2034): those retry after a short random pause instead of failing.
+    // The cap follows the host's plan at join time (a host downgrading
+    // mid-game never evicts anyone already in the room); worked out — like the
+    // avatar — before the lock, so the locked part stays short.
+    const rejoin = player.gameId === game.id;
+    const limit = rejoin
+      ? 0
+      : await this.entitlements.maxPlayersFor(game.creatorId);
+    const { avatars } = resolveGameLook(game.quiz, game.quiz.user?.preferences);
+    const profilePic = avatars.includes(player.profilePic ?? "")
+      ? undefined
+      : assignAvatar(avatars, playerId);
+
+    // Concurrent joins must not both pass the count and overshoot the cap:
+    // each join locks the room's row first (SELECT … FOR UPDATE), so joins to
+    // one room queue up for a few milliseconds instead of conflicting. (Under
+    // SERIALIZABLE a crowd joining at once — a QR code on the screen — kept
+    // aborting each other and piled up retries on the connection pool.) The
+    // retry below stays for the odd deadlock.
     for (let attempt = 1; ; attempt++) {
       try {
         await this.prisma.db.$transaction(
           async (tx) => {
-            // Re-joining the same room (e.g. after a refresh) must never hit the cap.
-            if (player.gameId !== game.id) {
-              // The cap follows the host's plan at join time; a host downgrading
-              // mid-game never evicts anyone already in the room.
-              const limit = await this.entitlements.maxPlayersFor(
-                game.creatorId,
-                tx,
-              );
+            await tx.$queryRaw`SELECT id FROM "GameSession" WHERE id = ${game.id} FOR UPDATE`;
+            // Re-joining the same room (e.g. after a refresh) never hits the cap.
+            if (!rejoin) {
               const playerCount = await tx.player.count({
                 where: { gameId: game.id },
               });
@@ -98,20 +107,17 @@ export class GameSessionsService {
                 );
               }
             }
-            // A picture from this room's avatar skin (kept when it already is).
-            const { avatars } = resolveGameLook(
-              game.quiz,
-              game.quiz.user?.preferences,
-            );
-            const profilePic = avatars.includes(player.profilePic ?? "")
-              ? undefined
-              : assignAvatar(avatars, playerId);
             await tx.player.update({
               where: { id: playerId },
               data: { gameId: game.id, ...(profilePic ? { profilePic } : {}) },
             });
           },
-          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+          {
+            isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+            // A crowd queues on the room's lock and for pool connections.
+            maxWait: 20_000,
+            timeout: 20_000,
+          },
         );
         break;
       } catch (err) {
