@@ -177,7 +177,14 @@ const gameSlice = createSlice({
       // none yet on the first question.
       if (s.you && (s.phase === "reveal" || s.phase === "final")) {
         state.standing = nextStanding(state.standing, s.qIndex, s.you);
-      } else if (s.you && s.phase === "question" && s.qIndex > 0) {
+      } else if (
+        s.you &&
+        s.phase === "question" &&
+        s.qIndex > 0 &&
+        // `answer-result` lands just ahead of the reveal, so a late snapshot
+        // of the same question must not roll that standing back.
+        (state.standing?.qIndex ?? -1) <= s.qIndex - 1
+      ) {
         state.standing = nextStanding(state.standing, s.qIndex - 1, s.you);
       }
     },

@@ -4,19 +4,21 @@
 --
 -- Deploy the code first: it reads both shapes, so this can run any time after.
 --
--- * Rows with exactly one correct option titled True or False get the key.
---   Anything else was already unplayable and is left as it was.
+-- * Rows whose options are exactly a "True" and a "False", one of them
+--   correct, get the key. Anything else is left as it was, options intact.
 -- * Then the Option rows of every converted question are dropped.
 
 UPDATE "Question" q
 SET "config" = q."config" || jsonb_build_object('answer', c."isTrue")
 FROM (
-  SELECT o."questionId", bool_and(lower(trim(o."title")) = 'true') AS "isTrue"
+  SELECT o."questionId",
+    bool_or(o."isCorrect" AND lower(trim(o."title")) = 'true') AS "isTrue"
   FROM "Option" o
-  WHERE o."isCorrect"
-    AND lower(trim(o."title")) IN ('true', 'false')
   GROUP BY o."questionId"
-  HAVING count(*) = 1
+  HAVING count(*) = 2
+    AND count(*) FILTER (WHERE o."isCorrect") = 1
+    AND bool_and(lower(trim(o."title")) IN ('true', 'false'))
+    AND count(DISTINCT lower(trim(o."title"))) = 2
 ) c
 WHERE q."id" = c."questionId"
   AND q."type" = 'true_false'

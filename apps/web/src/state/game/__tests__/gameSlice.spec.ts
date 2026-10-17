@@ -259,6 +259,15 @@ describe("standing", () => {
     expect(s.standing).toMatchObject({ rank: 2, previousRank: 4 });
   });
 
+  it("keeps a fresh result over a late snapshot of the same question", () => {
+    let s = reducer(onQuestion(1), answerResult(result(2, 1400)));
+    s = reducer(
+      s,
+      applySync(sync({ phase: "question", qIndex: 1, you: result(5, 300) })),
+    );
+    expect(s.standing).toMatchObject({ qIndex: 1, rank: 2 });
+  });
+
   it("takes the last reveal's standing from a mid-question sync", () => {
     const s = reducer(
       fresh(),

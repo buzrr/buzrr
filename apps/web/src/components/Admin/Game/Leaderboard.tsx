@@ -132,7 +132,9 @@ export default function LeaderBoard({
   // Ranks are shared by equal scores, so a step can hold several players.
   const onPlace = (place: number) =>
     leaderboard.filter((entry) => entry.rank === place);
-  const rest = leaderboard.filter((entry) => entry.rank > 3);
+  // A shared step names only some of its players ("Ana +2"), so the full
+  // list keeps everyone.
+  const rest = leaderboard;
 
   return (
     <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-2 gap-3.5 md:gap-5 md:pb-[18px]">
@@ -210,9 +212,7 @@ export default function LeaderBoard({
           ))}
           {rest.length === 0 && (
             <p className={clsx("text-center text-sm py-10", mutedText)}>
-              {leaderboard.length === 0
-                ? "No players finished this quiz."
-                : "Everyone made the podium!"}
+              No players finished this quiz.
             </p>
           )}
         </div>
