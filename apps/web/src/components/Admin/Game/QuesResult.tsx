@@ -29,6 +29,11 @@ import {
 } from "@/components/Game/GameUI";
 import { AnimatedNumber, useFlipReorder } from "@/components/Game/motion";
 import type { LeaderboardEntry } from "@buzrr/contract";
+import {
+  leaderboardWithReveal,
+  nextQuestionLabel,
+  scoresStepPending,
+} from "@/lib/moderation";
 import type { GameSocket } from "@/types/socket";
 
 /** Hold the old standings until the answer bars have mostly filled. */
@@ -81,6 +86,12 @@ export default function QuesResult(props: QuesResultProps) {
   const players = useAppSelector((state) => state.game.players);
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const qCount = useAppSelector((state) => state.game.qCount);
+  const phase = useAppSelector((state) => state.game.phase);
+  const moderation = useAppSelector((state) => state.game.moderation);
+  // Moderated: the answer and the standings can be separate steps.
+  const showAnswerPanel = phase !== "scores" || reveal !== null;
+  const showBoard = phase === "scores" || leaderboardWithReveal(moderation);
+  const nextIsScores = phase === "reveal" && scoresStepPending(moderation);
   const [advancing, setAdvancing] = useState(false);
   const [playerToBan, setPlayerToBan] = useState<{
     playerId: string;
@@ -158,7 +169,13 @@ export default function QuesResult(props: QuesResultProps) {
   }
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-2 gap-3.5 md:gap-5 md:pb-[18px]">
+    <div
+      className={clsx(
+        "flex-1 min-h-0 flex flex-col md:grid gap-3.5 md:gap-5 md:pb-[18px]",
+        showAnswerPanel && showBoard ? "md:grid-cols-2" : "md:grid-cols-1",
+      )}
+    >
+      {showAnswerPanel && (
       <section
         className={clsx(
           panelClass,
@@ -191,8 +208,22 @@ export default function QuesResult(props: QuesResultProps) {
         {question && reveal && (
           <RevealBreakdown question={question} summary={reveal.summary} />
         )}
+        {!showBoard && (
+          <NextButton
+            advancing={advancing}
+            onClick={() => {
+              setAdvancing(true);
+              socket.emit("host-next");
+            }}
+            label={
+              nextIsScores ? "Show scores" : nextQuestionLabel(qIndex, qCount)
+            }
+          />
+        )}
       </section>
+      )}
 
+      {showBoard && (
       <section
         className={clsx(
           panelClass,
@@ -307,6 +338,7 @@ export default function QuesResult(props: QuesResultProps) {
           </button>
         </div>
       </section>
+      )}
 
       <ConfirmationModal
         open={playerToBan !== null}
@@ -320,5 +352,28 @@ export default function QuesResult(props: QuesResultProps) {
         confirmingLabel="Banning…"
       />
     </div>
+  );
+}
+
+/** "Next" for the answer panel when the leaderboard (and its button) is hidden. */
+function NextButton({
+  advancing,
+  onClick,
+  label,
+}: {
+  advancing: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={advancing}
+      onClick={onClick}
+      className={clsx(primaryButtonClass, "w-full mt-auto")}
+    >
+      {label}
+      <LuPlay size={17} className="fill-current" />
+    </button>
   );
 }

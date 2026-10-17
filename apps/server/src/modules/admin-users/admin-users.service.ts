@@ -9,9 +9,8 @@ export class AdminUsersService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * With `search`, matches across all users (so a superadmin can find anyone
-   * to promote). Without it, defaults to the current admins/superadmins
-   * (the "who's an admin" view for demoting).
+   * All users (the superadmin's user management list), optionally filtered by
+   * `search` on name or email. The internal system user is left out.
    */
   async list(params: { search?: string; cursor?: string; limit?: number }) {
     const limit = params.limit ?? DEFAULT_LIMIT;
@@ -22,10 +21,10 @@ export class AdminUsersService {
             { email: { contains: params.search, mode: "insensitive" } },
           ],
         }
-      : { role: { in: ["admin", "superadmin"] } };
+      : {};
 
     const rows = await this.prisma.db.user.findMany({
-      where,
+      where: { AND: [where, { email: { not: "system@buzrr.local" } }] },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       take: limit + 1,
       ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),

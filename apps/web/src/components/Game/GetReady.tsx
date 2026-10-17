@@ -14,6 +14,7 @@ export default function GetReady({ title }: { title?: string }) {
   const phase = useAppSelector((state) => state.game.phase);
   const deadline = useAppSelector((state) => state.game.deadline);
   const countdownMs = useAppSelector((state) => state.game.countdownMs);
+  const qIndex = useAppSelector((state) => state.game.qIndex);
   const remaining = useServerCountdown(phase === "starting" ? deadline : 0);
   const seconds = Math.ceil(remaining);
   const counting = phase === "starting" && deadline > 0;
@@ -51,7 +52,7 @@ export default function GetReady({ title }: { title?: string }) {
         <div className="relative min-h-6 flex items-center justify-center">
           {counting ? (
             <p className={clsx("text-base md:text-lg font-medium", mutedText)}>
-              First question coming up
+              {qIndex > 0 ? `Question ${qIndex + 1} coming up` : "First question coming up"}
             </p>
           ) : (
             <WaitingDots>Waiting for the question</WaitingDots>

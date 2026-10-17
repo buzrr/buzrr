@@ -13,7 +13,9 @@ import Image from "next/image";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   DEFAULT_QUESTION_TYPE,
+  MAX_OPTIONS,
   MAX_POLL_OPTIONS,
+  MIN_OPTIONS,
   MIN_POLL_OPTIONS,
   RATING_LABEL_MAX,
   isQuestionType,
@@ -134,8 +136,12 @@ function optionsFor(type: QuestionType, from: AuthoredOption[]) {
   const titles = kept.map((o) => o.title);
   if (type === "multiple_choice") {
     // Single choice is the default: one correct option, A until picked.
+    const n = Math.min(
+      MAX_OPTIONS,
+      Math.max(MCQ_OPTIONS, titles.length),
+    );
     return singleCorrect(
-      blankOptions(MCQ_OPTIONS).map((o, i) => ({
+      blankOptions(n).map((o, i) => ({
         title: titles[i] ?? "",
         isCorrect: kept[i]?.isCorrect ?? false,
       })),
@@ -333,7 +339,8 @@ const AddQuesForm = (props: {
   question?: Question;
   /** The type a new question starts as (from the Add Question menu). */
   type?: QuestionType;
-  /** Called after a successful save of an existing question. */
+  /** Called after a successful save of an existing question, and after
+   *  "Done" on a new one (closes the dialog). */
   onDone?: () => void;
 }) => {
   const { question } = props;
@@ -492,6 +499,9 @@ const AddQuesForm = (props: {
     formState.errors.options as { message?: string } | undefined
   )?.message;
 
+  // Which button submitted a new question: "Done + Next" keeps the dialog open.
+  const addNextRef = useRef(false);
+
   const onSubmit = handleSubmit((data) => {
     const fd = new FormData();
     fd.append("title", data.title.trim());
@@ -524,7 +534,7 @@ const AddQuesForm = (props: {
     mutation.mutate(fd, {
       onSuccess: () => {
         toast.success(question?.id ? "Question updated" : "Question added");
-        if (question?.id) {
+        if (question?.id || !addNextRef.current) {
           props.onDone?.();
         } else {
           // Stay on the same type, ready for the next one.
@@ -750,6 +760,10 @@ const AddQuesForm = (props: {
                   }
 
                   const isPoll = type === "poll";
+                  // Poll and multiple choice can grow/shrink their options.
+                  const resizable = isPoll || type === "multiple_choice";
+                  const minOpts = isPoll ? MIN_POLL_OPTIONS : MIN_OPTIONS;
+                  const maxOpts = isPoll ? MAX_POLL_OPTIONS : MAX_OPTIONS;
                   const multi = values.mcqMulti;
                   return (
                     <div className="flex flex-col gap-2">
@@ -835,15 +849,17 @@ const AddQuesForm = (props: {
                                 aria-label={`Option ${OPTION_KEYS[i]}`}
                                 className="flex-1 min-w-0 bg-transparent outline-none py-1.5 text-[15px] font-medium placeholder:text-[#8a8896] dark:placeholder:text-muted-dark"
                               />
-                              {isPoll && opts.length > MIN_POLL_OPTIONS && (
+                              {resizable && opts.length > minOpts && (
                                 <button
                                   type="button"
                                   aria-label={`Remove option ${OPTION_KEYS[i]}`}
-                                  onClick={() =>
+                                  onClick={() => {
+                                    const rest = opts.filter((_, j) => j !== i);
+                                    // Single choice must keep one correct option.
                                     field.onChange(
-                                      opts.filter((_, j) => j !== i),
-                                    )
-                                  }
+                                      !isPoll && !multi ? singleCorrect(rest) : rest,
+                                    );
+                                  }}
                                   className="shrink-0 text-[#8a8896] dark:text-muted-dark hover:text-[#e5544e] cursor-pointer"
                                 >
                                   <LuX size={16} />
@@ -852,7 +868,7 @@ const AddQuesForm = (props: {
                             </div>
                           );
                         })}
-                        {isPoll && opts.length < MAX_POLL_OPTIONS && (
+                        {resizable && opts.length < maxOpts && (
                           <button
                             type="button"
                             onClick={() =>
@@ -1090,17 +1106,49 @@ const AddQuesForm = (props: {
         <p className={clsx("flex-1 text-[13px]", mutedText)}>
           {summaryOf(values)}
         </p>
-        <button
-          type="submit"
-          disabled={mutation.isPending}
-          className={clsx(primaryButtonClass, "px-[26px]")}
-        >
-          {mutation.isPending
-            ? "Saving..."
-            : question?.id
-              ? "Save changes"
-              : "Add question"}
-        </button>
+        {question?.id ? (
+          <button
+            type="submit"
+            disabled={mutation.isPending}
+            className={clsx(primaryButtonClass, "px-[26px]")}
+          >
+            {mutation.isPending ? "Saving..." : "Save changes"}
+          </button>
+        ) : (
+          <>
+            <button
+              type="submit"
+              disabled={mutation.isPending}
+              onClick={(e) => {
+                // Nothing written yet (no question, no answers, no media):
+                // "Done" just closes instead of failing validation.
+                const blank =
+                  !values.title?.trim() &&
+                  !file &&
+                  !fileLink &&
+                  (values.type === "true_false" ||
+                    (values.options ?? []).every((o) => !o.title.trim()));
+                if (blank) {
+                  e.preventDefault();
+                  props.onDone?.();
+                  return;
+                }
+                addNextRef.current = false;
+              }}
+              className="rounded-[14px] border-2 border-lprimary dark:border-dprimary px-[22px] py-3 font-bold text-lprimary dark:text-dprimary cursor-pointer hover:bg-lprimary/10 dark:hover:bg-dprimary/10 disabled:opacity-60"
+            >
+              Done
+            </button>
+            <button
+              type="submit"
+              disabled={mutation.isPending}
+              onClick={() => (addNextRef.current = true)}
+              className={clsx(primaryButtonClass, "px-[26px]")}
+            >
+              {mutation.isPending ? "Saving..." : "Done + Next"}
+            </button>
+          </>
+        )}
       </div>
     </form>
   );

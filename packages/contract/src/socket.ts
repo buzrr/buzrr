@@ -22,7 +22,47 @@ export const gamePhaseSchema = z.enum([
   "reveal",
   "final",
   "ended",
+  // Moderated games only (see moderationSettingsSchema):
+  /** "Get ready" slide before a question, waiting for the host. */
+  "ready",
+  /** The question closed; the answer waits for the host's "show answer". */
+  "closed",
+  /** Standings after a question, shown on the host's "show scores". */
+  "scores",
 ]);
+
+/**
+ * Moderated mode (a quiz setting): the host steps the room through every
+ * question — get-ready slide, countdown, question, answer, scores. Each
+ * `confirm*` makes that step wait for the host instead of following on its
+ * own. Off by default.
+ */
+export const moderationSettingsSchema = z.object({
+  enabled: z.boolean().default(false),
+  /** Reveal the correct answer after each question. */
+  showAnswer: z.boolean().default(true),
+  /** ...only when the host clicks "Show answer". */
+  confirmShowAnswer: z.boolean().default(true),
+  /** Show the standings after every question. */
+  showScores: z.boolean().default(true),
+  /** ...only when the host clicks "Show scores" (after the answer). */
+  confirmShowScores: z.boolean().default(true),
+  /** A "get ready" slide before each question that the host starts. */
+  confirmNextQuestion: z.boolean().default(true),
+});
+
+/** `Quiz.settings`. Unknown/missing keys fall back to the defaults. */
+export const quizSettingsSchema = z.object({
+  moderation: moderationSettingsSchema.prefault({}),
+});
+
+/** A moderated game moved to a phase that has no payload event of its own. */
+export const phaseChangeSchema = z.object({
+  phase: gamePhaseSchema,
+  qIndex: z.number().int(),
+  /** "starting": time until the question opens (display only). */
+  remainingMs: z.number().optional(),
+});
 export const gameModeSchema = z.enum(["classic", "duel"]);
 
 export const leaderboardEntrySchema = z.object({
@@ -182,6 +222,8 @@ export const stateSyncSchema = z.object({
   players: z.array(rosterPlayerSchema),
   /** Present for player connections only. */
   you: answerResultSchema.optional(),
+  /** Present for moderated games. */
+  moderation: moderationSettingsSchema.optional(),
 });
 
 export const submitAnswerSchema = z.object({
@@ -211,12 +253,29 @@ export const playerRemovedSchema = playerRefSchema.extend({
   banned: z.boolean().optional(),
 });
 
+/**
+ * The lobby's bubble mini-game: a player's running totals, sent about once a
+ * second while they wait; relayed to the host only (`host:{gameCode}`).
+ */
+export const bubbleStatsSchema = z.object({
+  hits: z.number().int().min(0).max(1_000_000),
+  misses: z.number().int().min(0).max(1_000_000),
+});
+export const playerBubbleStatsSchema = bubbleStatsSchema.extend({
+  playerId: z.string(),
+});
+
 export const duelInviteAcceptSchema = z.object({ code: z.string().min(1) });
 export const removePlayerSchema = z.object({ id: z.string().min(1) });
 
 // -- inferred types -----------------------------------------------------------
 
 export type GamePhase = z.infer<typeof gamePhaseSchema>;
+export type ModerationSettings = z.infer<typeof moderationSettingsSchema>;
+export type QuizSettings = z.infer<typeof quizSettingsSchema>;
+export type PhaseChangePayload = z.infer<typeof phaseChangeSchema>;
+export type BubbleStatsPayload = z.infer<typeof bubbleStatsSchema>;
+export type PlayerBubbleStatsPayload = z.infer<typeof playerBubbleStatsSchema>;
 export type GameMode = z.infer<typeof gameModeSchema>;
 export type LeaderboardEntry = z.infer<typeof leaderboardEntrySchema>;
 export type QuestionStartPayload = z.infer<typeof questionStartSchema>;
@@ -251,6 +310,10 @@ export interface ServerToClientEvents {
   leaderboard: (payload: LeaderboardPayload) => void;
   "game-over": (payload: GameOverPayload) => void;
   "state-sync": (payload: StateSyncPayload) => void;
+  /** Moderated games: ready / starting (countdown) / closed / scores. */
+  "phase-change": (payload: PhaseChangePayload) => void;
+  /** Host only: a waiting player's bubble mini-game totals. */
+  "bubble-stats": (payload: PlayerBubbleStatsPayload) => void;
   "player-connection": (payload: PlayerConnectionPayload) => void;
   // -- duel matchmaking --
   "duel:matched": (payload: DuelMatchedPayload) => void;
@@ -262,8 +325,15 @@ export interface ServerToClientEvents {
   "player-removed": (player: PlayerRemovedPayload) => void;
   /** A player left on their own (distinct from a host kick / player-removed). */
   "player-left": (player: PlayerPayload) => void;
-  /** `remainingMs`: time until the first question opens (display only). */
-  "game-started": (payload: { remainingMs: number }) => void;
+  /**
+   * `remainingMs`: time until the first question opens (display only; 0 for a
+   * moderated game that starts on its get-ready slide). `moderation`: present
+   * for moderated games.
+   */
+  "game-started": (payload: {
+    remainingMs: number;
+    moderation?: ModerationSettings;
+  }) => void;
   /** Terminal signal for players: the room is gone, stop rendering it. */
   "game-session-ended": () => void;
 }
@@ -289,6 +359,8 @@ export interface ClientToServerEvents {
   "request-sync": () => void;
   /** A player voluntarily leaves the room (back / leave-game confirmation). */
   "leave-room": () => void;
+  /** A waiting player's bubble mini-game totals (about once a second). */
+  "bubble-stats": (payload: BubbleStatsPayload) => void;
   // -- host intents (the server decides what each one means) --
   "remove-player": (player: { id: string }, gameCode?: string) => void;
   "start-game": (gameCode?: string) => void;

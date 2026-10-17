@@ -143,7 +143,7 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
               <div className="relative flex flex-col flex-1 min-h-0 md:overflow-y-auto p-4 md:px-6 gap-4 md:gap-[18px]">
                 <div className="sticky -top-4 z-10 -mx-4 -mt-4 px-4 pt-4 pb-1 md:-mx-6 md:px-6 md:rounded-t-xl bg-white dark:bg-dark flex items-center gap-2 md:gap-3.5">
                   <AddQuestionMenu quizId={quizId} />
-                  <HideQuestions />
+                  <HideQuestions defaultHidden={questionCount > 0} />
                 </div>
                 <AllQues quizId={quizId} />
               </div>

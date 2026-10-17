@@ -1,0 +1,180 @@
+"use client";
+
+import clsx from "clsx";
+import Image from "next/image";
+import { useState } from "react";
+import { LuPlay } from "react-icons/lu";
+import { DEFAULT_AVATAR } from "@/constants";
+import { useAppSelector } from "@/state/hooks";
+import {
+  WaitingDots,
+  labelClass,
+  mutedText,
+  panelClass,
+  primaryButtonClass,
+} from "@/components/Game/GameUI";
+import { rankBadgeClass } from "@/components/Admin/Game/QuesResult";
+
+/**
+ * Screens for the steps of a moderated game that have no screen of their own
+ * (see moderationSettingsSchema): the get-ready slide before a question, the
+ * "time's up" pause before the answer, and the players' standings. The host
+ * variant carries the button that advances the room (`onNext`).
+ */
+
+function Slide({
+  badge,
+  title,
+  subtitle,
+  onNext,
+  nextLabel,
+  waitingFor,
+}: {
+  badge: string;
+  title: string;
+  subtitle?: string;
+  onNext?: () => void;
+  nextLabel?: string;
+  waitingFor: string;
+}) {
+  const [advancing, setAdvancing] = useState(false);
+  return (
+    <div className="w-full max-w-3xl mx-auto flex flex-col justify-center px-4 py-6 md:py-10 min-h-[calc(100dvh-12rem)] text-dark dark:text-white">
+      <section
+        aria-live="polite"
+        className={clsx(
+          panelClass,
+          "relative overflow-hidden flex flex-col items-center text-center gap-5 md:gap-6 px-6 py-9 md:px-12 md:py-12",
+        )}
+      >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,color-mix(in_srgb,var(--color-dprimary)_16%,transparent),transparent_60%)]"
+        />
+        <span className="relative text-[12.5px] font-bold tracking-[0.08em] uppercase rounded-full px-3 py-1.5 text-lprimary dark:text-dprimary bg-lprimary/8 dark:bg-white/5">
+          {badge}
+        </span>
+        <h1 className="relative max-w-full text-3xl md:text-5xl font-black tracking-[-0.02em] leading-tight text-pretty wrap-break-word">
+          {title}
+        </h1>
+        {subtitle && (
+          <p className={clsx("relative text-base md:text-lg font-medium", mutedText)}>
+            {subtitle}
+          </p>
+        )}
+        <div className="relative min-h-6 flex items-center justify-center">
+          {onNext ? (
+            <button
+              type="button"
+              disabled={advancing}
+              onClick={() => {
+                setAdvancing(true);
+                onNext();
+              }}
+              className={clsx(primaryButtonClass, "px-8")}
+            >
+              {nextLabel}
+              <LuPlay size={17} className="fill-current" />
+            </button>
+          ) : (
+            <WaitingDots>{waitingFor}</WaitingDots>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/** Before every question: the host starts it, then the countdown runs. */
+export function ReadySlide({ onNext }: { onNext?: () => void }) {
+  const qIndex = useAppSelector((state) => state.game.qIndex);
+  const qCount = useAppSelector((state) => state.game.qCount);
+  return (
+    <Slide
+      badge={`Question ${qIndex + 1} of ${qCount}`}
+      title="Get ready!"
+      subtitle={
+        qIndex === 0 ? "The quiz is about to begin" : "The next question is coming up"
+      }
+      onNext={onNext}
+      nextLabel="Start question"
+      waitingFor="Waiting for the host to start"
+    />
+  );
+}
+
+/** The answer window is over; the host shows the answer (or scores) next. */
+export function ClosedSlide({
+  onNext,
+  nextLabel,
+}: {
+  onNext?: () => void;
+  nextLabel?: string;
+}) {
+  const question = useAppSelector((state) => state.game.question);
+  const answeredCount = useAppSelector((state) => state.game.answeredCount);
+  const players = useAppSelector((state) => state.game.players);
+  return (
+    <Slide
+      badge="Time's up"
+      title={question?.title ?? "Time's up!"}
+      subtitle={
+        onNext ? `${answeredCount} of ${players.length} answered` : undefined
+      }
+      onNext={onNext}
+      nextLabel={nextLabel}
+      waitingFor="Waiting for the host"
+    />
+  );
+}
+
+/** Players' standings after a question (moderated "show scores"). */
+export function PlayerScores({ playerId }: { playerId: string }) {
+  const leaderboard = useAppSelector((state) => state.game.leaderboard);
+  const qIndex = useAppSelector((state) => state.game.qIndex);
+  return (
+    <div className="w-full max-w-xl mx-auto px-4 py-6 md:py-10 text-dark dark:text-white">
+      <section className={clsx(panelClass, "flex flex-col gap-3 p-5 md:p-7")}>
+        <span className={labelClass}>Scores after question {qIndex + 1}</span>
+        <div className="flex flex-col gap-1.5">
+          {leaderboard.map((e) => (
+            <div
+              key={e.playerId}
+              className={clsx(
+                "flex items-center gap-3 rounded-[14px] px-3 py-2.5",
+                e.playerId === playerId
+                  ? "bg-lprimary/12 dark:bg-dprimary/15 ring-2 ring-lprimary dark:ring-dprimary"
+                  : "bg-light-bg dark:bg-card-dark",
+              )}
+            >
+              <span
+                className={clsx(
+                  "shrink-0 size-8 rounded-full flex items-center justify-center text-sm font-bold",
+                  rankBadgeClass(e.rank),
+                )}
+              >
+                {e.rank}
+              </span>
+              <Image
+                src={e.profilePic || DEFAULT_AVATAR}
+                alt=""
+                width={32}
+                height={32}
+                className="rounded-full shrink-0"
+              />
+              <span className="flex-1 min-w-0 truncate font-semibold">{e.name}</span>
+              {e.delta ? (
+                <span className="text-sm font-bold text-green-600 dark:text-green-400">
+                  +{e.delta}
+                </span>
+              ) : null}
+              <span className="min-w-[52px] text-right font-bold tabular-nums">
+                {e.score}
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}

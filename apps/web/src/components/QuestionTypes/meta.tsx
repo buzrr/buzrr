@@ -9,7 +9,7 @@ export const QUESTION_TYPE_META: Record<
 > = {
   multiple_choice: {
     name: "Multiple choice",
-    description: "4 options, single or multiple answers",
+    description: "2–8 options, single or multiple answers",
     scored: true,
   },
   true_false: {

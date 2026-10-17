@@ -7,6 +7,8 @@ import type {
   GamePhase,
   LiveSummaryPayload,
   LeaderboardEntry,
+  ModerationSettings,
+  PhaseChangePayload,
   PublicQuestion,
   QuestionEndPayload,
   QuestionStartPayload,
@@ -59,6 +61,8 @@ export interface GameLiveState {
   category: DuelCategoryRef;
   /** Duels only: daily streak per signed-in playerId, from game-over. */
   streaks: GameOverPayload["streaks"] | null;
+  /** Moderated games: the quiz's moderation settings; null otherwise. */
+  moderation: ModerationSettings | null;
 }
 
 const initialState: GameLiveState = {
@@ -82,6 +86,7 @@ const initialState: GameLiveState = {
   rated: false,
   category: null,
   streaks: null,
+  moderation: null,
 };
 
 /**
@@ -90,15 +95,24 @@ const initialState: GameLiveState = {
  * ended — so a larger number is always a later moment.
  */
 export function gameProgress(phase: GamePhase, qIndex: number): number {
+  // Per question: ready → starting (countdown) → question → closed → reveal →
+  // scores; unmoderated games skip ready/closed/scores.
+  const base = 1 + qIndex * 6;
   switch (phase) {
     case "lobby":
       return 0;
+    case "ready":
+      return base;
     case "starting":
-      return 1;
+      return base + 1;
     case "question":
-      return 2 + qIndex * 2;
+      return base + 2;
+    case "closed":
+      return base + 3;
     case "reveal":
-      return 3 + qIndex * 2;
+      return base + 4;
+    case "scores":
+      return base + 5;
     case "final":
       return Number.MAX_SAFE_INTEGER - 1;
     case "ended":
@@ -144,13 +158,44 @@ const gameSlice = createSlice({
       state.isFinalLeaderboard = s.phase === "final" || s.phase === "ended";
       state.players = s.players;
       state.you = s.you ?? null;
+      state.moderation = s.moderation ?? null;
     },
-    gameStarted: (state, action: PayloadAction<{ remainingMs: number }>) => {
+    gameStarted: (
+      state,
+      action: PayloadAction<{
+        remainingMs: number;
+        moderation?: ModerationSettings;
+      }>,
+    ) => {
       state.phase = "starting";
       // Display-only: the server opens question 1 on its own timer.
       state.deadline = Date.now() + action.payload.remainingMs;
       state.countdownMs = action.payload.remainingMs;
       state.gameOver = false;
+      state.moderation = action.payload.moderation ?? null;
+    },
+    /** Moderated games: ready / starting / closed / scores. */
+    phaseChange: (state, action: PayloadAction<PhaseChangePayload>) => {
+      const p = action.payload;
+      if (gameProgress(p.phase, p.qIndex) < gameProgress(state.phase === "idle" ? "lobby" : state.phase, state.qIndex)) {
+        return;
+      }
+      state.phase = p.phase;
+      state.qIndex = p.qIndex;
+      if (p.phase === "ready" || p.phase === "starting") {
+        state.question = null;
+        state.reveal = null;
+        state.answeredCount = 0;
+        state.liveSummary = null;
+      }
+      if (p.phase === "starting") {
+        const ms = p.remainingMs ?? 0;
+        state.deadline = Date.now() + ms;
+        state.countdownMs = ms;
+      } else {
+        state.deadline = 0;
+        state.countdownMs = 0;
+      }
     },
     questionStart: (state, action: PayloadAction<QuestionStartPayload>) => {
       const q = action.payload;
@@ -250,6 +295,7 @@ const gameSlice = createSlice({
 export const {
   applySync,
   gameStarted,
+  phaseChange,
   questionStart,
   questionEnd,
   answerResult,

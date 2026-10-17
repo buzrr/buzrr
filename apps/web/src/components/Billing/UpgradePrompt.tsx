@@ -9,6 +9,7 @@ import { getPlanLimitError } from "@/lib/api/errors";
 import type { PlanLimitDetails } from "@/lib/api/errors";
 import { useEntitlementsQuery } from "@/lib/modules/billing/hooks";
 import style from "@/utils/modalStyle";
+import { BILLING_ENABLED } from "@/lib/instance";
 
 function formatReset(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
@@ -31,6 +32,8 @@ export default function UpgradePrompt({
   onClose: () => void;
 }) {
   const weeklyRefill = limit?.resetsAt ?? null;
+  // Without billing there is nothing to upgrade to: just explain and close.
+  const noUpgrade = Boolean(weeklyRefill) || !BILLING_ENABLED;
   const title =
     limit?.limit === "quizzes"
       ? "You've reached your quiz limit"
@@ -66,7 +69,7 @@ export default function UpgradePrompt({
               Your generations refill on{" "}
               <strong>{formatReset(weeklyRefill)}</strong>.
             </p>
-          ) : (
+          ) : !BILLING_ENABLED ? null : (
             <ul className="mt-4 space-y-1 text-sm text-dark dark:text-white list-disc pl-5">
               <li>Unlimited quizzes</li>
               <li>10 AI quiz generations every week</li>
@@ -74,7 +77,7 @@ export default function UpgradePrompt({
             </ul>
           )}
           <div className="mt-6 flex flex-col sm:flex-row gap-3">
-            {weeklyRefill ? (
+            {noUpgrade ? (
               <button
                 type="button"
                 onClick={onClose}

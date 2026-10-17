@@ -8,6 +8,7 @@ import Switch from "@/components/ui/Switch";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { useUpdateQuizMutation } from "@/lib/modules/quizzes/hooks";
 import type { QuizDetail } from "@/lib/modules/quizzes/api";
+import ModerationSettingsCard from "@/components/Admin/Quiz/ModerationSettingsCard";
 
 function formatSessionDate(createdAt: string | Date) {
   const d = typeof createdAt === "string" ? new Date(createdAt) : createdAt;
@@ -43,8 +44,21 @@ export function QuizInfoContent(props: {
             Home
           </Link>
           <LuChevronRight size={14} />
-          <span className="font-semibold text-dark dark:text-white">
+          <Link
+            href={"/admin"}
+            className="font-semibold text-dark dark:text-white hover:underline"
+          >
             Quizzes
+          </Link>
+          <LuChevronRight size={14} className="shrink-0" />
+          <span
+            aria-current="page"
+            className="min-w-0 truncate text-xs"
+            title={props.quiz.title}
+          >
+            {props.quiz.title.length > 30
+              ? `${props.quiz.title.slice(0, 30)}…`
+              : props.quiz.title}
           </span>
         </nav>
         <h2 className="text-[26px] md:text-[32px] font-bold tracking-[-0.02em] leading-[1.05] mt-3 mb-1 wrap-break-word">
@@ -76,6 +90,7 @@ export function QuizInfoContent(props: {
             appearing in 1v1 duels
           </span>
         </div>
+        <ModerationSettingsCard quiz={props.quiz} />
         {showHostForm && (
           <div className="w-full mt-[18px]">
             <HostQuizForm

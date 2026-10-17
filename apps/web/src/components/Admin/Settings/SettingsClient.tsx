@@ -19,6 +19,7 @@ import TextInput from "@/components/ui/TextInput";
 import { DEFAULT_AVATAR } from "@/constants";
 import { authClient } from "@/lib/auth-client";
 import { useEntitlementsQuery } from "@/lib/modules/billing/hooks";
+import { BILLING_ENABLED } from "@/lib/instance";
 
 const accountSchema = z.object({
   name: z
@@ -262,7 +263,7 @@ export default function SettingsClient() {
       <div className="flex flex-col gap-6">
         <PreferencesCard />
         <AccountCard />
-        <PlanCard />
+        {BILLING_ENABLED && <PlanCard />}
         <DangerZoneCard />
       </div>
     </div>

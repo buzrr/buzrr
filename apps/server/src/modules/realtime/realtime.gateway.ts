@@ -1,4 +1,8 @@
-import { duelQueueSchema, submitAnswerSchema } from "@buzrr/contract";
+import {
+  bubbleStatsSchema,
+  duelQueueSchema,
+  submitAnswerSchema,
+} from "@buzrr/contract";
 import { Logger } from "@nestjs/common";
 import {
   OnGatewayConnection,
@@ -385,6 +389,21 @@ export class RealtimeGateway
   }
 
   private registerPlayerHandlers(socket: TypedSocket, gameCode: string): void {
+    // Lobby bubble game: relayed to the host as-is, nothing is stored. At most
+    // one update per ~800ms per socket gets through.
+    let lastBubbleStats = 0;
+    socket.on("bubble-stats", (payload) => {
+      const playerId = socket.data.playerId;
+      const now = Date.now();
+      if (!playerId || now - lastBubbleStats < 800) return;
+      const parsed = bubbleStatsSchema.safeParse(payload);
+      if (!parsed.success) return;
+      lastBubbleStats = now;
+      this.server
+        .to(`host:${gameCode}`)
+        .emit("bubble-stats", { playerId, ...parsed.data });
+    });
+
     socket.on("leave-room", async () => {
       const playerId = socket.data.playerId;
       if (!playerId) return;

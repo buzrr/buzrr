@@ -5,9 +5,12 @@
  * The apex `buzrr.in` redirects to www, so www is canonical.
  */
 export const SITE_URL = "https://www.buzrr.in";
-export const SITE_NAME = "Buzrr";
+import { INSTANCE_TITLE } from "@/lib/instance";
+
+export const SITE_NAME = INSTANCE_TITLE || "Buzrr";
 
 export const DEFAULT_TITLE =
+  INSTANCE_TITLE ||
   "Buzrr — Open-Source Live Quiz Platform with Ranked 1v1 Quiz Battles";
 
 /** The one-sentence definition reused in metadata and JSON-LD. */

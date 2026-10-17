@@ -8,6 +8,11 @@ import type { GameSession } from "@/types/db";
 import { WaitGameStart, Question, Result, LeaderBoard } from "./GameScreens";
 import ConnectionBanner from "@/components/ConnectionBanner";
 import GetReady from "@/components/Game/GetReady";
+import {
+  ClosedSlide,
+  PlayerScores,
+  ReadySlide,
+} from "@/components/Game/ModeratedSteps";
 import ConnectionStatusPill from "@/components/ConnectionStatusPill";
 import ConfirmationModal from "@/components/Admin/ConfirmationModal";
 import { usePlayerSocket } from "@/hooks/usePlayerSocket";
@@ -88,7 +93,7 @@ const GamePage = (params: {
   return (
     <>
       <ConnectionBanner />
-      {phase !== "question" && phase !== "reveal" && (
+      {phase !== "question" && phase !== "reveal" && phase !== "closed" && (
         <ConnectionStatusPill className="fixed left-3 bottom-3 z-40" />
       )}
       <ConfirmationModal
@@ -103,6 +108,9 @@ const GamePage = (params: {
           player={params.player}
           game={params.game}
           onLeave={() => setShowLeaveModal(true)}
+          onBubbleStats={(stats) => {
+            if (socket?.connected) socket.emit("bubble-stats", stats);
+          }}
         />
       ) : phase === "question" ? (
         question && socket ? (
@@ -117,6 +125,12 @@ const GamePage = (params: {
         ) : (
           <GetReady title={game.quiz.title ?? undefined} />
         )
+      ) : phase === "ready" ? (
+        <ReadySlide />
+      ) : phase === "closed" ? (
+        <ClosedSlide />
+      ) : phase === "scores" ? (
+        <PlayerScores playerId={params.player.id} />
       ) : phase === "reveal" ? (
         <Result
           you={you}

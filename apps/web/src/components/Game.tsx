@@ -60,7 +60,13 @@ interface Ring {
 const GRAVITY = 520; // px/s² pulling droplets down
 const MAX_BUBBLES = 18;
 
-const Game = () => {
+/** Hits and misses (taps that popped nothing). */
+export interface BubbleStats {
+  hits: number;
+  misses: number;
+}
+
+const Game = ({ onStats }: { onStats?: (stats: BubbleStats) => void }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const bubblesRef = useRef<Bubble[]>([]);
@@ -71,6 +77,21 @@ const Game = () => {
   const lastSpawnRef = useRef(0);
   const [score, setScore] = useState(0);
   const scoreRef = useRef(0);
+  const [misses, setMisses] = useState(0);
+  const missesRef = useRef(0);
+  const onStatsRef = useRef(onStats);
+  onStatsRef.current = onStats;
+
+  // Report the running totals once a second (the host's lobby shows them).
+  useEffect(() => {
+    const timer = setInterval(() => {
+      onStatsRef.current?.({
+        hits: scoreRef.current,
+        misses: missesRef.current,
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const spawnBubble = useCallback(() => {
     const { w, h } = sizeRef.current;
@@ -279,9 +300,11 @@ const Game = () => {
           bubblesRef.current.splice(i, 1);
           scoreRef.current += 1;
           setScore(scoreRef.current);
-          break;
+          return;
         }
       }
+      missesRef.current += 1;
+      setMisses(missesRef.current);
     },
     [burst],
   );
@@ -297,6 +320,11 @@ const Game = () => {
       <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-full bg-white/70 dark:bg-dark/70 px-3 py-1 text-sm font-bold text-lprimary dark:text-dprimary backdrop-blur">
         <span aria-hidden>🫧</span>
         {score}
+        {score + misses > 0 && (
+          <span className="font-medium opacity-70">
+            · {Math.round((score / (score + misses)) * 100)}%
+          </span>
+        )}
       </div>
 
       <p className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs font-medium text-dark/50 dark:text-white/40">

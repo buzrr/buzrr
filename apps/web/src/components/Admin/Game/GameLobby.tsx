@@ -12,6 +12,8 @@ import GetReady from "@/components/Game/GetReady";
 import QuestionScreen from "./QuestionScreen";
 import QuesResult from "./QuesResult";
 import LeaderBoard from "./Leaderboard";
+import { ClosedSlide, ReadySlide } from "@/components/Game/ModeratedSteps";
+import { closedNextLabel } from "@/lib/moderation";
 
 interface QuizQuestionItem {
   title?: string;
@@ -42,6 +44,7 @@ const GameLobby = (params: {
   const phase = useAppSelector((state) => state.game.phase);
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const qCount = useAppSelector((state) => state.game.qCount);
+  const moderation = useAppSelector((state) => state.game.moderation);
 
   useEffect(() => {
     dispatch(setPlayers(params.players));
@@ -56,7 +59,13 @@ const GameLobby = (params: {
   // yet, so the button must still end (and save); only "ended" is a plain exit.
   const showLeaderboard = phase === "final" || phase === "ended";
   const alreadyEnded = phase === "ended";
-  const inGame = phase === "question" || phase === "reveal" || showLeaderboard;
+  const inGame =
+    phase === "question" ||
+    phase === "reveal" ||
+    phase === "ready" ||
+    phase === "closed" ||
+    phase === "scores" ||
+    showLeaderboard;
   const title = params.quizQuestions?.title ?? "Quiz";
 
   if (!socket) return null;
@@ -79,7 +88,11 @@ const GameLobby = (params: {
         qIndex={qIndex}
         qCount={qCount}
         final={showLeaderboard}
-        gameCode={phase === "reveal" ? params.gameCode : undefined}
+        gameCode={
+          phase === "reveal" || phase === "scores" || phase === "ready"
+            ? params.gameCode
+            : undefined
+        }
         right={
           <EndQuizButton
             inline
@@ -90,8 +103,21 @@ const GameLobby = (params: {
       />
       {phase === "question" ? (
         <QuestionScreen socket={socket} gameCode={params.gameCode} />
-      ) : phase === "reveal" ? (
-        <QuesResult socket={socket} roomId={params.roomId} />
+      ) : phase === "ready" ? (
+        <ReadySlide key={`ready-${qIndex}`} onNext={() => socket.emit("host-next")} />
+      ) : phase === "closed" ? (
+        <ClosedSlide
+          key={`closed-${qIndex}`}
+          onNext={() => socket.emit("host-next")}
+          nextLabel={closedNextLabel(moderation, qIndex, qCount)}
+        />
+      ) : phase === "reveal" || phase === "scores" ? (
+        // Keyed by step: "show scores" remounts it so the standings animate.
+        <QuesResult
+          key={`${phase}-${qIndex}`}
+          socket={socket}
+          roomId={params.roomId}
+        />
       ) : (
         <LeaderBoard
           roomId={params.roomId}

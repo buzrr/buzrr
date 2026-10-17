@@ -9,6 +9,7 @@ import {
   applySync,
   gameOver,
   gameStarted,
+  phaseChange,
   leaderboardReceived,
   playerConnection,
   playerRemoved,
@@ -115,6 +116,7 @@ export function useGameSocket({
 
     conn.on("state-sync", (payload) => dispatch(applySync(payload)));
     conn.on("game-started", (payload) => dispatch(gameStarted(payload)));
+    conn.on("phase-change", (payload) => dispatch(phaseChange(payload)));
     conn.on("question-start", (payload) => dispatch(questionStart(payload)));
     conn.on("question-end", (payload) => dispatch(questionEnd(payload)));
     conn.on("answer-result", (payload) => dispatch(answerResult(payload)));

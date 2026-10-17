@@ -41,6 +41,11 @@ export interface GameMeta {
   botOptionId?: string;
   botAnswerAt?: number;
   /**
+   * Moderated mode settings as JSON (`moderationSettingsSchema`), copied from
+   * the quiz at start; absent = not moderated. Read via `moderationOf`.
+   */
+  moderation?: string;
+  /**
    * Duels only: when the match was frozen because no human was connected. 0
    * (or absent) means running; resumeDuel shifts every timestamp below by the
    * span it was held for.

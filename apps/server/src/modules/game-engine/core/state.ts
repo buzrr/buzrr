@@ -2,6 +2,8 @@ import type {
   AnswerCountPayload,
   AnswerResultPayload,
   LeaderboardPayload,
+  ModerationSettings,
+  PhaseChangePayload,
   QuestionAnswer,
   QuestionEndPayload,
   QuestionStartPayload,
@@ -40,6 +42,13 @@ export type Outbound =
       event: "game-started";
       /** When question 1 opens; sent to clients as `remainingMs`. */
       deadline: number;
+      moderation?: ModerationSettings;
+    }
+  | {
+      event: "phase-change";
+      payload: Omit<PhaseChangePayload, "remainingMs">;
+      /** "starting": when the question opens; sent as `remainingMs`. */
+      deadline?: number;
     }
   | {
       event: "question-start";

@@ -9,7 +9,7 @@ export default function Page() {
           <NavbarToggle />
         </span>
         <h1 className="text-md md:text-3xl font-black md:py-2 dark:text-white">
-          Manage Admins
+          Manage Users
         </h1>
       </div>
       <AdminsListClient />

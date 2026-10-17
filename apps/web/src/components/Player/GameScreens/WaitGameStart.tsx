@@ -1,4 +1,4 @@
-import Game from "@/components/Game";
+import Game, { type BubbleStats } from "@/components/Game";
 import BackNavButton from "@/components/BackNavButton";
 import { DEFAULT_AVATAR } from "@/constants";
 import type { GameSession } from "@/types/db";
@@ -21,6 +21,8 @@ const WaitGameStart = (params: {
   game: GameWithQuiz;
   /** Back/leave action — opens the "you'll leave the game" confirmation. */
   onLeave?: () => void;
+  /** Bubble game totals, about once a second (sent on to the host). */
+  onBubbleStats?: (stats: BubbleStats) => void;
 }) => {
   const game = params.game;
 
@@ -85,7 +87,7 @@ const WaitGameStart = (params: {
               />
               {params.player.name}
             </div>
-            <Game />
+            <Game onStats={params.onBubbleStats} />
             <div className="flex flex-col mt-2 md:hidden">
               <p className="text-xs dark:text-off-white">Room Code</p>
               <h2 className="text-2xl font-extrabold dark:text-white">

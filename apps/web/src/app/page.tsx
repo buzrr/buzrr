@@ -7,6 +7,7 @@ import {
   LuGitPullRequest,
   LuGithub,
   LuHeart,
+  LuLogIn,
   LuPlay,
   LuScale,
   LuServer,
@@ -33,6 +34,7 @@ import {
 import { siteGraph, webPageSchema } from "@/lib/seo/json-ld";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 import { DEFAULT_TITLE, SITE_DESCRIPTION } from "@/lib/seo/site";
+import { PRIVATE_BUZZ } from "@/lib/instance";
 
 export const metadata = buildPageMetadata({
   title: DEFAULT_TITLE,
@@ -85,7 +87,50 @@ const features = [
 const formatStat = (n: number | null) =>
   n === null ? "—" : n.toLocaleString("en-US");
 
+/** Private instance: just the three ways in, no marketing, no GitHub calls. */
+function PrivateHome() {
+  const button =
+    "flex items-center justify-center gap-2 w-full px-8 py-3 rounded-xl text-lg font-black transition-colors";
+  return (
+    <div className="min-h-dvh bg-light-bg dark:bg-dark-bg">
+      <LandingNavbar />
+      <main className="max-w-md mx-auto px-4 pt-16 pb-16 sm:pt-24 flex flex-col items-center text-center animate-fade-up">
+        <h1 className="text-4xl sm:text-5xl font-black text-dark dark:text-white leading-tight">
+          Build quizzes.
+          <br />
+          <span className="text-lprimary dark:text-dprimary">Battle</span>{" "}
+          friends.
+        </h1>
+        <div className="mt-10 flex flex-col gap-4 w-full">
+          <Link
+            href="/duel"
+            className={`${button} bg-lprimary dark:bg-dprimary text-white dark:text-dark hover:opacity-90`}
+          >
+            <LuPlay size={18} />
+            Start 1v1
+          </Link>
+          <Link
+            href="/player"
+            className={`${button} border-2 border-lprimary dark:border-dprimary text-lprimary dark:text-dprimary hover:bg-lprimary/10 dark:hover:bg-dprimary/10`}
+          >
+            <LuDoorOpen size={18} />
+            Join Room
+          </Link>
+          <Link
+            href="/admin"
+            className={`${button} border-2 border-card-light dark:border-off-dark text-dark dark:text-white hover:bg-card-light dark:hover:bg-card-dark`}
+          >
+            <LuLogIn size={18} />
+            Admin Login
+          </Link>
+        </div>
+      </main>
+    </div>
+  );
+}
+
 export default async function Home() {
+  if (PRIVATE_BUZZ) return <PrivateHome />;
   const stats = await getGithubStats();
 
   const statTiles = [

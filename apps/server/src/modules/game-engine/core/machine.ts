@@ -1,7 +1,13 @@
 import { ANSWER_GRACE_MS } from "../../../common/utils/answer-timing";
 import { planBotAnswer } from "../../../common/utils/duel-bot";
 import { acceptsMoreAnswers, toPublicQuestion } from "../../question-types";
+import type { ModerationSettings } from "@buzrr/contract";
 import type { LiveQuestion } from "../game-engine.types";
+import {
+  leaderboardWithReveal,
+  moderationOf,
+  scoresStepPending,
+} from "./moderation";
 import { pacingFor, type PacingStrategy } from "./pacing";
 import {
   ROOM,
@@ -23,7 +29,13 @@ export const START_COUNTDOWN_MS = 5_000;
  */
 export type EngineEvent =
   /** The host started a classic lobby; questions come from Postgres. */
-  | { type: "start"; questions: LiveQuestion[]; quizTitle: string }
+  | {
+      type: "start";
+      questions: LiveQuestion[];
+      quizTitle: string;
+      /** Moderated mode settings from the quiz; null/absent = unmoderated. */
+      moderation?: ModerationSettings | null;
+    }
   /** The host's single pacing intent — the machine decides what it means. */
   | { type: "host-next" }
   /** The game's scheduled deadline came due (local timer or sweeper). */
@@ -106,7 +118,7 @@ export function step(
       // Only the question that met the early-close condition: if another
       // path already revealed it and opened the next, this is stale.
       return event.qIndex === state.meta.qIndex
-        ? reveal(state, now, pacing)
+        ? closeQuestion(state, now, pacing)
         : noop(state);
     case "roster-changed":
       return onRosterChanged(state);
@@ -115,7 +127,11 @@ export function step(
 
 function start(
   state: GameState,
-  event: { questions: LiveQuestion[]; quizTitle: string },
+  event: {
+    questions: LiveQuestion[];
+    quizTitle: string;
+    moderation?: ModerationSettings | null;
+  },
   now: number,
 ): Transition {
   if (state.meta.phase !== "lobby") return noop(state);
@@ -126,6 +142,42 @@ function start(
       message: "Cannot start: the quiz has no playable questions",
     });
   }
+  const mod = event.moderation?.enabled ? event.moderation : null;
+  if (mod?.confirmNextQuestion) {
+    // Moderated: the room opens on question 1's get-ready slide and waits.
+    const patch = {
+      phase: "ready" as const,
+      quizTitle: event.quizTitle,
+      qCount: event.questions.length,
+      startedAt: now,
+      qIndex: 0,
+      qDeadline: 0,
+      moderation: JSON.stringify(mod),
+    };
+    return {
+      state: { ...withMeta(state, patch), questions: event.questions },
+      effects: [
+        { kind: "set-questions", questions: event.questions },
+        { kind: "patch-meta", patch },
+        { kind: "park-deadline" },
+        { kind: "claim-owner" },
+        { kind: "mark-playing" },
+        {
+          kind: "emit",
+          to: ROOM,
+          message: { event: "game-started", deadline: now, moderation: mod },
+        },
+        {
+          kind: "emit",
+          to: ROOM,
+          message: {
+            event: "phase-change",
+            payload: { phase: "ready", qIndex: 0 },
+          },
+        },
+      ],
+    };
+  }
   const firstQuestionAt = now + START_COUNTDOWN_MS;
   const patch = {
     phase: "starting" as const,
@@ -133,6 +185,7 @@ function start(
     qCount: event.questions.length,
     startedAt: now,
     qDeadline: firstQuestionAt,
+    ...(mod ? { moderation: JSON.stringify(mod) } : {}),
   };
   return {
     state: { ...withMeta(state, patch), questions: event.questions },
@@ -145,7 +198,11 @@ function start(
       {
         kind: "emit",
         to: ROOM,
-        message: { event: "game-started", deadline: firstQuestionAt },
+        message: {
+          event: "game-started",
+          deadline: firstQuestionAt,
+          ...(mod ? { moderation: mod } : {}),
+        },
       },
       { kind: "arm-timer", at: firstQuestionAt },
     ],
@@ -159,10 +216,21 @@ function hostNext(
   ctx: StepContext,
 ): Transition {
   if (!pacing.hostControlled) return noop(state);
+  const mod = moderationOf(state.meta);
   switch (state.meta.phase) {
+    case "ready":
+      return startCountdown(state, state.meta.qIndex, now);
     case "question":
-      return reveal(state, now, pacing);
+      return closeQuestion(state, now, pacing);
+    case "closed":
+      // "Show answer", or — with answers hidden — "Show scores" / next.
+      if (mod?.showAnswer) return reveal(state, now, pacing);
+      if (mod?.showScores) return showScores(state, true);
+      return advance(state, now, pacing, ctx);
     case "reveal":
+      if (scoresStepPending(mod)) return showScores(state, false);
+      return advance(state, now, pacing, ctx);
+    case "scores":
       return advance(state, now, pacing, ctx);
     case "final":
       return noop(state, { kind: "end-game" });
@@ -182,16 +250,22 @@ function onDeadline(
   if (meta.pausedAt) return noop(state);
   switch (meta.phase) {
     case "starting":
-      return openQuestion(state, 0, now, ctx);
+      // Question 1 after "start game", or a moderated game's next question.
+      return openQuestion(state, meta.qIndex, now, ctx);
     case "question":
       if (!meta.qStartAt) {
         // Legacy meta only — the window and the phase are one write now.
         return openQuestion(state, meta.qIndex, now, ctx);
       }
       if (now >= meta.qDeadline + ANSWER_GRACE_MS) {
-        return reveal(state, now, pacing);
+        return closeQuestion(state, now, pacing);
       }
       return noop(state);
+    case "ready":
+    case "closed":
+    case "scores":
+      // Moderated steps wait on the host; keep the room visible to the sweep.
+      return noop(state, { kind: "park-deadline" });
     case "reveal":
       // Only a reveal that ends by itself carries a real deadline. A
       // host-paced one that comes due (its parked entry reached the TTL
@@ -214,9 +288,154 @@ function advance(
 ): Transition {
   const { meta } = state;
   if (meta.qIndex + 1 < meta.qCount) {
+    const mod = moderationOf(meta);
+    if (mod?.confirmNextQuestion) return enterReady(state, meta.qIndex + 1);
+    if (mod) return startCountdown(state, meta.qIndex + 1, now);
     return openQuestion(state, meta.qIndex + 1, now, ctx);
   }
   return enterFinal(state, pacing);
+}
+
+/** Moderated: the get-ready slide before question `index`, until the host starts it. */
+function enterReady(state: GameState, index: number): Transition {
+  const patch = { phase: "ready" as const, qIndex: index, qDeadline: 0 };
+  return {
+    state: { ...withMeta(state, patch), answers: {} },
+    effects: [
+      { kind: "clear-timer" },
+      { kind: "park-deadline" },
+      { kind: "patch-meta", patch },
+      {
+        kind: "emit",
+        to: ROOM,
+        message: { event: "phase-change", payload: { phase: "ready", qIndex: index } },
+      },
+    ],
+  };
+}
+
+/** Moderated: the countdown into question `index` (it opens on the deadline). */
+function startCountdown(
+  state: GameState,
+  index: number,
+  now: number,
+): Transition {
+  if (!state.questions[index]) return noop(state);
+  const at = now + START_COUNTDOWN_MS;
+  const patch = { phase: "starting" as const, qIndex: index, qDeadline: at };
+  return {
+    state: { ...withMeta(state, patch), answers: {} },
+    effects: [
+      { kind: "set-deadline", at },
+      { kind: "patch-meta", patch },
+      {
+        kind: "emit",
+        to: ROOM,
+        message: {
+          event: "phase-change",
+          payload: { phase: "starting", qIndex: index },
+          deadline: at,
+        },
+      },
+      { kind: "arm-timer", at },
+    ],
+  };
+}
+
+/**
+ * The open question's answer window is over. Unmoderated (and moderated with
+ * the answer shown right away) this is the reveal; a moderated game whose
+ * host confirms the answer — or that hides answers — waits in "closed".
+ */
+function closeQuestion(
+  state: GameState,
+  now: number,
+  pacing: PacingStrategy,
+): Transition {
+  const mod = moderationOf(state.meta);
+  if (!mod || (mod.showAnswer && !mod.confirmShowAnswer)) {
+    return reveal(state, now, pacing);
+  }
+  if (!mod.showAnswer && mod.showScores && !mod.confirmShowScores) {
+    return showScores(state, true, true);
+  }
+  if (state.meta.phase !== "question") return noop(state);
+  const patch = { phase: "closed" as const, qDeadline: 0 };
+  return {
+    state: withMeta(state, patch),
+    effects: [
+      { kind: "clear-timer" },
+      { kind: "cancel-bot" },
+      { kind: "park-deadline" },
+      { kind: "patch-meta", patch },
+      {
+        kind: "emit",
+        to: ROOM,
+        message: {
+          event: "phase-change",
+          payload: { phase: "closed", qIndex: state.meta.qIndex },
+        },
+      },
+    ],
+  };
+}
+
+/**
+ * Moderated: the standings after a question. `sendResults` when the players
+ * never got their personal outcome (answers hidden, so no reveal ran);
+ * `fromQuestion` when the question closes straight into the scores.
+ */
+function showScores(
+  state: GameState,
+  sendResults: boolean,
+  fromQuestion = false,
+): Transition {
+  const { meta, roster, scores, answers } = state;
+  const allowed = fromQuestion
+    ? meta.phase === "question"
+    : meta.phase === "closed" || meta.phase === "reveal";
+  if (!allowed) return noop(state);
+  const patch = { phase: "scores" as const, qDeadline: 0 };
+  const effects: Effect[] = [
+    { kind: "clear-timer" },
+    { kind: "cancel-bot" },
+    { kind: "park-deadline" },
+    { kind: "patch-meta", patch },
+  ];
+  if (sendResults) {
+    for (const player of roster) {
+      effects.push({
+        kind: "emit",
+        to: { player: player.id },
+        message: {
+          event: "answer-result",
+          payload: buildAnswerResult(scores, answers, player.id),
+        },
+      });
+    }
+  }
+  effects.push(
+    {
+      kind: "emit",
+      to: ROOM,
+      message: {
+        event: "leaderboard",
+        payload: {
+          entries: buildLeaderboard(scores, roster, answers),
+          isFinal: false,
+        },
+      },
+    },
+    {
+      kind: "emit",
+      to: ROOM,
+      message: {
+        event: "phase-change",
+        payload: { phase: "scores", qIndex: meta.qIndex },
+      },
+    },
+  );
+  return { state: withMeta(state, patch), effects };
 }
 
 function openQuestion(
@@ -302,9 +521,10 @@ function reveal(
   pacing: PacingStrategy,
 ): Transition {
   const { meta, answers, roster, scores } = state;
-  if (meta.phase !== "question") return noop(state);
+  if (meta.phase !== "question" && meta.phase !== "closed") return noop(state);
   const question = state.questions[meta.qIndex];
   if (!question) return noop(state);
+  const mod = moderationOf(meta);
 
   const revealUntil = pacing.revealEndsAt(now);
   const patch = { phase: "reveal" as const, qDeadline: revealUntil ?? 0 };
@@ -343,23 +563,29 @@ function reveal(
       payload: buildReveal(question, meta.qIndex, answers, roster),
     },
   });
-  // Running leaderboard so the host screen needs no REST round trip.
-  effects.push({
-    kind: "emit",
-    to: ROOM,
-    message: {
-      event: "leaderboard",
-      payload: {
-        entries: buildLeaderboard(scores, roster, answers),
-        isFinal: false,
+  // Running leaderboard so the host screen needs no REST round trip — unless
+  // a moderated game shows the standings as a step of its own (or not at all).
+  if (leaderboardWithReveal(mod)) {
+    effects.push({
+      kind: "emit",
+      to: ROOM,
+      message: {
+        event: "leaderboard",
+        payload: {
+          entries: buildLeaderboard(scores, roster, answers),
+          isFinal: false,
+        },
       },
-    },
-  });
+    });
+  }
   return { state: withMeta(state, patch), effects };
 }
 
 function enterFinal(state: GameState, pacing: PacingStrategy): Transition {
-  if (state.meta.phase !== "reveal") return noop(state);
+  // Moderated games may leave the last question from "closed" or "scores".
+  if (!["reveal", "closed", "scores"].includes(state.meta.phase)) {
+    return noop(state);
+  }
   const patch = { phase: "final" as const, qDeadline: 0 };
   const effects: Effect[] = [
     { kind: "clear-timer" },
@@ -432,8 +658,15 @@ function onRosterChanged(state: GameState): Transition {
   if (meta.phase === "question") {
     return onAnswerRecorded(state, meta.qIndex, Object.keys(state.answers));
   }
-  if (meta.phase === "reveal" || meta.phase === "final") {
-    const inReveal = meta.phase === "reveal";
+  if (
+    meta.phase === "reveal" ||
+    meta.phase === "scores" ||
+    meta.phase === "final"
+  ) {
+    const inReveal = meta.phase !== "final";
+    if (meta.phase === "reveal" && !leaderboardWithReveal(moderationOf(meta))) {
+      return noop(state);
+    }
     return noop(state, {
       kind: "emit",
       to: ROOM,

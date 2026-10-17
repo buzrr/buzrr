@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { absoluteUrl } from "@/lib/seo/site";
+import { PRIVATE_BUZZ } from "@/lib/instance";
 
 /**
  * Blocks only what crawlers can't use: API routes and the signed-in areas
@@ -9,6 +10,9 @@ import { absoluteUrl } from "@/lib/seo/site";
  * could leave bare URLs in the index.
  */
 export default function robots(): MetadataRoute.Robots {
+  if (PRIVATE_BUZZ) {
+    return { rules: [{ userAgent: "*", disallow: "/" }] };
+  }
   return {
     rules: [
       {

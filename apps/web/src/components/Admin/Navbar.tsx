@@ -21,12 +21,15 @@ import { NavToggle, setNavToggle } from "@/state/admin/navtoggleSlice";
 import { useCurrentRole } from "@/components/SessionProvider";
 import { LICENSE_LINK } from "@/components/Landing/links";
 import { isAiConfigured } from "@/lib/api/ai-client";
+import { BILLING_ENABLED } from "@/lib/instance";
 import SignOutButton from "./SignOutButton";
 
 const NavLinks = [
   { href: "/admin", label: "Quizzes", icon: LuBookText },
   { href: "/admin/history", label: "History", icon: LuHistory },
-  { href: "/admin/billing", label: "Plan & Billing", icon: LuCrown },
+  ...(BILLING_ENABLED
+    ? [{ href: "/admin/billing", label: "Plan & Billing", icon: LuCrown }]
+    : []),
   { href: "/admin/settings", label: "Settings", icon: LuSettings },
 ];
 
@@ -64,7 +67,7 @@ export default function Navbar() {
       ? [
           {
             href: "/admin/superadmin/admins",
-            label: "Manage Admins",
+            label: "Manage Users",
             icon: LuUserCog,
           },
         ]

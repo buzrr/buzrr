@@ -14,6 +14,7 @@ import type {
   ScoreEntry,
   StoredAnswer,
 } from "../game-engine.types";
+import { leaderboardWithReveal, moderationOf } from "./moderation";
 import type { GameState } from "./state";
 
 // Pure projections of a game's state into what clients are sent.
@@ -145,11 +146,25 @@ export function buildSnapshot(
     // Lets a client that (re)connects mid-countdown show the real time left.
     payload.remainingMs = Math.max(0, meta.qDeadline - now);
   }
+  const mod = moderationOf(meta);
+  if (mod) payload.moderation = mod;
   const question = state.questions[meta.qIndex];
   const inReveal = meta.phase === "reveal";
-  if (question && (meta.phase === "question" || inReveal)) {
+  const inScores = meta.phase === "scores";
+  if (
+    question &&
+    (meta.phase === "question" ||
+      meta.phase === "closed" ||
+      inReveal ||
+      inScores)
+  ) {
     payload.question = toPublicQuestion(question);
-    if (meta.phase === "question") {
+    // "closed" (and scores with answers hidden) keep the answer key back.
+    const answerHidden =
+      meta.phase === "closed" || (inScores && !mod?.showAnswer);
+    if (answerHidden) {
+      // Nothing beyond the public question.
+    } else if (meta.phase === "question") {
       // Unstamped is only possible for meta written by an older build (the
       // window is durable before the broadcast); fall back to the full window
       // rather than showing a dead countdown.
@@ -167,11 +182,16 @@ export function buildSnapshot(
     }
   }
 
-  if (inReveal || meta.phase === "final" || meta.phase === "ended") {
+  if (
+    (inReveal && leaderboardWithReveal(mod)) ||
+    inScores ||
+    meta.phase === "final" ||
+    meta.phase === "ended"
+  ) {
     payload.leaderboard = buildLeaderboard(
       scores,
       roster,
-      inReveal ? answers : undefined,
+      inReveal || inScores ? answers : undefined,
     );
   }
 
@@ -181,8 +201,10 @@ export function buildSnapshot(
     // stored (and which one — reconnects re-lock on it), never whether it was
     // right: the verdict, the points, and the total/rank they already move
     // all wait for the reveal.
-    payload.you =
-      meta.phase === "question"
+    // Moderated "closed" keeps the verdict back the same way until the
+    // answer (or the scores) are shown.
+    const masked = meta.phase === "question" || meta.phase === "closed";
+    payload.you = masked
         ? {
             ...you,
             isCorrect: false,

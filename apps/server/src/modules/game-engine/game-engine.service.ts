@@ -4,6 +4,7 @@ import {
   OnApplicationBootstrap,
   OnApplicationShutdown,
 } from "@nestjs/common";
+import { quizSettingsSchema } from "@buzrr/contract";
 import type { GameOverPayload, QuestionAnswer } from "@buzrr/contract";
 import type { DuelOutcome, Prisma } from "@buzrr/prisma";
 import { nanoid } from "nanoid";
@@ -240,6 +241,15 @@ export class GameEngineService
       case "game-started":
         target.emit("game-started", {
           remainingMs: Math.max(0, message.deadline - Date.now()),
+          ...(message.moderation ? { moderation: message.moderation } : {}),
+        });
+        break;
+      case "phase-change":
+        target.emit("phase-change", {
+          ...message.payload,
+          ...(message.deadline !== undefined
+            ? { remainingMs: Math.max(0, message.deadline - Date.now()) }
+            : {}),
         });
         break;
       case "question-start":
@@ -416,9 +426,18 @@ export class GameEngineService
       );
     }
 
+    // Moderated mode comes from the quiz's settings (invalid → unmoderated).
+    const settings = quizSettingsSchema.safeParse(session.quiz.settings ?? {});
+    const moderation = settings.success ? settings.data.moderation : null;
+
     const { effects } = step(
       state,
-      { type: "start", questions, quizTitle: session.quiz.title },
+      {
+        type: "start",
+        questions,
+        quizTitle: session.quiz.title,
+        moderation: moderation?.enabled ? moderation : null,
+      },
       Date.now(),
     );
     await this.run(gameCode, effects);

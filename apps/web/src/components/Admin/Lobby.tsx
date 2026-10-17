@@ -8,6 +8,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
+import { AnimatedNumber } from "@/components/Game/motion";
 import {
   LuBan,
   LuCheck,
@@ -29,6 +30,7 @@ import type { PlayerPayload } from "@buzrr/contract";
 import ConfirmationModal from "@/components/Admin/ConfirmationModal";
 import { buildJoinUrl } from "@/lib/join-link";
 import EndQuizButton from "@/components/Admin/EndQuizButton";
+import { BILLING_ENABLED } from "@/lib/instance";
 
 const Lobby = (params: {
   roomId: string;
@@ -71,6 +73,23 @@ const Lobby = (params: {
     },
     onGameStarted: handleGameStarted,
   });
+
+  // Live bubble mini-game totals per waiting player (relayed by the server).
+  const [bubbles, setBubbles] = useState<
+    Record<string, { hits: number; misses: number }>
+  >({});
+  useEffect(() => {
+    if (!socket) return;
+    const onStats = (s: { playerId: string; hits: number; misses: number }) =>
+      setBubbles((prev) => ({
+        ...prev,
+        [s.playerId]: { hits: s.hits, misses: s.misses },
+      }));
+    socket.on("bubble-stats", onStats);
+    return () => {
+      socket.off("bubble-stats", onStats);
+    };
+  }, [socket]);
 
   const removePlayerMutation = useRemoveRoomPlayerMutation();
   const banPlayerMutation = useBanRoomPlayerMutation();
@@ -305,7 +324,7 @@ const Lobby = (params: {
             </div>
             <p className="text-[12.5px] text-off-dark dark:text-muted-dark">
               This room can hold up to {maxPlayers} players.
-              {params.plan === "free" && (
+              {BILLING_ENABLED && params.plan === "free" && (
                 <>
                   {" "}
                   <Link
@@ -355,11 +374,16 @@ const Lobby = (params: {
                   alt=""
                   className="size-9 shrink-0 rounded-full object-cover"
                 />
-                <span
-                  className="flex-1 min-w-0 truncate text-[14.5px] font-medium"
-                  title={player.name ?? undefined}
-                >
-                  {player.name}
+                <span className="flex-1 min-w-0 flex flex-col">
+                  <span
+                    className="truncate text-[14.5px] font-medium"
+                    title={player.name ?? undefined}
+                  >
+                    {player.name}
+                  </span>
+                  {bubbles[player.id] && (
+                    <BubbleLine stats={bubbles[player.id]!} />
+                  )}
                 </span>
                 <span className="flex gap-0.5 shrink-0 md:opacity-55 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
                   <button
@@ -425,5 +449,16 @@ const Lobby = (params: {
     </div>
   );
 };
+
+/** "🫧 12 · 80% hits" — the tally ticks up as the server relays new totals. */
+function BubbleLine({ stats }: { stats: { hits: number; misses: number } }) {
+  const total = stats.hits + stats.misses;
+  return (
+    <span className="text-xs text-off-dark dark:text-muted-dark tabular-nums">
+      🫧 <AnimatedNumber value={stats.hits} />
+      {total > 0 && ` · ${Math.round((stats.hits / total) * 100)}% hits`}
+    </span>
+  );
+}
 
 export default Lobby;
