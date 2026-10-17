@@ -8,7 +8,7 @@ import {
 import { T0, answer, meta, player, questionOpen, state } from "./fixtures";
 
 describe("buildLeaderboard", () => {
-  it("ranks scorers, then lists everyone else at zero", () => {
+  it("ranks scorers, then lists everyone else at zero, sharing a rank", () => {
     const entries = buildLeaderboard(
       [{ playerId: "p2", score: 800 }],
       [player("p1"), player("p2"), player("p3")],
@@ -16,9 +16,22 @@ describe("buildLeaderboard", () => {
     expect(entries.map((e) => [e.playerId, e.score, e.rank])).toEqual([
       ["p2", 800, 1],
       ["p1", 0, 2],
-      ["p3", 0, 3],
+      ["p3", 0, 2],
     ]);
     expect(entries[0]).not.toHaveProperty("delta");
+  });
+
+  it("gives equal scores one rank and the next score the next rank", () => {
+    const entries = buildLeaderboard(
+      [
+        { playerId: "p1", score: 900 },
+        { playerId: "p2", score: 500 },
+        { playerId: "p3", score: 500 },
+        { playerId: "p4", score: 200 },
+      ],
+      [player("p1"), player("p2"), player("p3"), player("p4"), player("p5")],
+    );
+    expect(entries.map((e) => e.rank)).toEqual([1, 2, 2, 3, 4]);
   });
 
   it("names a scorer who left the roster Unknown", () => {
@@ -28,15 +41,22 @@ describe("buildLeaderboard", () => {
 });
 
 describe("buildAnswerResult", () => {
-  it("has no rank until the player has scored", () => {
+  it("ranks a player who hasn't scored with everyone else on zero", () => {
     expect(buildAnswerResult([], {}, "p1")).toEqual({
       answered: false,
       answer: null,
       isCorrect: false,
       score: 0,
       totalScore: 0,
-      rank: null,
+      rank: 1,
     });
+    const scores = [
+      { playerId: "p2", score: 900 },
+      { playerId: "p3", score: 900 },
+      { playerId: "p4", score: 0 },
+    ];
+    expect(buildAnswerResult(scores, {}, "p1").rank).toBe(2);
+    expect(buildAnswerResult(scores, {}, "p3").rank).toBe(1);
   });
 });
 
@@ -86,7 +106,8 @@ describe("buildSnapshot", () => {
       isCorrect: false,
       score: 0,
       totalScore: 600,
-      rank: null,
+      // As of the last reveal: 600 behind p2's 1000.
+      rank: 2,
     });
   });
 

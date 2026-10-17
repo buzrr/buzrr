@@ -99,7 +99,8 @@ services.
   and true / false (`isDuelEligible` in the question-type registry). Others
   in a public quiz go straight to `unapproved` (so they never fill the queue),
   `approve` refuses them with a 400, and the duel pool SQL filters on type
-  and a single correct option as a last guard.
+  and, for multiple choice, a single correct option as a last guard (true /
+  false has no options; its key is `config.answer`).
 - The admin list is one tab per status (`?status=`, default `pending`;
   `draft` is never listed), cursor-paginated: pending oldest first,
   unapproved most-reported first (auto-unapproved questions surface there),

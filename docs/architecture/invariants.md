@@ -95,8 +95,9 @@ the docs, and write an ADR.
     questions leave the server only through their type handler's `toPublic`
     (`toPublicQuestion` in `question-types/registry.ts`); snapshots include
     reveal data only in the `reveal` phase, and a question-phase snapshot
-    masks the player's own verdict (`you.isCorrect`/`score`/`rank`) too
-    (`buildSnapshot`).
+    masks the player's own verdict (`you.isCorrect`/`score`) too, and its
+    `totalScore`/`rank` are the standings as of the last reveal, computed
+    with every player's open-question points taken out (`buildSnapshot`).
 19. **[explicit] Friend-invite duels are unrated** (`rated: false`) so
     ratings can't be farmed; matchmade (including bot) duels are rated. The
     check is `rated !== false` for pre-field compatibility

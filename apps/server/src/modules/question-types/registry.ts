@@ -155,10 +155,13 @@ type LiveOption = LiveQuestion["options"][number];
 export function toLiveQuestion(row: QuestionRecord): LiveQuestion | null {
   if (!isQuestionType(row.type)) return null;
   try {
-    const { config } = handlerFor(row.type).validateDefinition({
+    const definition = handlerFor(row.type).validateDefinition({
       options: row.options,
       config: row.config,
     });
+    // A type that keeps no options (true / false folds legacy ones into its
+    // config) plays with none.
+    const options = definition.options.length > 0 ? row.options : [];
     return {
       id: row.id,
       type: row.type,
@@ -166,12 +169,12 @@ export function toLiveQuestion(row: QuestionRecord): LiveQuestion | null {
       media: row.media,
       mediaType: row.mediaType,
       timeOut: row.timeOut,
-      options: row.options.map((o) => ({
+      options: options.map((o) => ({
         id: o.id,
         title: o.title,
         isCorrect: o.isCorrect,
       })),
-      config,
+      config: definition.config,
     };
   } catch (err) {
     if (err instanceof QuestionDefinitionError) return null;
@@ -181,15 +184,23 @@ export function toLiveQuestion(row: QuestionRecord): LiveQuestion | null {
 
 /**
  * Questions written to Redis before `type`/`config` existed are multiple
- * choice; a deploy mid-game must not strand them.
+ * choice, and true / false ones from before `config.answer` carry their key
+ * as options; a deploy mid-game must not strand them.
  */
 export function normalizeLiveQuestion(
   question: Omit<LiveQuestion, "type" | "config"> &
     Partial<Pick<LiveQuestion, "type" | "config">>,
 ): LiveQuestion {
-  return {
-    ...question,
-    type: question.type ?? DEFAULT_QUESTION_TYPE,
-    config: question.config ?? {},
-  };
+  const type = question.type ?? DEFAULT_QUESTION_TYPE;
+  const config = question.config ?? {};
+  if (type === "true_false" && !("answer" in config)) {
+    const correct = question.options.find((o) => o.isCorrect);
+    return {
+      ...question,
+      type,
+      options: [],
+      config: { answer: correct?.title.trim().toLowerCase() === "true" },
+    };
+  }
+  return { ...question, type, config };
 }

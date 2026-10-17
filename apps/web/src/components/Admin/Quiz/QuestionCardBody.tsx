@@ -6,6 +6,7 @@ import {
   openText,
   rating,
   ratingMax,
+  trueFalse,
   wordCloud,
   type QuestionType,
 } from "@buzrr/contract";
@@ -24,6 +25,23 @@ interface CardQuestion {
 /** Rows written before `type` existed are multiple choice. */
 export function cardType(q: CardQuestion): QuestionType {
   return isQuestionType(q.type) ? q.type : "multiple_choice";
+}
+
+/**
+ * The options to list for a question. True / false stores its answer in
+ * config, not as options, so its fixed pair is built from that.
+ */
+export function cardOptions<O extends { title?: string; isCorrect?: boolean }>(
+  q: CardQuestion & { options?: O[] },
+): (O | { title: string; isCorrect: boolean })[] {
+  const t = trueFalse.config.safeParse(q.config);
+  if (cardType(q) === "true_false" && t.success) {
+    return [
+      { title: "True", isCorrect: t.data.answer },
+      { title: "False", isCorrect: !t.data.answer },
+    ];
+  }
+  return q.options ?? [];
 }
 
 /** The type tag shown beside the time on a question card. */
@@ -59,7 +77,7 @@ export default function QuestionCardBody({
   question: CardQuestion;
 }) {
   const type = cardType(question);
-  const options = question.options ?? [];
+  const options = cardOptions(question);
 
   if (type === "multiple_choice" || type === "true_false") {
     return (

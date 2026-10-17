@@ -49,6 +49,11 @@ export interface GameLiveState {
     connected: boolean;
   }[];
   you: AnswerResultPayload | null;
+  /**
+   * The player's place as of the latest reveal. Unlike `you` it outlives
+   * `question-start`, so the next question can still show it.
+   */
+  standing: Standing | null;
   connection: ConnectionStatus;
   gameOver: boolean;
   /** Duels only: rating change per playerId, delivered with game-over. */
@@ -59,6 +64,29 @@ export interface GameLiveState {
   category: DuelCategoryRef;
   /** Duels only: daily streak per signed-in playerId, from game-over. */
   streaks: GameOverPayload["streaks"] | null;
+}
+
+export interface Standing {
+  /** The question whose reveal this standing is from. */
+  qIndex: number;
+  rank: number;
+  totalScore: number;
+  /** The rank one reveal earlier, when this client saw it. */
+  previousRank: number | null;
+}
+
+/** The standing after `you` for question `qIndex`, keeping the move. */
+function nextStanding(
+  current: Standing | null,
+  qIndex: number,
+  you: AnswerResultPayload,
+): Standing | null {
+  if (you.rank === null) return current;
+  // A second result for the same reveal (a sync after the event) keeps the
+  // rank it moved from.
+  const previousRank =
+    current?.qIndex === qIndex ? current.previousRank : (current?.rank ?? null);
+  return { qIndex, rank: you.rank, totalScore: you.totalScore, previousRank };
 }
 
 const initialState: GameLiveState = {
@@ -76,6 +104,7 @@ const initialState: GameLiveState = {
   isFinalLeaderboard: false,
   players: [],
   you: null,
+  standing: null,
   connection: "connecting",
   gameOver: false,
   eloChanges: null,
@@ -144,6 +173,20 @@ const gameSlice = createSlice({
       state.isFinalLeaderboard = s.phase === "final" || s.phase === "ended";
       state.players = s.players;
       state.you = s.you ?? null;
+      // Mid-question the server sends the standing as of the last reveal —
+      // none yet on the first question.
+      if (s.you && (s.phase === "reveal" || s.phase === "final")) {
+        state.standing = nextStanding(state.standing, s.qIndex, s.you);
+      } else if (
+        s.you &&
+        s.phase === "question" &&
+        s.qIndex > 0 &&
+        // `answer-result` lands just ahead of the reveal, so a late snapshot
+        // of the same question must not roll that standing back.
+        (state.standing?.qIndex ?? -1) <= s.qIndex - 1
+      ) {
+        state.standing = nextStanding(state.standing, s.qIndex - 1, s.you);
+      }
     },
     gameStarted: (state, action: PayloadAction<{ remainingMs: number }>) => {
       state.phase = "starting";
@@ -171,6 +214,11 @@ const gameSlice = createSlice({
     },
     answerResult: (state, action: PayloadAction<AnswerResultPayload>) => {
       state.you = action.payload;
+      state.standing = nextStanding(
+        state.standing,
+        state.qIndex,
+        action.payload,
+      );
     },
     answerCount: (state, action: PayloadAction<AnswerCountPayload>) => {
       if (action.payload.index === state.qIndex) {

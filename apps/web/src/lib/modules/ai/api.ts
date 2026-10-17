@@ -1,5 +1,5 @@
 import type { AxiosInstance } from "axios";
-import type { QuestionType } from "@buzrr/contract";
+import type { ImportQuizBody } from "@buzrr/contract";
 import { getAiApiClient } from "@/lib/api/ai-client";
 import { getAuthApiClient } from "@/lib/api/client";
 
@@ -183,16 +183,7 @@ export async function updateQuestion(
  */
 export async function importAsQuiz(
   client: AxiosInstance,
-  body: {
-    title: string;
-    description?: string;
-    questions: {
-      title: string;
-      type?: QuestionType;
-      timeOut?: number;
-      options: GeneratedOption[];
-    }[];
-  },
+  body: ImportQuizBody,
 ) {
   const { data } = await client.post<{ quizId: string; questionCount: number }>(
     "/quizzes/import",

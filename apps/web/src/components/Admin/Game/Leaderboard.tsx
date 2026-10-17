@@ -36,36 +36,66 @@ const PODIUM = {
   },
 } as const;
 
+/** Most avatars a shared podium step draws before "+N". */
+const MAX_PODIUM_AVATARS = 3;
+
+/** "Ana", "Ana & Ben", or "Ana +2". */
+function podiumNames(entries: LeaderboardEntry[]) {
+  if (entries.length === 1) return entries[0]!.name;
+  if (entries.length === 2) return `${entries[0]!.name} & ${entries[1]!.name}`;
+  return `${entries[0]!.name} +${entries.length - 1}`;
+}
+
+/** One podium step — everyone tied on that rank stands on it together. */
 function PodiumSpot({
-  entry,
+  entries,
   place,
 }: {
-  entry: LeaderboardEntry | undefined;
+  entries: LeaderboardEntry[];
   place: 1 | 2 | 3;
 }) {
   const p = PODIUM[place];
-  if (!entry) return <div />;
+  if (entries.length === 0) return <div />;
+  const shown = entries.slice(0, MAX_PODIUM_AVATARS);
+  const shared = entries.length > 1;
   return (
     <div className="flex flex-col items-center gap-1.5 min-w-0">
-      <span className="rounded-full p-1" style={{ background: p.color }}>
-        <Image
-          src={entry.profilePic || DEFAULT_AVATAR}
-          width={104}
-          height={104}
-          alt=""
-          className={clsx("rounded-full object-cover", p.avatar)}
-        />
-      </span>
+      <div className="flex items-center">
+        {shown.map((entry, i) => (
+          <span
+            key={entry.playerId}
+            className={clsx("rounded-full p-1", i > 0 && "-ml-4 md:-ml-6")}
+            style={{ background: p.color }}
+          >
+            <Image
+              src={entry.profilePic || DEFAULT_AVATAR}
+              width={104}
+              height={104}
+              alt=""
+              className={clsx(
+                "rounded-full object-cover",
+                shared ? "size-11 md:size-16" : p.avatar,
+              )}
+            />
+          </span>
+        ))}
+      </div>
       <span
+        title={shared ? entries.map((e) => e.name).join(", ") : undefined}
         className={clsx(
           "mt-1.5 max-w-full truncate font-bold",
           place === 1 ? "text-base md:text-xl" : "text-sm md:text-[17px]",
         )}
       >
-        {entry.name}
+        {podiumNames(entries)}
       </span>
+      {shared && (
+        <span className="sr-only">
+          Tied: {entries.map((e) => e.name).join(", ")}
+        </span>
+      )}
       <span className={clsx("text-xs md:text-sm font-semibold", mutedText)}>
-        {entry.score.toLocaleString()} pts
+        {entries[0]!.score.toLocaleString()} pts
       </span>
       <div
         className={clsx(
@@ -99,7 +129,12 @@ export default function LeaderBoard({
 }) {
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
   const qCount = useAppSelector((state) => state.game.qCount);
-  const rest = leaderboard.slice(3);
+  // Ranks are shared by equal scores, so a step can hold several players.
+  const onPlace = (place: number) =>
+    leaderboard.filter((entry) => entry.rank === place);
+  // A shared step names only some of its players ("Ana +2"), so the full
+  // list keeps everyone.
+  const rest = leaderboard;
 
   return (
     <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-2 gap-3.5 md:gap-5 md:pb-[18px]">
@@ -120,9 +155,9 @@ export default function LeaderBoard({
           </p>
         </div>
         <div className="flex-1 grid grid-cols-[1fr_1.15fr_1fr] gap-3 items-end min-h-0">
-          <PodiumSpot entry={leaderboard[1]} place={2} />
-          <PodiumSpot entry={leaderboard[0]} place={1} />
-          <PodiumSpot entry={leaderboard[2]} place={3} />
+          <PodiumSpot entries={onPlace(2)} place={2} />
+          <PodiumSpot entries={onPlace(1)} place={1} />
+          <PodiumSpot entries={onPlace(3)} place={3} />
         </div>
         <div className="flex flex-col-reverse md:flex-row gap-3 md:justify-end pt-[18px] border-t border-lprimary/15 dark:border-white/10 [&>button]:w-full md:[&>button]:w-auto">
           <EndQuizButton
@@ -177,9 +212,7 @@ export default function LeaderBoard({
           ))}
           {rest.length === 0 && (
             <p className={clsx("text-center text-sm py-10", mutedText)}>
-              {leaderboard.length === 0
-                ? "No players finished this quiz."
-                : "Everyone made the podium!"}
+              No players finished this quiz.
             </p>
           )}
         </div>

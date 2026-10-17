@@ -21,6 +21,7 @@ import {
   openText,
   poll,
   rating,
+  trueFalse,
   wordCloud,
   type QuestionType,
 } from "@buzrr/contract";
@@ -106,10 +107,17 @@ const OPTION_TYPES: QuestionType[] = ["multiple_choice", "true_false", "poll"];
 const blankOptions = (n: number): AuthoredOption[] =>
   Array.from({ length: n }, () => ({ title: "", isCorrect: false }));
 
+/**
+ * True / false is stored as `config.answer` with no options; the picker
+ * edits it as this pair, converted on load and submit.
+ */
 const TRUE_FALSE: AuthoredOption[] = [
   { title: "True", isCorrect: true },
   { title: "False", isCorrect: false },
 ];
+
+const truthOptions = (answer: boolean): AuthoredOption[] =>
+  TRUE_FALSE.map((o) => ({ ...o, isCorrect: (o.title === "True") === answer }));
 
 /** Keeps only the first correct option (or marks A), for single choice. */
 function singleCorrect(options: AuthoredOption[]): AuthoredOption[] {
@@ -177,10 +185,14 @@ function valuesFor(
   const r = configOf(rating.config, config, type === "rating");
   const o = configOf(openText.config, config, type === "open_text");
   const m = configOf(multipleChoice.config, config, type === "multiple_choice");
-  const stored = (question?.options ?? []).map((opt) => ({
-    title: opt.title ?? "",
-    isCorrect: Boolean(opt.isCorrect),
-  }));
+  const t = trueFalse.config.safeParse(config);
+  const stored =
+    type === "true_false" && t.success
+      ? truthOptions(t.data.answer)
+      : (question?.options ?? []).map((opt) => ({
+          title: opt.title ?? "",
+          isCorrect: Boolean(opt.isCorrect),
+        }));
   return {
     type,
     title: question?.title ?? "",
@@ -210,6 +222,8 @@ function configFor(v: FormValues): Record<string, unknown> {
   switch (v.type) {
     case "multiple_choice":
       return { multiSelect: v.mcqMulti };
+    case "true_false":
+      return { answer: v.options.find((o) => o.isCorrect)?.title === "True" };
     case "poll":
       return { multiSelect: v.pollMulti };
     case "word_cloud":
@@ -500,7 +514,7 @@ const AddQuesForm = (props: {
     fd.append(
       "options",
       JSON.stringify(
-        OPTION_TYPES.includes(data.type)
+        OPTION_TYPES.includes(data.type) && data.type !== "true_false"
           ? data.options.map((o) => ({
               title: o.title.trim(),
               isCorrect: data.type === "poll" ? false : o.isCorrect,

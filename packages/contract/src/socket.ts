@@ -25,11 +25,24 @@ export const gamePhaseSchema = z.enum([
 ]);
 export const gameModeSchema = z.enum(["classic", "duel"]);
 
+/**
+ * Ranks for scores sorted high to low. Equal scores share a rank and the
+ * next score down is one place below: 900, 500, 500, 0 → 1, 2, 2, 3.
+ */
+export function denseRanks(scoresHighToLow: readonly number[]): number[] {
+  let rank = 0;
+  return scoresHighToLow.map((score, i) => {
+    if (i === 0 || score !== scoresHighToLow[i - 1]) rank++;
+    return rank;
+  });
+}
+
 export const leaderboardEntrySchema = z.object({
   playerId: z.string(),
   name: z.string(),
   profilePic: z.string().nullable(),
   score: z.number(),
+  /** Shared by equal scores (see `denseRanks`). */
   rank: z.number().int(),
   /** Points earned on the question just revealed; absent outside a reveal. */
   delta: z.number().optional(),
@@ -77,6 +90,10 @@ export const answerResultSchema = z.object({
   isCorrect: z.boolean(),
   score: z.number(),
   totalScore: z.number(),
+  /**
+   * Place on the board (see `denseRanks`). While a question is open this is
+   * the standing as of the last reveal, so it gives nothing away.
+   */
   rank: z.number().int().nullable(),
 });
 
