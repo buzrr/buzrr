@@ -33,6 +33,11 @@ At 100 players everything was fine: join p50 30 ms, answer ack p50 18 ms,
 
 ## 1. Join returns HTTP 500 under a crowd (highest priority)
 
+> **Status: implemented in 5762aca, not yet measured.** Joins now lock the
+> room row instead of retrying SERIALIZABLE transactions, and the DB pool is
+> configurable (`DB_POOL_MAX`, see c1b6038). What remains: confirm with the
+> bench ("Done when" below), then remove this item.
+
 `POST /api/game-sessions/join` → `GameSessionsService.join`
 (`apps/server/src/modules/game-sessions/game-sessions.service.ts`).
 
@@ -171,6 +176,11 @@ Web:
   scores step and on the final screen.
 
 ## 4. Bundle lobby `bubble-stats` for the host
+
+> **Status: implemented in 5762aca, not yet measured.** Bubble stats are
+> relayed less often in big rooms, and the host applies events in batches.
+> What remains: confirm with a 500-bot lobby ("Done when" below), then
+> remove this item.
 
 `apps/server/src/modules/realtime/realtime.gateway.ts`,
 `socket.on("bubble-stats")`.
