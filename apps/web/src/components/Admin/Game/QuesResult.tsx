@@ -28,7 +28,7 @@ import {
   primaryButtonClass,
 } from "@/components/Game/GameUI";
 import { AnimatedNumber, useFlipReorder } from "@/components/Game/motion";
-import type { LeaderboardEntry } from "@buzrr/contract";
+import { denseRanks, type LeaderboardEntry } from "@buzrr/contract";
 import type { GameSocket } from "@/types/socket";
 
 /** Hold the old standings until the answer bars have mostly filled. */
@@ -36,16 +36,18 @@ const SETTLE_DELAY_MS = 1100;
 
 /**
  * The standings as they were before this question: each score minus its
- * `delta`, re-ranked (ties share a rank). The server only sends the new ones.
+ * `delta`, re-ranked the way the server ranks (ties share a rank). The
+ * server only sends the new ones.
  */
 function previousStandings(entries: LeaderboardEntry[]) {
   const sorted = entries
     .map((entry, i) => ({ entry, i, prev: entry.score - (entry.delta ?? 0) }))
     .sort((a, b) => b.prev - a.prev || a.i - b.i);
-  return sorted.map(({ entry, prev }) => ({
+  const ranks = denseRanks(sorted.map((s) => s.prev));
+  return sorted.map(({ entry, prev }, i) => ({
     ...entry,
     shownScore: prev,
-    shownRank: sorted.findIndex((s) => s.prev === prev) + 1,
+    shownRank: ranks[i]!,
   }));
 }
 

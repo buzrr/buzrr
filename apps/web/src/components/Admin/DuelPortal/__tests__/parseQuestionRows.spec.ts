@@ -27,6 +27,7 @@ describe("parseQuestionRows", () => {
           { title: "Paris", isCorrect: true },
           { title: "Rome", isCorrect: false },
         ],
+        config: {},
       },
     ]);
   });
@@ -60,10 +61,8 @@ describe("parseQuestionRows", () => {
     ]);
     expect(valid[0]).toMatchObject({
       type: "true_false",
-      options: [
-        { title: "True", isCorrect: false },
-        { title: "False", isCorrect: true },
-      ],
+      options: [],
+      config: { answer: false },
     });
   });
 

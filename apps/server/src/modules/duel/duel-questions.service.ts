@@ -19,10 +19,11 @@ const POOL_WHERE = Prisma.sql`
   -- Duels score head to head: one right answer, scored types only
   -- (approval already requires this; kept here as the last guard).
   AND q."type" IN ('multiple_choice', 'true_false')
-  AND (
+  -- True / false keeps its key in config (no options); the handler checks it.
+  AND (q."type" = 'true_false' OR (
     SELECT count(*) FROM "Option" o
     WHERE o."questionId" = q."id" AND o."isCorrect" = true
-  ) = 1
+  ) = 1)
 `;
 
 /** Thrown when a category can't currently host a duel. */

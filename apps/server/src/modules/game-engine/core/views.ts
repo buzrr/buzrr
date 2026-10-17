@@ -1,7 +1,8 @@
-import type {
-  AnswerResultPayload,
-  LeaderboardEntry,
-  StateSyncPayload,
+import {
+  denseRanks,
+  type AnswerResultPayload,
+  type LeaderboardEntry,
+  type StateSyncPayload,
 } from "@buzrr/contract";
 import {
   summarizeAnswers,
@@ -29,9 +30,9 @@ export function averageAnswerMs(
 }
 
 /**
- * Ranked by score; rostered players who never scored follow in roster order.
- * With `revealAnswers`, each entry carries the points it earned on that
- * question as `delta`.
+ * Ranked by score, equal scores sharing a rank; rostered players who never
+ * scored follow at zero, in roster order. With `revealAnswers`, each entry
+ * carries the points it earned on that question as `delta`.
  */
 export function buildLeaderboard(
   scores: ScoreEntry[],
@@ -39,47 +40,65 @@ export function buildLeaderboard(
   revealAnswers?: Record<string, StoredAnswer>,
 ): LeaderboardEntry[] {
   const byId = new Map(roster.map((p) => [p.id, p]));
-  const entries: LeaderboardEntry[] = scores.map((s, i) => ({
-    playerId: s.playerId,
-    name: byId.get(s.playerId)?.name ?? "Unknown",
-    profilePic: byId.get(s.playerId)?.profilePic ?? null,
-    score: s.score,
-    rank: i + 1,
-    ...(revealAnswers ? { delta: revealAnswers[s.playerId]?.score ?? 0 } : {}),
-  }));
   // Players who never scored still belong on the board.
   const scored = new Set(scores.map((s) => s.playerId));
-  for (const p of roster) {
-    if (!scored.has(p.id)) {
-      entries.push({
-        playerId: p.id,
-        name: p.name,
-        profilePic: p.profilePic,
-        score: 0,
-        rank: entries.length + 1,
-        ...(revealAnswers ? { delta: 0 } : {}),
-      });
-    }
-  }
-  return entries;
+  const rows = [
+    ...scores,
+    ...roster
+      .filter((p) => !scored.has(p.id))
+      .map((p) => ({ playerId: p.id, score: 0 })),
+  ].sort((a, b) => b.score - a.score);
+  const ranks = denseRanks(rows.map((r) => r.score));
+  return rows.map((r, i) => ({
+    playerId: r.playerId,
+    name: byId.get(r.playerId)?.name ?? "Unknown",
+    profilePic: byId.get(r.playerId)?.profilePic ?? null,
+    score: r.score,
+    rank: ranks[i]!,
+    ...(revealAnswers ? { delta: revealAnswers[r.playerId]?.score ?? 0 } : {}),
+  }));
 }
 
-/** A player's own outcome on the current question, plus their standing. */
+/** Where `score` places among `scores` — one below each higher distinct score. */
+function rankAmong(score: number, scores: ScoreEntry[]): number {
+  return (
+    new Set(scores.filter((s) => s.score > score).map((s) => s.score)).size + 1
+  );
+}
+
+/**
+ * A player's own outcome on the current question, plus their standing. A
+ * player who hasn't scored ranks with everyone else on zero.
+ */
 export function buildAnswerResult(
   scores: ScoreEntry[],
   answers: Record<string, StoredAnswer>,
   playerId: string,
 ): AnswerResultPayload {
   const answer = answers[playerId];
-  const index = scores.findIndex((s) => s.playerId === playerId);
+  const totalScore = scores.find((s) => s.playerId === playerId)?.score ?? 0;
   return {
     answered: Boolean(answer),
     answer: answer?.answer ?? null,
     isCorrect: answer?.isCorrect ?? false,
     score: answer?.score ?? 0,
-    totalScore: index === -1 ? 0 : (scores[index]?.score ?? 0),
-    rank: index === -1 ? null : index + 1,
+    totalScore,
+    rank: rankAmong(totalScore, scores),
   };
+}
+
+/**
+ * Everyone's score before the open question's answers were counted — the
+ * standings as of the last reveal.
+ */
+function scoresBefore(
+  scores: ScoreEntry[],
+  answers: Record<string, StoredAnswer>,
+): ScoreEntry[] {
+  return scores.map((s) => ({
+    playerId: s.playerId,
+    score: s.score - (answers[s.playerId]?.score ?? 0),
+  }));
 }
 
 /**
@@ -180,7 +199,7 @@ export function buildSnapshot(
     // While the question is open a player may learn *that* their answer was
     // stored (and which one — reconnects re-lock on it), never whether it was
     // right: the verdict, the points, and the total/rank they already move
-    // all wait for the reveal.
+    // all wait for the reveal. Total and rank are as of the last reveal.
     payload.you =
       meta.phase === "question"
         ? {
@@ -188,7 +207,10 @@ export function buildSnapshot(
             isCorrect: false,
             score: 0,
             totalScore: you.totalScore - you.score,
-            rank: null,
+            rank: rankAmong(
+              you.totalScore - you.score,
+              scoresBefore(scores, answers),
+            ),
           }
         : you;
   }

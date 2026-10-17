@@ -7,9 +7,11 @@ import {
   isDuelEligible,
   mergeAnswers,
   isScored,
+  normalizeLiveQuestion,
   sampleAnswer,
   scoreAnswer,
   summarizeAnswers,
+  toLiveQuestion,
   toPublicQuestion,
   validateDefinition,
 } from "../registry";
@@ -29,21 +31,36 @@ describe("true / false", () => {
   const live: LiveQuestion = {
     ...base,
     type: "true_false",
-    options: [
-      { id: "t", title: "True", isCorrect: false },
-      { id: "f", title: "False", isCorrect: true },
-    ],
-    config: {},
+    options: [],
+    config: { answer: false },
   };
 
-  it("needs two options, exactly one correct", () => {
+  it("keeps its key in config and takes no options", () => {
+    expect(
+      validateDefinition("true_false", {
+        options: [],
+        config: { answer: true },
+      }),
+    ).toEqual({ options: [], config: { answer: true } });
+    expect(() =>
+      validateDefinition("true_false", { options: [], config: {} }),
+    ).toThrow(QuestionDefinitionError);
+    expect(() =>
+      validateDefinition("true_false", {
+        options: [{ title: "True", isCorrect: true }],
+        config: { answer: true },
+      }),
+    ).toThrow(QuestionDefinitionError);
+  });
+
+  it("folds the legacy True / False options into config", () => {
     const opts = [
-      { title: "True", isCorrect: true },
-      { title: "False", isCorrect: false },
+      { title: "True", isCorrect: false },
+      { title: "False", isCorrect: true },
     ];
     expect(
-      validateDefinition("true_false", { options: opts, config: {} }).options,
-    ).toEqual(opts);
+      validateDefinition("true_false", { options: opts, config: {} }),
+    ).toEqual({ options: [], config: { answer: false } });
     expect(() =>
       validateDefinition("true_false", {
         options: opts.map((o) => ({ ...o, isCorrect: true })),
@@ -55,33 +72,51 @@ describe("true / false", () => {
     ).toThrow(QuestionDefinitionError);
   });
 
+  it("plays legacy rows and Redis snapshots without their options", () => {
+    const options = [
+      { id: "t", title: "True", isCorrect: true },
+      { id: "f", title: "False", isCorrect: false },
+    ];
+    expect(
+      toLiveQuestion({ ...base, type: "true_false", config: {}, options }),
+    ).toMatchObject({ options: [], config: { answer: true } });
+    expect(
+      normalizeLiveQuestion({ ...base, type: "true_false", options }),
+    ).toMatchObject({ options: [], config: { answer: true } });
+  });
+
   it("is scored and duel-eligible", () => {
     expect(isScored("true_false")).toBe(true);
-    const check = checkAnswer(live, { optionId: "f" });
+    const check = checkAnswer(live, { value: false });
     expect(check?.correct).toBe(true);
     expect(scoreAnswer(live, check!, 0)).toBe(1000);
-    expect(checkAnswer(live, { optionId: "t" })?.correct).toBe(false);
+    expect(checkAnswer(live, { value: true })?.correct).toBe(false);
+    expect(checkAnswer(live, { optionId: "f" })).toBeNull();
     expect(
-      isDuelEligible("true_false", {
-        options: [
-          { title: "True", isCorrect: true },
-          { title: "False", isCorrect: false },
-        ],
-        config: {},
-      }),
+      isDuelEligible("true_false", { options: [], config: { answer: true } }),
     ).toBe(true);
   });
 
+  it("bots answer right or wrong on request", () => {
+    expect(sampleAnswer(live, true)).toEqual({ value: false });
+    expect(sampleAnswer(live, false)).toEqual({ value: true });
+  });
+
   it("hides the answer key and summarises", () => {
-    expect(toPublicQuestion(live)).not.toHaveProperty("options.0.isCorrect");
+    expect(toPublicQuestion(live)).not.toHaveProperty("answer");
+    expect(toPublicQuestion(live)).not.toHaveProperty("config");
     expect(
-      summarizeAnswers(live, entries([{ optionId: "f" }, { optionId: "t" }])),
+      summarizeAnswers(
+        live,
+        entries([{ value: false }, { value: true }, { value: false }]),
+      ),
     ).toEqual({
       type: "true_false",
-      counts: [1, 1],
-      responses: 2,
-      correctOptionIds: ["f"],
-      correct: 1,
+      trueCount: 1,
+      falseCount: 2,
+      responses: 3,
+      answer: false,
+      correct: 2,
     });
   });
 });

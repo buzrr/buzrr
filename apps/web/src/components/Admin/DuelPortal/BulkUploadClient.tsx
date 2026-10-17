@@ -17,6 +17,7 @@ import { useCreateStandaloneQuestionsMutation } from "@/lib/modules/moderation/h
 import { queryKeys } from "@/lib/modules/query-keys";
 import {
   MAX_UPLOAD_ROWS,
+  correctAnswerLabel,
   parseQuestionRows,
   type ParseResult,
 } from "./parseQuestionRows";
@@ -128,6 +129,7 @@ export default function BulkUploadClient() {
             type: q.type,
             title: q.title,
             options: q.options,
+            config: q.config,
             timeOut: q.timeOut,
             categoryIds,
           })),
@@ -409,7 +411,7 @@ function Preview({ parsed }: { parsed: ParseResult }) {
                   <td className="px-3 py-2 tabular-nums">{q.row}</td>
                   <td className="px-3 py-2 break-words">{q.title}</td>
                   <td className="px-3 py-2 font-semibold text-[#20A97C] break-words">
-                    {q.options.find((o) => o.isCorrect)?.title}
+                    {correctAnswerLabel(q)}
                   </td>
                 </tr>
               ))}

@@ -2,10 +2,19 @@
 import clsx from "clsx";
 import Image from "next/image";
 import type { ReactNode } from "react";
-import { LuCheck, LuClock, LuSend, LuX } from "react-icons/lu";
+import {
+  LuArrowDown,
+  LuArrowUp,
+  LuCheck,
+  LuClock,
+  LuSend,
+  LuTrophy,
+  LuX,
+} from "react-icons/lu";
 import type { PublicQuestion, QuestionAnswer } from "@buzrr/contract";
 import { DEFAULT_AVATAR } from "@/constants";
 import { useAppSelector } from "@/state/hooks";
+import type { Standing } from "@/state/game/gameSlice";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
 import { AnswerInput, QuestionTypePill } from "@/components/QuestionTypes";
 import {
@@ -55,6 +64,82 @@ const STATUS = {
     answer: "border-[#e0a020] bg-[#e0a020]/8",
   },
 } as const;
+
+/** Places climbed (positive) or dropped since the reveal before. */
+function rankMove(standing: Standing): number {
+  return standing.previousRank === null
+    ? 0
+    : standing.previousRank - standing.rank;
+}
+
+/** "▲ 2" / "▼ 1" beside a rank; nothing when it didn't change. */
+function RankMove({ move }: { move: number }) {
+  if (move === 0) return null;
+  const up = move > 0;
+  return (
+    <span
+      className={clsx(
+        "inline-flex items-center gap-0.5 font-bold",
+        up ? "text-green-600 dark:text-green-500" : "text-[#e5544e]",
+      )}
+    >
+      {up ? (
+        <LuArrowUp size={14} strokeWidth={3} />
+      ) : (
+        <LuArrowDown size={14} strokeWidth={3} />
+      )}
+      <span className="sr-only">{up ? "up" : "down"}</span>
+      {Math.abs(move)}
+    </span>
+  );
+}
+
+/** The player's place from the last reveal, in the top bar while answering. */
+function StandingChip({ standing }: { standing: Standing }) {
+  return (
+    <span
+      title="Your rank after the last question"
+      className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-lprimary/15 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-1.5 text-[13px] font-semibold"
+    >
+      <LuTrophy
+        size={14}
+        className="text-lprimary dark:text-dprimary"
+        aria-hidden="true"
+      />
+      <span className="sr-only">Your rank</span>
+      {ordinal(standing.rank)}
+    </span>
+  );
+}
+
+/** Rank, field size and total under the verdict — phones only. */
+function StandingStrip({
+  standing,
+  playerCount,
+}: {
+  standing: Standing;
+  playerCount: number;
+}) {
+  return (
+    <div
+      className={clsx(
+        "md:hidden mt-3 flex items-center justify-center gap-2 rounded-full px-4 py-2 text-[14.5px] animate-fade-up",
+        subtleCardClass,
+      )}
+    >
+      <b className="text-dark dark:text-white">{ordinal(standing.rank)}</b>
+      {playerCount > 0 && <span className={mutedText}>of {playerCount}</span>}
+      <RankMove move={rankMove(standing)} />
+      <span className={mutedText} aria-hidden="true">
+        ·
+      </span>
+      <b className="text-dark dark:text-white tabular-nums">
+        {standing.totalScore.toLocaleString()}
+      </b>
+      <span className={mutedText}>pts</span>
+    </div>
+  );
+}
 
 /** One labelled answer; `children` is the answer as its type renders it. */
 function AnswerRow({
@@ -115,6 +200,10 @@ const QuestionAndResult = (params: {
   const qCount = useAppSelector((state) => state.game.qCount);
   const players = useAppSelector((state) => state.game.players);
   const you = useAppSelector((state) => state.game.you);
+  // Duels show both scores in their own header instead.
+  const standing = useAppSelector((state) =>
+    state.game.mode === "classic" ? state.game.standing : null,
+  );
   // Answers submitted while offline would be rejected anyway — lock the UI.
   const offline = connection !== "connected";
   // Display-only countdown against the server deadline; the reveal is pushed
@@ -139,7 +228,16 @@ const QuestionAndResult = (params: {
 
   return (
     <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 pb-16 md:pb-6 md:min-h-[calc(100dvh-7.5rem)] text-dark dark:text-white">
-      <GameTopBar title={params.quizTitle} qIndex={qIndex} qCount={qCount} />
+      <GameTopBar
+        title={params.quizTitle}
+        qIndex={qIndex}
+        qCount={qCount}
+        right={
+          isQuestion && standing ? (
+            <StandingChip standing={standing} />
+          ) : undefined
+        }
+      />
       {isQuestion && (
         <TimerBar
           key={params.question?.id ?? params.question?.title}
@@ -329,6 +427,9 @@ const QuestionAndResult = (params: {
                   ? "Not scored — thanks for answering"
                   : `+${params.points ?? 0} points`}
             </span>
+            {standing && standing.qIndex === qIndex && (
+              <StandingStrip standing={standing} playerCount={players.length} />
+            )}
             <div className="mt-3 md:mt-[22px] flex flex-col gap-3 md:gap-4 w-full max-w-[420px] animate-fade-up [animation-delay:150ms]">
               <AnswerRow
                 label="Your answer"

@@ -25,12 +25,18 @@ export const TEMPLATE_HEADERS = [
 ] as const;
 
 export type ParsedQuestion = Required<
-  Pick<QuestionDefinitionInput, "type" | "title" | "options">
+  Pick<QuestionDefinitionInput, "type" | "title" | "options" | "config">
 > &
   Pick<QuestionDefinitionInput, "timeOut"> & {
     /** The spreadsheet row it came from (header is row 1). */
     row: number;
   };
+
+/** The right answer as the preview shows it. */
+export function correctAnswerLabel(q: ParsedQuestion): string {
+  if (q.type === "true_false") return q.config.answer ? "True" : "False";
+  return q.options.find((o) => o.isCorrect)?.title ?? "";
+}
 
 export type RowError = { row: number; message: string };
 
@@ -126,15 +132,14 @@ export function parseQuestionRows(
       return fail(`Unknown type "${fields.type}" (use MCQ or True/False)`);
 
     const correctRaw = fields.correct ?? "";
-    let options: { title: string; isCorrect: boolean }[];
+    let options: { title: string; isCorrect: boolean }[] = [];
+    let config: Record<string, unknown> = {};
 
     if (type === "true_false") {
+      // Stored as the answer itself; true / false has no options.
       const answer = parseBoolean(correctRaw);
       if (answer === null) return fail("Correct Option must be True or False");
-      options = [
-        { title: "True", isCorrect: answer },
-        { title: "False", isCorrect: !answer },
-      ];
+      config = { answer };
     } else {
       const filled: { column: number; title: string }[] = [];
       for (let column = 1; column <= OPTION_COLUMNS; column++) {
@@ -164,7 +169,7 @@ export function parseQuestionRows(
       }
     }
 
-    const question = { type, title, options, timeOut };
+    const question = { type, title, options, config, timeOut };
     const checked = questionDefinitionSchema.safeParse(question);
     if (!checked.success) {
       const issue = checked.error.issues[0];

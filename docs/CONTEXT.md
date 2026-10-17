@@ -80,6 +80,10 @@ effects }` in `game-engine/core/`, unit-tested; `GameEngineService` is
    still missing from the design: "show results on players' screens", the
    word-cloud profanity filter and open-text host review. The spreadsheet
    import and `POST /quizzes/ai` still produce multiple choice only.
+   True / false moved its key from `Option` rows to `config.answer`
+   (2026-10-18). Until migration `20261018000001` runs in production, the
+   handler still accepts the old two-option rows. After that, the legacy
+   path in `true-false.ts` / `normalizeLiveQuestion` can be removed.
 3. **Self-paced pacing** — planned; needs per-player question state the
    phase machine doesn't model yet (ADR-012).
 4. **REST validation is half on the contract** — `POST /quizzes/import` uses

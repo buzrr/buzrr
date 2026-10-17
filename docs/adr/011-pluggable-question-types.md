@@ -84,9 +84,30 @@ as a handler.
 - Out of scope for now: "show results on players' screens", the word-cloud
   profanity filter and open-text host review.
 
+## Amendment (2026-10-18): true / false keeps its answer in config
+
+- `true_false` stores its key as `Question.config.answer` (boolean) and has
+  **no `Option` rows**. "True" and "False" never change, so a pair of rows per
+  question only added storage. Players send `{ value: boolean }`. The reveal
+  summary carries `trueCount`, `falseCount` and `answer` instead of
+  `counts`/`correctOptionIds`. The public question has no options, and
+  `toPublic` never copies `config`.
+- Decision 1's "options stay in the `Option` table" now applies to the
+  option-based types (multiple choice, poll) only.
+- Legacy input still works: when `config.answer` is missing, the handler folds
+  a True/False option pair into it. Older clients that post options, rows not
+  yet migrated, and Redis snapshots from before the deploy
+  (`normalizeLiveQuestion`) all still play. Migration
+  `20261018000001_true_false_answer_in_config` converts the rows and deletes
+  their options. Deploy the code first, then run it.
+- Side effect: the old renderer picked ✓/✗ by option position. Options read
+  back sorted by a shared `createdAt` could come back as False, True, which
+  drew a red ✗ on "True". That can't happen now.
+
 ## Evidence
 
 `packages/contract/src/question-types.ts`,
 `apps/server/src/modules/question-types/`,
-`apps/web/src/components/QuestionTypes/`, migration
-`20261006000001_add_question_type_and_config`.
+`apps/web/src/components/QuestionTypes/`, migrations
+`20261006000001_add_question_type_and_config`,
+`20261018000001_true_false_answer_in_config`.

@@ -30,14 +30,23 @@ export default function ExportToQuizButton({
       {
         title,
         description: "Generated from a Buzrr AI knowledge space",
-        questions: keepers.map((question) => ({
-          title: question.stem,
-          type:
-            question.type === "TRUE_FALSE"
-              ? ("true_false" as const)
-              : ("multiple_choice" as const),
-          options: question.options,
-        })),
+        questions: keepers.map((question) =>
+          question.type === "TRUE_FALSE"
+            ? {
+                // True / false is stored as its answer, not as options.
+                title: question.stem,
+                type: "true_false" as const,
+                config: {
+                  answer:
+                    question.options.find((o) => o.isCorrect)?.title === "True",
+                },
+              }
+            : {
+                title: question.stem,
+                type: "multiple_choice" as const,
+                options: question.options,
+              },
+        ),
       },
       {
         onSuccess: (result) => {

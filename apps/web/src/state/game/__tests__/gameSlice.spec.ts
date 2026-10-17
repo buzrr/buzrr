@@ -5,6 +5,7 @@ import type {
   StateSyncPayload,
 } from "@buzrr/contract";
 import reducer, {
+  answerResult,
   applySync,
   gameOver,
   gameProgress,
@@ -223,6 +224,52 @@ describe("liveSummary", () => {
     expect(
       reducer(held, applySync(sync({ phase: "reveal", qIndex: 0 })))
         .liveSummary,
+    ).toBeNull();
+  });
+});
+
+describe("standing", () => {
+  const result = (rank: number, totalScore: number) => ({
+    answered: true,
+    answer: null,
+    isCorrect: true,
+    score: 0,
+    totalScore,
+    rank,
+  });
+
+  it("outlives the next question and tracks the move", () => {
+    let s = reducer(onQuestion(0), answerResult(result(4, 500)));
+    expect(s.standing).toEqual({
+      qIndex: 0,
+      rank: 4,
+      totalScore: 500,
+      previousRank: null,
+    });
+    s = onQuestion(1, s);
+    expect(s.you).toBeNull();
+    expect(s.standing?.rank).toBe(4);
+    s = reducer(s, answerResult(result(2, 1400)));
+    expect(s.standing).toMatchObject({ qIndex: 1, rank: 2, previousRank: 4 });
+    // The reveal's own sync doesn't erase the move.
+    s = reducer(
+      s,
+      applySync(sync({ phase: "reveal", qIndex: 1, you: result(2, 1400) })),
+    );
+    expect(s.standing).toMatchObject({ rank: 2, previousRank: 4 });
+  });
+
+  it("takes the last reveal's standing from a mid-question sync", () => {
+    const s = reducer(
+      fresh(),
+      applySync(sync({ phase: "question", qIndex: 2, you: result(3, 900) })),
+    );
+    expect(s.standing).toMatchObject({ qIndex: 1, rank: 3 });
+    expect(
+      reducer(
+        fresh(),
+        applySync(sync({ phase: "question", qIndex: 0, you: result(1, 0) })),
+      ).standing,
     ).toBeNull();
   });
 });

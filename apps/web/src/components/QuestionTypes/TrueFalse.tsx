@@ -6,18 +6,32 @@ import { subtleCardClass } from "@/components/Game/GameUI";
 import { OptionsReveal } from "./MultipleChoice";
 import type { QuestionRenderer } from "./types";
 
-/** "True" gets the check, "False" the cross — by position, as authored. */
-function TruthKey({ index, className }: { index: number; className?: string }) {
+/** The two fixed answers, "True" first; questions carry no options. */
+const TRUTHS = [
+  { id: "true", value: true, title: "True" },
+  { id: "false", value: false, title: "False" },
+] as const;
+
+const titleOf = (value: boolean) => (value ? "True" : "False");
+
+/** "True" gets the check, "False" the cross. */
+function TruthKey({
+  truth,
+  className,
+}: {
+  truth: boolean;
+  className?: string;
+}) {
   return (
     <span
       aria-hidden="true"
       className={clsx(
         "shrink-0 flex items-center justify-center rounded-xl text-white",
-        index === 0 ? "bg-[#2f9e6a]" : "bg-[#e5544e]",
+        truth ? "bg-[#2f9e6a]" : "bg-[#e5544e]",
         className,
       )}
     >
-      {index === 0 ? (
+      {truth ? (
         <LuCheck size={20} strokeWidth={3} />
       ) : (
         <LuX size={20} strokeWidth={3} />
@@ -26,11 +40,11 @@ function TruthKey({ index, className }: { index: number; className?: string }) {
   );
 }
 
-function TruthLabel({ index, title }: { index: number; title: string }) {
+function TruthLabel({ value }: { value: boolean }) {
   return (
     <>
-      <TruthKey index={index} className="size-9" />
-      <span>{title}</span>
+      <TruthKey truth={value} className="size-9" />
+      <span>{titleOf(value)}</span>
     </>
   );
 }
@@ -39,19 +53,19 @@ const cardClass =
   "flex items-center gap-4 rounded-[18px] border-[1.5px] px-4 py-4 md:px-[22px] md:py-6 min-h-16 md:min-h-[110px] text-xl md:text-[26px] font-bold";
 
 export const trueFalseRenderer: QuestionRenderer<"true_false"> = {
-  AnswerInput({ question, selected, disabled, onSubmit }) {
+  AnswerInput({ selected, disabled, onSubmit }) {
     return (
       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-2.5 md:gap-3.5 mt-4 md:mt-7">
-        {question.options.map((option, index) => {
-          const picked = option.id === selected?.optionId;
+        {TRUTHS.map((truth) => {
+          const picked = truth.value === selected?.value;
           return (
             <button
-              key={option.id}
+              key={truth.id}
               type="button"
               disabled={disabled}
               aria-pressed={picked}
               onClick={() => {
-                if (!disabled) onSubmit({ optionId: option.id });
+                if (!disabled) onSubmit({ value: truth.value });
               }}
               className={clsx(
                 cardClass,
@@ -64,8 +78,8 @@ export const trueFalseRenderer: QuestionRenderer<"true_false"> = {
                 disabled && !picked && "opacity-50 cursor-default",
               )}
             >
-              <TruthKey index={index} className="size-11 md:size-14" />
-              {option.title}
+              <TruthKey truth={truth.value} className="size-11 md:size-14" />
+              {truth.title}
             </button>
           );
         })}
@@ -73,25 +87,25 @@ export const trueFalseRenderer: QuestionRenderer<"true_false"> = {
     );
   },
 
-  HostPrompt({ question }) {
+  HostPrompt() {
     return (
       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3.5 mt-7">
-        {question.options.map((option, index) => (
-          <div key={option.id} className={clsx(cardClass, subtleCardClass)}>
-            <TruthKey index={index} className="size-11 md:size-14" />
-            {option.title}
+        {TRUTHS.map((truth) => (
+          <div key={truth.id} className={clsx(cardClass, subtleCardClass)}>
+            <TruthKey truth={truth.value} className="size-11 md:size-14" />
+            {truth.title}
           </div>
         ))}
       </div>
     );
   },
 
-  RevealBreakdown({ question, summary }) {
+  RevealBreakdown({ summary }) {
     return (
       <OptionsReveal
-        options={question.options}
-        counts={summary.counts}
-        correctOptionIds={summary.correctOptionIds}
+        options={[...TRUTHS]}
+        counts={[summary.trueCount, summary.falseCount]}
+        correctOptionIds={[String(summary.answer)]}
         renderKey={() => null}
       />
     );
@@ -101,17 +115,11 @@ export const trueFalseRenderer: QuestionRenderer<"true_false"> = {
     return { responses, correct };
   },
 
-  describeAnswer(question, answer) {
-    const index = question.options.findIndex((o) => o.id === answer.optionId);
-    const option = question.options[index];
-    return option ? <TruthLabel index={index} title={option.title} /> : null;
+  describeAnswer(_question, answer) {
+    return <TruthLabel value={answer.value} />;
   },
 
-  correctAnswers(question, summary) {
-    return question.options.flatMap((option, index) =>
-      summary.correctOptionIds.includes(option.id)
-        ? [<TruthLabel key={option.id} index={index} title={option.title} />]
-        : [],
-    );
+  correctAnswers(_question, summary) {
+    return [<TruthLabel key="answer" value={summary.answer} />];
   },
 };
