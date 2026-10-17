@@ -80,6 +80,8 @@ const Lobby = (params: {
   const { socket } = useAdminSocket({
     gameCode: params.gameCode,
     onPlayerRemoved: (player) => {
+      // A device that went quiet just drops off the list — no toast.
+      if (player.timedOut) return;
       toast.error(
         player.banned
           ? tx("You have banned {name}", {

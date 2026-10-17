@@ -455,6 +455,8 @@ export const playerRefSchema = z.object({
 export const playerRemovedSchema = playerRefSchema.extend({
   /** True when the host banned the player instead of just kicking them. */
   banned: z.boolean().optional(),
+  /** Not the host's doing: the player's device went quiet in the lobby. */
+  timedOut: z.boolean().optional(),
 });
 
 /**

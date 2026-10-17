@@ -188,7 +188,11 @@ describe("lobby grace", () => {
 
     await vi.advanceTimersByTimeAsync(1);
     expect(io.events("player-removed")).toEqual([
-      { room: CODE, event: "player-removed", payload: { id: "p2" } },
+      {
+        room: CODE,
+        event: "player-removed",
+        payload: { id: "p2", timedOut: true },
+      },
     ]);
     expect(store.players.has("p2")).toBe(false);
   });

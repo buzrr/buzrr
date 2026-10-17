@@ -1485,7 +1485,10 @@ export class GameEngineService
     if (!meta || !entry || entry.connected) return;
     if (meta.phase !== "lobby") return;
     await this.store.removePlayer(gameCode, playerId);
-    this.emitRoom(gameCode).emit("player-removed", { id: playerId });
+    this.emitRoom(gameCode).emit("player-removed", {
+      id: playerId,
+      timedOut: true,
+    });
   }
 
   /**
