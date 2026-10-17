@@ -133,6 +133,40 @@ one); the service refuses others with a message saying so. Local models are
 slower and less reliable than hosted ones at following the quiz format — if a
 generation fails, try again or use a larger model.
 
+### Big rooms
+
+How many players fit in a room is set on the **server**:
+
+- `MAX_PLAYERS_NOBILLING` — without billing (the self-hosted default), every
+  host's room size (default `250`).
+- `MAX_PLAYERS_FREE` / `MAX_PLAYERS_PRO` — with `BILLING=ON`, per plan
+  (defaults `50` / `250`). A user's `hostSizeLimit` (database) can raise it
+  for one account.
+
+`DB_POOL_MAX` sets how many PostgreSQL connections one server process keeps
+open (default `10`, the `pg` driver's default). It matters when many players
+join at the same moment — a QR code on the screen: each join briefly takes the
+room's lock (so the room can't overfill) while holding a connection, and the
+joins of one room queue behind each other. With too small a pool, everything
+else the server does (sign-ins, the host's lobby, game results) waits behind
+that queue too, and the player count on the host screen seems stuck until the
+crowd is through. A bigger pool lets that work run alongside.
+
+Rough values for the largest crowd you expect to join **at once**:
+
+| Players joining at once | `DB_POOL_MAX`  |
+| ----------------------- | -------------- |
+| up to ~100              | `10` (default) |
+| ~100–300                | `20`           |
+| ~300–1000               | `30`–`50`      |
+
+Keep the sum of all pools under PostgreSQL's `max_connections` (default
+`100`), with room to spare: every server process × `DB_POOL_MAX`, plus the web
+app (about 10), plus a few for migrations and backups. More connections than
+that don't make joins faster — the room's lock serializes them anyway (a few
+milliseconds each, so 1000 joins take a few seconds) — they only keep the rest
+of the server responsive meanwhile.
+
 ## Upgrade
 
 ```sh
