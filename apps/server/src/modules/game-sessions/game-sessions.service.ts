@@ -31,7 +31,9 @@ function isSerializationConflict(e: unknown): boolean {
   // Driver-adapter errors that weren't mapped to P2034.
   return (
     e instanceof Error &&
-    /could not serialize access|40001|deadlock detected/i.test(e.message)
+    /could not serialize access|40001|deadlock detected|TransactionWriteConflict/i.test(
+      e.message + e.name,
+    )
   );
 }
 
