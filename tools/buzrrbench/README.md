@@ -32,12 +32,23 @@ python3 -m venv .venv
 .venv/bin/python buzrrbench.py --url https://quiz.woikn.de --code ABC123 --users 100 --ramp 20
 ```
 
-| Option            | Default   | What                                                                          |
-| ----------------- | --------- | ----------------------------------------------------------------------------- |
-| `--kbps N`        | unlimited | Download bandwidth per player (kbit/s), e.g. `2000` for a weak phone/Wi-Fi.   |
-| `--sound-optin F` | `0.3`     | Share of players who switch sound on when the quiz plays it on the host only. |
-| `--no-assets`     |           | No downloads at all (sockets only, like before).                              |
-| `--no-reactions`  |           | Players send no reactions.                                                    |
+| Option                | Default   | What                                                                          |
+| --------------------- | --------- | ----------------------------------------------------------------------------- |
+| `--kbps N`            | unlimited | Download bandwidth per player (kbit/s), e.g. `2000` for a weak phone/Wi-Fi.   |
+| `--sound-optin F`     | `0.3`     | Share of players who switch sound on when the quiz plays it on the host only. |
+| `--no-assets`         |           | No downloads at all (sockets only, like before).                              |
+| `--no-reactions`      |           | Players send no reactions.                                                    |
+| `--timeout-after SEC` |           | With `--timeout-users`: when players time out (seconds after the start).      |
+| `--timeout-users N`   | `0`       | That many connected players freeze then: no heartbeat, answers or reactions.  |
+
+Frozen players are like a locked phone: the socket still answers the transport
+ping, so only the server's heartbeat check (35 s after the last beat) can drop
+them, and once dropped they stay away. The summary shows how long that took
+(`frozen -> dropped by server`) and how many were never dropped.
+
+```sh
+.venv/bin/python buzrrbench.py --code ABC123 --users 50 --timeout-after 90 --timeout-users 5
+```
 
 Host the quiz in the browser, start the bench, wait until the players appear in
 the lobby, then start the game. Ctrl+C stops early and still prints the summary.

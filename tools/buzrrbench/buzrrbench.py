@@ -32,6 +32,12 @@ Measures:
 Usage:
   python3 buzrrbench.py [--url https://quiz.woikn.de] [--code ABC123] [--users 50]
                         [--kbps 2000] [--sound-optin 0.3] [--no-assets] [--no-reactions]
+                        [--timeout-after 60 --timeout-users 5]
+
+With --timeout-after/--timeout-users, that many connected players "freeze" at
+that point (like a locked phone): they send nothing any more — no heartbeat,
+answers, reactions — while the socket still answers the transport ping, so
+only the server's heartbeat check can drop them. Dropped, they stay away.
 Missing values are asked for interactively.
 """
 
@@ -209,8 +215,18 @@ class Bot:
     question_audio: dict | None = None
     seen_q: set = field(default_factory=set)
     wait_started: dict = field(default_factory=dict)  # qIndex -> first "waiting for downloads"
+    frozen_at: float = 0.0  # --timeout-*: when this player stopped sending (perf_counter)
 
     # -- helpers ------------------------------------------------------------------
+
+    @property
+    def frozen(self) -> bool:
+        return self.frozen_at > 0
+
+    def freeze(self) -> None:
+        """Stop sending anything, like a page frozen on a locked phone."""
+        self.frozen_at = time.perf_counter()
+        M.counts["players timed out (frozen)"] += 1
 
     def spawn(self, coro) -> None:
         t = asyncio.create_task(coro)
@@ -399,6 +415,8 @@ class Bot:
             self.spawn(self._emit("preload-status", payload))
 
     async def _emit(self, event: str, payload) -> None:
+        if self.frozen:
+            return
         try:
             await self.sio.emit(event, payload) if payload is not None else await self.sio.emit(event)
             M.counts[f"{event} sent"] += 1
@@ -562,6 +580,14 @@ class Bot:
 
         @s.event
         async def disconnect(*_args):
+            if self.frozen and not self.done.is_set():
+                # The server noticed: stay away (a frozen page can't reconnect).
+                M.add("frozen -> dropped by server", (time.perf_counter() - self.frozen_at) * 1000)
+                M.counts["frozen players dropped by server"] += 1
+                self.connected = False
+                self.done.set()
+                self.spawn(self.sio.shutdown())
+                return
             if not self.done.is_set():
                 M.counts["socket disconnects (unexpected)"] += 1
 
@@ -577,7 +603,7 @@ class Bot:
         """Lobby: 'pop' a few bubbles (some misses) and report once a second."""
         while True:
             await asyncio.sleep(1.0)
-            if self.phase not in ("idle", "lobby"):
+            if self.frozen or self.phase not in ("idle", "lobby"):
                 continue
             self.hits += random.randint(0, 3)
             self.misses += random.randint(0, 2)
@@ -597,7 +623,7 @@ class Bot:
 
     async def tap(self, delay: float = 0.0) -> None:
         await asyncio.sleep(delay)
-        if not self.reactions_on or self.phase not in REACTION_PHASES:
+        if self.frozen or not self.reactions_on or self.phase not in REACTION_PHASES:
             return
         emoji = random.choice(self.emojis)
         burst = random.randint(3, 10) if random.random() < 0.15 else random.choice([1, 1, 1, 2])
@@ -613,7 +639,7 @@ class Bot:
         """Lobby only: request-sync round trip as a latency probe."""
         await asyncio.sleep(random.uniform(0, SYNC_PROBE_EVERY))
         while True:
-            if self.phase in ("idle", "lobby") and not self.sync_sent:
+            if not self.frozen and self.phase in ("idle", "lobby") and not self.sync_sent:
                 self.sync_sent = time.perf_counter()
                 try:
                     await self.sio.emit("request-sync")
@@ -631,6 +657,9 @@ class Bot:
     async def answer(self, q_index: int, question: dict) -> None:
         delay = random.uniform(*ANSWER_DELAY)
         await asyncio.sleep(delay)
+        if self.frozen:
+            M.counts["answers not sent (frozen)"] += 1
+            return
         ans = random_answer(question)
         if ans is None:
             M.counts[f"skipped (unsupported type {question.get('type')})"] += 1
@@ -660,6 +689,11 @@ class Bot:
         for t in list(self.tasks):
             t.cancel()
         try:
+            if self.frozen:
+                if self.sio.connected:
+                    M.counts["frozen players never dropped"] += 1
+                await self.sio.shutdown()
+                return
             if self.sio.connected:
                 await self.sio.emit("leave-room")
                 await asyncio.sleep(0.05)
@@ -725,6 +759,10 @@ async def main() -> None:
                     help="share of players who switch sound on when the quiz plays it on the host only (default 0.3)")
     ap.add_argument("--no-assets", action="store_true", help="skip all downloads (images, sounds)")
     ap.add_argument("--no-reactions", action="store_true", help="players send no reactions")
+    ap.add_argument("--timeout-after", type=float, metavar="SEC",
+                    help="after SEC seconds, --timeout-users players freeze (stop sending, heartbeat too)")
+    ap.add_argument("--timeout-users", type=int, default=0, metavar="N",
+                    help="how many connected players freeze at --timeout-after (default 0)")
     args = ap.parse_args()
 
     base = (args.url or ask("Server URL", "https://quiz.woikn.de")).rstrip("/")
@@ -732,6 +770,8 @@ async def main() -> None:
     users = args.users or int(ask("Parallel users", "20"))
     if not code or users < 1:
         sys.exit("room code and a positive number of users are required")
+    if (args.timeout_after is None) != (args.timeout_users < 1):
+        sys.exit("--timeout-after and --timeout-users go together")
 
     started = time.time()
     conn = aiohttp.TCPConnector(limit=0)
@@ -768,12 +808,26 @@ async def main() -> None:
                 rej = sum(v for k, v in M.counts.items() if k.startswith("answers rejected"))
                 print(
                     f"[{time.time() - started:6.0f}s] connected={sum(b.connected for b in bots)}/{users} "
-                    f"phases={dict(phases)} answers ok={acc} rejected={rej} "
+                    + (f"frozen={sum(b.frozen and b.connected for b in bots)} " if args.timeout_users else "")
+                    + f"phases={dict(phases)} answers ok={acc} rejected={rej} "
                     f"downloaded={sum(M.bytes.values()) / 1e6:.1f}MB errors={sum(M.errors.values())}",
                     flush=True,
                 )
 
+        async def time_out_some():
+            await asyncio.sleep(max(0.0, args.timeout_after - (time.time() - started)))
+            alive = [b for b in bots if b.connected and not b.frozen and not b.done.is_set()]
+            picked = random.sample(alive, min(args.timeout_users, len(alive)))
+            for b in picked:
+                b.freeze()
+            print(
+                f"[{time.time() - started:6.0f}s] {len(picked)} players froze "
+                f"(no heartbeat, answers, reactions) - the server should drop them",
+                flush=True,
+            )
+
         prog = asyncio.create_task(progress())
+        freezer = asyncio.create_task(time_out_some()) if args.timeout_users else None
         print(f"{users} players joining {code} on {base} - waiting for the host to start (Ctrl+C to stop)")
         all_done = asyncio.gather(*tasks)
         stopper = asyncio.create_task(stop.wait())
@@ -783,6 +837,8 @@ async def main() -> None:
             # python-socketio's own Ctrl+C handler cancels every task; still report.
             pass
         prog.cancel()
+        if freezer:
+            freezer.cancel()
         all_done.add_done_callback(lambda f: f.cancelled() or f.exception())
         for b in bots:
             b.done.set()
