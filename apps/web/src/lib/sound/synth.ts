@@ -339,6 +339,8 @@ export function playBuiltin(
   const t0 = ctx.currentTime + 0.05;
   const beat = 60 / p.bpm;
   const d = p.drums;
+  // Arcade: an 8-bit kick (a triangle sweep, like an old console's).
+  const K = skinId === "builtin:arcade" ? chipKick : kick;
 
   const fadeOut = () => {
     const now = ctx.currentTime;
@@ -347,6 +349,37 @@ export function playBuiltin(
     bus.gain.linearRampToValueAtTime(0.0001, now + 0.4);
     setTimeout(() => bus.disconnect(), 600);
   };
+
+  // -- Arcade one-shots: 8-bit, square waves only ---------------------------
+  if (skinId === "builtin:arcade") {
+    if (slot === "countdown") {
+      // A race-start beep per second, the last one an octave up and long.
+      const secs = Math.max(1, Math.round((opts.remainingMs ?? 5000) / 1000));
+      for (let i = 0; i < secs; i++) chip(ctx, bus, t0 + i, hz(12), 0.12, 0.35);
+      chip(ctx, bus, t0 + secs, hz(24), 0.5, 0.4);
+      return { stop: fadeOut };
+    }
+    if (slot === "end") {
+      // Time's up: a quick fall, then a little two-chord sting.
+      [24, 19, 15, 12].forEach((n, i) =>
+        chip(ctx, bus, t0 + i * 0.06, hz(n), 0.06, 0.35),
+      );
+      const hit = t0 + 0.3;
+      [12, 16, 19].forEach((n) => chip(ctx, bus, hit, hz(n), 0.14, 0.18));
+      [17, 21, 24].forEach((n) =>
+        chip(ctx, bus, hit + 0.18, hz(n), 0.45, 0.18),
+      );
+      return { stop: fadeOut };
+    }
+    if (slot === "reveal") {
+      // The answer: a sparkling run up two octaves, ending on a held note.
+      [12, 16, 19, 24, 28, 31, 36].forEach((n, i) =>
+        chip(ctx, bus, t0 + i * 0.045, hz(n), 0.06, 0.28),
+      );
+      chip(ctx, bus, t0 + 7 * 0.045, hz(36), 0.35, 0.3);
+      return { stop: fadeOut };
+    }
+  }
 
   // -- one-shots ------------------------------------------------------------
   if (slot === "countdown") {
@@ -362,7 +395,7 @@ export function playBuiltin(
         0.3,
         p.cutoff,
       );
-      kick(ctx, bus, t0 + i, 0.5 * d);
+      K(ctx, bus, t0 + i, 0.5 * d);
     }
     chord(ctx, bus, t0 + secs, p.roots[0]! + 12, 0.7, p.pad, 0.12, p.cutoff);
     crash(ctx, bus, t0 + secs, d);
@@ -374,7 +407,7 @@ export function playBuiltin(
     const hit = t0 + 0.5;
     chord(ctx, bus, hit, p.roots[0]!, 0.25, p.pad, 0.13, p.cutoff);
     chord(ctx, bus, hit + 0.3, p.roots[0]! + 12, 1.1, p.pad, 0.15, p.cutoff);
-    kick(ctx, bus, hit + 0.3, 0.8);
+    K(ctx, bus, hit + 0.3, 0.8);
     crash(ctx, bus, hit + 0.3, 1);
     return { stop: fadeOut };
   }
@@ -416,7 +449,7 @@ export function playBuiltin(
       const root = sc.roots[bar]!;
       const inBar = step % 8;
       const onBeat = inBar % 2 === 0;
-      if (onBeat) kick(ctx, bus, next, 0.75 * d);
+      if (onBeat) K(ctx, bus, next, 0.75 * d);
       else hiss(ctx, bus, next, 0.09, 0.07 * d + 0.02, "highpass", 7000);
       if (inBar === 2 || inBar === 6) snare(ctx, bus, next, 0.5 * d + 0.15);
       if (!onBeat) {
@@ -449,11 +482,11 @@ export function playBuiltin(
       const root = fin.roots[bar]!;
       const inBar = step % 8;
       if (fin.halfTime) {
-        if (inBar === 0) kick(ctx, bus, next, 0.8 * d + 0.1);
+        if (inBar === 0) K(ctx, bus, next, 0.8 * d + 0.1);
         if (inBar === 4) snare(ctx, bus, next, 0.6 * d + 0.2);
         if (inBar % 2 === 1) hat(ctx, bus, next, 0.5 * d);
       } else {
-        if (inBar % 2 === 0) kick(ctx, bus, next, 0.75 * d);
+        if (inBar % 2 === 0) K(ctx, bus, next, 0.75 * d);
         else hat(ctx, bus, next, d);
         if (inBar === 2 || inBar === 6) snare(ctx, bus, next, 0.55 * d + 0.1);
       }
@@ -489,11 +522,11 @@ export function playBuiltin(
       const onBeat = inBar % 2 === 0;
 
       if (party || slot === "question") {
-        if (onBeat) kick(ctx, bus, next, 0.7 * d);
+        if (onBeat) K(ctx, bus, next, 0.7 * d);
         else hat(ctx, bus, next, d);
         if (inBar === 2 || inBar === 6) snare(ctx, bus, next, 0.6 * d);
       } else {
-        if (inBar === 0) kick(ctx, bus, next, 0.45 * d);
+        if (inBar === 0) K(ctx, bus, next, 0.45 * d);
         if (!onBeat) hat(ctx, bus, next, 0.5 * d);
       }
       // bass
@@ -674,4 +707,18 @@ export function playArcadePling(volume = 0.09) {
   [0, 4, 7].forEach((step, i) =>
     chip(c.ctx, c.bus, c.t + i * 0.045, hz(root + step), 0.07, 0.45),
   );
+}
+
+/** 8-bit kick: a triangle wave swept down fast. */
+function chipKick(ctx: AudioContext, out: AudioNode, t: number, level: number) {
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = "triangle";
+  o.frequency.setValueAtTime(180, t);
+  o.frequency.exponentialRampToValueAtTime(45, t + 0.09);
+  g.gain.setValueAtTime(Math.max(0.0001, level), t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+  o.connect(g).connect(out);
+  o.start(t);
+  o.stop(t + 0.14);
 }

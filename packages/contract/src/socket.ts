@@ -217,6 +217,8 @@ export const preloadStatusSchema = z.object({
   loaded: z.number().int().nonnegative(),
   total: z.number().int().nonnegative(),
   done: z.boolean(),
+  /** Done, but a clip couldn't be fetched (it won't play on this device). */
+  failed: z.boolean().optional(),
 });
 export const gameModeSchema = z.enum(["classic", "duel"]);
 

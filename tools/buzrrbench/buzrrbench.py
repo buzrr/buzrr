@@ -70,6 +70,8 @@ ACK_TIMEOUT = 15.0
 SYNC_PROBE_EVERY = 5.0
 HEARTBEAT_EVERY = 10.0  # HEARTBEAT_INTERVAL_MS in the contract
 PRELOAD_REPORT_EVERY = 0.4  # like the web client's throttle
+# Tries per download, like the web client (lib/sound/preload.ts).
+DOWNLOAD_TRIES = 3
 CHUNK = 64 * 1024
 
 BUILTIN_SKINS = {"builtin:show", "builtin:arcade", "builtin:chill"}
@@ -207,6 +209,7 @@ class Bot:
     skin: dict | None = None
     emojis: list = field(default_factory=lambda: list(DEFAULT_EMOJIS))
     cache: dict = field(default_factory=dict)  # bare url -> download task
+    failed_keys: set = field(default_factory=set)  # clips given up after all tries
     progress: dict = field(default_factory=dict)  # bare url -> (loaded, total, done)
     tracked: tuple | None = None  # (qIndex, [bare urls], hint time)
     last_report: float = 0.0
@@ -346,11 +349,31 @@ class Bot:
         key = url.split("?")[0]
         task = self.cache.get(key)
         if task is None or (task.done() and (task.cancelled() or task.exception())):
-            task = asyncio.create_task(self._download(url, key, kind))
+            task = asyncio.create_task(self._download_with_retry(url, key, kind))
             self.cache[key] = task
             self.tasks.add(task)
             task.add_done_callback(self.tasks.discard)
         return task
+
+    async def _download_with_retry(self, url: str, key: str, kind: str) -> int:
+        """Like the web client: up to DOWNLOAD_TRIES tries, a random, growing
+        pause between them; a clip given up still reports "done" (failed),
+        so the countdown doesn't wait for it."""
+        for attempt in range(1, DOWNLOAD_TRIES + 1):
+            try:
+                return await self._download(url, key, kind)
+            except asyncio.CancelledError:
+                raise
+            except Exception:  # noqa: BLE001
+                if attempt == DOWNLOAD_TRIES:
+                    M.counts[f"downloads failed after {DOWNLOAD_TRIES} tries: {kind}"] += 1
+                    self.progress[key] = (0, 0, True)
+                    self.failed_keys.add(key)
+                    self.notify()
+                    raise
+                M.counts[f"download retries: {kind}"] += 1
+                await asyncio.sleep((0.4 + random.random() * 0.8) * attempt)
+        return 0
 
     async def _download(self, url: str, key: str, kind: str) -> int:
         full = urljoin(self.base + "/", url)
@@ -414,6 +437,8 @@ class Bot:
             self.tracked = (q_index, keys, None)
         if self.sio.connected:
             payload = {"qIndex": q_index, "loaded": loaded, "total": total, "done": done}
+            if done and any(k in self.failed_keys for k in keys):
+                payload["failed"] = True
             self.spawn(self._emit("preload-status", payload))
 
     async def _emit(self, event: str, payload) -> None:

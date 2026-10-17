@@ -8,7 +8,7 @@
 const cache = new Map<string, Promise<ArrayBuffer>>();
 const progress = new Map<
   string,
-  { loaded: number; total: number; done: boolean }
+  { loaded: number; total: number; done: boolean; failed?: boolean }
 >();
 const MAX_ENTRIES = 12;
 
@@ -52,14 +52,41 @@ async function download(url: string, key: string): Promise<ArrayBuffer> {
   return out.buffer;
 }
 
+/** Tries per clip; between them a random pause that grows with each try. */
+const DOWNLOAD_TRIES = 3;
+
+/**
+ * A crowd downloading at once makes some requests fail (timeouts, refused
+ * connections): try again after a random pause (0.4–1.2 s, then 0.8–2.4 s) so
+ * the retries don't all land together. Only then is the clip given up.
+ */
+async function downloadWithRetry(
+  url: string,
+  key: string,
+): Promise<ArrayBuffer> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await download(url, key);
+    } catch (err) {
+      if (attempt >= DOWNLOAD_TRIES) throw err;
+      await new Promise((r) =>
+        setTimeout(r, (400 + Math.random() * 800) * attempt),
+      );
+    }
+  }
+}
+
 export function fetchClip(url: string): Promise<ArrayBuffer> {
   const key = bare(url);
   let p = cache.get(key);
   if (!p) {
-    p = download(url, key);
+    p = downloadWithRetry(url, key);
     p.catch(() => {
       cache.delete(key);
-      progress.delete(key);
+      // Report it as finished (not ok, but nothing left to wait for): the
+      // server's countdown shouldn't hold the room for this device.
+      progress.set(key, { loaded: 0, total: 0, done: true, failed: true });
+      notify();
     });
     cache.set(key, p);
     if (cache.size > MAX_ENTRIES) {
@@ -73,7 +100,14 @@ export function fetchClip(url: string): Promise<ArrayBuffer> {
 
 // -- progress reports (`preload-status`, for the countdown's wait) -------------
 
-type Report = { qIndex: number; loaded: number; total: number; done: boolean };
+type Report = {
+  qIndex: number;
+  loaded: number;
+  total: number;
+  done: boolean;
+  /** A clip failed: done, but it won't play here. */
+  failed?: boolean;
+};
 let tracked: { qIndex: number; keys: string[]; reportedDone?: boolean } | null =
   null;
 const listeners = new Set<(r: Report) => void>();
@@ -85,14 +119,22 @@ function notify() {
   let loaded = 0;
   let total = 0;
   let done = true;
+  let failed = false;
   for (const k of tracked.keys) {
     const p = progress.get(k);
     loaded += p?.loaded ?? 0;
     total += p?.total ?? 0;
     if (!p?.done) done = false;
+    if (p?.failed) failed = true;
   }
   if (done) tracked.reportedDone = true;
-  const report = { qIndex: tracked.qIndex, loaded, total, done };
+  const report = {
+    qIndex: tracked.qIndex,
+    loaded,
+    total,
+    done,
+    ...(failed ? { failed } : {}),
+  };
   for (const l of listeners) l(report);
 }
 
