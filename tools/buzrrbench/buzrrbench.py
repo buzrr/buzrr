@@ -226,19 +226,30 @@ class Bot:
             return bool(self.sound_pref)
         return False
 
-    async def http_json(self, method: str, path: str, metric: str, **kw):
-        t0 = time.perf_counter()
-        try:
-            async with self.http.request(method, f"{self.base}{path}", **kw) as r:
-                body = await r.json(content_type=None)
-                M.add(metric, (time.perf_counter() - t0) * 1000)
-                if r.status >= 400:
-                    M.err(f"{metric}: HTTP {r.status} {str(body)[:80]}")
+    async def http_json(self, method: str, path: str, metric: str, retries: int = 0, **kw):
+        """JSON request; with `retries`, 5xx and network errors are retried like
+        the web client does (0.8 s, 1.6 s, 3.2 s + jitter)."""
+        for attempt in range(retries + 1):
+            t0 = time.perf_counter()
+            last = attempt == retries
+            try:
+                async with self.http.request(method, f"{self.base}{path}", **kw) as r:
+                    body = await r.json(content_type=None)
+                    M.add(metric, (time.perf_counter() - t0) * 1000)
+                    if r.status < 400:
+                        return body
+                    if r.status < 500 or last:
+                        M.err(f"{metric}: HTTP {r.status} {str(body)[:80]}")
+                        return None
+                    what = f"HTTP {r.status}"
+            except Exception as e:  # noqa: BLE001
+                if last:
+                    M.err(f"{metric}: {type(e).__name__}")
                     return None
-                return body
-        except Exception as e:  # noqa: BLE001
-            M.err(f"{metric}: {type(e).__name__}")
-            return None
+                what = type(e).__name__
+            M.counts[f"{metric}: retried after {what}"] += 1
+            await asyncio.sleep(0.4 * 2 ** (attempt + 1) + random.uniform(0, 0.4))
+        return None
 
     async def run(self) -> None:
         p = await self.http_json(
@@ -250,7 +261,7 @@ class Bot:
             return
         self.player_id, self.token = p["playerId"], p["accessToken"]
         ok = await self.http_json(
-            "POST", "/api/game-sessions/join", "http join-room",
+            "POST", "/api/game-sessions/join", "http join-room", retries=3,
             json={"gameCode": self.code},
             headers={"Authorization": f"Bearer {self.token}"},
         )

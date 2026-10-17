@@ -23,6 +23,18 @@ const generateGameCode = customAlphabet("ABCDEFGHJKMNPQRSTUVWXYZ23456789", 6);
 /** Tries per join when concurrent joins collide (serialization conflict). */
 const JOIN_ATTEMPTS = 8;
 
+/** Postgres aborted a serializable transaction that raced another (40001). */
+function isSerializationConflict(e: unknown): boolean {
+  if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2034") {
+    return true;
+  }
+  // Driver-adapter errors that weren't mapped to P2034.
+  return (
+    e instanceof Error &&
+    /could not serialize access|40001|deadlock detected/i.test(e.message)
+  );
+}
+
 @Injectable()
 export class GameSessionsService {
   constructor(
@@ -103,10 +115,9 @@ export class GameSessionsService {
         );
         break;
       } catch (err) {
-        const conflict =
-          err instanceof Prisma.PrismaClientKnownRequestError &&
-          err.code === "P2034";
-        if (!conflict || attempt >= JOIN_ATTEMPTS) throw err;
+        if (!isSerializationConflict(err) || attempt >= JOIN_ATTEMPTS) {
+          throw err;
+        }
         await new Promise((r) =>
           setTimeout(r, 20 + Math.random() * 80 * attempt),
         );
