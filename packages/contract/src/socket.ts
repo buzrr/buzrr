@@ -220,6 +220,18 @@ export const leaderboardEntrySchema = z.object({
   delta: z.number().optional(),
 });
 
+/**
+ * Sent to `player:{id}` with every leaderboard when the players' broadcast
+ * carries only its top and this player is below it: their own row, so every
+ * player always knows their place.
+ */
+export const myStandingSchema = z.object({
+  entry: leaderboardEntrySchema,
+  total: z.number().int(),
+  isFinal: z.boolean(),
+});
+export type MyStandingPayload = z.infer<typeof myStandingSchema>;
+
 export const questionStartSchema = z.object({
   index: z.number().int(),
   qCount: z.number().int(),
@@ -517,6 +529,8 @@ export interface ServerToClientEvents {
   "answer-count": (payload: AnswerCountPayload) => void;
   "live-summary": (payload: LiveSummaryPayload) => void;
   leaderboard: (payload: LeaderboardPayload) => void;
+  /** A player beyond the players' top of the board: their own place. */
+  "my-standing": (payload: MyStandingPayload) => void;
   "game-over": (payload: GameOverPayload) => void;
   "state-sync": (payload: StateSyncPayload) => void;
   /** Moderated games: ready / starting (countdown) / closed / scores. */

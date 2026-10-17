@@ -183,26 +183,33 @@ export function PlayerScores({ playerId }: { playerId: string }) {
   const me = useAppSelector((state) =>
     state.game.players.find((p) => p.id === playerId),
   );
-  // Players are sent the top of the board; below it, their own standing.
-  const leaderboard: LeaderboardEntry[] =
-    board.some((e) => e.playerId === playerId) || !you?.rank
-      ? board
-      : [
-          ...board,
-          {
-            playerId,
-            name: me?.name ?? t("You"),
-            profilePic: me?.profilePic ?? null,
-            score: you.totalScore,
-            rank: you.rank,
-            delta: you.score,
-          },
-        ];
+  // Players are sent the top of the board; below it, their own standing
+  // (`my-standing`, else the last answer-result).
+  const standing = useAppSelector((state) => state.game.myStanding);
+  const leaderboard: LeaderboardEntry[] = board.some(
+    (e) => e.playerId === playerId,
+  )
+    ? board
+    : standing?.playerId === playerId
+      ? [...board, standing]
+      : !you?.rank
+        ? board
+        : [
+            ...board,
+            {
+              playerId,
+              name: me?.name ?? t("You"),
+              profilePic: me?.profilePic ?? null,
+              score: you.totalScore,
+              rank: you.rank,
+              delta: you.score,
+            },
+          ];
   return (
     <div className="w-full max-w-xl mx-auto px-4 py-6 md:py-10 text-dark dark:text-white">
       <section className={clsx(panelClass, "flex flex-col gap-3 p-5 md:p-7")}>
         <span className={labelClass}>
-          {t("Scores after question")} {qIndex + 1}
+          {t("Scores after question {n}", { n: qIndex + 1 })}
         </span>
         <div className="flex flex-col gap-1.5">
           {leaderboard.map((e, i) => (

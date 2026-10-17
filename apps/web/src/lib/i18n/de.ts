@@ -652,6 +652,7 @@ export const DE: Record<string, string> = {
   SCORED: "GEWERTET",
   Scored: "Gewertet",
   "Scores after question": "Punkte nach Frage",
+  "Scores after question {n}": "Punkte nach Frage {n}",
   "Search by name or email…": "Nach Name oder E-Mail suchen…",
   "Search categories": "Kategorien suchen",
   "Search players": "Spieler suchen",
