@@ -226,6 +226,8 @@ class Bot:
     def freeze(self) -> None:
         """Stop sending anything, like a page frozen on a locked phone."""
         self.frozen_at = time.perf_counter()
+        # A frozen page can't reconnect either once the server drops it.
+        self.sio.reconnection = False
         M.counts["players timed out (frozen)"] += 1
 
     def spawn(self, coro) -> None:
@@ -586,7 +588,6 @@ class Bot:
                 M.counts["frozen players dropped by server"] += 1
                 self.connected = False
                 self.done.set()
-                self.spawn(self.sio.shutdown())
                 return
             if not self.done.is_set():
                 M.counts["socket disconnects (unexpected)"] += 1
@@ -692,7 +693,7 @@ class Bot:
             if self.frozen:
                 if self.sio.connected:
                     M.counts["frozen players never dropped"] += 1
-                await self.sio.shutdown()
+                    await self.sio.disconnect()
                 return
             if self.sio.connected:
                 await self.sio.emit("leave-room")
