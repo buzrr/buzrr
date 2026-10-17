@@ -378,9 +378,13 @@ export class RealtimeGateway
     socket.on("heartbeat", () => {
       socket.data.lastBeatAt = Date.now();
     });
+    // A socket that never beats counts from its connect: a client that keeps
+    // reconnecting without beating (stuck, or long-outdated) would otherwise
+    // stay "online" forever — counted in "x of y answered" and waited for.
+    const since = Date.now();
     const check = setInterval(() => {
-      const last = socket.data.lastBeatAt;
-      if (!last || Date.now() - last < HEARTBEAT_TIMEOUT_MS) return;
+      const last = socket.data.lastBeatAt ?? since;
+      if (Date.now() - last < HEARTBEAT_TIMEOUT_MS) return;
       clearInterval(check);
       this.logger.log(
         `Player ${socket.data.playerId} missed heartbeats in ${gameCode} — dropping the socket`,

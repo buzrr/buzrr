@@ -296,6 +296,15 @@ class Bot:
         probe.cancel()
         reacts.cancel()
         beats.cancel()
+        # A bot that gives up (error, kicked, game over) leaves for real: no
+        # auto-reconnect, so the host sees it go offline instead of a silent
+        # player that keeps coming back without answering.
+        try:
+            self.sio.reconnection = False
+            if self.sio.connected:
+                await self.sio.disconnect()
+        except Exception:
+            pass
 
     async def load_context(self) -> None:
         """What the player page loads: the play context (quiz settings) and the skin."""
