@@ -1,17 +1,12 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import LandingNavbar from "@/components/Landing/LandingNavbar";
 import LandingFooter from "@/components/Landing/LandingFooter";
 import PricingPlans from "@/components/Pricing/PricingPlans";
 import PricingFaq from "@/components/Pricing/PricingFaq";
 import PlanComparison from "@/components/Pricing/PlanComparison";
 import { JsonLd } from "@/components/Marketing/primitives";
-import { auth } from "@/lib/auth";
 import { siteGraph } from "@/lib/seo/json-ld";
 import { buildPageMetadata } from "@/lib/seo/metadata";
-import { getVisitorPriceRegion } from "@/lib/visitor-region";
-
-export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Pricing: Free and Pro Plans",
@@ -20,12 +15,7 @@ export const metadata: Metadata = buildPageMetadata({
   path: "/pricing",
 });
 
-export default async function PricingPage() {
-  const [region, session] = await Promise.all([
-    getVisitorPriceRegion(),
-    auth.api.getSession({ headers: await headers() }).catch(() => null),
-  ]);
-
+export default function PricingPage() {
   return (
     <div className="min-h-dvh flex flex-col bg-light-bg dark:bg-dark-bg">
       <JsonLd nodes={siteGraph()} />
@@ -45,10 +35,7 @@ export default async function PricingPage() {
             </p>
           </div>
 
-          <PricingPlans
-            serverRegion={region}
-            signedIn={Boolean(session?.user)}
-          />
+          <PricingPlans />
           <PlanComparison />
           <PricingFaq />
         </div>

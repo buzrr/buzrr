@@ -16,7 +16,8 @@ need cross-app thinking.
 1. **Better Auth lives in the web app only.** Config:
    `apps/web/src/lib/auth.ts` (lazy proxy so builds don't need creds); routes:
    `src/app/api/auth/[...all]/route.ts`. Sign-in methods come from env
-   (`lib/auth-methods.ts`): Google OAuth when `GOOGLE_CLIENT_ID`/`SECRET`
+   (`lib/auth-methods.ts`, exposed to the static login page by
+   `src/app/api/auth/methods/route.ts`): Google OAuth when `GOOGLE_CLIENT_ID`/`SECRET`
    are set, local **email + password** when `AUTH_EMAIL_PASSWORD=ON`
    (min 8 chars; `AUTH_EMAIL_SIGNUP=OFF` disables self-registration; no email
    verification or password reset — the self-hosted/offline path has no mail
@@ -27,8 +28,9 @@ need cross-app thinking.
 2. **JWT bridge:** `GET /api/auth/access-token`
    (`src/app/api/auth/access-token/route.ts`) reads the session cookie and
    signs `{ sub: userId, email }` HS256 with **`BETTER_AUTH_SECRET`**, 7d
-   expiry (jose). The browser caches it in memory
-   (`lib/api/get-access-token.ts`) and axios attaches it
+   expiry (jose). The browser caches it in memory, sharing one in-flight
+   request between concurrent callers (`lib/api/get-access-token.ts`), and
+   axios attaches it
    (`lib/api/client.ts`).
 3. **The Nest server verifies that JWT** with the same secret — passport-jwt
    strategy `apps/server/src/modules/auth/jwt.strategy.ts`. It never talks to

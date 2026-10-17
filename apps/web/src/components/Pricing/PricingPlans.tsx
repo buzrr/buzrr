@@ -2,16 +2,17 @@
 
 import clsx from "clsx";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { LuCheck } from "react-icons/lu";
 import { Badge } from "@/components/ui/Badge";
 import ProPrice from "@/components/Pricing/ProPrice";
 import { usePriceRegion } from "@/hooks/usePriceRegion";
+import { authClient } from "@/lib/auth-client";
 import {
   useEntitlementsQuery,
   useProPricingQuery,
 } from "@/lib/modules/billing/hooks";
 import { FALLBACK_PRICING, PLAN_COPY, formatMoney } from "@/lib/pricing";
-import type { PriceRegion } from "@/lib/pricing";
 
 const CHECKOUT_PATH = "/billing/checkout";
 
@@ -40,14 +41,12 @@ function FeatureList({ items }: { items: string[] }) {
   );
 }
 
-export default function PricingPlans({
-  serverRegion,
-  signedIn,
-}: {
-  serverRegion: PriceRegion | null;
-  signedIn: boolean;
-}) {
-  const { region, resolved } = usePriceRegion(serverRegion);
+/**
+ * Region and session are read in the browser so `/pricing` can be a static
+ * page served from the CDN instead of a function render on every visit.
+ */
+export default function PricingPlans() {
+  const { region, resolved } = usePriceRegion(null);
   const pricingQuery = useProPricingQuery(region, resolved);
   const pricing = pricingQuery.data;
   // Until the live price arrives (or if it fails) show the regional default.
@@ -55,12 +54,29 @@ export default function PricingPlans({
   const amount = pricing?.amount ?? FALLBACK_PRICING[region].amount;
   const priceLoading = !resolved || pricingQuery.isPending;
 
+  // Not `authClient.useSession()`: better-auth is a server-external package, so
+  // its hook resolves a second React copy when this page is prerendered.
+  const { data: session, isPending: sessionPending } = useQuery({
+    queryKey: ["auth", "session"] as const,
+    // getSession() resolves with { error } instead of throwing; rethrow so a
+    // failed lookup is retried rather than read as "signed out".
+    queryFn: async () => {
+      const { data, error } = await authClient.getSession();
+      if (error) throw error;
+      return data ?? null;
+    },
+  });
+  const signedIn = Boolean(session?.user);
+
   const { data: entitlements, isPending: entitlementsPending } =
     useEntitlementsQuery({ enabled: signedIn });
   const plan = entitlements?.plan;
   const billingOff = entitlements ? !entitlements.billingEnabled : false;
 
   const proCta = (() => {
+    if (sessionPending) {
+      return <span className={ctaDisabled}>Loading…</span>;
+    }
     if (!signedIn) {
       return (
         <Link
