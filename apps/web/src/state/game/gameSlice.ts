@@ -7,7 +7,6 @@ import type {
   GamePhase,
   LiveSummaryPayload,
   LeaderboardEntry,
-  MyStandingPayload,
   ModerationSettings,
   PhaseChangePayload,
   PreloadPayload,
@@ -47,8 +46,6 @@ export interface GameLiveState {
   leaderboard: LeaderboardEntry[];
   /** Players: how many are on the board when `leaderboard` is only its top. */
   leaderboardTotal: number | null;
-  /** Players below the board's top: their own row (`my-standing`). */
-  myStanding: LeaderboardEntry | null;
   isFinalLeaderboard: boolean;
   players: {
     id: string;
@@ -94,7 +91,6 @@ const initialState: GameLiveState = {
   reveal: null,
   leaderboard: [],
   leaderboardTotal: null,
-  myStanding: null,
   isFinalLeaderboard: false,
   players: [],
   you: null,
@@ -255,10 +251,6 @@ const gameSlice = createSlice({
       state.you = null;
       state.myAnswerMs = null;
     },
-    myStanding: (state, action: PayloadAction<MyStandingPayload>) => {
-      state.myStanding = action.payload.entry;
-      state.leaderboardTotal = action.payload.total;
-    },
     answerTimed: (state, action: PayloadAction<number>) => {
       state.myAnswerMs = action.payload;
     },
@@ -295,7 +287,6 @@ const gameSlice = createSlice({
         finalSoundKey?: string;
       }>,
     ) => {
-      state.myStanding = null;
       state.leaderboard = action.payload.entries;
       state.leaderboardTotal = action.payload.total ?? null;
       state.isFinalLeaderboard = action.payload.isFinal;
@@ -363,7 +354,6 @@ export const {
   questionEnd,
   answerResult,
   answerTimed,
-  myStanding,
   answerCount,
   liveSummary,
   leaderboardReceived,

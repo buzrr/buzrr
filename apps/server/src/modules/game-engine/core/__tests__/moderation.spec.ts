@@ -197,6 +197,17 @@ describe("moderated question flow", () => {
     expect(events(open, { type: "deadline" }, now)).toContain("leaderboard");
   });
 
+  it("the last question's 'closed' step sends every player their result before any standings", () => {
+    const closed = questionOpen(
+      {},
+      { phase: "closed", moderation: moderated() },
+      1,
+    );
+    const { state: next, effects } = step(closed, { type: "host-next" }, T0);
+    expect(next.meta.phase).toBe("reveal");
+    expect(emitted(effects).map((e) => e.event)).toContain("answer-result");
+  });
+
   it("an older quiz that hid the answer still reveals it", () => {
     const closed = questionOpen(
       {},

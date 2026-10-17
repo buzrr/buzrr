@@ -59,62 +59,6 @@ no real client creates, and one Python process may be its own bottleneck.
 **Done when:** a 510-bot run with `--procs 4` finishes on its own, and the
 summary shows the same sections as before plus `bots without game end`.
 
-## 3. One personal message per player per question (drop `my-standing`)
-
-Every player needs their own points and place. `answer-result` already
-carries them: `totalScore` and `rank` from `buildAnswerResult`
-(`apps/server/src/modules/game-engine/core/views.ts`), sent once per player
-per question. `my-standing` (22e41c5) sends the same again, one emit per
-player below the top 10. That is about 408 extra Redis-adapter publishes,
-sent **before** the room's `phase-change`.
-
-Server:
-
-- `apps/server/src/modules/game-engine/game-engine.service.ts`, `send()`,
-  case `"leaderboard"`: remove the `for (const entry of
-entries.slice(PLAYER_LEADERBOARD_TOP))` loop that emits `my-standing`.
-  Keep the split: the host room gets the full board, everyone else
-  (`.except(host:{code})`) gets `topOfLeaderboard(entries)` plus `total`.
-- Make sure every path into a standings screen has sent `answer-result` for
-  the last question, in
-  `apps/server/src/modules/game-engine/core/machine.ts`:
-  - `reveal()` sends it.
-  - `showScores(state, true)` sends it when no reveal ran.
-  - `enterFinal()` can be reached from `"closed"` via `hostNext` → `case
-"closed"` → `advance()` when the answer and scores steps are off. Then no
-    `answer-result` was sent for the last question. Check whether f879fb0
-    ("moderated mode always reveals the answer") made that path unreachable.
-    If it still exists, push `answer-result` per rostered player in
-    `enterFinal` when `state.meta.phase === "closed"`, before the final
-    `leaderboard`, the same way `showScores` does with `sendResults`.
-  - Add a machine spec for it.
-- `packages/contract/src/socket.ts`: remove `"my-standing"` from
-  `ServerToClientEvents` and remove `MyStandingPayload` / its schema.
-
-Web:
-
-- `apps/web/src/hooks/useGameSocket.ts`: remove the `my-standing` listener.
-- `apps/web/src/state/game/gameSlice.ts`: remove the `my-standing` state and
-  the `myStanding` reducer.
-- `apps/web/src/components/Game/ModeratedSteps.tsx` (`PlayerScores`) and
-  `apps/web/src/components/Player/GamePage.tsx`: the player's own row comes
-  from the board if they are in the top, otherwise from `state.game.you`.
-  - Rank from `you.rank`, points from `you.totalScore`, points for this
-    question from `you.score`.
-  - Name and avatar from `state.game.players`.
-  - Show it as an extra row below the top 10, with a gap when the rank
-    doesn't follow on.
-  - The player count comes from `leaderboardTotal ?? leaderboard.length`.
-- Known, accepted limitation: if someone above leaves mid-round, a player's
-  rank is one too low until the next `answer-result`.
-
-**Done when:**
-
-- With ≥ 250 bots, `phase-change: scores` spread is within about 2× of
-  `question-end` spread for the same question.
-- A player ranked 200 sees their own row with correct rank and points on the
-  scores step and on the final screen.
-
 ## 4. Bundle lobby `bubble-stats` for the host
 
 `apps/server/src/modules/realtime/realtime.gateway.ts`,

@@ -250,12 +250,10 @@ function hostNext(
     case "question":
       return closeQuestion(state, now, pacing);
     case "closed":
-      // "Show answer", or — with answers hidden — "Show scores" / next.
-      if (mod?.showAnswer) return reveal(state, now, pacing);
-      if (mod?.showScores && currentScored(state)) {
-        return showScores(state, true);
-      }
-      return advance(state, now, pacing, ctx);
+      // "Show answer": the answer is always revealed (no longer optional),
+      // and the reveal sends every player their answer-result — so no path
+      // reaches the scores or the final board without one.
+      return reveal(state, now, pacing);
     case "reveal":
       // An unscored question (poll, word cloud, …) changes no score: no
       // standings step after it.
@@ -412,11 +410,8 @@ function closeQuestion(
   pacing: PacingStrategy,
 ): Transition {
   const mod = moderationOf(state.meta);
-  if (!mod || (mod.showAnswer && !mod.confirmShowAnswer)) {
+  if (!mod || !mod.confirmShowAnswer) {
     return reveal(state, now, pacing);
-  }
-  if (!mod.showAnswer && mod.showScores && !mod.confirmShowScores) {
-    return showScores(state, true, true);
   }
   if (state.meta.phase !== "question") return noop(state);
   const patch = { phase: "closed" as const, qDeadline: 0 };

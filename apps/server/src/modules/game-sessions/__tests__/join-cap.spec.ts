@@ -95,8 +95,8 @@ describe("GameSessionsService.join under a crowd (Postgres)", () => {
     const member = await prisma.player.findFirst({
       where: { game: { gameCode } },
     });
-    await expect(
-      service.join(member!.id, { gameCode }),
-    ).resolves.toMatchObject({ playerId: member!.id });
+    await expect(service.join(member!.id, { gameCode })).resolves.toMatchObject(
+      { playerId: member!.id },
+    );
   });
 });

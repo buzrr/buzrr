@@ -308,14 +308,7 @@ export class GameEngineService
             entries: topOfLeaderboard(entries),
             total: entries.length,
           });
-        // Everyone below the top learns their own place (small, per player).
-        for (const entry of entries.slice(PLAYER_LEADERBOARD_TOP)) {
-          this.io.to(`player:${entry.playerId}`).emit("my-standing", {
-            entry,
-            total: entries.length,
-            isFinal: message.payload.isFinal,
-          });
-        }
+        // Their own place comes with answer-result (once per question).
         break;
       }
     }

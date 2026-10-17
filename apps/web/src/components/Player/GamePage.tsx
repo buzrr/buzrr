@@ -61,11 +61,9 @@ const GamePage = (params: {
   const playerCount =
     useAppSelector((state) => state.game.leaderboardTotal) ??
     leaderboard.length;
-  // Our row: on the board's top, or sent separately (`my-standing`).
-  const standing = useAppSelector((state) => state.game.myStanding);
-  const mine =
-    leaderboard.find((e) => e.playerId === params.player.id) ??
-    (standing?.playerId === params.player.id ? standing : undefined);
+  // Our row when we're on the board's top; below it the place and points
+  // come from answer-result (`you.rank` / `you.totalScore`, used below).
+  const mine = leaderboard.find((e) => e.playerId === params.player.id);
   const question = useAppSelector((state) => state.game.question);
   const you = useAppSelector((state) => state.game.you);
 

@@ -14,7 +14,6 @@ import {
   preloadHint,
   closedSummaryReceived,
   leaderboardReceived,
-  myStanding,
   playerConnection,
   playerRemoved,
   questionEnd,
@@ -151,7 +150,6 @@ export function useGameSocket({
     conn.on("answer-count", (payload) => dispatch(answerCount(payload)));
     conn.on("live-summary", (payload) => dispatch(liveSummary(payload)));
     conn.on("leaderboard", (payload) => dispatch(leaderboardReceived(payload)));
-    conn.on("my-standing", (payload) => dispatch(myStanding(payload)));
     conn.on("game-over", (payload) =>
       dispatch(
         gameOver({
