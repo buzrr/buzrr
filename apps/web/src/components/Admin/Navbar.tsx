@@ -27,7 +27,7 @@ import { useInstance } from "@/lib/instance-context";
 import SignOutButton from "./SignOutButton";
 
 export default function Navbar() {
-  const { billing: BILLING_ENABLED } = useInstance();
+  const { billing: BILLING_ENABLED, duels: DUELS } = useInstance();
   const NavLinks = [
     { href: "/admin", label: "Quizzes", icon: LuBookText },
     { href: "/admin/history", label: "History", icon: LuHistory },
@@ -59,7 +59,7 @@ export default function Navbar() {
     ...(isAiConfigured()
       ? [{ href: "/admin/ai", label: "AI Spaces", icon: LuSparkles }]
       : []),
-    ...(role === "admin" || role === "superadmin"
+    ...(DUELS && (role === "admin" || role === "superadmin")
       ? [
           {
             href: "/admin/duel-portal",

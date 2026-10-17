@@ -89,7 +89,7 @@ const formatStat = (n: number | null) =>
   n === null ? "—" : n.toLocaleString("en-US");
 
 /** Private instance: just the three ways in, no marketing, no GitHub calls. */
-function PrivateHome() {
+function PrivateHome({ duels }: { duels: boolean }) {
   const button =
     "flex items-center justify-center gap-2 w-full px-8 py-3 rounded-xl text-lg font-black transition-colors";
   return (
@@ -103,16 +103,22 @@ function PrivateHome() {
           friends.
         </h1>
         <div className="mt-10 flex flex-col gap-4 w-full">
-          <Link
-            href="/duel"
-            className={`${button} bg-lprimary dark:bg-dprimary text-white dark:text-dark hover:opacity-90`}
-          >
-            <LuPlay size={18} />
-            Start 1v1
-          </Link>
+          {duels && (
+            <Link
+              href="/duel"
+              className={`${button} bg-lprimary dark:bg-dprimary text-white dark:text-dark hover:opacity-90`}
+            >
+              <LuPlay size={18} />
+              Start 1v1
+            </Link>
+          )}
           <Link
             href="/player"
-            className={`${button} border-2 border-lprimary dark:border-dprimary text-lprimary dark:text-dprimary hover:bg-lprimary/10 dark:hover:bg-dprimary/10`}
+            className={
+              duels
+                ? `${button} border-2 border-lprimary dark:border-dprimary text-lprimary dark:text-dprimary hover:bg-lprimary/10 dark:hover:bg-dprimary/10`
+                : `${button} bg-lprimary dark:bg-dprimary text-white dark:text-dark hover:opacity-90`
+            }
           >
             <LuDoorOpen size={18} />
             Join Room
@@ -131,7 +137,8 @@ function PrivateHome() {
 }
 
 export default async function Home() {
-  if (getInstanceConfig().privateBuzz) return <PrivateHome />;
+  const { privateBuzz, duels } = getInstanceConfig();
+  if (privateBuzz) return <PrivateHome duels={duels} />;
   const stats = await getGithubStats();
 
   const statTiles = [
@@ -191,13 +198,15 @@ export default async function Home() {
             </p>
 
             <div className="mt-8 flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
-              <Link
-                href="/duel"
-                className="flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-3 rounded-xl text-lg font-black bg-lprimary dark:bg-dprimary text-white dark:text-dark hover:opacity-90 transition-opacity"
-              >
-                <LuPlay size={18} />
-                Start 1v1
-              </Link>
+              {duels && (
+                <Link
+                  href="/duel"
+                  className="flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-3 rounded-xl text-lg font-black bg-lprimary dark:bg-dprimary text-white dark:text-dark hover:opacity-90 transition-opacity"
+                >
+                  <LuPlay size={18} />
+                  Start 1v1
+                </Link>
+              )}
               <Link
                 href="/player"
                 className="flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-3 rounded-xl text-lg font-black border-2 border-lprimary dark:border-dprimary text-lprimary dark:text-dprimary hover:bg-lprimary/10 dark:hover:bg-dprimary/10 transition-colors"

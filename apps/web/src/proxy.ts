@@ -17,6 +17,9 @@ const PUBLIC_SITE_ROUTES = [
   "/support",
 ];
 
+/** 1v1 duels (off with DUELS=OFF). */
+const DUEL_ROUTES = ["/duel", "/admin/duel-portal", "/admin/profile/duels"];
+
 const matches = (pathname: string, routes: string[]) =>
   routes.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`),
@@ -24,8 +27,16 @@ const matches = (pathname: string, routes: string[]) =>
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const { billing: BILLING_ENABLED, privateBuzz: PRIVATE_BUZZ } =
-    getInstanceConfig();
+  const {
+    billing: BILLING_ENABLED,
+    privateBuzz: PRIVATE_BUZZ,
+    duels: DUELS,
+  } = getInstanceConfig();
+  if (!DUELS && matches(pathname, DUEL_ROUTES)) {
+    return NextResponse.redirect(
+      new URL(pathname.startsWith("/admin") ? "/admin" : "/", request.url),
+    );
+  }
   if (!BILLING_ENABLED && pathname.startsWith("/admin/billing")) {
     return NextResponse.redirect(new URL("/admin", request.url));
   }
@@ -52,5 +63,8 @@ export const config = {
     "/privacy/:path*",
     "/terms/:path*",
     "/support/:path*",
+    "/duel/:path*",
+    "/admin/duel-portal/:path*",
+    "/admin/profile/duels/:path*",
   ],
 };

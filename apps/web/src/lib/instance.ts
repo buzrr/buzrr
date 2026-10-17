@@ -14,12 +14,15 @@ import "server-only";
  * - TITLE: site name / browser title / app manifest (empty = Buzrr).
  * - CONTACT_EMAIL: on a private instance "Contact us" points here (hidden
  *   when unset).
+ * - DUELS=OFF: no 1v1 duels — no "Start 1v1", no public (duel pool) option
+ *   on quizzes, no duel stats, duel pages redirect home.
  */
 export interface InstanceConfig {
   billing: boolean;
   privateBuzz: boolean;
   title: string;
   contactEmail: string;
+  duels: boolean;
 }
 
 const read = (name: string) => (process.env[name] ?? "").trim();
@@ -30,5 +33,6 @@ export function getInstanceConfig(): InstanceConfig {
     privateBuzz: read("PRIVATE_BUZZ").toUpperCase() === "ON",
     title: read("TITLE"),
     contactEmail: read("CONTACT_EMAIL"),
+    duels: read("DUELS").toUpperCase() !== "OFF",
   };
 }

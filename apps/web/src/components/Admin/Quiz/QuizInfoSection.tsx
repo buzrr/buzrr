@@ -23,6 +23,7 @@ import {
   useUpdateQuizMutation,
 } from "@/lib/modules/quizzes/hooks";
 import type { QuizDetail } from "@/lib/modules/quizzes/api";
+import { useInstance } from "@/lib/instance-context";
 import ModerationSettingsCard from "@/components/Admin/Quiz/ModerationSettingsCard";
 
 function formatSessionDate(createdAt: string | Date) {
@@ -208,6 +209,7 @@ export function QuizInfoContent(props: {
   const questionCount = props.quiz._count?.questions ?? 0;
   const updateQuiz = useUpdateQuizMutation();
   const deleteResults = useDeleteResultsMutation(props.quiz.id);
+  const { duels } = useInstance();
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
   return (
@@ -246,25 +248,27 @@ export function QuizInfoContent(props: {
           Total number of questions :{" "}
           <b className="font-extrabold">{questionCount}</b>
         </p>
-        <div className="flex items-center gap-2 mt-3 mb-1">
-          <Switch
-            aria-label="Make quiz public for duels"
-            checked={Boolean(props.quiz.isPublic)}
-            disabled={updateQuiz.isPending}
-            onCheckedChange={(checked) =>
-              updateQuiz.mutate(
-                { quizId: props.quiz.id, isPublic: checked },
-                {
-                  onError: (err) => toast.error(getApiErrorMessage(err)),
-                },
-              )
-            }
-          />
-          <span className="text-sm max-w-[250px]">
-            Public — scored questions are submitted for admin review before
-            appearing in 1v1 duels
-          </span>
-        </div>
+        {duels && (
+          <div className="flex items-center gap-2 mt-3 mb-1">
+            <Switch
+              aria-label="Make quiz public for duels"
+              checked={Boolean(props.quiz.isPublic)}
+              disabled={updateQuiz.isPending}
+              onCheckedChange={(checked) =>
+                updateQuiz.mutate(
+                  { quizId: props.quiz.id, isPublic: checked },
+                  {
+                    onError: (err) => toast.error(getApiErrorMessage(err)),
+                  },
+                )
+              }
+            />
+            <span className="text-sm max-w-[250px]">
+              Public — scored questions are submitted for admin review before
+              appearing in 1v1 duels
+            </span>
+          </div>
+        )}
         <LogoSetting quiz={props.quiz} />
         <ModerationSettingsCard quiz={props.quiz} />
       </div>

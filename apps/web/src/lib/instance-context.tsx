@@ -8,6 +8,7 @@ const DEFAULTS: InstanceConfig = {
   privateBuzz: false,
   title: "",
   contactEmail: "",
+  duels: true,
 };
 
 const InstanceContext = createContext<InstanceConfig>(DEFAULTS);
