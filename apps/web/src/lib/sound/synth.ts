@@ -25,6 +25,14 @@ interface Palette {
   cutoff: number;
   /** Overall level of drums (0..1). */
   drums: number;
+  /** The scoreboard loop: its own progression, riff (semitones above the
+   *  chord root per 8th, null = rest; 16 steps = 2 bars) and lead voice, so
+   *  it doesn't sound like the question music. */
+  scores: {
+    roots: number[];
+    riff: (number | null)[];
+    lead: OscillatorType;
+  };
 }
 
 export const BUILTIN_SKINS: Record<BuiltinSkinId, Palette> = {
@@ -38,6 +46,28 @@ export const BUILTIN_SKINS: Record<BuiltinSkinId, Palette> = {
     scale: [0, 2, 4, 7, 9, 12],
     cutoff: 2600,
     drums: 0.9,
+    scores: {
+      roots: [-7, -2, -9, -4], // Am – G – C – F
+      riff: [
+        12,
+        null,
+        16,
+        19,
+        null,
+        16,
+        12,
+        null,
+        14,
+        null,
+        12,
+        7,
+        null,
+        9,
+        12,
+        null,
+      ],
+      lead: "triangle",
+    },
   },
   "builtin:arcade": {
     name: "Arcade",
@@ -49,6 +79,11 @@ export const BUILTIN_SKINS: Record<BuiltinSkinId, Palette> = {
     scale: [0, 3, 5, 7, 10, 12],
     cutoff: 5000,
     drums: 0.7,
+    scores: {
+      roots: [-5, -12, -10, -7], // E – A – B – D
+      riff: [0, 7, 12, 7, 0, 7, 15, 12, 3, 10, 15, 10, 3, 12, 19, null],
+      lead: "sawtooth",
+    },
   },
   "builtin:chill": {
     name: "Chill",
@@ -60,6 +95,28 @@ export const BUILTIN_SKINS: Record<BuiltinSkinId, Palette> = {
     scale: [0, 3, 7, 10, 12, 15],
     cutoff: 1400,
     drums: 0.45,
+    scores: {
+      roots: [-9, -5, -12, -7], // C – E – Am – Dm, laid-back
+      riff: [
+        null,
+        12,
+        null,
+        10,
+        7,
+        null,
+        3,
+        null,
+        null,
+        15,
+        12,
+        null,
+        10,
+        null,
+        7,
+        null,
+      ],
+      lead: "triangle",
+    },
   },
 };
 
@@ -267,7 +324,41 @@ export function playBuiltin(
   }
   const tick = () => {
     const ahead = ctx.currentTime + 0.12;
-    while (next < ahead) {
+    while (slot === "scores" && next < ahead) {
+      // Scoreboard: four-on-the-floor, claps on 2 and 4, pumping offbeat
+      // bass and its own riff — clearly not the question loop.
+      const sc = p.scores;
+      const eighth = beat / 2 / tempo;
+      const bar = Math.floor(step / 8) % sc.roots.length;
+      const root = sc.roots[bar]!;
+      const inBar = step % 8;
+      const onBeat = inBar % 2 === 0;
+      if (onBeat) kick(ctx, bus, next, 0.75 * d);
+      else hiss(ctx, bus, next, 0.09, 0.07 * d + 0.02, "highpass", 7000);
+      if (inBar === 2 || inBar === 6) snare(ctx, bus, next, 0.5 * d + 0.15);
+      if (!onBeat) {
+        tone(ctx, bus, next, hz(root - 24), eighth * 0.8, p.bass, 0.24, 800);
+      }
+      if (inBar === 0) {
+        chord(ctx, bus, next, root, beat * 4, p.pad, 0.045, p.cutoff * 0.5);
+      }
+      const note = sc.riff[step % sc.riff.length];
+      if (note !== null && note !== undefined) {
+        tone(
+          ctx,
+          bus,
+          next,
+          hz(root + note),
+          eighth * 0.9,
+          sc.lead,
+          0.11,
+          p.cutoff,
+        );
+      }
+      next += eighth;
+      step++;
+    }
+    while (slot !== "scores" && next < ahead) {
       // The question loop gets faster and denser towards the end.
       const prog =
         slot === "question" ? Math.min(1, opts.progress?.() ?? 0) : 0;
@@ -365,4 +456,40 @@ export function playPing(volume = 0.35) {
   tone(ctx, bus, t, hz(15), 0.18, "sine", 0.5, 9000); // C6
   tone(ctx, bus, t + 0.09, hz(22), 0.35, "sine", 0.45, 9000); // G6
   setTimeout(() => bus.disconnect(), 800);
+}
+
+/** Half the ping's level: the lobby's bubble pops and reactions are frequent. */
+const SOFT = 0.5;
+
+/** A soft "blopp" (a player popped a bubble): a quick downward sine drop. */
+export function playBlopp(volume = 0.35 * SOFT) {
+  const ctx = audioContext();
+  if (!ctx) return;
+  const t = ctx.currentTime + 0.01;
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = "sine";
+  const f0 = 520 + Math.random() * 160;
+  o.frequency.setValueAtTime(f0, t);
+  o.frequency.exponentialRampToValueAtTime(f0 * 0.35, t + 0.09);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(volume, t + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+  o.connect(g).connect(ctx.destination);
+  o.start(t);
+  o.stop(t + 0.15);
+}
+
+/** A light, high "pling" (a player sent a reaction). */
+export function playPling(volume = 0.35 * SOFT) {
+  const ctx = audioContext();
+  if (!ctx) return;
+  const bus = ctx.createGain();
+  bus.gain.value = volume;
+  bus.connect(ctx.destination);
+  const t = ctx.currentTime + 0.01;
+  const f = hz(27 + Math.floor(Math.random() * 3) * 2); // C7..E7
+  tone(ctx, bus, t, f, 0.3, "triangle", 0.5, 12000);
+  tone(ctx, bus, t, f * 2, 0.15, "sine", 0.15, 12000);
+  setTimeout(() => bus.disconnect(), 600);
 }

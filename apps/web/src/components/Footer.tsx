@@ -16,7 +16,9 @@ const ROUTES_WITH_OWN_FOOTER = ["/", "/docs", "/support", "/pricing"];
 // Route prefixes where the bar is hidden on every subpage: the checkout flow,
 // and the marketing + legal pages in app/(marketing), which render LandingFooter.
 const PREFIXES_WITHOUT_FOOTER = [
-  // The host's game screen uses the full height (no footer, no theme toggle).
+  // The host's waiting room and game screen use the full height (no footer,
+  // no theme toggle).
+  "/admin/play/",
   "/admin/game/",
   "/billing/",
   "/alternatives",

@@ -26,7 +26,9 @@ import {
   audioContext,
   isLoopSlot,
   playBuiltin,
+  playBlopp,
   playPing,
+  playPling,
   type BuiltinSkinId,
   type SoundHandle,
 } from "./synth";
@@ -97,15 +99,23 @@ interface SoundState {
 const SoundCtx = createContext<SoundState | null>(null);
 export const useGameSound = () => useContext(SoundCtx);
 
-/** Resume the AudioContext on the first gesture (autoplay policies). */
+/**
+ * Events that count as a user gesture for autoplay. On touch screens
+ * `pointerdown` does not (only `pointerup` / `touchend` / `click` do), so a
+ * host who never touched the sound switch stayed silent on a tablet.
+ */
+const GESTURES = ["pointerup", "touchend", "click", "keydown"] as const;
+
+/** Resume the AudioContext on every gesture (autoplay policies, iOS interruptions). */
 function useUnlockAudio() {
   useEffect(() => {
-    const unlock = () => void audioContext()?.resume();
-    window.addEventListener("pointerdown", unlock);
-    window.addEventListener("keydown", unlock);
+    const unlock = () => {
+      const ctx = audioContext();
+      if (ctx && ctx.state !== "running") void ctx.resume();
+    };
+    for (const g of GESTURES) window.addEventListener(g, unlock);
     return () => {
-      window.removeEventListener("pointerdown", unlock);
-      window.removeEventListener("keydown", unlock);
+      for (const g of GESTURES) window.removeEventListener(g, unlock);
     };
   }, []);
 }
@@ -134,13 +144,25 @@ function playFile(url: string, loop: boolean, volume: number): SoundHandle {
   const a = new Audio(url);
   a.loop = loop;
   a.volume = volume;
-  const start = () => void a.play().catch(() => undefined);
+  let stopped = false;
+  const retry = () => {
+    if (!stopped && a.paused) start();
+  };
+  const unhook = () => {
+    for (const g of GESTURES) window.removeEventListener(g, retry);
+  };
+  const start = () =>
+    void a
+      .play()
+      .then(unhook)
+      .catch(() => undefined);
   start();
   // Autoplay may refuse until the first gesture; retry then.
-  window.addEventListener("pointerdown", start, { once: true });
+  for (const g of GESTURES) window.addEventListener(g, retry);
   return {
     stop: () => {
-      window.removeEventListener("pointerdown", start);
+      stopped = true;
+      unhook();
       fadeOutAndPause(a);
     },
   };
@@ -234,6 +256,8 @@ export function GameSounds({
     slot: SoundSlot,
     extra?: { progress?: () => number; remainingMs?: number },
   ) => {
+    const ctx = audioContext();
+    if (ctx && ctx.state !== "running") void ctx.resume();
     if (slot === "final" && skin?.finalClipUrl) {
       return finalSoundKey
         ? playEncrypted(skin.finalClipUrl, finalSoundKey, 0.8)
@@ -336,24 +360,77 @@ export function GameSounds({
 }
 
 /** Host waiting room: a ping for every player who joins (if sound is on here). */
-export function JoinPing({ socket }: { socket: GameSocket | null }) {
+/**
+ * The host's live cues: a ping when a player joins, a soft "blopp" for each
+ * bubble a player pops (lobby) and a "pling" for each reaction. Rate-limited
+ * so a full room doesn't turn into noise.
+ */
+export function LiveSounds({ socket }: { socket: GameSocket | null }) {
   const s = useGameSound();
   const on = Boolean(s?.on);
   useEffect(() => {
     if (!socket || !on) return;
+    const last = { blopp: 0, pling: 0 };
+    const limited = (
+      kind: keyof typeof last,
+      gapMs: number,
+      play: () => void,
+    ) => {
+      const now = performance.now();
+      if (now - last[kind] < gapMs) return;
+      last[kind] = now;
+      play();
+    };
+    const hits: Record<string, number> = {};
     const ping = () => playPing();
+    const onReaction = () => limited("pling", 90, () => playPling());
+    const onStats = (b: { playerId: string; hits: number }) => {
+      const before = hits[b.playerId];
+      hits[b.playerId] = b.hits;
+      const fresh = before === undefined ? 0 : Math.min(5, b.hits - before);
+      for (let i = 0; i < fresh; i++) {
+        setTimeout(
+          () => limited("blopp", 70, () => playBlopp()),
+          (i * 900) / fresh,
+        );
+      }
+    };
     socket.on("player-joined", ping);
+    socket.on("reaction", onReaction);
+    socket.on("bubble-stats", onStats);
     return () => {
       socket.off("player-joined", ping);
+      socket.off("reaction", onReaction);
+      socket.off("bubble-stats", onStats);
     };
   }, [socket, on]);
   return null;
 }
 
 /** Speaker switch for this device (hidden when sound can't play here). */
-export function SoundToggle({ className }: { className?: string }) {
+export function SoundToggle({
+  className,
+  pill = false,
+}: {
+  className?: string;
+  /** Header pill with a label, styled like the "Live" status. */
+  pill?: boolean;
+}) {
   const s = useGameSound();
   if (!s?.allowed) return null;
+  if (pill) {
+    return (
+      <button
+        type="button"
+        aria-label={s.on ? "Mute sounds" : "Turn sounds on"}
+        onClick={() => s.setOn(!s.on)}
+        className="inline-flex items-center gap-2 rounded-full border border-lprimary/15 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-1.5 text-[13px] font-semibold text-dark dark:text-white cursor-pointer hover:border-dprimary"
+      >
+        {s.on ? <LuVolume2 size={15} /> : <LuVolumeX size={15} />}
+        {s.on ? "Sound on" : "Sound off"}
+      </button>
+    );
+  }
   return (
     <button
       type="button"

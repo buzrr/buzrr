@@ -100,21 +100,29 @@ function CorrectGlow({ children }: { children: ReactNode }) {
         {
           borderColor: "rgba(34,197,94,0)",
           backgroundColor: "rgba(34,197,94,0)",
+          boxShadow: "0 0 0 0 rgba(34,197,94,0)",
           transform: "scale(1)",
         },
         {
           borderColor: "rgba(34,197,94,1)",
-          backgroundColor: "rgba(34,197,94,0.22)",
-          transform: "scale(1.03)",
-          offset: 0.55,
+          backgroundColor: "rgba(34,197,94,0.3)",
+          boxShadow: "0 0 0 8px rgba(34,197,94,0.25)",
+          transform: "scale(1.05)",
+          offset: 0.4,
         },
         {
           borderColor: "rgba(34,197,94,1)",
-          backgroundColor: "rgba(34,197,94,0.12)",
+          backgroundColor: "rgba(34,197,94,0.14)",
+          boxShadow: "0 0 0 0 rgba(34,197,94,0)",
           transform: "scale(1)",
         },
       ],
-      { duration: 900, easing: "cubic-bezier(.2,.8,.2,1)", fill: "forwards" },
+      {
+        duration: 1300,
+        delay: 250,
+        easing: "cubic-bezier(.2,.8,.2,1)",
+        fill: "both",
+      },
     );
   }, []);
   return (
@@ -141,8 +149,15 @@ export function OptionsReveal({
   // Bars share out the picks; with multi-select one player can count twice.
   const picks = counts.reduce((sum, c) => sum + c, 0);
   const maxCount = Math.max(1, ...counts);
+  // Every option has to fit on screen: from five options on, two columns.
+  const twoCols = options.length >= 5;
   return (
-    <div className="flex-1 flex flex-col justify-center gap-3.5">
+    <div
+      className={clsx(
+        "flex-1 grid content-center",
+        twoCols ? "gap-x-5 gap-y-1.5 sm:grid-cols-2" : "gap-3.5",
+      )}
+    >
       {options.map((opt, i) => {
         const count = counts[i] ?? 0;
         const ok = correctOptionIds.includes(opt.id);

@@ -111,6 +111,7 @@ export default function AddQuestionMenu({ quizId }: { quizId: string }) {
       <BasicModal
         btnTitle="Add Question"
         wide
+        confirmDismiss
         subtitle={type ? SUBTITLES[type] : undefined}
         open={type !== null}
         onClose={() => setType(null)}

@@ -39,7 +39,13 @@ function Slide({
 }) {
   const [advancing, setAdvancing] = useState(false);
   return (
-    <div className="w-full max-w-3xl mx-auto flex flex-col px-4 pt-6 md:pt-10 min-h-[calc(100dvh-12rem)] text-dark dark:text-white">
+    <div
+      className={clsx(
+        "w-full max-w-3xl mx-auto flex flex-col px-4 pt-6 md:pt-10 text-dark dark:text-white",
+        // Host: fills the game screen, so the button sits at the very bottom.
+        onNext ? "flex-1 min-h-0" : "min-h-[calc(100dvh-12rem)]",
+      )}
+    >
       <section
         aria-live="polite"
         className={clsx(

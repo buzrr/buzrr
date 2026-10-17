@@ -56,7 +56,7 @@ export function OptionKey({
   );
 }
 
-function Progress({
+export function Progress({
   qIndex,
   qCount,
   final,

@@ -134,15 +134,38 @@ export default function QuesResult(props: QuesResultProps) {
       ? `${(reveal.avgTimeMs / 1000).toFixed(1)}s`
       : "—";
   const isLastQuestion = qIndex === qCount - 1;
+  // Many options: a tighter panel, so all of them fit without scrolling.
+  const manyOptions =
+    question !== null &&
+    question !== undefined &&
+    "options" in question &&
+    question.options.length >= 5;
   const scored = question ? isScoredType(question.type) : true;
 
   // Start on the pre-question standings, then count scores up and let rows
   // glide into their new ranks.
   const [settled, setSettled] = useState(false);
   useEffect(() => {
+    if (!showBoard) return;
+    setSettled(false);
     const t = setTimeout(() => setSettled(true), SETTLE_DELAY_MS);
     return () => clearTimeout(t);
-  }, []);
+  }, [showBoard]);
+
+  // "Show answer": the whole question grows once, briefly, as the right
+  // answer turns green.
+  const answerRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (phase !== "reveal") return;
+    answerRef.current?.animate(
+      [
+        { transform: "scale(1)" },
+        { transform: "scale(1.035)", offset: 0.35 },
+        { transform: "scale(1)" },
+      ],
+      { duration: 800, easing: "cubic-bezier(.2,.8,.2,1)" },
+    );
+  }, [phase]);
   const rows = useMemo(
     () =>
       settled
@@ -202,9 +225,13 @@ export default function QuesResult(props: QuesResultProps) {
         {phase === "reveal" && <ConfettiBurst duration={1400} />}
         {showAnswerPanel && (
           <section
+            ref={answerRef}
             className={clsx(
               panelClass,
-              "flex flex-col gap-5 md:gap-[22px] p-5 md:px-[30px] md:py-7 md:min-h-0 md:overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+              "flex flex-col p-5 md:px-[30px] md:min-h-0 md:overflow-y-auto [scrollbar-width:thin]",
+              manyOptions
+                ? "gap-3 md:gap-4 md:py-5"
+                : "gap-5 md:gap-[22px] md:py-7",
             )}
           >
             <div>
