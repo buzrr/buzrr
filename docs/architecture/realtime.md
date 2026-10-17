@@ -283,6 +283,20 @@ masked until the reveal (`buildSnapshot`).
   exactly what the current client speaks. Adding a compat alias "just in case"
   reintroduces the drift this removal cleared.
 
+## Question sounds: preload and the countdown's wait
+
+- During a reveal (or the get-ready slide) the room gets `preload` with the
+  next question's encrypted clips. Each device starts after a random pause of
+  up to 3 s (`PRELOAD_SPREAD_MS`, `lib/sound/preload.ts`) and reports
+  `preload-status` with `loaded: 0` at once, so the countdown counts it as
+  downloading.
+- A failed download is retried twice after a random, growing pause; a clip
+  given up reports `done: true, failed: true` — the countdown never waits for
+  it. Clips are mono, 64 kbit/s.
+- The countdown (`waitForDownloads`) waits for connected devices still
+  downloading, ignores ones whose progress stalled for 4 s, and gives up
+  after 30 s. Questions with "∞" time have no countdown and no wait.
+
 ## Lobby extras: bubbles and reactions
 
 - **Bubble game:** players send `bubble-stats` (their running hits/misses,

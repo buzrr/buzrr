@@ -21,7 +21,7 @@ Each player also downloads what its browser would, with its own cache:
 Measures:
   - HTTP latency: create player, join room
   - socket connect latency (connect + first state-sync)
-  - request-sync -> state-sync round trip (lobby, every few seconds)
+  - request-sync -> state-sync round trip (lobby, a few probe bots every 10 s)
   - submit-answer ack latency (accepted / rejected by reason)
   - broadcast spread: how far apart the players received question-start /
     question-end / phase-change for the same question
@@ -32,24 +32,33 @@ Measures:
 Usage:
   python3 buzrrbench.py [--url https://quiz.woikn.de] [--code ABC123] [--users 50]
                         [--kbps 2000] [--sound-optin 0.3] [--no-assets] [--no-reactions]
-                        [--timeout-after 60 --timeout-users 5]
+                        [--timeout-after 60 --timeout-users 5] [--procs 4] [--probe-bots 20]
 
 With --timeout-after/--timeout-users, that many connected players "freeze" at
 that point (like a locked phone): they send nothing any more — no heartbeat,
 answers, reactions — while the socket still answers the transport ping, so
 only the server's heartbeat check can drop them. Dropped, they stay away.
 Missing values are asked for interactively.
+
+The run ends by itself once 95 % of the connected players are done (game over,
+dropped, kicked) plus 30 s for stragglers; the rest count as "bots without game
+end". With --procs N the players are split over N processes (one asyncio loop
+can't keep up beyond ~200 bots); the parent merges their numbers into one summary.
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import json
+import os
 import random
 import signal
 import statistics
 import string
+import subprocess
 import sys
+import tempfile
 import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
@@ -67,8 +76,11 @@ except ImportError:
 
 ANSWER_DELAY = (0.5, 20.0)
 ACK_TIMEOUT = 15.0
-SYNC_PROBE_EVERY = 5.0
+SYNC_PROBE_EVERY = 10.0  # only --probe-bots players probe
 HEARTBEAT_EVERY = 10.0  # HEARTBEAT_INTERVAL_MS in the contract
+# The run stops this long after DONE_SHARE of the connected players are done.
+DONE_SHARE = 0.95
+DONE_GRACE = 30.0
 PRELOAD_REPORT_EVERY = 0.4  # like the web client's throttle
 # Tries per download, like the web client (lib/sound/preload.ts).
 DOWNLOAD_TRIES = 3
@@ -104,6 +116,29 @@ class Metrics:
 
     def err(self, what: str) -> None:
         self.errors[what] += 1
+
+    # --procs: children dump raw numbers, the parent merges them.
+    def dump(self) -> dict:
+        return {
+            "lat": self.lat, "errors": self.errors, "counts": self.counts,
+            "recv": [[ev, q, ts] for (ev, q), ts in self.recv.items()],
+            "bytes": self.bytes,
+            "waiting_for": list(self.waiting_for.items()),
+            "wait_ms": list(self.wait_ms.items()),
+        }
+
+    def merge(self, d: dict) -> None:
+        for k, v in d["lat"].items():
+            self.lat[k].extend(v)
+        self.errors.update(d["errors"])
+        self.counts.update(d["counts"])
+        self.bytes.update(d["bytes"])
+        for ev, q, ts in d["recv"]:
+            self.recv[(ev, q)].extend(ts)  # time.time(): comparable across processes
+        for q, n in d["waiting_for"]:
+            self.waiting_for[q] = self.waiting_for.get(q, 0) + n
+        for q, ms in d["wait_ms"]:
+            self.wait_ms[q] = max(self.wait_ms.get(q, 0.0), ms)
 
 
 M = Metrics()
@@ -195,6 +230,9 @@ class Bot:
     token: str = ""
     phase: str = "idle"
     connected: bool = False
+    ever_connected: bool = False
+    game_ended: bool = False  # saw game-over / game-session-ended
+    probe: bool = False  # one of the --probe-bots request-sync probes
     done: asyncio.Event = field(default_factory=asyncio.Event)
     sync_sent: float = 0.0
     hits: int = 0
@@ -307,9 +345,9 @@ class Bot:
             self.done.set()
             return
         M.add("socket connect", (time.perf_counter() - t0) * 1000)
-        self.connected = True
+        self.connected = self.ever_connected = True
         bubbles = asyncio.create_task(self.pop_bubbles())
-        probe = asyncio.create_task(self.sync_probe())
+        probe = asyncio.create_task(self.sync_probe() if self.probe else asyncio.sleep(0))
         reacts = asyncio.create_task(self.react())
         beats = asyncio.create_task(self.heartbeat())
         await self.done.wait()
@@ -587,11 +625,13 @@ class Bot:
         async def _over(_data=None):
             self.set_phase("ended")
             M.counts["game-over received"] += 1
+            self.game_ended = True
             self.done.set()
 
         @s.on("game-session-ended")
         async def _ended(_data=None):
             M.counts["game-session-ended received"] += 1
+            self.game_ended = True
             self.done.set()
 
         @s.on("player-removed")
@@ -662,7 +702,8 @@ class Bot:
             await asyncio.sleep(random.uniform(0.06, 0.15))
 
     async def sync_probe(self) -> None:
-        """Lobby only: request-sync round trip as a latency probe."""
+        """Lobby only: request-sync round trip as a latency probe (--probe-bots
+        players only — every bot syncing every few seconds was itself a load)."""
         await asyncio.sleep(random.uniform(0, SYNC_PROBE_EVERY))
         while True:
             if not self.frozen and self.phase in ("idle", "lobby") and not self.sync_sent:
@@ -737,7 +778,7 @@ def ask(prompt: str, default: str | None = None) -> str:
     return val or (default or "")
 
 
-def report(started: float) -> None:
+def report(started: float, no_game_end: int | None = None) -> None:
     print("\n" + "=" * 100)
     print(f"buzrrbench summary - {time.time() - started:.0f}s run")
     print("=" * 100)
@@ -762,6 +803,8 @@ def report(started: float) -> None:
         for q in sorted(M.waiting_for):
             print(f"  q{q + 1:<3d} up to {M.waiting_for[q]:4d} devices, "
                   f"waited {M.wait_ms.get(q, 0.0):8.1f} ms")
+    if no_game_end is not None:
+        M.counts["bots without game end"] = no_game_end
     if M.counts:
         print("\nCounts")
         for k, v in sorted(M.counts.items()):
@@ -773,7 +816,7 @@ def report(started: float) -> None:
     print()
 
 
-async def main() -> None:
+def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Buzrr room load test")
     ap.add_argument("--url", help="server URL, e.g. https://quiz.woikn.de")
     ap.add_argument("--code", help="room code (Teilnahmecode)")
@@ -789,22 +832,27 @@ async def main() -> None:
                     help="after SEC seconds, --timeout-users players freeze (stop sending, heartbeat too)")
     ap.add_argument("--timeout-users", type=int, default=0, metavar="N",
                     help="how many connected players freeze at --timeout-after (default 0)")
-    args = ap.parse_args()
+    ap.add_argument("--probe-bots", type=int, default=20, metavar="N",
+                    help="players that probe the request-sync round trip in the lobby (default 20)")
+    ap.add_argument("--procs", type=int, default=1, metavar="N",
+                    help="split the players over N processes (use for more than ~200; default 1)")
+    # internal: set by the parent for its --procs children
+    ap.add_argument("--child-out", help=argparse.SUPPRESS)
+    ap.add_argument("--first-idx", type=int, default=1, help=argparse.SUPPRESS)
+    ap.add_argument("--label", default="", help=argparse.SUPPRESS)
+    return ap.parse_args()
 
-    base = (args.url or ask("Server URL", "https://quiz.woikn.de")).rstrip("/")
-    code = (args.code or ask("Room code")).strip().upper()
-    users = args.users or int(ask("Parallel users", "20"))
-    if not code or users < 1:
-        sys.exit("room code and a positive number of users are required")
-    if (args.timeout_after is None) != (args.timeout_users < 1):
-        sys.exit("--timeout-after and --timeout-users go together")
 
+async def run_bots(args: argparse.Namespace, base: str, code: str, users: int) -> int | None:
+    """Runs this process's players; returns how many never saw the game end
+    (None if none did — e.g. stopped in the lobby)."""
+    tag = f"[{args.label}] " if args.label else ""
     started = time.time()
     conn = aiohttp.TCPConnector(limit=0)
     async with aiohttp.ClientSession(connector=conn, timeout=aiohttp.ClientTimeout(total=30)) as http:
         bots = [
             Bot(
-                i + 1, base, code, http,
+                args.first_idx + i, base, code, http,
                 assets=not args.no_assets,
                 kbps=args.kbps,
                 reacting=not args.no_reactions and random.random() < 0.7,
@@ -813,6 +861,8 @@ async def main() -> None:
             )
             for i in range(users)
         ]
+        for b in random.sample(bots, min(args.probe_bots, users)):
+            b.probe = True
         stop = asyncio.Event()
         loop = asyncio.get_running_loop()
         for sig in (signal.SIGINT, signal.SIGTERM):
@@ -821,11 +871,6 @@ async def main() -> None:
             except NotImplementedError:
                 pass
 
-        tasks = []
-        for b in bots:
-            tasks.append(asyncio.create_task(b.run()))
-            await asyncio.sleep(1.0 / args.ramp)
-
         async def progress():
             while True:
                 await asyncio.sleep(5)
@@ -833,7 +878,7 @@ async def main() -> None:
                 acc = M.counts["answers accepted"]
                 rej = sum(v for k, v in M.counts.items() if k.startswith("answers rejected"))
                 print(
-                    f"[{time.time() - started:6.0f}s] connected={sum(b.connected for b in bots)}/{users} "
+                    f"{tag}[{time.time() - started:6.0f}s] connected={sum(b.connected for b in bots)}/{users} "
                     + (f"frozen={sum(b.frozen and b.connected for b in bots)} " if args.timeout_users else "")
                     + f"phases={dict(phases)} answers ok={acc} rejected={rej} "
                     f"downloaded={sum(M.bytes.values()) / 1e6:.1f}MB errors={sum(M.errors.values())}",
@@ -847,25 +892,51 @@ async def main() -> None:
             for b in picked:
                 b.freeze()
             print(
-                f"[{time.time() - started:6.0f}s] {len(picked)} players froze "
+                f"{tag}[{time.time() - started:6.0f}s] {len(picked)} players froze "
                 f"(no heartbeat, answers, reactions) - the server should drop them",
                 flush=True,
             )
 
+        async def end_when_mostly_done():
+            # Once the game is over for most players, don't hang on a few that
+            # never got the end (lost socket, stuck): give them DONE_GRACE, stop.
+            while True:
+                await asyncio.sleep(1)
+                joined = [b for b in bots if b.ever_connected]
+                if not joined or not any(b.game_ended for b in joined):
+                    continue
+                # floor: with --procs a child may hold few bots (9 of 10 counts)
+                if sum(b.done.is_set() for b in joined) >= int(DONE_SHARE * len(joined)):
+                    break
+            print(f"{tag}[{time.time() - started:6.0f}s] {DONE_SHARE:.0%} done - "
+                  f"stopping in {DONE_GRACE:.0f}s", flush=True)
+            await asyncio.sleep(DONE_GRACE)
+            stop.set()
+
+        tasks = []
         prog = asyncio.create_task(progress())
+        ender = asyncio.create_task(end_when_mostly_done())
         freezer = asyncio.create_task(time_out_some()) if args.timeout_users else None
-        print(f"{users} players joining {code} on {base} - waiting for the host to start (Ctrl+C to stop)")
-        all_done = asyncio.gather(*tasks)
-        stopper = asyncio.create_task(stop.wait())
+        print(f"{tag}{users} players joining {code} on {base} - waiting for the host to start (Ctrl+C to stop)",
+              flush=True)
         try:
+            for b in bots:
+                tasks.append(asyncio.create_task(b.run()))
+                if stop.is_set():
+                    break
+                await asyncio.sleep(1.0 / args.ramp)
+            all_done = asyncio.gather(*tasks)
+            stopper = asyncio.create_task(stop.wait())
             await asyncio.wait({all_done, stopper}, return_when=asyncio.FIRST_COMPLETED)
+            all_done.add_done_callback(lambda f: f.cancelled() or f.exception())
         except asyncio.CancelledError:
             # python-socketio's own Ctrl+C handler cancels every task; still report.
             pass
-        prog.cancel()
-        if freezer:
-            freezer.cancel()
-        all_done.add_done_callback(lambda f: f.cancelled() or f.exception())
+        for t in (prog, ender, freezer):
+            if t:
+                t.cancel()
+        joined = [b for b in bots if b.ever_connected]
+        no_end = sum(not b.game_ended for b in joined) if any(b.game_ended for b in joined) else None
         for b in bots:
             b.done.set()
         try:
@@ -875,11 +946,86 @@ async def main() -> None:
             await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=5)
         except (asyncio.TimeoutError, asyncio.CancelledError):
             pass
-    report(started)
+    return no_end
+
+
+def split(total: int, parts: int) -> list[int]:
+    return [total // parts + (1 if i < total % parts else 0) for i in range(parts)]
+
+
+def run_parent(args: argparse.Namespace, base: str, code: str, users: int) -> None:
+    """--procs: start the children, wait, merge their numbers, one summary."""
+    started = time.time()
+    procs = min(args.procs, users)
+    sizes = split(users, procs)
+    freeze = split(args.timeout_users, procs)
+    probes = split(args.probe_bots, procs)
+    tmp = tempfile.mkdtemp(prefix="buzrrbench-")
+    children = []
+    first = 1
+    for i, n in enumerate(sizes):
+        out = os.path.join(tmp, f"p{i + 1}.json")
+        cmd = [sys.executable, os.path.abspath(__file__),
+               "--url", base, "--code", code, "--users", str(n),
+               "--ramp", str(args.ramp / procs), "--kbps", str(args.kbps),
+               "--sound-optin", str(args.sound_optin), "--probe-bots", str(probes[i]),
+               "--child-out", out, "--first-idx", str(first), "--label", f"p{i + 1}"]
+        if args.no_assets:
+            cmd.append("--no-assets")
+        if args.no_reactions:
+            cmd.append("--no-reactions")
+        if args.timeout_users and freeze[i]:
+            cmd += ["--timeout-after", str(args.timeout_after), "--timeout-users", str(freeze[i])]
+        children.append((out, subprocess.Popen(cmd)))
+        first += n
+
+    # Ctrl+C reaches the children through the terminal's process group; the
+    # parent only waits (a no-op handler, not SIG_IGN, so children keep theirs).
+    signal.signal(signal.SIGINT, lambda *_: None)
+    signal.signal(signal.SIGTERM, lambda *_: [p.send_signal(signal.SIGTERM) for _, p in children])
+    no_end = None
+    for i, (out, p) in enumerate(children):
+        while p.poll() is None:
+            try:
+                p.wait()
+            except InterruptedError:
+                pass
+        try:
+            with open(out, encoding="utf-8") as f:
+                d = json.load(f)
+        except (OSError, ValueError):
+            M.err(f"process p{i + 1}: no result (exit {p.returncode})")
+            continue
+        M.merge(d["metrics"])
+        if d["no_game_end"] is not None:
+            no_end = (no_end or 0) + d["no_game_end"]
+    report(started, no_end)
+
+
+def main() -> None:
+    args = parse_args()
+    base = (args.url or ask("Server URL", "https://quiz.woikn.de")).rstrip("/")
+    code = (args.code or ask("Room code")).strip().upper()
+    users = args.users or int(ask("Parallel users", "20"))
+    if not code or users < 1:
+        sys.exit("room code and a positive number of users are required")
+    if (args.timeout_after is None) != (args.timeout_users < 1):
+        sys.exit("--timeout-after and --timeout-users go together")
+    if args.procs > 1 and not args.child_out:
+        run_parent(args, base, code, users)
+        return
+    started = time.time()
+    no_end = None
+    try:
+        no_end = asyncio.run(run_bots(args, base, code, users))
+    except KeyboardInterrupt:
+        pass
+    if args.child_out:
+        with open(args.child_out, "w", encoding="utf-8") as f:
+            json.dump({"metrics": M.dump(), "no_game_end": no_end}, f)
+    else:
+        report(started, no_end)
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        pass
+    main()

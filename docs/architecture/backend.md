@@ -121,10 +121,13 @@ services.
 `game-sessions.service.ts` — read alongside the socket paths in
 [realtime.md](realtime.md#kick--ban-semantics):
 
-- `join`: banned-check first, then a **serializable transaction** so
-  concurrent joins can't overshoot the host's plan cap (`maxPlayersFor`: 50 Free / 250 Pro, or a
-  higher `hostSizeLimit` override); rejoining the
-  same room bypasses the cap.
+- `join`: banned-check first; the cap (`maxPlayersFor`: per plan, `MAX_PLAYERS_FREE` /
+  `_PRO` / `_NOBILLING`, or a higher `hostSizeLimit` override) and the avatar are worked out,
+  then a short transaction takes the room row's lock (`SELECT … FOR UPDATE`, ReadCommitted),
+  counts and attaches the player. Concurrent joins of one room queue on that lock for a few
+  ms each instead of aborting each other (SERIALIZABLE did, and at 510 players the retries
+  exhausted the pool — `TransactionWriteConflict`, P2028). Rejoining the same room bypasses the
+  cap. `DB_POOL_MAX` sizes the pg pool. Spec: `game-sessions/__tests__/join-cap.spec.ts`.
 - `endRoom` / `removePlayerFromRoom` / `banPlayerFromRoom`: host-only; they
   drive the engine (broadcasts included) and then reconcile Postgres. Ban
   order (Redis ban **before** Postgres detach) is deliberate — a join between
