@@ -20,6 +20,9 @@ import { JoinRoomDto } from "./dto/join-room.dto";
 
 const generateGameCode = customAlphabet("ABCDEFGHJKMNPQRSTUVWXYZ23456789", 6);
 
+/** Tries per join when concurrent joins collide (serialization conflict). */
+const JOIN_ATTEMPTS = 8;
+
 @Injectable()
 export class GameSessionsService {
   constructor(
@@ -59,41 +62,56 @@ export class GameSessionsService {
       );
     }
     // Serializable so concurrent joins can't both pass the count and
-    // overshoot the cap.
-    await this.prisma.db.$transaction(
-      async (tx) => {
-        // Re-joining the same room (e.g. after a refresh) must never hit the cap.
-        if (player.gameId !== game.id) {
-          // The cap follows the host's plan at join time; a host downgrading
-          // mid-game never evicts anyone already in the room.
-          const limit = await this.entitlements.maxPlayersFor(
-            game.creatorId,
-            tx,
-          );
-          const playerCount = await tx.player.count({
-            where: { gameId: game.id },
-          });
-          if (playerCount >= limit) {
-            throw new ForbiddenException(
-              `This room is full — it can hold up to ${limit} players.`,
+    // overshoot the cap. A crowd joining at once (a QR code on the screen)
+    // makes Postgres abort some of them with a serialization conflict
+    // (P2034): those retry after a short random pause instead of failing.
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await this.prisma.db.$transaction(
+          async (tx) => {
+            // Re-joining the same room (e.g. after a refresh) must never hit the cap.
+            if (player.gameId !== game.id) {
+              // The cap follows the host's plan at join time; a host downgrading
+              // mid-game never evicts anyone already in the room.
+              const limit = await this.entitlements.maxPlayersFor(
+                game.creatorId,
+                tx,
+              );
+              const playerCount = await tx.player.count({
+                where: { gameId: game.id },
+              });
+              if (playerCount >= limit) {
+                throw new ForbiddenException(
+                  `This room is full — it can hold up to ${limit} players.`,
+                );
+              }
+            }
+            // A picture from this room's avatar skin (kept when it already is).
+            const { avatars } = resolveGameLook(
+              game.quiz,
+              game.quiz.user?.preferences,
             );
-          }
-        }
-        // A picture from this room's avatar skin (kept when it already is).
-        const { avatars } = resolveGameLook(
-          game.quiz,
-          game.quiz.user?.preferences,
+            const profilePic = avatars.includes(player.profilePic ?? "")
+              ? undefined
+              : assignAvatar(avatars, playerId);
+            await tx.player.update({
+              where: { id: playerId },
+              data: { gameId: game.id, ...(profilePic ? { profilePic } : {}) },
+            });
+          },
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
         );
-        const profilePic = avatars.includes(player.profilePic ?? "")
-          ? undefined
-          : assignAvatar(avatars, playerId);
-        await tx.player.update({
-          where: { id: playerId },
-          data: { gameId: game.id, ...(profilePic ? { profilePic } : {}) },
-        });
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
+        break;
+      } catch (err) {
+        const conflict =
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === "P2034";
+        if (!conflict || attempt >= JOIN_ATTEMPTS) throw err;
+        await new Promise((r) =>
+          setTimeout(r, 20 + Math.random() * 80 * attempt),
+        );
+      }
+    }
     return { roomId: game.id, playerId };
   }
 

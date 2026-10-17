@@ -240,7 +240,7 @@ export const DE: Record<string, string> = {
   Description: "Beschreibung",
   "Description (optional)": "Beschreibung (optional)",
   "Description (Optional)": "Beschreibung (optional)",
-  "Disable": "Deaktivieren",
+  Disable: "Deaktivieren",
   "Disabled · skipped": "Deaktiviert · wird übersprungen",
   Disconnected: "Getrennt",
   "Display name": "Anzeigename",
