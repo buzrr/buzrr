@@ -74,11 +74,14 @@ export function fetchClip(url: string): Promise<ArrayBuffer> {
 // -- progress reports (`preload-status`, for the countdown's wait) -------------
 
 type Report = { qIndex: number; loaded: number; total: number; done: boolean };
-let tracked: { qIndex: number; keys: string[] } | null = null;
+let tracked: { qIndex: number; keys: string[]; reportedDone?: boolean } | null =
+  null;
 const listeners = new Set<(r: Report) => void>();
 
 function notify() {
-  if (!tracked) return;
+  // "Done" once per question: other downloads (skin sounds, images) keep
+  // calling notify, and every report is a store write on the server.
+  if (!tracked || tracked.reportedDone) return;
   let loaded = 0;
   let total = 0;
   let done = true;
@@ -88,6 +91,7 @@ function notify() {
     total += p?.total ?? 0;
     if (!p?.done) done = false;
   }
+  if (done) tracked.reportedDone = true;
   const report = { qIndex: tracked.qIndex, loaded, total, done };
   for (const l of listeners) l(report);
 }
