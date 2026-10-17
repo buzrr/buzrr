@@ -8,12 +8,15 @@ export const DE: Record<string, string> = {
   "+{n} points": "+{n} Punkte",
   "1. Download the template": "1. Vorlage herunterladen",
   "1250 pt.": "1250 Pkt.",
+  "1v1 Duel": "1v1-Duell",
+  "1v1 Duel · {category}": "1v1-Duell · {category}",
   "1–5 or 1–10 sentiment": "Stimmung von 1–5 oder 1–10",
   "2. Upload filled document": "2. Ausgefüllte Datei hochladen",
   "2nd": "2.",
   "2–8 options, single or multiple answers":
     "2–8 Optionen, eine oder mehrere richtige",
   "5 stars": "5 Sterne",
+  "Accept challenge": "Herausforderung annehmen",
   "Accepted answer {n}": "Akzeptierte Antwort {n}",
   "Accepted answers": "Akzeptierte Antworten",
   Account: "Konto",
@@ -26,6 +29,7 @@ export const DE: Record<string, string> = {
   "Add option": "Option hinzufügen",
   "Add pictures": "Bilder hinzufügen",
   "Add Question": "Frage hinzufügen",
+  "Admin Login": "Admin-Login",
   "AGPL-3.0": "AGPL-3.0",
   "All answers need the same length per word as the first ({n} letters).":
     "Alle Antworten brauchen pro Wort dieselbe Länge wie die erste ({n} Buchstaben).",
@@ -33,8 +37,10 @@ export const DE: Record<string, string> = {
   "Allow anonymous answers": "Anonyme Antworten erlauben",
   "Allow multiple choices": "Mehrfachauswahl erlauben",
   "Allow multiple submissions": "Mehrere Antworten erlauben",
+  "Already counted today": "Heute schon gezählt",
   "Already have an account? Sign in": "Schon ein Konto? Anmelden",
   "Also accepted": "Ebenfalls akzeptiert",
+  Alternatives: "Alternativen",
   "An unexpected error occurred during parsing.":
     "Beim Einlesen ist ein unerwarteter Fehler aufgetreten.",
   "anonymous allowed": "anonym erlaubt",
@@ -46,6 +52,7 @@ export const DE: Record<string, string> = {
   answered: "geantwortet",
   "Answers in": "Antworten",
   "Answers per player": "Antworten pro Spieler",
+  "Any category, mixed every round": "Alle Kategorien, jede Runde gemischt",
   "Appearance & Preferences": "Darstellung & Einstellungen",
   Arcade: "Arcade",
   "Are you sure you want to delete this question?":
@@ -73,6 +80,8 @@ export const DE: Record<string, string> = {
   "Avg score": "Ø Punkte",
   "Avg. answer time": "Ø Antwortzeit",
   Back: "Zurück",
+  "Back to Duel": "Zurück zum Duell",
+  "Back to duel": "Zurück zum Duell",
   "Back to history": "Zurück zum Verlauf",
   "Back to home": "Zur Startseite",
   "Back to quiz details": "Zurück zum Quiz",
@@ -87,17 +96,29 @@ export const DE: Record<string, string> = {
   "Banning…": "Sperre…",
   "Base smileys cannot be changed":
     "Die Basis-Smileys können nicht geändert werden",
+  Battle: "Duelle",
   "Be prepared": "Mach dich bereit",
   "Be prepared!": "Mach dich bereit!",
+  Best: "Bestwert",
   "Big party at the very end": "Große Party ganz am Ende",
   Both: "Beide",
   Breadcrumb: "Navigationspfad",
   "Build from the ground up": "Von Grund auf erstellen",
+  "Build quizzes.": "Quizze bauen.",
   "Built in · synthesized in the browser": "Eingebaut · im Browser erzeugt",
+  "Buzrr home": "Buzrr-Startseite",
   "Buzrr Logo": "Buzrr-Logo",
   "Buzrr v": "Buzrr v",
   cancel: "abbrechen",
   Cancel: "Abbrechen",
+  "Cancel challenge": "Herausforderung abbrechen",
+  Category: "Kategorie",
+  "Category: {name}": "Kategorie: {name}",
+  "Challenge expired": "Herausforderung abgelaufen",
+  "Challenge link copied!": "Link zur Herausforderung kopiert!",
+  "Challenge unavailable": "Herausforderung nicht verfügbar",
+  "challenged you to a 1v1": "fordert dich zum 1v1 heraus",
+  "Change category": "Kategorie wechseln",
   "Change logo": "Logo ändern",
   "Change your avatar": "Avatar ändern",
   "Change your reaction": "Reaktion ändern",
@@ -168,6 +189,12 @@ export const DE: Record<string, string> = {
     "Spieler konnte nicht entfernt werden. Bitte erneut versuchen.",
   "Could not update your profile.":
     "Dein Profil konnte nicht aktualisiert werden.",
+  "Couldn't cancel the challenge.":
+    "Die Herausforderung konnte nicht abgebrochen werden.",
+  "Couldn't create a challenge link. Try again.":
+    "Der Link zur Herausforderung konnte nicht erstellt werden. Bitte erneut versuchen.",
+  "Couldn't start the duel. Please sign in and try again.":
+    "Das Duell konnte nicht gestartet werden. Bitte anmelden und erneut versuchen.",
   "Countdown before a question": "Countdown vor einer Frage",
   Create: "Erstellen",
   "Create a custom profile": "Eigenes Profil erstellen",
@@ -177,10 +204,18 @@ export const DE: Record<string, string> = {
   "Create one from scratch or let AI draft it for you.":
     "Erstelle eins von Grund auf oder lass die KI einen Entwurf machen.",
   "Create user": "Nutzer anlegen",
+  "Creating link…": "Erstelle Link…",
   CSV: "CSV",
+  Current: "Aktuell",
   "Current image": "Aktuelles Bild",
   "Current sound": "Aktueller Ton",
+  "Daily duel streak": "Tägliche Duell-Serie",
+  "Daily streak": "Tägliche Serie",
   "Danger zone": "Gefahrenbereich",
+  "day streak": "Tage-Serie",
+  "Day {n}": "Tag {n}",
+  "Day {n}: duel played": "Tag {n}: Duell gespielt",
+  "Days this month": "Tage diesen Monat",
   Default: "Standard",
   "Default (your settings)": "Standard (deine Einstellungen)",
   "Default audio skin": "Standard-Audio-Skin",
@@ -208,15 +243,19 @@ export const DE: Record<string, string> = {
   "Disabled · skipped": "Deaktiviert · wird übersprungen",
   Disconnected: "Getrennt",
   "Display name": "Anzeigename",
+  Docs: "Doku",
   Done: "Fertig",
   Download: "Herunterladen",
   "Download {kind} template": "{kind}-Vorlage herunterladen",
   Duel: "Duell",
   "Duel History": "Duell-Verlauf",
+  "Duel over": "Duell vorbei",
   "Duel Portal": "Duell-Portal",
   "Duel stats": "Duell-Statistik",
+  Duels: "Duelle",
   "Duels played": "Gespielte Duelle",
   Duplicate: "Duplizieren",
+  "Each category has its own rating": "Jede Kategorie hat ihre eigene Wertung",
   Edit: "Bearbeiten",
   "Edit Question": "Frage bearbeiten",
   "Edit quiz": "Quiz bearbeiten",
@@ -251,9 +290,14 @@ export const DE: Record<string, string> = {
   "Final leaderboard": "Endstand",
   "Final results": "Endergebnis",
   "Final results coming up": "Gleich kommt der Endstand",
+  "Find a random match instead": "Stattdessen zufälligen Gegner suchen",
+  "Find Match · {category}": "Gegner suchen · {category}",
+  "Finish this duel to start a streak":
+    "Beende dieses Duell, um eine Serie zu starten",
   "First question coming up": "Gleich kommt die erste Frage",
   "Fixed length": "Feste Länge",
   "fixed length": "feste Länge",
+  "for a faster match.": "für eine schnellere Suche.",
   "For all users": "Für alle Nutzer",
   "for rooms of up to 250.": "für Räume mit bis zu 250 Spielern.",
   "For you and for players on this device. “Automatic” follows the browser.":
@@ -261,8 +305,13 @@ export const DE: Record<string, string> = {
   "Free responses shown as a wall": "Freie Antworten als Pinnwand",
   "Free text · up to": "Freitext · bis zu",
   "Free text · up to {n} characters": "Freitext · bis zu {n} Zeichen",
+  "Friendly duel — rating unaffected":
+    "Freundschaftsduell – Wertung unverändert",
+  "Friendly duel, no rating at stake":
+    "Freundschaftsduell, keine Wertung im Spiel",
   "Friendly flat-style faces: all kinds of people, all smiling.":
     "Freundliche Gesichter im flachen Stil: alle möglichen Leute, alle lächelnd.",
+  "friends.": "mit Freunden.",
   "Full rankings": "Gesamtwertung",
   "Game code": "Spielcode",
   "Game defaults": "Spiel-Standards",
@@ -271,6 +320,7 @@ export const DE: Record<string, string> = {
   "Game Show": "Game Show",
   "Games hosted": "Geleitete Spiele",
   "Games played": "Gespielte Spiele",
+  "Get ready!": "Mach dich bereit!",
   "Get-ready slide before each question (host starts it)":
     "„Mach dich bereit“-Folie vor jeder Frage (Spielleiter startet sie)",
   "Give your quiz a title and description":
@@ -311,12 +361,15 @@ export const DE: Record<string, string> = {
   "Import Quiz": "Quiz importieren",
   "Imported Quiz": "Importiertes Quiz",
   "Importing…": "Importiere…",
+  "Invite a Friend": "Freund einladen",
   "It looks like there are no previously used quizzes for this session. Start adding questions to create an engaging quiz for your students.":
     "Dieses Quiz wurde noch nicht gespielt. Füge Fragen hinzu und starte eine Runde.",
   "It looks like there are no questions for this quiz. Start adding questions to engage your students and make learning fun!":
     "Dieses Quiz hat noch keine Fragen. Füge Fragen hinzu und mach das Lernen zum Spaß!",
+  "It's a tie!": "Unentschieden!",
   "Join another game": "Anderem Spiel beitreten",
   "Join game": "Spiel beitreten",
+  "Join Room": "Raum beitreten",
   "Join with a room code instead": "Stattdessen mit Raumcode beitreten",
   Joined: "Beigetreten",
   "Joining a": "Beitritt zu einem",
@@ -339,6 +392,8 @@ export const DE: Record<string, string> = {
     "Nur Buchstaben, Zahlen und Unterstriche.",
   "Licensed under": "Lizenziert unter",
   "Like the quiz": "Wie im Quiz",
+  "Link expires in {time} · Friendly duels don't affect your rating":
+    "Link läuft ab in {time} · Freundschaftsduelle zählen nicht für die Wertung",
   "Live reactions": "Live-Reaktionen",
   "Live reactions — players can send 👍 ❤️ 😂 to your screen":
     "Live-Reaktionen – Spieler können 👍 ❤️ 😂 auf deinen Bildschirm schicken",
@@ -346,6 +401,7 @@ export const DE: Record<string, string> = {
   "Loading quizzes": "Lade Quizze",
   "Loading your plan…": "Lade deinen Tarif…",
   "Loading…": "Lade…",
+  Login: "Login",
   "Logo removed": "Logo entfernt",
   "Logo saved": "Logo gespeichert",
   Logout: "Abmelden",
@@ -377,17 +433,21 @@ export const DE: Record<string, string> = {
   "Music and effects of quizzes set to “Default”.":
     "Musik und Effekte der Quizze mit „Standard“.",
   "Music while a question runs": "Musik während einer Frage",
+  "Mute duel audio": "Duell-Ton aus",
   "Mute sounds": "Ton aus",
   "Name your quiz": "Benenne dein Quiz",
   "New audio skin name": "Name des neuen Audio-Skins",
   "New here? Create an account": "Neu hier? Konto erstellen",
   "new owner's email": "E-Mail des neuen Besitzers",
   "New password (min. 8)": "Neues Passwort (mind. 8)",
+  "Next month": "Nächster Monat",
+  "Next page": "Nächste Seite",
   "Next question coming up": "Gleich kommt die nächste Frage",
   "Next question · {n} of {total}": "Nächste Frage · {n} von {total}",
   "Next: add questions": "Weiter: Fragen hinzufügen",
   "No answer this round": "Keine Antwort in dieser Runde",
   "No audio skins yet.": "Noch keine Audio-Skins.",
+  "No categories match “{query}”.": "Keine Kategorie passt zu „{query}“.",
   "No categories yet.": "Noch keine Kategorien.",
   "No correct answer": "Keine richtige Antwort",
   "No correct answer · votes shown live":
@@ -395,6 +455,8 @@ export const DE: Record<string, string> = {
   "No duels played yet": "Noch keine Duelle gespielt",
   "No games played yet": "Noch keine Spiele gespielt",
   "No music (effects only)": "Keine Musik (nur Effekte)",
+  "No opponent found this time. Try again?":
+    "Diesmal kein Gegner gefunden. Nochmal versuchen?",
   "No pictures yet. Add up to": "Noch keine Bilder. Füge bis zu",
   "No pictures yet. Add up to {n} — any size, they are cropped to a square.":
     "Noch keine Bilder. Füge bis zu {n} hinzu – beliebige Größe, sie werden quadratisch zugeschnitten.",
@@ -408,7 +470,10 @@ export const DE: Record<string, string> = {
   "no time limit": "kein Zeitlimit",
   "No time limit and no countdown: the question stays open until everyone answered or you move on.":
     "Kein Zeitlimit und kein Countdown: Die Frage bleibt offen, bis alle geantwortet haben oder du weitermachst.",
+  "No {category} duels yet": "Noch keine Duelle in {category}",
   "no-questions": "keine Fragen",
+  "Nobody accepted in time. Create a fresh link to try again.":
+    "Niemand hat rechtzeitig angenommen. Erstelle einen neuen Link.",
   "Nobody answered.": "Niemand hat geantwortet.",
   "Not at all": "Gar nicht",
   "Not connected to the game server yet. Please wait.":
@@ -428,13 +493,16 @@ export const DE: Record<string, string> = {
   "Open quiz info": "Quiz-Infos öffnen",
   "Open text": "Freitext",
   "Open your profile": "Dein Profil öffnen",
+  "Opponent found — starting…": "Gegner gefunden – es geht los…",
   "Option {key}": "Option {key}",
   Optional: "Optional",
   "Optional · plays on your screen": "Optional · spielt auf deinem Bildschirm",
   "Optional · PNG, JPG, SVG or WebP": "Optional · PNG, JPG, SVG oder WebP",
   Options: "Optionen",
+  "Or pick a category": "Oder wähle eine Kategorie",
   Original: "Original",
   "out of 10": "von 10",
+  "Page {n}": "Seite {n}",
   Participants: "Teilnehmer",
   "Party music on the scoreboard": "Partymusik bei der Punkteanzeige",
   Password: "Passwort",
@@ -447,11 +515,19 @@ export const DE: Record<string, string> = {
   Play: "Abspielen",
   "Play a duel and your results will show up here.":
     "Spiel ein Duell – deine Ergebnisse erscheinen dann hier.",
+  "Play a duel today to keep your {n}-day streak":
+    "Spiel heute ein Duell, um deine Serie von {n} Tagen zu halten",
+  "Play a duel today to start a streak":
+    "Spiel heute ein Duell, um eine Serie zu starten",
+  "Play Again · {category}": "Nochmal spielen · {category}",
   "Play on": "Abspielen auf",
+  "Play one duel a day to keep it going":
+    "Ein Duell pro Tag hält die Serie am Laufen",
   Played: "Gespielt",
   "Played games deleted": "Gespielte Runden gelöscht",
   "Played {date} · Room {code}": "Gespielt am {date} · Raum {code}",
   player: "Spieler",
+  Player: "Spieler",
   "Player name updated": "Spielername aktualisiert",
   Players: "Spieler",
   "Players answer in a word or two; the most common grow biggest.":
@@ -491,7 +567,10 @@ export const DE: Record<string, string> = {
   Poll: "Umfrage",
   "Post anonymously": "Anonym posten",
   "Posted anonymously": "Anonym gepostet",
+  "Previous month": "Voriger Monat",
+  "Previous page": "Vorige Seite",
   "Previously played": "Bisher gespielt",
+  Pricing: "Preise",
   "private quiz": "privaten Quiz",
   Profile: "Profil",
   "profile pic": "Profilbild",
@@ -506,6 +585,7 @@ export const DE: Record<string, string> = {
   "Question deleted successfully": "Frage gelöscht",
   "Question image": "Bild zur Frage",
   "Question media": "Medien zur Frage",
+  "Question reported": "Frage gemeldet",
   "Question type": "Fragetyp",
   "Question updated": "Frage aktualisiert",
   "Question {n} coming up": "Gleich kommt Frage {n}",
@@ -530,11 +610,16 @@ export const DE: Record<string, string> = {
   "Quiz updated": "Quiz aktualisiert",
   Quizzes: "Quizze",
   "Quizzes created": "Erstellte Quizze",
+  Random: "Zufällig",
+  Rating: "Wertung",
   "Rating scale": "Bewertungsskala",
+  "Rating unchanged": "Wertung unverändert",
   "ready. More can join until you start.":
     "bereit. Bis zum Start können weitere beitreten.",
   "Recent duels": "Letzte Duelle",
+  Record: "Bilanz",
   "Redirecting to Google…": "Weiterleitung zu Google…",
+  "Rejoining your duel…": "Trete deinem Duell wieder bei…",
   remove: "entfernen",
   Remove: "Entfernen",
   "Remove accepted answer {n}": "Akzeptierte Antwort {n} entfernen",
@@ -547,6 +632,8 @@ export const DE: Record<string, string> = {
   "Remove {name}": "{name} entfernen",
   "Remove {name} from this game": "{name} aus diesem Spiel entfernen",
   "Remove {word}": "{word} entfernen",
+  "Report this question": "Diese Frage melden",
+  "Reported — thanks for the feedback.": "Gemeldet – danke für das Feedback.",
   "Response received": "Antwort erhalten",
   Responses: "Antworten",
   results: "Ergebnisse",
@@ -564,7 +651,11 @@ export const DE: Record<string, string> = {
   Scored: "Gewertet",
   "Scores after question": "Punkte nach Frage",
   "Search by name or email…": "Nach Name oder E-Mail suchen…",
+  "Search categories": "Kategorien suchen",
   "Search players": "Spieler suchen",
+  "Search {n} categories": "{n} Kategorien durchsuchen",
+  "Search {n} category": "{n} Kategorie durchsuchen",
+  "Searching for an opponent…": "Suche Gegner…",
   sec: "Sek.",
   seconds: "Sekunden",
   "Seconds per question": "Sekunden pro Frage",
@@ -573,6 +664,8 @@ export const DE: Record<string, string> = {
   "Select all that apply.": "Wähle alle zutreffenden.",
   "Send one word at a time — as many as you like":
     "Ein Wort nach dem anderen – so viele du willst",
+  "Send them this link. The duel starts the moment they accept.":
+    "Schick diesen Link. Das Duell startet, sobald angenommen wird.",
   "Sent {n} · add as many as you like while time's left":
     "{n} gesendet · füge weitere hinzu, solange Zeit ist",
   "Set password": "Passwort setzen",
@@ -602,14 +695,19 @@ export const DE: Record<string, string> = {
     "Von diesem Gerät abmelden oder dein Profil endgültig löschen.",
   silent: "stumm",
   Skip: "Überspringen",
+  "Someone else already accepted this challenge.":
+    "Jemand anderes hat diese Herausforderung schon angenommen.",
   Soon: "Bald",
   Sound: "Ton",
   "Sound uploaded": "Ton hochgeladen",
   Sounds: "Töne",
+  "Start 1v1": "1v1 starten",
+  "Start a duel": "Duell starten",
   "Start Game": "Spiel starten",
   "Start question": "Frage starten",
   "Start something new": "Etwas Neues starten",
   "Start without players": "Ohne Spieler starten",
+  "Starting…": "Starte…",
   Step: "Schritt",
   "Step {n} of {total}": "Schritt {n} von {total}",
   "still thinking": "überlegen noch",
@@ -618,6 +716,8 @@ export const DE: Record<string, string> = {
   "Successfully deleted quiz": "Quiz gelöscht",
   "Switch between light and dark mode.":
     "Zwischen hellem und dunklem Modus wechseln.",
+  "Switch to Random": "Wechsle zu Zufällig",
+  "Taking a while?": "Dauert es?",
   "Tap a letter to mark it correct":
     "Tippe auf einen Buchstaben, um ihn als richtig zu markieren",
   "Tap letters to mark the correct ones":
@@ -644,7 +744,11 @@ export const DE: Record<string, string> = {
   "the player": "den Spieler",
   "The quiz is about to begin": "Gleich geht es los",
   "The quiz needs a title": "Das Quiz braucht einen Titel",
+  "The rating range widens the longer you wait.":
+    "Je länger du wartest, desto größer wird der Wertungsbereich.",
   Theme: "Design",
+  "This challenge link has expired or was cancelled.":
+    "Dieser Link ist abgelaufen oder wurde zurückgezogen.",
   "This ends the quiz for everyone and saves the current results. This can't be undone.":
     "Das beendet das Quiz für alle und speichert die aktuellen Ergebnisse. Das kann nicht rückgängig gemacht werden.",
   "This is how other players will see you on the leaderboard.":
@@ -663,6 +767,9 @@ export const DE: Record<string, string> = {
   "Time to answer": "Antwortzeit",
   "time's up": "Zeit abgelaufen",
   "Time's up!": "Zeit abgelaufen!",
+  "Today's duel counted": "Heutiges Duell gezählt",
+  "Today's duel done · come back tomorrow for day {n}":
+    "Heutiges Duell erledigt · komm morgen für Tag {n} wieder",
   "Toggle navigation": "Navigation umschalten",
   "Total number of questions :": "Anzahl der Fragen:",
   "Total points": "Gesamtpunkte",
@@ -674,6 +781,8 @@ export const DE: Record<string, string> = {
   "Type “{phrase}” to confirm": "Zum Bestätigen „{phrase}“ eintippen",
   "typos forgiven": "Tippfehler verziehen",
   Unauthorized: "Nicht berechtigt",
+  "Unfinished duels don't count": "Abgebrochene Duelle zählen nicht",
+  "Unmute duel audio": "Duell-Ton an",
   "Untitled Question": "Frage ohne Titel",
   "up to {n} characters": "bis zu {n} Zeichen",
   "Upgrade to Pro": "Auf Pro upgraden",
@@ -683,6 +792,7 @@ export const DE: Record<string, string> = {
   "Upload via Excel or CSV": "Per Excel oder CSV hochladen",
   "Upload your questions using our template.":
     "Lade deine Fragen mit unserer Vorlage hoch.",
+  "Use cases": "Anwendungsfälle",
   "Used by all your quizzes unless a quiz sets its own.":
     "Gilt für alle deine Quizze, sofern ein Quiz nichts eigenes festlegt.",
   "User {email} created": "Nutzer {email} angelegt",
@@ -692,6 +802,7 @@ export const DE: Record<string, string> = {
   "View full duel history →": "Gesamten Duell-Verlauf ansehen →",
   "View image": "Bild ansehen",
   "View mode": "Ansicht",
+  VS: "VS",
   "Waiting for players to join…": "Warte auf Spieler…",
   "Waiting for sound downloads · {n} left":
     "Warte auf Ton-Downloads · noch {n}",
@@ -702,6 +813,9 @@ export const DE: Record<string, string> = {
   "Waiting for the host to start question {n}":
     "Warte, bis der Spielleiter Frage {n} startet",
   "Waiting for the question": "Warte auf die Frage",
+  "Waiting for your friend…": "Warte auf deinen Freund…",
+  "Waiting for {name} to open the challenge…":
+    "Warte, bis {name} die Herausforderung öffnet…",
   "Waveform — drag the highlighted parts, or click to place the selected cue":
     "Wellenform – markierte Bereiche ziehen oder klicken, um den gewählten Marker zu setzen",
   "We couldn't reach the game server. Check your internet connection.":
@@ -721,6 +835,7 @@ export const DE: Record<string, string> = {
     "Schreib eine Aussage und markiere, ob sie wahr oder falsch ist.",
   "Write the question, fill in 2 to 8 options and mark the correct one — or turn on multiple correct answers.":
     "Schreib die Frage, fülle 2 bis 8 Optionen aus und markiere die richtige – oder schalte mehrere richtige Antworten ein.",
+  You: "Du",
   "You answered within": "Du hast geantwortet in",
   "You answered within {s} seconds": "Du hast in {s} Sekunden geantwortet",
   "You can add up to {n} answers · {left} left":
@@ -732,6 +847,9 @@ export const DE: Record<string, string> = {
   "You finished {place}.": "Du bist {place} geworden.",
   "You have banned {name}": "Du hast {name} gesperrt",
   "You have removed {name}": "Du hast {name} entfernt",
+  "You lost": "Verloren",
+  "You vs {name}": "Du gegen {name}",
+  "You won!": "Gewonnen!",
   "You'll add questions in the next step.":
     "Fragen fügst du im nächsten Schritt hinzu.",
   "You're on Buzrr Pro.": "Du nutzt Buzrr Pro.",
@@ -744,6 +862,7 @@ export const DE: Record<string, string> = {
     "Dein Buzrr-Tarif, Nutzung und Abo.",
   "Your changes to this question will be lost.":
     "Deine Änderungen an dieser Frage gehen verloren.",
+  "Your friend joined — starting…": "Dein Freund ist da – es geht los…",
   "Your name": "Dein Name",
   "Your Name": "Dein Name",
   "Your own pictures — up to {n}, cropped to a square automatically.":
@@ -758,6 +877,7 @@ export const DE: Record<string, string> = {
   "Your session expired. Please try again.":
     "Deine Sitzung ist abgelaufen. Bitte erneut versuchen.",
   "Your skin": "Dein Skin",
+  "{category} rating": "Wertung {category}",
   "{date} · Room {code}": "{date} · Raum {code}",
   "{name} is your default": "{name} ist jetzt dein Standard",
   "{name} will be removed and blocked from rejoining this room. The ban lasts until this room ends.":
@@ -771,6 +891,8 @@ export const DE: Record<string, string> = {
   "{n} accepted answers": "{n} akzeptierte Antworten",
   "{n} answer each": "je {n} Antwort",
   "{n} answers each": "je {n} Antworten",
+  "{n} day": "{n} Tag",
+  "{n} days": "{n} Tage",
   "{n} left": "noch {n}",
   "{n} letters — fast and exact scores best":
     "{n} Buchstaben – schnell und genau bringt die meisten Punkte",
@@ -789,9 +911,14 @@ export const DE: Record<string, string> = {
   "{n} sec": "{n} Sek.",
   "{n} still thinking": "{n} überlegen noch",
   "{n}% hits": "{n} % Treffer",
+  "{n}-day streak · today already counted":
+    "Serie: {n} Tage · heute schon gezählt",
+  "{n}-day streak · today counts": "Serie: {n} Tage · heute zählt",
   "{n}s to answer": "{n} s zum Antworten",
   "{s}s each · about {m} min to play": "je {s} s · etwa {m} Min. Spielzeit",
   "{title} — Leaderboard": "{title} – Bestenliste",
+  "{w}W · {l}L in {category}": "{w} S · {l} N in {category}",
+  "· best {n}": "· Bestwert {n}",
   "· not scored": "· nicht gewertet",
   "· not scored ·": "· nicht gewertet ·",
   "· not scored · up to": "· nicht gewertet · bis zu",
@@ -801,16 +928,6 @@ export const DE: Record<string, string> = {
   "— email can't be changed here.":
     "– die E-Mail kann hier nicht geändert werden.",
   "— Leaderboard": "– Bestenliste",
+  "← Back to duel": "← Zurück zum Duell",
   "← Back to profile": "← Zurück zum Profil",
-  "Build quizzes.": "Quizze bauen.",
-  Battle: "Duelle",
-  "friends.": "mit Freunden.",
-  "Start 1v1": "1v1 starten",
-  "Join Room": "Raum beitreten",
-  "Admin Login": "Admin-Login",
-  Login: "Login",
-  Pricing: "Preise",
-  "Use cases": "Anwendungsfälle",
-  Alternatives: "Alternativen",
-  Docs: "Doku",
 };

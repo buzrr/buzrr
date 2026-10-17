@@ -6,6 +6,7 @@ import { DEFAULT_AVATAR } from "@/constants";
 import { Button } from "@/components/ui/Button";
 import { useDuelInvite } from "@/hooks/useDuelInvite";
 import type { DuelInvite } from "@/lib/modules/duel/api";
+import { useT } from "@/lib/i18n/context";
 import type { DuelMatchedPayload } from "@buzrr/contract";
 
 /**
@@ -19,6 +20,7 @@ export default function DuelInviteGuestView({
   invite: DuelInvite;
   onMatched: (payload: DuelMatchedPayload) => void;
 }) {
+  const t = useT();
   const { status, error, accept } = useDuelInvite({
     code: invite.code,
     onMatched,
@@ -42,17 +44,19 @@ export default function DuelInviteGuestView({
           {invite.host.name}
         </p>
         <p className="text-sm text-off-dark dark:text-off-white text-center">
-          challenged you to a 1v1
+          {t("challenged you to a 1v1")}
         </p>
         <p className="text-xs text-off-dark dark:text-off-white text-center">
-          {invite.category ? `${invite.category.name} · ` : ""}Friendly duel, no
-          rating at stake
+          {invite.category ? `${invite.category.name} · ` : ""}
+          {t("Friendly duel, no rating at stake")}
         </p>
       </div>
 
       {!invite.hostOnline && (
         <p className="text-sm text-off-dark dark:text-off-white text-center">
-          Waiting for {invite.host.name} to open the challenge…
+          {t("Waiting for {name} to open the challenge…", {
+            name: invite.host.name,
+          })}
         </p>
       )}
 
@@ -68,14 +72,14 @@ export default function DuelInviteGuestView({
         disabled={connecting || busy || !invite.hostOnline}
         onClick={accept}
       >
-        {busy ? "Starting…" : "Accept challenge"}
+        {busy ? t("Starting…") : t("Accept challenge")}
       </Button>
 
       <Link
         href="/duel"
         className="text-xs text-lprimary dark:text-dprimary font-bold hover:underline"
       >
-        Find a random match instead
+        {t("Find a random match instead")}
       </Link>
     </div>
   );

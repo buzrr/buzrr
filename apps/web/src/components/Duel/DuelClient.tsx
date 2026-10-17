@@ -23,6 +23,7 @@ import CategoryPicker from "./CategoryPicker";
 import DuelProfileCard from "./DuelProfileCard";
 import StreakButton from "./StreakButton";
 import { RANDOM_HUE, categorySwatch } from "./duelUi";
+import { useT } from "@/lib/i18n/context";
 import { storeMatched } from "./matchedStorage";
 
 /** After this long searching a category, offer Random instead. */
@@ -36,6 +37,7 @@ export default function DuelClient({
   /** "Play Again": start searching as soon as the page loads. */
   autoStart: boolean;
 }) {
+  const t = useT();
   const router = useRouter();
   const { data: session } = authClient.useSession();
   const { data: profile, isPending } = useDuelProfileQuery();
@@ -51,7 +53,7 @@ export default function DuelClient({
     (categoryId && catalog?.categories.find((c) => c.id === categoryId)) ||
     null;
   const effectiveId = catalog ? (category?.id ?? null) : categoryId;
-  const categoryName = category?.name ?? "Random";
+  const categoryName = category?.name ?? t("Random");
 
   const { status, error, queuedAt, findMatch, cancel, switchCategory } =
     useDuelQueue({
@@ -103,19 +105,19 @@ export default function DuelClient({
     createInvite.mutate(effectiveId, {
       onSuccess: (res) => router.push(`/duel/invite/${res.code}`),
       onError: () =>
-        toast.error("Couldn't create a challenge link. Try again."),
+        toast.error(t("Couldn't create a challenge link. Try again.")),
     });
 
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-40 border-b border-card-light dark:border-card-dark bg-light-bg/90 dark:bg-dark-bg/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          <Link href="/" aria-label="Buzrr home">
+          <Link href="/" aria-label={t("Buzrr home")}>
             <ClientImage
               props={{
                 src: "/images/logo.svg",
                 darksrc: "/images/logo-dark.svg",
-                alt: "Buzrr Logo",
+                alt: t("Buzrr Logo"),
                 width: 72,
                 height: 72,
               }}
@@ -123,12 +125,12 @@ export default function DuelClient({
           </Link>
           <div className="flex items-center gap-2.5 sm:gap-3.5">
             {profile && <StreakButton streak={profile.streak} />}
-            <Link href="/duel/profile" aria-label="Open your profile">
+            <Link href="/duel/profile" aria-label={t("Open your profile")}>
               <Image
                 src={session?.user?.image || DEFAULT_AVATAR}
                 width={40}
                 height={40}
-                alt="Profile"
+                alt={t("Profile")}
                 className="h-10 w-10 rounded-full transition-opacity hover:opacity-90"
               />
             </Link>
@@ -139,7 +141,7 @@ export default function DuelClient({
       <div className="flex w-full flex-1 flex-col items-center px-4 pb-44 pt-5 sm:justify-center sm:px-6 sm:pb-16 sm:pt-10">
         <div className="flex w-full max-w-[660px] flex-col gap-3.5 sm:gap-[18px]">
           <h1 className="text-[28px] font-extrabold tracking-tight text-dark dark:text-white sm:text-center sm:text-5xl md:text-6xl animate-fade-up">
-            1v1 Duel
+            {t("1v1 Duel")}
           </h1>
 
           {isPending ? (
@@ -177,14 +179,14 @@ export default function DuelClient({
             />
           ) : status === "matched" ? (
             <p className="animate-pulse text-center font-bold text-dark dark:text-white">
-              Opponent found — starting…
+              {t("Opponent found — starting…")}
             </p>
           ) : (
             <>
               <div className="mt-1.5 hidden items-baseline justify-between sm:flex">
-                <span className={labelClass}>Category</span>
+                <span className={labelClass}>{t("Category")}</span>
                 <span className="text-[13.5px] text-off-dark dark:text-muted-dark">
-                  Each category has its own rating
+                  {t("Each category has its own rating")}
                 </span>
               </div>
               {catalogPending ? (
@@ -200,7 +202,7 @@ export default function DuelClient({
 
               {status === "timeout" && (
                 <p className="text-center text-sm text-dark dark:text-white">
-                  No opponent found this time. Try again?
+                  {t("No opponent found this time. Try again?")}
                 </p>
               )}
               {status === "error" && error && (
@@ -217,7 +219,7 @@ export default function DuelClient({
                   onClick={start}
                   className="shadow-[0_12px_28px_-14px_rgba(60,30,160,0.55)] sm:shadow-none"
                 >
-                  Find Match · {categoryName}
+                  {t("Find Match · {category}", { category: categoryName })}
                 </Button>
                 <Button
                   variant="outline"
@@ -228,8 +230,8 @@ export default function DuelClient({
                   className="bg-white! dark:bg-dark! sm:bg-transparent!"
                 >
                   {createInvite.isPending
-                    ? "Creating link…"
-                    : "Invite a Friend"}
+                    ? t("Creating link…")
+                    : t("Invite a Friend")}
                 </Button>
               </div>
             </>
@@ -252,6 +254,7 @@ function SearchingCard({
   onSwitchToRandom: () => void;
   onCancel: () => void;
 }) {
+  const t = useT();
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -266,33 +269,33 @@ function SearchingCard({
     <div className="flex w-full flex-col items-center gap-3.5 rounded-[22px] border border-lprimary/15 dark:border-white/5 bg-white dark:bg-dark px-6 py-8 text-center shadow-[0_10px_30px_-18px_rgba(70,40,160,0.35)] animate-fade-up">
       <div className="h-16 w-16 animate-spin rounded-full border-[5px] border-card-light dark:border-card-dark border-t-lprimary dark:border-t-dprimary" />
       <h3 className="mt-1.5 text-xl font-bold text-dark dark:text-white sm:text-[22px]">
-        Searching for an opponent… {queuedAt ? `${elapsed}s` : ""}
+        {t("Searching for an opponent…")} {queuedAt ? `${elapsed} s` : ""}
       </h3>
       <span className="inline-flex items-center gap-1.5 rounded-full bg-card-light dark:bg-card-dark px-3 py-1.5 text-[13.5px] font-bold text-lprimary dark:text-dprimary">
         <span
           className="h-[9px] w-[9px] rounded-[3px]"
           style={{ background: categorySwatch(category?.hue ?? RANDOM_HUE) }}
         />
-        {category?.name ?? "Random"}
+        {category?.name ?? t("Random")}
       </span>
       <p className="text-[15px] text-off-dark dark:text-muted-dark">
-        The rating range widens the longer you wait.
+        {t("The rating range widens the longer you wait.")}
       </p>
       {category && queuedAt && elapsed >= SWITCH_TO_RANDOM_AFTER_S && (
         <p className="text-sm text-off-dark dark:text-muted-dark">
-          Taking a while?{" "}
+          {t("Taking a while?")}{" "}
           <button
             type="button"
             onClick={onSwitchToRandom}
             className="cursor-pointer font-semibold text-lprimary hover:underline dark:text-dprimary"
           >
-            Switch to Random
+            {t("Switch to Random")}
           </button>{" "}
-          for a faster match.
+          {t("for a faster match.")}
         </p>
       )}
       <Button variant="outline" fullWidth onClick={onCancel} className="mt-1.5">
-        Cancel
+        {t("Cancel")}
       </Button>
     </div>
   );

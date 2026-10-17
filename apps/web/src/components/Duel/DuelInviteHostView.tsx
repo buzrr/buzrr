@@ -9,6 +9,7 @@ import { useDuelInvite } from "@/hooks/useDuelInvite";
 import { buildDuelInviteUrl } from "@/lib/join-link";
 import { useCancelDuelInviteMutation } from "@/lib/modules/duel/hooks";
 import type { DuelInvite } from "@/lib/modules/duel/api";
+import { useT } from "@/lib/i18n/context";
 import type { DuelMatchedPayload } from "@buzrr/contract";
 
 /**
@@ -23,6 +24,7 @@ export default function DuelInviteHostView({
   invite: DuelInvite;
   onMatched: (payload: DuelMatchedPayload) => void;
 }) {
+  const t = useT();
   const router = useRouter();
   // Connect but never call `accept` — the host can't claim their own challenge.
   const { status, error } = useDuelInvite({ code: invite.code, onMatched });
@@ -33,13 +35,13 @@ export default function DuelInviteHostView({
     return (
       <div className="flex flex-col items-center gap-4 bg-white dark:bg-dark rounded-2xl p-6 w-full max-w-sm shadow border border-card-light dark:border-off-dark animate-fade-up">
         <p className="text-xl font-black text-dark dark:text-white text-center">
-          Challenge expired
+          {t("Challenge expired")}
         </p>
         <p className="text-sm text-off-dark dark:text-off-white text-center">
-          Nobody accepted in time. Create a fresh link to try again.
+          {t("Nobody accepted in time. Create a fresh link to try again.")}
         </p>
         <Button fullWidth onClick={() => router.replace("/duel")}>
-          Back to duel
+          {t("Back to duel")}
         </Button>
       </div>
     );
@@ -50,15 +52,15 @@ export default function DuelInviteHostView({
       <div className="flex flex-col items-center gap-1">
         <p className="text-xl font-black text-dark dark:text-white text-center">
           {status === "matched"
-            ? "Your friend joined — starting…"
-            : "Waiting for your friend…"}
+            ? t("Your friend joined — starting…")
+            : t("Waiting for your friend…")}
         </p>
         <p className="text-xs text-off-dark dark:text-off-white text-center">
-          Send them this link. The duel starts the moment they accept.
+          {t("Send them this link. The duel starts the moment they accept.")}
         </p>
         {invite.category && (
           <p className="text-xs font-bold text-lprimary dark:text-dprimary text-center">
-            Category: {invite.category.name}
+            {t("Category: {name}", { name: invite.category.name })}
           </p>
         )}
       </div>
@@ -66,12 +68,13 @@ export default function DuelInviteHostView({
       <ShareRoom
         url={buildDuelInviteUrl(invite.code)}
         caption="SCAN TO CHALLENGE"
-        toastMessage="Challenge link copied!"
+        toastMessage={t("Challenge link copied!")}
       />
 
       <p className="text-xs text-off-dark dark:text-off-white text-center">
-        Link expires in {formatRemaining(remaining)} · Friendly duels don&apos;t
-        affect your rating
+        {t("Link expires in {time} · Friendly duels don't affect your rating", {
+          time: formatRemaining(remaining),
+        })}
       </p>
 
       {status === "error" && error && (
@@ -89,11 +92,11 @@ export default function DuelInviteHostView({
             onSuccess: () => router.replace("/duel"),
             // A 409 means a friend accepted first, and duel:matched is already
             // navigating us into the game.
-            onError: () => toast.error("Couldn't cancel the challenge."),
+            onError: () => toast.error(t("Couldn't cancel the challenge.")),
           })
         }
       >
-        Cancel challenge
+        {t("Cancel challenge")}
       </Button>
     </div>
   );
