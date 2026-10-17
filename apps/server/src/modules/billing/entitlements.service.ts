@@ -78,6 +78,12 @@ function hashReleaseToken(token: string): string {
  * `subscriptions` table on every call — never from the JWT, which lives 7 days
  * (same reasoning as `RolesGuard`, invariant #13).
  */
+/** `MAX_PLAYERS`: an instance-wide room size (0 / unset = the plans decide). */
+function instanceMaxPlayers(): number {
+  const n = Number(process.env.MAX_PLAYERS);
+  return Number.isInteger(n) && n > 0 ? n : 0;
+}
+
 @Injectable()
 export class EntitlementsService {
   constructor(
@@ -165,6 +171,7 @@ export class EntitlementsService {
   /**
    * Room-size cap for a host. `hostSizeLimit` survives as a manual override,
    * so an account an admin raised by hand never loses capacity on Free.
+   * `MAX_PLAYERS` (env) raises the cap for every host on this instance.
    */
   async maxPlayersFor(
     userId: string,
@@ -177,7 +184,11 @@ export class EntitlementsService {
         select: { hostSizeLimit: true },
       }),
     ]);
-    return Math.max(PLAN_LIMITS[plan].maxPlayers, user?.hostSizeLimit ?? 0);
+    return Math.max(
+      PLAN_LIMITS[plan].maxPlayers,
+      user?.hostSizeLimit ?? 0,
+      instanceMaxPlayers(),
+    );
   }
 
   /**
