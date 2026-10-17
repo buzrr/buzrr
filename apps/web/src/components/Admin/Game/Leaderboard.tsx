@@ -205,7 +205,8 @@ export default function LeaderBoard({
           roomId={roomId}
           redirectTo="/admin"
           alreadyEnded={alreadyEnded}
-          primaryLabel="Back to quizzes"
+          primaryLabel={alreadyEnded ? "Back to quizzes" : "End game"}
+          danger={!alreadyEnded}
         />
       </div>
     </div>

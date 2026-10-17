@@ -115,6 +115,15 @@ export async function decryptClip(
   url: string,
   keyB64: string,
 ): Promise<string> {
+  const plain = await decryptClipBuffer(url, keyB64);
+  return URL.createObjectURL(new Blob([plain], { type: "audio/mpeg" }));
+}
+
+/** The decrypted clip's bytes (for Web Audio playback). */
+export async function decryptClipBuffer(
+  url: string,
+  keyB64: string,
+): Promise<ArrayBuffer> {
   const data = new Uint8Array(await fetchClip(url));
   const raw = Uint8Array.from(
     atob(keyB64.replace(/-/g, "+").replace(/_/g, "/")),
@@ -128,5 +137,5 @@ export async function decryptClip(
     key,
     data.subarray(12),
   );
-  return URL.createObjectURL(new Blob([plain], { type: "audio/mpeg" }));
+  return plain;
 }
