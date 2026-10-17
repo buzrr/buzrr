@@ -147,6 +147,10 @@ def random_answer(q: dict) -> dict | None:
                 for _ in range(n)
             ]
         }
+    if t == "type_answer":
+        words = q.get("pattern") or [random.randint(4, 10)]
+        guess = " ".join("".join(random.choices(string.ascii_lowercase, k=n)) for n in words)
+        return {"guess": guess[: int(q.get("maxLength") or 100)]}
     if t == "open_text":
         return {"text": "bench " + "".join(random.choices(string.ascii_lowercase, k=12)), "anonymous": False}
     return None
@@ -721,12 +725,22 @@ async def main() -> None:
         print(f"{users} players joining {code} on {base} - waiting for the host to start (Ctrl+C to stop)")
         all_done = asyncio.gather(*tasks)
         stopper = asyncio.create_task(stop.wait())
-        await asyncio.wait({all_done, stopper}, return_when=asyncio.FIRST_COMPLETED)
+        try:
+            await asyncio.wait({all_done, stopper}, return_when=asyncio.FIRST_COMPLETED)
+        except asyncio.CancelledError:
+            # python-socketio's own Ctrl+C handler cancels every task; still report.
+            pass
         prog.cancel()
+        all_done.add_done_callback(lambda f: f.cancelled() or f.exception())
         for b in bots:
             b.done.set()
-        await asyncio.gather(*(b.close() for b in bots), return_exceptions=True)
-        await asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*(b.close() for b in bots), return_exceptions=True), timeout=5
+            )
+            await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=5)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            pass
     report(started)
 
 
