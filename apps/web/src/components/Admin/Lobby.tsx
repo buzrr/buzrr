@@ -246,7 +246,7 @@ const Lobby = (params: {
     const r = lastReaction[id];
     return r && now - r.at < REACTION_SHOW_MS ? r : null;
   };
-  const visiblePlayers = players
+  const sortedPlayers = players
     .filter((p) =>
       (p.name ?? "").toLowerCase().includes(query.trim().toLowerCase()),
     )
@@ -264,6 +264,23 @@ const Lobby = (params: {
       return sb - sa || a.i - b.i;
     })
     .map(({ p }) => p);
+  // With many players tapping away the order would never settle: it is
+  // re-sorted every REORDER_EVERY_MS; in between, joins go to the end and
+  // leaves drop out in place.
+  const wanted = sortedPlayers.map((p) => p.id);
+  const latest = useRef<string[]>([]);
+  useEffect(() => {
+    latest.current = wanted;
+  });
+  const [orderIds, setOrderIds] = useState<string[]>([]);
+  useEffect(() => {
+    const tm = setInterval(() => setOrderIds(latest.current), REORDER_EVERY_MS);
+    return () => clearInterval(tm);
+  }, []);
+  const keep = orderIds.filter((id) => wanted.includes(id));
+  const ids = [...keep, ...wanted.filter((id) => !keep.includes(id))];
+  const byId = new Map(sortedPlayers.map((p) => [p.id, p]));
+  const visiblePlayers = ids.map((id) => byId.get(id)!);
   const listRef = useRef<HTMLDivElement>(null);
   useFlip2d(listRef, visiblePlayers.map((p) => p.id).join());
 
@@ -470,14 +487,14 @@ const Lobby = (params: {
 
             <div
               ref={listRef}
-              className="md:flex-1 md:min-h-0 md:overflow-y-auto px-4 py-3 md:px-[22px] md:py-4 grid grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-2.5 content-start"
+              className="md:flex-1 md:min-h-0 md:overflow-y-auto overflow-x-hidden px-4 py-3 md:px-[22px] md:py-4 grid grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] auto-rows-[58px] gap-2.5 content-start"
             >
               {visiblePlayers.map((player) => (
                 <div
                   key={player.id}
                   data-player-card={player.id}
                   data-flip-id={player.id}
-                  className="group flex items-center gap-[11px] min-w-0 rounded-[14px] border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 hover:border-dprimary py-2 pr-2 pl-[9px] transition-colors animate-pop-in"
+                  className="group relative flex items-center gap-[11px] min-w-0 h-[58px] rounded-[14px] border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 hover:border-dprimary pr-2 pl-[9px] transition-colors animate-pop-in"
                 >
                   <Image
                     src={player.profilePic || DEFAULT_AVATAR}
@@ -493,15 +510,18 @@ const Lobby = (params: {
                     >
                       {player.name}
                     </span>
-                    {bubbles[player.id] && (
+                    {/* Always one line, so the card's height never changes. */}
+                    {bubbles[player.id] ? (
                       <BubbleLine stats={bubbles[player.id]!} />
+                    ) : (
+                      <span className="text-xs">&nbsp;</span>
                     )}
                   </span>
                   {fresh(player.id) && (
                     <span
                       key={fresh(player.id)!.at}
                       aria-label={`Reacted ${fresh(player.id)!.emoji}`}
-                      className="shrink-0 text-2xl leading-none animate-pop-in"
+                      className="pointer-events-none absolute -top-2 left-6 text-xl leading-none animate-pop-in drop-shadow"
                     >
                       {fresh(player.id)!.emoji}
                     </span>
@@ -594,6 +614,8 @@ const Lobby = (params: {
 };
 
 const REACTION_SHOW_MS = 5000;
+/** The waiting list re-sorts (bubble score, reactions) at most this often. */
+const REORDER_EVERY_MS = 5000;
 /** A player's reactions move them to the top of the list at most this often. */
 const BUMP_EVERY_MS = 20_000;
 
