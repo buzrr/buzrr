@@ -12,6 +12,12 @@ describe("sniffAudio", () => {
     );
   });
 
+  it("doesn't take AAC (ADTS) for MP3", () => {
+    expect(() => sniffAudio(Buffer.from([0xff, 0xf1, 0x50, 0x80]))).toThrow(
+      UnsupportedMediaError,
+    );
+  });
+
   it("refuses anything else", () => {
     expect(() => sniffAudio(Buffer.from("RIFF....WAVE"))).toThrow(
       UnsupportedMediaError,

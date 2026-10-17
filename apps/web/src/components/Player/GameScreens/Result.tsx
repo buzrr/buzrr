@@ -2,6 +2,8 @@
 import React from "react";
 import QuestionAndResult from "./QuesAndResult";
 import { useAppSelector } from "@/state/hooks";
+import { useAudioSegment } from "@/lib/audio-cues";
+import { useGameSound } from "@/lib/sound/director";
 import {
   correctAnswers,
   describeAnswer,
@@ -24,6 +26,14 @@ const Result = (params: {
   hostImage?: string | null;
 }) => {
   const you = params.you;
+  const sound = useGameSound();
+  const revealAudio = useAppSelector((state) => state.game.question?.audio);
+  useAudioSegment(
+    sound?.questionAudioHere(revealAudio) ? revealAudio?.url : null,
+    revealAudio?.revealMs,
+    null,
+    revealAudio?.url,
+  );
   const question = useAppSelector((state) => state.game.question);
   const reveal = useAppSelector((state) => state.game.reveal);
 

@@ -18,6 +18,7 @@ import {
   MediaUnavailableError,
   UnsupportedMediaError,
 } from "../../common/storage/media-storage";
+import { toMp3 } from "../../common/storage/audio-transcode";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
 import {
@@ -249,7 +250,9 @@ export class QuestionsService {
       kind: "image" | "audio",
     ) => {
       try {
-        return await this.storage.upload(upload.buffer, {
+        const buffer =
+          kind === "audio" ? await toMp3(upload.buffer) : upload.buffer;
+        return await this.storage.upload(buffer, {
           contentType: upload.mimetype,
           filename: upload.originalname,
           kind,
@@ -281,6 +284,12 @@ export class QuestionsService {
       audio,
       audioStartMs: audio ? (cueMs(body.audio_start_ms) ?? 0) : null,
       audioRevealMs: audio ? cueMs(body.audio_reveal_ms) : null,
+      // null = like the quiz's sound setting
+      audioPlayOn:
+        audio &&
+        ["host", "players", "both", "off"].includes(body.audio_play_on ?? "")
+          ? body.audio_play_on!
+          : null,
     };
 
     if (file && file.size > 0) {

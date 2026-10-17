@@ -30,7 +30,8 @@ RUN yarn workspace @buzrr/contract build \
 # --------------------------------------------------------------------------- #
 
 FROM node:20-bookworm-slim AS runtime
-RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+# ffmpeg re-encodes uploaded audio (WAV, OGG, FLAC, M4A, …) to MP3.
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ffmpeg \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 ENV NODE_ENV=production \

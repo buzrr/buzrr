@@ -15,6 +15,7 @@ import LeaderBoard from "./Leaderboard";
 import { ClosedSlide, ReadySlide } from "@/components/Game/ModeratedSteps";
 import { closedNextLabel } from "@/lib/moderation";
 import { ReactionOverlay } from "@/components/Game/Flyers";
+import { GameSounds, SoundToggle } from "@/lib/sound/director";
 
 interface QuizQuestionItem {
   title?: string;
@@ -27,6 +28,7 @@ interface QuizQuestionItem {
 interface QuizQuestion {
   id?: string;
   title?: string;
+  settings?: unknown;
   questions?: QuizQuestionItem[];
 }
 
@@ -75,70 +77,74 @@ const GameLobby = (params: {
   if (!inGame) {
     // idle / lobby / starting — the pre-question countdown
     return (
-      <>
+      <GameSounds role="host" quizSettings={params.quizQuestions?.settings}>
+        <SoundToggle />
         <ConnectionBanner />
         <ReactionOverlay
           socket={socket}
           nameOf={(id) => roster.find((p) => p.id === id)?.name}
         />
         <GetReady title={title} />
-      </>
+      </GameSounds>
     );
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 pb-4 md:pb-0 md:h-[calc(100dvh-10rem)] text-dark dark:text-white">
-      <ConnectionBanner />
-      <ReactionOverlay
-        socket={socket}
-        nameOf={(id) => roster.find((p) => p.id === id)?.name}
-      />
-      <GameTopBar
-        title={title}
-        qIndex={qIndex}
-        qCount={qCount}
-        final={showLeaderboard}
-        gameCode={
-          phase === "reveal" || phase === "scores" || phase === "ready"
-            ? params.gameCode
-            : undefined
-        }
-        right={
-          <EndQuizButton
-            inline
+    <GameSounds role="host" quizSettings={params.quizQuestions?.settings}>
+      <SoundToggle />
+      <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 pb-4 md:pb-0 md:h-[calc(100dvh-10rem)] text-dark dark:text-white">
+        <ConnectionBanner />
+        <ReactionOverlay
+          socket={socket}
+          nameOf={(id) => roster.find((p) => p.id === id)?.name}
+        />
+        <GameTopBar
+          title={title}
+          qIndex={qIndex}
+          qCount={qCount}
+          final={showLeaderboard}
+          gameCode={
+            phase === "reveal" || phase === "scores" || phase === "ready"
+              ? params.gameCode
+              : undefined
+          }
+          right={
+            <EndQuizButton
+              inline
+              roomId={params.roomId}
+              alreadyEnded={alreadyEnded}
+            />
+          }
+        />
+        {phase === "question" ? (
+          <QuestionScreen socket={socket} gameCode={params.gameCode} />
+        ) : phase === "ready" ? (
+          <ReadySlide
+            key={`ready-${qIndex}`}
+            onNext={() => socket.emit("host-next")}
+          />
+        ) : phase === "closed" ? (
+          <ClosedSlide
+            key={`closed-${qIndex}`}
+            onNext={() => socket.emit("host-next")}
+            nextLabel={closedNextLabel(moderation, qIndex, qCount)}
+          />
+        ) : phase === "reveal" || phase === "scores" ? (
+          // Keyed by step: "show scores" remounts it so the standings animate.
+          <QuesResult
+            key={`${phase}-${qIndex}`}
+            socket={socket}
             roomId={params.roomId}
+          />
+        ) : (
+          <LeaderBoard
+            roomId={params.roomId}
+            quizTitle={title}
             alreadyEnded={alreadyEnded}
           />
-        }
-      />
-      {phase === "question" ? (
-        <QuestionScreen socket={socket} gameCode={params.gameCode} />
-      ) : phase === "ready" ? (
-        <ReadySlide
-          key={`ready-${qIndex}`}
-          onNext={() => socket.emit("host-next")}
-        />
-      ) : phase === "closed" ? (
-        <ClosedSlide
-          key={`closed-${qIndex}`}
-          onNext={() => socket.emit("host-next")}
-          nextLabel={closedNextLabel(moderation, qIndex, qCount)}
-        />
-      ) : phase === "reveal" || phase === "scores" ? (
-        // Keyed by step: "show scores" remounts it so the standings animate.
-        <QuesResult
-          key={`${phase}-${qIndex}`}
-          socket={socket}
-          roomId={params.roomId}
-        />
-      ) : (
-        <LeaderBoard
-          roomId={params.roomId}
-          quizTitle={title}
-          alreadyEnded={alreadyEnded}
-        />
-      )}
-    </div>
+        )}
+      </div>
+    </GameSounds>
   );
 };
 

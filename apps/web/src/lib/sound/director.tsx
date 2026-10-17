@@ -1,0 +1,305 @@
+"use client";
+
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { LuVolume2, LuVolumeX } from "react-icons/lu";
+import {
+  BUILTIN_SOUND_SKINS,
+  quizSettingsSchema,
+  type QuestionAudio,
+  type SoundSettings,
+  type SoundSkin,
+  type SoundSlot,
+} from "@buzrr/contract";
+import { useAppSelector } from "@/state/hooks";
+import { soundSkinsApi } from "@/lib/modules/sound-skins/api";
+import {
+  audioContext,
+  isLoopSlot,
+  playBuiltin,
+  type BuiltinSkinId,
+  type SoundHandle,
+} from "./synth";
+
+/**
+ * Game sounds for the host's screen and the players' devices: a skin plays a
+ * bed for the current phase (lobby, question, scores, final) and one-shots on
+ * the way (countdown, the "tusch" when a question ends, the reveal). The
+ * quiz's sound settings decide where (host / players / both / off) and
+ * whether players may switch sound on themselves.
+ */
+
+type Role = "host" | "player";
+
+const MUTE_KEY = (role: Role) => `buzrr:sound-${role}`;
+
+function readPref(role: Role): boolean | null {
+  try {
+    const v = window.localStorage.getItem(MUTE_KEY(role));
+    return v === null ? null : v === "on";
+  } catch {
+    return null;
+  }
+}
+
+function writePref(role: Role, on: boolean) {
+  try {
+    window.localStorage.setItem(MUTE_KEY(role), on ? "on" : "off");
+  } catch {
+    // ignore
+  }
+}
+
+export function soundSettingsOf(settings: unknown): SoundSettings {
+  const parsed = quizSettingsSchema.safeParse(settings ?? {});
+  return parsed.success
+    ? parsed.data.sound
+    : quizSettingsSchema.parse({}).sound;
+}
+
+/** Whether a sound with this placement plays on this device by default / at all. */
+function placement(
+  playOn: SoundSettings["playOn"],
+  role: Role,
+  playerOptIn: boolean,
+): { allowed: boolean; defaultOn: boolean } {
+  const here =
+    playOn === "both" || playOn === (role === "host" ? "host" : "players");
+  if (here) return { allowed: true, defaultOn: true };
+  if (role === "player" && playOn === "host" && playerOptIn) {
+    return { allowed: true, defaultOn: false };
+  }
+  return { allowed: false, defaultOn: false };
+}
+
+interface SoundState {
+  role: Role;
+  settings: SoundSettings;
+  /** Game sounds audible on this device right now. */
+  on: boolean;
+  /** The device's switch (muted or not), if it may play sound at all. */
+  allowed: boolean;
+  setOn: (on: boolean) => void;
+  /** Whether a question's own sound plays on this device. */
+  questionAudioHere: (audio: QuestionAudio | null | undefined) => boolean;
+}
+
+const SoundCtx = createContext<SoundState | null>(null);
+export const useGameSound = () => useContext(SoundCtx);
+
+/** Resume the AudioContext on the first gesture (autoplay policies). */
+function useUnlockAudio() {
+  useEffect(() => {
+    const unlock = () => void audioContext()?.resume();
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, []);
+}
+
+/** Loads a user skin (null for built-in ones). */
+function useSkin(id: string): SoundSkin | null {
+  const [skin, setSkin] = useState<SoundSkin | null>(null);
+  useEffect(() => {
+    if ((BUILTIN_SOUND_SKINS as readonly string[]).includes(id)) {
+      setSkin(null);
+      return;
+    }
+    let alive = true;
+    soundSkinsApi
+      .get(id)
+      .then((s) => alive && setSkin(s))
+      .catch(() => alive && setSkin(null));
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+  return skin;
+}
+
+function playFile(url: string, loop: boolean, volume: number): SoundHandle {
+  const a = new Audio(url);
+  a.loop = loop;
+  a.volume = volume;
+  const start = () => void a.play().catch(() => undefined);
+  start();
+  // Autoplay may refuse until the first gesture; retry then.
+  window.addEventListener("pointerdown", start, { once: true });
+  return {
+    stop: () => {
+      window.removeEventListener("pointerdown", start);
+      const fade = setInterval(() => {
+        a.volume = Math.max(0, a.volume - 0.1);
+        if (a.volume <= 0.01) {
+          clearInterval(fade);
+          a.pause();
+        }
+      }, 40);
+    },
+  };
+}
+
+/** Which bed (loop) a phase plays; null = none. */
+function bedFor(phase: string): SoundSlot | null {
+  switch (phase) {
+    case "idle":
+    case "lobby":
+    case "ready":
+      return "lobby";
+    case "question":
+      return "question";
+    case "scores":
+      return "scores";
+    case "final":
+    case "ended":
+      return "final";
+    default:
+      return null;
+  }
+}
+
+/**
+ * Provides the sound state and plays the skin for the current phase. Render
+ * once per game screen (host or player) with the quiz's settings.
+ */
+export function GameSounds({
+  role,
+  quizSettings,
+  children,
+}: {
+  role: Role;
+  quizSettings: unknown;
+  children?: ReactNode;
+}) {
+  useUnlockAudio();
+  const settings = soundSettingsOf(quizSettings);
+  const { allowed, defaultOn } = placement(
+    settings.playOn,
+    role,
+    settings.playerOptIn,
+  );
+  const [pref, setPref] = useState<boolean | null>(null);
+  useEffect(() => setPref(readPref(role)), [role]);
+  const on = allowed && (pref ?? defaultOn);
+  const setOn = (v: boolean) => {
+    setPref(v);
+    writePref(role, v);
+    if (v) void audioContext()?.resume();
+  };
+
+  const skin = useSkin(settings.skin);
+  const phase = useAppSelector((s) => s.game.phase);
+  const qIndex = useAppSelector((s) => s.game.qIndex);
+  const deadline = useAppSelector((s) => s.game.deadline);
+  const countdownMs = useAppSelector((s) => s.game.countdownMs);
+  const question = useAppSelector((s) => s.game.question);
+
+  const questionAudioHere = (audio: QuestionAudio | null | undefined) => {
+    if (!audio) return false;
+    const playOn = audio.playOn === "quiz" ? settings.playOn : audio.playOn;
+    const p = placement(playOn, role, settings.playerOptIn);
+    return p.allowed && (pref ?? p.defaultOn);
+  };
+
+  const play = (
+    slot: SoundSlot,
+    extra?: { progress?: () => number; remainingMs?: number },
+  ) => {
+    const builtin = (BUILTIN_SOUND_SKINS as readonly string[]).includes(
+      settings.skin,
+    );
+    if (builtin) {
+      return playBuiltin(settings.skin as BuiltinSkinId, slot, {
+        volume: 0.45,
+        ...extra,
+      });
+    }
+    const url = skin?.slots[slot];
+    return url ? playFile(url, isLoopSlot(slot), 0.8) : null;
+  };
+
+  // Bed for the phase. A question with its own sound here plays no bed.
+  const bed = useRef<{ key: string; handle: SoundHandle | null } | null>(null);
+  const deadlineRef = useRef(deadline);
+  useEffect(() => {
+    deadlineRef.current = deadline;
+  });
+  const ownAudio = phase === "question" && questionAudioHere(question?.audio);
+  const bedSlot = on && !ownAudio ? bedFor(phase) : null;
+  const bedKey = bedSlot
+    ? `${bedSlot}:${settings.skin}:${skin?.id ?? ""}:${bedSlot === "question" ? qIndex : ""}`
+    : "";
+  useEffect(() => {
+    if (bed.current?.key === bedKey) return;
+    bed.current?.handle?.stop();
+    bed.current = null;
+    if (!bedSlot) return;
+    const total = (question?.timeOut ?? 20) * 1000;
+    bed.current = {
+      key: bedKey,
+      handle: play(bedSlot, {
+        progress: () =>
+          1 - Math.max(0, deadlineRef.current - Date.now()) / total,
+      }),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bedKey]);
+  useEffect(() => () => bed.current?.handle?.stop(), []);
+
+  // One-shots on transitions.
+  const prev = useRef(phase);
+  useEffect(() => {
+    const from = prev.current;
+    prev.current = phase;
+    if (!on || from === phase) return;
+    if (phase === "starting") play("countdown", { remainingMs: countdownMs });
+    if (
+      from === "question" &&
+      (phase === "closed" || phase === "reveal" || phase === "scores")
+    ) {
+      play("end");
+    }
+    if (phase === "reveal") {
+      // After the tusch if the question just closed.
+      setTimeout(() => play("reveal"), from === "question" ? 900 : 0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  return (
+    <SoundCtx.Provider
+      value={{ role, settings, on, allowed, setOn, questionAudioHere }}
+    >
+      {children}
+    </SoundCtx.Provider>
+  );
+}
+
+/** Speaker switch for this device (hidden when sound can't play here). */
+export function SoundToggle({ className }: { className?: string }) {
+  const s = useGameSound();
+  if (!s?.allowed) return null;
+  return (
+    <button
+      type="button"
+      aria-label={s.on ? "Mute sounds" : "Turn sounds on"}
+      title={s.on ? "Mute sounds" : "Turn sounds on"}
+      onClick={() => s.setOn(!s.on)}
+      className={
+        className ??
+        "fixed top-3 right-3 z-50 size-10 rounded-full flex items-center justify-center bg-white/85 dark:bg-dark/85 border border-lprimary/15 dark:border-white/10 shadow cursor-pointer text-dark dark:text-white"
+      }
+    >
+      {s.on ? <LuVolume2 size={18} /> : <LuVolumeX size={18} />}
+    </button>
+  );
+}

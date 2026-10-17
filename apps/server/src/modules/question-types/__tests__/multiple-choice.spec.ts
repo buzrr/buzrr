@@ -285,6 +285,7 @@ describe("toLiveQuestion", () => {
       url: "https://x/a.mp3",
       startMs: 1500,
       revealMs: null,
+      playOn: "quiz",
     });
     expect(toPublicQuestion(q).audio).toEqual(q.audio);
   });

@@ -89,6 +89,7 @@ model User {
 
   @@index([role])
   @@map("users")
+  soundSkins          SoundSkin[]
 }
 
 model Verification {
@@ -146,6 +147,9 @@ model Question {
   audio            String?
   audioStartMs     Int?
   audioRevealMs    Int?
+  /// Where the sound plays: null = like the quiz's sound setting, otherwise
+  /// "host" | "players" | "both" | "off".
+  audioPlayOn      String?
   order            Int                @default(1)
   /// Per-question moderation gate for the duel pool; the quiz's `isPublic`
   /// flag alone no longer decides eligibility.
@@ -423,4 +427,22 @@ enum ModerationStatus {
   pending
   approved
   unapproved
+}
+
+/// A set of game sounds (an uploaded MP3 per moment: lobby, countdown,
+/// question, end, reveal, scores, final). Built-in skins are synthesized in
+/// the browser and have no row. Global skins are offered to every user.
+model SoundSkin {
+  id        String   @id @default(cuid())
+  name      String
+  userId    String?  @map("user_id")
+  isGlobal  Boolean  @default(false) @map("is_global")
+  /// slot -> uploaded MP3 URL (`soundSlotSchema`)
+  slots     Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sound_skins")
 }

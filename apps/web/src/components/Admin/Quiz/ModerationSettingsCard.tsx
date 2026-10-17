@@ -2,10 +2,14 @@
 
 import { toast } from "react-toastify";
 import {
+  BUILTIN_SOUND_SKINS,
   quizSettingsSchema,
   type ModerationSettings,
   type QuizSettings,
+  type SoundSettings,
 } from "@buzrr/contract";
+import { useSoundSkinsQuery } from "@/lib/modules/sound-skins/hooks";
+import { BUILTIN_SKINS, type BuiltinSkinId } from "@/lib/sound/synth";
 import Switch from "@/components/ui/Switch";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { useUpdateQuizMutation } from "@/lib/modules/quizzes/hooks";
@@ -44,6 +48,18 @@ export default function ModerationSettingsCard({ quiz }: { quiz: QuizDetail }) {
     : quizSettingsSchema.parse({});
   const mod = settings.moderation;
 
+  const skins = useSoundSkinsQuery();
+  const saveSound = (patch: Partial<SoundSettings>) =>
+    updateQuiz.mutate(
+      {
+        quizId: quiz.id,
+        settings: { ...settings, sound: { ...settings.sound, ...patch } },
+      },
+      { onError: (err) => toast.error(getApiErrorMessage(err)) },
+    );
+  const selectClass =
+    "rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent dark:bg-dark px-2 py-1 text-[13px]";
+
   const save = (patch: Partial<ModerationSettings>) =>
     updateQuiz.mutate(
       {
@@ -55,6 +71,63 @@ export default function ModerationSettingsCard({ quiz }: { quiz: QuizDetail }) {
 
   return (
     <div className="mt-3 mb-1 flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5 text-sm">
+        <span className="font-semibold">Sounds</span>
+        <label className="flex items-center gap-2">
+          <span className="w-16 text-[13px]">Play on</span>
+          <select
+            aria-label="Where sounds play"
+            value={settings.sound.playOn}
+            disabled={updateQuiz.isPending}
+            onChange={(e) =>
+              saveSound({ playOn: e.target.value as SoundSettings["playOn"] })
+            }
+            className={selectClass}
+          >
+            <option value="host">Your screen</option>
+            <option value="players">Players&apos; devices</option>
+            <option value="both">Both</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        {settings.sound.playOn !== "off" && (
+          <label className="flex items-center gap-2">
+            <span className="w-16 text-[13px]">Skin</span>
+            <select
+              aria-label="Sound skin"
+              value={settings.sound.skin}
+              disabled={updateQuiz.isPending}
+              onChange={(e) => saveSound({ skin: e.target.value })}
+              className={selectClass}
+            >
+              {BUILTIN_SOUND_SKINS.map((id) => (
+                <option key={id} value={id}>
+                  {BUILTIN_SKINS[id as BuiltinSkinId].name}
+                </option>
+              ))}
+              {(skins.data ?? []).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                  {s.isGlobal ? " (shared)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {settings.sound.playOn === "host" && (
+          <label className="flex items-center gap-2">
+            <Switch
+              aria-label="Players can turn sound on"
+              checked={settings.sound.playerOptIn}
+              disabled={updateQuiz.isPending}
+              onCheckedChange={(checked) => saveSound({ playerOptIn: checked })}
+            />
+            <span className="text-[13px] max-w-[230px]">
+              Players can turn sound on for themselves
+            </span>
+          </label>
+        )}
+      </div>
       <div className="flex items-center gap-2">
         <Switch
           aria-label="Live reactions"

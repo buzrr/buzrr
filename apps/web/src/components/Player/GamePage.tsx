@@ -17,6 +17,7 @@ import ConnectionStatusPill from "@/components/ConnectionStatusPill";
 import ConfirmationModal from "@/components/Admin/ConfirmationModal";
 import { usePlayerSocket } from "@/hooks/usePlayerSocket";
 import { ReactionBar } from "@/components/Game/Flyers";
+import { GameSounds, SoundToggle } from "@/lib/sound/director";
 import { quizSettingsSchema } from "@buzrr/contract";
 import { playersApi } from "@/lib/modules/players/api";
 
@@ -97,7 +98,8 @@ const GamePage = (params: {
   const reactionsOn = settings.success ? settings.data.reactions : true;
 
   return (
-    <>
+    <GameSounds role="player" quizSettings={game.quiz.settings}>
+      <SoundToggle />
       <ConnectionBanner />
       {reactionsOn &&
         phase !== "ended" &&
@@ -162,7 +164,7 @@ const GamePage = (params: {
         // "starting" — the pre-question countdown
         <GetReady title={game.quiz.title ?? undefined} />
       )}
-    </>
+    </GameSounds>
   );
 };
 

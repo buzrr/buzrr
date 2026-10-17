@@ -51,8 +51,55 @@ export const moderationSettingsSchema = z.object({
   confirmNextQuestion: z.boolean().default(true),
 });
 
+/** Where game sounds play: the host's screen, the players' devices, both, or nowhere. */
+export const soundPlayOnSchema = z.enum(["host", "players", "both", "off"]);
+
+/** The moments a sound skin has a sound for. */
+export const soundSlotSchema = z.enum([
+  /** Background music: lobby and get-ready slides (loops). */
+  "lobby",
+  /** The countdown before a question (once). */
+  "countdown",
+  /** While a question is open, building up towards its end (loops). */
+  "question",
+  /** The "tusch" when a question ends (once). */
+  "end",
+  /** With the results animation when the answer is shown (once). */
+  "reveal",
+  /** Party music on the scoreboard between questions (loops). */
+  "scores",
+  /** More party at the very end, on the final leaderboard (loops). */
+  "final",
+]);
+
+/** Ids of the built-in, synthesized skins (no audio files involved). */
+export const BUILTIN_SOUND_SKINS = [
+  "builtin:show",
+  "builtin:arcade",
+  "builtin:chill",
+] as const;
+
+/** A quiz's game sounds. `skin`: a built-in id or a SoundSkin id. */
+export const soundSettingsSchema = z.object({
+  skin: z.string().min(1).max(64).default("builtin:show"),
+  playOn: soundPlayOnSchema.default("host"),
+  /** With sounds on the host only: players may switch them on for themselves. */
+  playerOptIn: z.boolean().default(true),
+});
+
+/** A user's sound skin: an uploaded MP3 per slot (missing slots stay silent). */
+export const soundSkinSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** Offered to every user (set by admins). */
+  isGlobal: z.boolean(),
+  ownerId: z.string().nullable(),
+  slots: z.partialRecord(soundSlotSchema, z.string()),
+});
+
 /** `Quiz.settings`. Unknown/missing keys fall back to the defaults. */
 export const quizSettingsSchema = z.object({
+  sound: soundSettingsSchema.prefault({}),
   moderation: moderationSettingsSchema.prefault({}),
   /** Players can send live reactions (👍 ❤️ 😂) that fly across the host screen. */
   reactions: z.boolean().default(true),
@@ -292,6 +339,10 @@ export const removePlayerSchema = z.object({ id: z.string().min(1) });
 export type GamePhase = z.infer<typeof gamePhaseSchema>;
 export type ModerationSettings = z.infer<typeof moderationSettingsSchema>;
 export type QuizSettings = z.infer<typeof quizSettingsSchema>;
+export type SoundPlayOn = z.infer<typeof soundPlayOnSchema>;
+export type SoundSlot = z.infer<typeof soundSlotSchema>;
+export type SoundSettings = z.infer<typeof soundSettingsSchema>;
+export type SoundSkin = z.infer<typeof soundSkinSchema>;
 export type PhaseChangePayload = z.infer<typeof phaseChangeSchema>;
 export type BubbleStatsPayload = z.infer<typeof bubbleStatsSchema>;
 export type ReactionPayload = z.infer<typeof reactionSchema>;

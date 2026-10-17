@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { AnimatedNumber } from "@/components/Game/motion";
 import { ReactionOverlay, useFlyers } from "@/components/Game/Flyers";
+import { GameSounds, SoundToggle } from "@/lib/sound/director";
 import {
   LuBan,
   LuCheck,
@@ -43,6 +44,8 @@ const Lobby = (params: {
   quizId: string;
   maxPlayers?: number;
   plan?: "free" | "pro";
+  /** `Quiz.settings` — sounds. */
+  quizSettings?: unknown;
 }) => {
   const dispatch = useAppDispatch();
   const players = useAppSelector((state) => state.player.players);
@@ -467,6 +470,9 @@ const Lobby = (params: {
       </div>
 
       {bubbleLayer}
+      <GameSounds role="host" quizSettings={params.quizSettings}>
+        <SoundToggle />
+      </GameSounds>
       <ReactionOverlay
         socket={socket}
         nameOf={(id) => players.find((p) => p.id === id)?.name ?? undefined}

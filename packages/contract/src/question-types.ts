@@ -34,6 +34,8 @@ export const questionAudioSchema = z.object({
   url: z.string(),
   startMs: z.number().int().nonnegative(),
   revealMs: z.number().int().nonnegative().nullable(),
+  /** Where it plays; "quiz" follows the quiz's sound setting. */
+  playOn: z.enum(["quiz", "host", "players", "both", "off"]).default("quiz"),
 });
 export type QuestionAudio = z.infer<typeof questionAudioSchema>;
 

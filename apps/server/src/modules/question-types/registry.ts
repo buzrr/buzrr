@@ -150,6 +150,7 @@ export interface QuestionRecord {
   audio?: string | null;
   audioStartMs?: number | null;
   audioRevealMs?: number | null;
+  audioPlayOn?: string | null;
 }
 
 type LiveOption = LiveQuestion["options"][number];
@@ -160,6 +161,13 @@ type LiveOption = LiveQuestion["options"][number];
  * no longer passes its type's checks. Callers skip nulls rather than failing
  * the whole game over one bad row.
  */
+const AUDIO_PLAY_ON = ["host", "players", "both", "off"] as const;
+function audioPlayOn(
+  raw: string | null | undefined,
+): "quiz" | (typeof AUDIO_PLAY_ON)[number] {
+  return AUDIO_PLAY_ON.find((v) => v === raw) ?? "quiz";
+}
+
 export function toLiveQuestion(row: QuestionRecord): LiveQuestion | null {
   if (!isQuestionType(row.type)) return null;
   try {
@@ -185,6 +193,7 @@ export function toLiveQuestion(row: QuestionRecord): LiveQuestion | null {
             url: row.audio,
             startMs: row.audioStartMs ?? 0,
             revealMs: row.audioRevealMs ?? null,
+            playOn: audioPlayOn(row.audioPlayOn),
           }
         : null,
     };

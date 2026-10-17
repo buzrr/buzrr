@@ -77,6 +77,7 @@ interface Question {
   audio?: string | null;
   audioStartMs?: number | null;
   audioRevealMs?: number | null;
+  audioPlayOn?: string | null;
   options?: Option[];
 }
 
@@ -372,6 +373,9 @@ const AddQuesForm = (props: {
     revealMs: question?.audioRevealMs ?? null,
   });
   const audioInputRef = useRef<HTMLInputElement>(null);
+  const [audioPlayOn, setAudioPlayOn] = useState(
+    question?.audioPlayOn ?? "quiz",
+  );
   const [customTime, setCustomTime] = useState(
     !isSliderTime(
       question?.type && isQuestionType(question.type)
@@ -415,6 +419,7 @@ const AddQuesForm = (props: {
       revealMs: question?.audioRevealMs ?? null,
     });
     if (audioInputRef.current) audioInputRef.current.value = "";
+    setAudioPlayOn(question?.audioPlayOn ?? "quiz");
   }, [question, initialType, reset]);
 
   useEffect(() => {
@@ -583,6 +588,7 @@ const AddQuesForm = (props: {
       if (audioCues.revealMs !== null) {
         fd.append("audio_reveal_ms", String(audioCues.revealMs));
       }
+      if (audioPlayOn !== "quiz") fd.append("audio_play_on", audioPlayOn);
     }
 
     mutation.mutate(fd, {
@@ -757,6 +763,23 @@ const AddQuesForm = (props: {
                   onChange={setAudioCues}
                   onRemove={removeAudio}
                 />
+              ) : null}
+              {audioPreview || audioLink ? (
+                <label className="flex items-center gap-2 text-[13px]">
+                  Plays on
+                  <select
+                    aria-label="Where the sound plays"
+                    value={audioPlayOn}
+                    onChange={(e) => setAudioPlayOn(e.target.value)}
+                    className="rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent dark:bg-dark px-2 py-1"
+                  >
+                    <option value="quiz">Like the quiz</option>
+                    <option value="host">Your screen</option>
+                    <option value="players">Players&apos; devices</option>
+                    <option value="both">Both</option>
+                    <option value="off">Off</option>
+                  </select>
+                </label>
               ) : (
                 <label className="flex items-center gap-3.5 rounded-2xl border-[1.5px] border-dashed px-4 py-3 cursor-pointer transition-colors border-lprimary/25 dark:border-white/15 hover:border-dprimary bg-light-bg dark:bg-card-dark">
                   <span className="size-10 shrink-0 rounded-xl flex items-center justify-center bg-lprimary/10 dark:bg-white/5 text-lprimary dark:text-dprimary">
@@ -767,12 +790,12 @@ const AddQuesForm = (props: {
                       Upload a sound
                     </span>
                     <span className={clsx("text-[12.5px]", mutedText)}>
-                      MP3 under 20MB
+                      MP3, WAV, OGG, FLAC or M4A under 20MB
                     </span>
                   </span>
                   <input
                     type="file"
-                    accept="audio/mpeg,.mp3"
+                    accept="audio/*,.mp3,.wav,.ogg,.oga,.opus,.flac,.m4a,.aac,.webm"
                     name="audio"
                     className="sr-only"
                     ref={audioInputRef}

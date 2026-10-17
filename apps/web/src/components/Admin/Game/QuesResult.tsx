@@ -30,6 +30,8 @@ import {
 import { AnimatedNumber, useFlipReorder } from "@/components/Game/motion";
 import type { LeaderboardEntry } from "@buzrr/contract";
 import { useAudioSegment } from "@/lib/audio-cues";
+import { useGameSound } from "@/lib/sound/director";
+import ConfettiBurst from "@/components/ConfettiBurst";
 import {
   leaderboardWithReveal,
   nextQuestionLabel,
@@ -94,8 +96,10 @@ export default function QuesResult(props: QuesResultProps) {
   const showBoard = phase === "scores" || leaderboardWithReveal(moderation);
   const nextIsScores = phase === "reveal" && scoresStepPending(moderation);
   // The reveal cue plays when the answer is shown, until the host moves on.
+  const sound = useGameSound();
+  const audioHere = sound ? sound.questionAudioHere(question?.audio) : true;
   useAudioSegment(
-    phase === "reveal" ? question?.audio?.url : null,
+    phase === "reveal" && audioHere ? question?.audio?.url : null,
     question?.audio?.revealMs,
     null,
     question?.id,
@@ -183,6 +187,8 @@ export default function QuesResult(props: QuesResultProps) {
         showAnswerPanel && showBoard ? "md:grid-cols-2" : "md:grid-cols-1",
       )}
     >
+      {/* The results animation (with the skin's reveal sound). */}
+      {phase === "reveal" && <ConfettiBurst duration={1400} />}
       {showAnswerPanel && (
         <section
           className={clsx(
