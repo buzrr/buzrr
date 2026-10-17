@@ -197,6 +197,7 @@ export class QuizzesService {
               audioRevealClip: q.audioRevealClip,
               audioRevealKey: q.audioRevealKey,
               order: q.order,
+              disabled: q.disabled,
               options: {
                 create: q.options.map((o) => ({
                   title: o.title,
@@ -304,7 +305,12 @@ export class QuizzesService {
       where: { userId: user.userId },
       orderBy: { createdAt: "desc" },
       include: {
-        _count: { select: { questions: true, gameResults: true } },
+        _count: {
+          select: {
+            questions: { where: { disabled: false } },
+            gameResults: true,
+          },
+        },
       },
     });
   }
@@ -314,7 +320,12 @@ export class QuizzesService {
     return this.prisma.db.quiz.findMany({
       orderBy: { createdAt: "desc" },
       include: {
-        _count: { select: { questions: true, gameResults: true } },
+        _count: {
+          select: {
+            questions: { where: { disabled: false } },
+            gameResults: true,
+          },
+        },
         user: { select: { id: true, name: true, email: true } },
       },
     });
@@ -360,7 +371,7 @@ export class QuizzesService {
           orderBy: { endedAt: "desc" },
           take: 50,
         },
-        _count: { select: { questions: true } },
+        _count: { select: { questions: { where: { disabled: false } } } },
       },
     });
     if (!quiz) {

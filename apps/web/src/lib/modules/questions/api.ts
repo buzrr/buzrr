@@ -46,4 +46,10 @@ export const questionsApi = {
     reorderQuestions(getAuthApiClient(), body),
   delete: (questionId: string) =>
     deleteQuestion(getAuthApiClient(), questionId),
+  /** Disabled questions are skipped in games, counts and scoring. */
+  setDisabled: async (questionId: string, disabled: boolean) => {
+    await getAuthApiClient().patch(`/questions/${questionId}/disabled`, {
+      disabled,
+    });
+  },
 };

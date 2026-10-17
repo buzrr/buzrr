@@ -312,6 +312,7 @@ export class GameSessionsService {
         where: { id: room.quizId },
         include: {
           questions: {
+            where: { disabled: false },
             include: { options: true },
           },
         },
@@ -355,7 +356,7 @@ export class GameSessionsService {
             title: true,
             settings: true,
             logo: true,
-            questions: { select: { id: true } },
+            questions: { where: { disabled: false }, select: { id: true } },
           },
         },
         creator: {

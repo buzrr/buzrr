@@ -164,6 +164,29 @@ export class QuestionsService {
     return { status: 200, message: "Success" };
   }
 
+  /** Disables (skipped in games and counts) or re-enables a question. */
+  async setDisabled(
+    user: AuthUser,
+    quesId: string,
+    disabled: boolean,
+  ): Promise<{ id: string; disabled: boolean }> {
+    const question = await this.prisma.db.question.findUnique({
+      where: { id: quesId },
+      include: { quiz: true },
+    });
+    if (!question) {
+      throw new NotFoundException("Question not found");
+    }
+    if (!ownsQuestion(question, user.userId)) {
+      throw new ForbiddenException("Unauthorized");
+    }
+    await this.prisma.db.question.update({
+      where: { id: quesId },
+      data: { disabled },
+    });
+    return { id: quesId, disabled };
+  }
+
   async delete(user: AuthUser, quesId: string): Promise<void> {
     const question = await this.prisma.db.question.findUnique({
       where: { id: quesId },

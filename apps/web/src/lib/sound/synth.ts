@@ -33,6 +33,15 @@ interface Palette {
     riff: (number | null)[];
     lead: OscillatorType;
   };
+  /** The final leaderboard: a 4-bar anthem. Melody notes are semitones from
+   *  A4 with a length in 8ths (null = rest), 32 8ths in all; `halfTime`
+   *  gives the drums a slow, stadium feel. */
+  final: {
+    roots: number[];
+    melody: [number | null, number][];
+    lead: OscillatorType;
+    halfTime: boolean;
+  };
 }
 
 export const BUILTIN_SKINS: Record<BuiltinSkinId, Palette> = {
@@ -68,6 +77,27 @@ export const BUILTIN_SKINS: Record<BuiltinSkinId, Palette> = {
       ],
       lead: "triangle",
     },
+    final: {
+      // Stadium anthem: C – G – Am – F, a melody that climbs and lands.
+      roots: [-9, -2, -12, -4],
+      melody: [
+        [7, 2],
+        [10, 2],
+        [15, 4],
+        [14, 3],
+        [12, 1],
+        [10, 4],
+        [12, 2],
+        [15, 2],
+        [19, 3],
+        [17, 1],
+        [15, 4],
+        [12, 2],
+        [10, 2],
+      ],
+      lead: "sawtooth",
+      halfTime: true,
+    },
   },
   "builtin:arcade": {
     name: "Arcade",
@@ -83,6 +113,39 @@ export const BUILTIN_SKINS: Record<BuiltinSkinId, Palette> = {
       roots: [-5, -12, -10, -7], // E – A – B – D
       riff: [0, 7, 12, 7, 0, 7, 15, 12, 3, 10, 15, 10, 3, 12, 19, null],
       lead: "sawtooth",
+    },
+    final: {
+      // Synth-brass fanfare: Am – F – G – E, staccato pick-ups into long hits.
+      roots: [-12, -4, -2, -5],
+      melody: [
+        [12, 1],
+        [null, 1],
+        [12, 1],
+        [15, 1],
+        [19, 2],
+        [17, 1],
+        [15, 1],
+        [15, 1],
+        [null, 1],
+        [15, 1],
+        [12, 1],
+        [17, 2],
+        [15, 1],
+        [12, 1],
+        [14, 1],
+        [null, 1],
+        [14, 1],
+        [17, 1],
+        [22, 2],
+        [19, 1],
+        [17, 1],
+        [19, 3],
+        [23, 1],
+        [19, 2],
+        [null, 2],
+      ],
+      lead: "square",
+      halfTime: false,
     },
   },
   "builtin:chill": {
@@ -116,6 +179,26 @@ export const BUILTIN_SKINS: Record<BuiltinSkinId, Palette> = {
         null,
       ],
       lead: "triangle",
+    },
+    final: {
+      // Warm and glowing: Am – Dm – C – Em, long gentle notes.
+      roots: [-12, -7, -9, -5],
+      melody: [
+        [12, 2],
+        [15, 2],
+        [19, 4],
+        [17, 2],
+        [15, 2],
+        [12, 4],
+        [15, 2],
+        [19, 2],
+        [22, 2],
+        [19, 2],
+        [17, 6],
+        [null, 2],
+      ],
+      lead: "triangle",
+      halfTime: true,
     },
   },
 };
@@ -358,7 +441,44 @@ export function playBuiltin(
       next += eighth;
       step++;
     }
-    while (slot !== "scores" && next < ahead) {
+    while (slot === "final" && next < ahead) {
+      // Final leaderboard: the skin's anthem over big chords.
+      const fin = p.final;
+      const eighth = beat / 2 / tempo;
+      const bar = Math.floor(step / 8) % fin.roots.length;
+      const root = fin.roots[bar]!;
+      const inBar = step % 8;
+      if (fin.halfTime) {
+        if (inBar === 0) kick(ctx, bus, next, 0.8 * d + 0.1);
+        if (inBar === 4) snare(ctx, bus, next, 0.6 * d + 0.2);
+        if (inBar % 2 === 1) hat(ctx, bus, next, 0.5 * d);
+      } else {
+        if (inBar % 2 === 0) kick(ctx, bus, next, 0.75 * d);
+        else hat(ctx, bus, next, d);
+        if (inBar === 2 || inBar === 6) snare(ctx, bus, next, 0.55 * d + 0.1);
+      }
+      if (inBar === 0) {
+        chord(ctx, bus, next, root, beat * 4, p.pad, 0.07, p.cutoff * 0.7);
+        tone(ctx, bus, next, hz(root - 24), beat * 3.5, p.bass, 0.25, 700);
+        if (bar === 0) crash(ctx, bus, next, 0.6 * d + 0.2);
+      }
+      // The melody note that starts on this 8th, if any.
+      let at = 0;
+      const pos = step % 32;
+      for (const [note, len] of fin.melody) {
+        if (at === pos && note !== null) {
+          const dur = eighth * len * 0.95;
+          tone(ctx, bus, next, hz(note), dur, fin.lead, 0.13, p.cutoff + 800);
+          // An octave below, softer: a fuller, singalong lead.
+          tone(ctx, bus, next, hz(note - 12), dur, "triangle", 0.07, p.cutoff);
+        }
+        at += len;
+        if (at > pos) break;
+      }
+      next += eighth;
+      step++;
+    }
+    while (slot !== "scores" && slot !== "final" && next < ahead) {
       // The question loop gets faster and denser towards the end.
       const prog =
         slot === "question" ? Math.min(1, opts.progress?.() ?? 0) : 0;
