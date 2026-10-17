@@ -1,4 +1,4 @@
-import { isScoredType } from "@buzrr/contract";
+import { isScoredType, isUnlimitedTime } from "@buzrr/contract";
 import { ANSWER_GRACE_MS } from "../../../common/utils/answer-timing";
 import { planBotAnswer } from "../../../common/utils/duel-bot";
 import {
@@ -242,7 +242,7 @@ function hostNext(
   const mod = moderationOf(state.meta);
   switch (state.meta.phase) {
     case "ready":
-      return startCountdown(state, state.meta.qIndex, now);
+      return startCountdown(state, state.meta.qIndex, now, ctx);
     case "starting":
       // Skip the countdown (and any wait for downloads): e.g. a host running
       // the quiz with nobody playing.
@@ -328,8 +328,13 @@ function advance(
     const mod = moderationOf(meta);
     if (mod?.confirmNextQuestion) return enterReady(state, meta.qIndex + 1);
     // A question with sound always gets a countdown, so downloads can finish.
-    if (mod || preloadUrls(state.questions[meta.qIndex + 1]).length > 0) {
-      return startCountdown(state, meta.qIndex + 1, now);
+    // … unless it has no time limit: those open straight away.
+    const nextQ = state.questions[meta.qIndex + 1];
+    if (
+      !isUnlimitedTime(nextQ?.timeOut) &&
+      (mod || preloadUrls(nextQ).length > 0)
+    ) {
+      return startCountdown(state, meta.qIndex + 1, now, ctx);
     }
     return openQuestion(state, meta.qIndex + 1, now, ctx);
   }
@@ -363,8 +368,14 @@ function startCountdown(
   state: GameState,
   index: number,
   now: number,
+  ctx: StepContext,
 ): Transition {
-  if (!state.questions[index]) return noop(state);
+  const question = state.questions[index];
+  if (!question) return noop(state);
+  // No time limit: no countdown either, the question just opens.
+  if (isUnlimitedTime(question.timeOut)) {
+    return openQuestion(state, index, now, ctx);
+  }
   const at = now + START_COUNTDOWN_MS;
   const patch = { phase: "starting" as const, qIndex: index, qDeadline: at };
   return {

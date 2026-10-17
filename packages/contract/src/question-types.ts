@@ -24,6 +24,14 @@ export const MIN_OPTIONS = 2;
 export const MAX_OPTIONS = 8;
 export const MIN_TIME_OUT = 5;
 export const DEFAULT_TIME_OUT = 15;
+/**
+ * "∞" time to answer: the question stays open until everyone answered or the
+ * host moves on, and opens without a countdown. Stored as this many seconds
+ * (an hour — the room's own lifetime bounds it anyway).
+ */
+export const UNLIMITED_TIME_OUT = 3600;
+export const isUnlimitedTime = (seconds: number | null | undefined) =>
+  (seconds ?? 0) >= UNLIMITED_TIME_OUT;
 
 /**
  * A question's optional sound, played on the host screen: from `startMs` for

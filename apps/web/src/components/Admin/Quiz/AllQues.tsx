@@ -1,6 +1,7 @@
 "use client";
 
 import clsx from "clsx";
+import { isUnlimitedTime } from "@buzrr/contract";
 import ShowMedia from "./ShowMediaComp";
 import Image from "next/image";
 import { LuClock, LuGripVertical } from "react-icons/lu";
@@ -180,7 +181,9 @@ export default function AllQues(props: { quizId: string }) {
                                   <QuestionTypeTag type={cardType(ques)} />
                                   <span className="shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap rounded-[9px] px-3 py-1.5 text-[13px] font-bold bg-lprimary/10 dark:bg-white/5">
                                     <LuClock size={14} />
-                                    {ques?.timeOut} sec
+                                    {isUnlimitedTime(ques?.timeOut)
+                                      ? "∞"
+                                      : `${ques?.timeOut} sec`}
                                   </span>
                                 </div>
                               </div>

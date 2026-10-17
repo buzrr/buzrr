@@ -1,5 +1,7 @@
 "use client";
 
+import { isUnlimitedTime } from "@buzrr/contract";
+
 import clsx from "clsx";
 import { useId, type ReactNode } from "react";
 import ConnectionStatusPill from "@/components/ConnectionStatusPill";
@@ -187,8 +189,14 @@ export function TimerRing({
   const gradientId = `ring-grad-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const r = 44;
   const c = 2 * Math.PI * r;
-  const low = value <= 5;
-  const frac = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
+  // No time limit: a full ring with "∞".
+  const unlimited = isUnlimitedTime(max);
+  const low = !unlimited && value <= 5;
+  const frac = unlimited
+    ? 1
+    : max > 0
+      ? Math.max(0, Math.min(1, value / max))
+      : 0;
   return (
     <div className={clsx("relative shrink-0", className)}>
       <svg viewBox="0 0 100 100" className="block size-full -rotate-90">
@@ -227,9 +235,9 @@ export function TimerRing({
             valueClassName,
           )}
         >
-          {value}
+          {unlimited ? "∞" : value}
         </b>
-        {label && (
+        {label && !unlimited && (
           <span className={clsx("text-[13px] font-medium mt-1", mutedText)}>
             {label}
           </span>
@@ -249,8 +257,13 @@ export function TimerBar({
   max: number;
   className?: string;
 }) {
-  const low = value <= 5;
-  const frac = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
+  const unlimited = isUnlimitedTime(max);
+  const low = !unlimited && value <= 5;
+  const frac = unlimited
+    ? 1
+    : max > 0
+      ? Math.max(0, Math.min(1, value / max))
+      : 0;
   return (
     <div
       role="timer"
@@ -272,7 +285,7 @@ export function TimerBar({
           low && "text-[#e5544e]",
         )}
       >
-        {Math.ceil(value)}s
+        {unlimited ? "∞" : `${Math.ceil(value)}s`}
       </b>
     </div>
   );

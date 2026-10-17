@@ -25,7 +25,9 @@ import {
   MAX_OPTIONS,
   MAX_POLL_OPTIONS,
   TYPE_ANSWER_MAX_LENGTH,
+  UNLIMITED_TIME_OUT,
   answerPattern,
+  isUnlimitedTime,
   MIN_OPTIONS,
   MIN_POLL_OPTIONS,
   RATING_LABEL_MAX,
@@ -111,14 +113,18 @@ function timeRangeFor(type: QuestionType) {
 }
 
 const clampTime = (t: number, type: QuestionType) => {
+  if (isUnlimitedTime(t)) return UNLIMITED_TIME_OUT;
   const { min, max } = timeRangeFor(type);
   return Math.min(max, Math.max(min, t));
 };
 
 const isSliderTime = (type: QuestionType, t?: number) => {
   const { min, max } = timeRangeFor(type);
-  return t === undefined || (t >= min && t <= max);
+  return t === undefined || isUnlimitedTime(t) || (t >= min && t <= max);
 };
+
+/** The slider's last step past the range: no time limit ("∞"). */
+const SLIDER_UNLIMITED_STEP = 5;
 const OPTION_TYPES: QuestionType[] = ["multiple_choice", "true_false", "poll"];
 
 const blankOptions = (n: number): AuthoredOption[] =>
@@ -270,7 +276,9 @@ function configFor(v: FormValues): Record<string, unknown> {
 
 /** The one-line recap in the footer. */
 function summaryOf(v: FormValues): ReactNode {
-  const secs = `${Number(v.time) || DEFAULT_QUESTION_TIMEOUT}s to answer`;
+  const secs = isUnlimitedTime(Number(v.time))
+    ? "no time limit"
+    : `${Number(v.time) || DEFAULT_QUESTION_TIMEOUT}s to answer`;
   const strong = (t: string) => (
     <b className="text-dark dark:text-white">{t}</b>
   );
@@ -1364,25 +1372,41 @@ const AddQuesForm = (props: {
                     ) : (
                       <div className="flex items-center gap-3.5">
                         <span className="shrink-0 w-[58px] text-[22px] font-extrabold tracking-[-0.02em] leading-none text-lprimary dark:text-dprimary">
-                          {t}
-                          <small
-                            className={clsx(
-                              "ml-[3px] text-[13px] font-semibold",
-                              mutedText,
-                            )}
-                          >
-                            sec
-                          </small>
+                          {isUnlimitedTime(t) ? "∞" : t}
+                          {!isUnlimitedTime(t) && (
+                            <small
+                              className={clsx(
+                                "ml-[3px] text-[13px] font-semibold",
+                                mutedText,
+                              )}
+                            >
+                              sec
+                            </small>
+                          )}
                         </span>
                         <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                           <RangeSlider
                             label="Seconds to answer"
                             min={range.min}
-                            max={range.max}
-                            value={clampTime(t, type)}
-                            onChange={field.onChange}
-                            ticks={range.ticks}
+                            max={range.max + SLIDER_UNLIMITED_STEP}
+                            value={
+                              isUnlimitedTime(t)
+                                ? range.max + SLIDER_UNLIMITED_STEP
+                                : clampTime(t, type)
+                            }
+                            onChange={(v) =>
+                              field.onChange(
+                                v > range.max ? UNLIMITED_TIME_OUT : v,
+                              )
+                            }
+                            ticks={[...range.ticks, "∞"]}
                           />
+                          {isUnlimitedTime(t) && (
+                            <span className={clsx("text-xs", mutedText)}>
+                              No time limit and no countdown: the question stays
+                              open until everyone answered or you move on.
+                            </span>
+                          )}
                         </div>
                       </div>
                     )}
