@@ -14,7 +14,7 @@ import { LuPlus } from "react-icons/lu";
 import { toast } from "react-toastify";
 import modalStyle from "@/utils/modalStyle";
 import type { GameSocket } from "@/types/socket";
-import { REACTION_WINDOW_MS } from "@buzrr/contract";
+import { useAppSelector } from "@/state/hooks";
 import { useT } from "@/lib/i18n/context";
 import {
   BASE_REACTION_EMOJIS,
@@ -309,9 +309,19 @@ export function ReactionBar({
   // afresh with every question): after that the buttons rest until the
   // oldest tap drops out of the window; a tap then says so.
   const taps = useRef<number[]>([]);
-  const limit = useRef(5);
-  const windowMs = useRef(REACTION_WINDOW_MS);
+  // The server's budget, from the store (0 = no limit: the final top three).
+  const budget = useAppSelector((st) => st.game.reactionBudget);
+  const limit = budget.limit > 0 ? budget.limit : Infinity;
+  const windowMs = budget.windowMs;
   const [blockedUntil, setBlockedUntil] = useState(0);
+  // A fresh start (every question, the final standings): count anew — the
+  // pause ends now, the taps are dropped with the next one.
+  const tapsSeq = useRef(budget.resetSeq);
+  const [seenReset, setSeenReset] = useState(budget.resetSeq);
+  if (seenReset !== budget.resetSeq) {
+    setSeenReset(budget.resetSeq);
+    setBlockedUntil(0);
+  }
   const limitReached = () =>
     toast.info(t("Limit reached — wait a little."), {
       toastId: "reaction-limit",
@@ -319,30 +329,14 @@ export function ReactionBar({
     });
   useEffect(() => {
     if (!socket) return;
-    const onLimit = (p: {
-      limit: number;
-      windowMs: number;
-      reset?: boolean;
-      winner?: boolean;
-    }) => {
-      // 0 = no limit (the final top three).
-      limit.current = p.limit > 0 ? p.limit : Infinity;
-      windowMs.current = p.windowMs;
-      if (p.reset) {
-        taps.current = [];
-        setBlockedUntil(0);
-      }
-      // A winner (no limit from now on) is told once the host's podium
-      // stands — the bar's "share your emojis" hint — not here, early.
-    };
+    // A winner (no limit from now on) is told once the host's podium
+    // stands — the bar's "share your emojis" hint — not early.
     const onLimited = ({ retryInMs }: { retryInMs: number }) => {
       setBlockedUntil(Date.now() + retryInMs);
       limitReached();
     };
-    socket.on("reaction-limit", onLimit);
     socket.on("reaction-limited", onLimited);
     return () => {
-      socket.off("reaction-limit", onLimit);
       socket.off("reaction-limited", onLimited);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -365,14 +359,21 @@ export function ReactionBar({
 
   const send = (emoji: string, el: HTMLElement) => {
     const now = Date.now();
-    taps.current = taps.current.filter((at) => now - at < windowMs.current);
-    if (now < blockedUntil || taps.current.length >= limit.current) {
+    if (tapsSeq.current !== budget.resetSeq) {
+      tapsSeq.current = budget.resetSeq;
+      taps.current = [];
+    }
+    taps.current = taps.current.filter((at) => now - at < windowMs);
+    if (
+      limit !== Infinity &&
+      (now < blockedUntil || taps.current.length >= limit)
+    ) {
       limitReached();
       return;
     }
     taps.current.push(now);
-    if (taps.current.length >= limit.current) {
-      setBlockedUntil(taps.current[0]! + windowMs.current);
+    if (taps.current.length >= limit) {
+      setBlockedUntil(taps.current[0]! + windowMs);
     }
     if (socket?.connected) {
       socket.emit("reaction", oneShot ? { emoji, board: true } : { emoji });

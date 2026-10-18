@@ -59,10 +59,14 @@ export function standingsCountMs(
   return Math.max(0, ...before.map(({ e }) => countUpMs(e.delta ?? 0)));
 }
 
-/** When the host's final podium stands, for the whole board's entries. */
+/**
+ * When players learn their final place: as the host's board has added the
+ * last question's points (its count-up is over) — before the re-sort and
+ * the podium. Without new points, straight away.
+ */
 export function finalRevealMs(
   entries: readonly { score: number; delta?: number }[],
 ): number {
   const resorts = entries.some((e) => (e.delta ?? 0) > 0);
-  return podiumDoneMs(resorts, standingsCountMs(entries));
+  return resorts ? SETTLE_DELAY_MS + standingsCountMs(entries) : 0;
 }

@@ -10,6 +10,7 @@ import reducer, {
   gameOver,
   gameProgress,
   gameStarted,
+  reactionBudgetKnown,
   liveSummary,
   questionEnd,
   questionStart,
@@ -317,5 +318,26 @@ describe("gameStarted", () => {
       }),
     );
     expect(s.phase).toBe("starting");
+  });
+});
+
+describe("reactionBudgetKnown", () => {
+  it("keeps the budget for bars mounted later; 0 is no limit, a reset counts", () => {
+    let s = reducer(
+      fresh(),
+      reactionBudgetKnown({ limit: 5, windowMs: 60_000, players: 40 }),
+    );
+    expect(s.reactionBudget).toMatchObject({ limit: 5, resetSeq: 0 });
+    expect(s.roomSize).toBe(40);
+    s = reducer(
+      s,
+      reactionBudgetKnown({ limit: 5, windowMs: 60_000, reset: true }),
+    );
+    // A winner at the final standings.
+    s = reducer(
+      s,
+      reactionBudgetKnown({ limit: 0, windowMs: 60_000, reset: true }),
+    );
+    expect(s.reactionBudget).toMatchObject({ limit: 0, resetSeq: 2 });
   });
 });

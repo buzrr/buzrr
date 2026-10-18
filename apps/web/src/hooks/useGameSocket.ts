@@ -12,7 +12,7 @@ import {
   gameStarted,
   phaseChange,
   preloadHint,
-  roomSizeKnown,
+  reactionBudgetKnown,
   lobbyAssetsKnown,
   closedSummaryReceived,
   leaderboardReceived,
@@ -152,9 +152,9 @@ export function useGameSocket({
       lastAssets = now;
       if (conn.connected) conn.emit("assets-status", r);
     });
-    conn.on("reaction-limit", (p) => {
-      if (typeof p.players === "number") dispatch(roomSizeKnown(p.players));
-    });
+    // The reaction budget (and the room's size) — kept in the store, so a
+    // reaction bar mounted later (the final standings') still knows it.
+    conn.on("reaction-limit", (p) => dispatch(reactionBudgetKnown(p)));
     conn.on("closed-summary", (payload) =>
       dispatch(closedSummaryReceived(payload)),
     );

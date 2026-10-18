@@ -16,6 +16,7 @@ import type {
   QuestionStartPayload,
   StateSyncPayload,
 } from "@buzrr/contract";
+import { REACTION_WINDOW_MS } from "@buzrr/contract";
 import type { ConnectionStatus } from "@/types/socket";
 
 /**
@@ -82,6 +83,12 @@ export interface GameLiveState {
   waitingFor: number;
   /** How many are in the room (server's `reaction-limit`); 0 = not told. */
   roomSize: number;
+  /**
+   * The reaction budget (server's `reaction-limit`): `limit` per `windowMs`,
+   * 0 = no limit (the final top three); `resetSeq` counts fresh starts. Kept
+   * here, not in the bar, so a bar mounted later still knows it.
+   */
+  reactionBudget: { limit: number; windowMs: number; resetSeq: number };
   /** Everything to load ahead in the lobby (`preload-all`). */
   lobbyAssets: PreloadAllPayload | null;
   /** While waiting: devices reporting the download / done, and whether the host chose to wait for all. */
@@ -147,6 +154,7 @@ const initialState: GameLiveState = {
   myAnswerMs: null,
   waitingFor: 0,
   roomSize: 0,
+  reactionBudget: { limit: 5, windowMs: REACTION_WINDOW_MS, resetSeq: 0 },
   lobbyAssets: null,
   downloadDevices: 0,
   downloadsDone: 0,
@@ -278,6 +286,23 @@ const gameSlice = createSlice({
     },
     roomSizeKnown: (state, action: PayloadAction<number>) => {
       state.roomSize = action.payload;
+    },
+    reactionBudgetKnown: (
+      state,
+      action: PayloadAction<{
+        limit: number;
+        windowMs: number;
+        reset?: boolean;
+        players?: number;
+      }>,
+    ) => {
+      const p = action.payload;
+      state.reactionBudget = {
+        limit: Math.max(0, p.limit),
+        windowMs: p.windowMs,
+        resetSeq: state.reactionBudget.resetSeq + (p.reset ? 1 : 0),
+      };
+      if (typeof p.players === "number") state.roomSize = p.players;
     },
     preloadHint: (state, action: PayloadAction<PreloadPayload>) => {
       state.preload = action.payload;
@@ -435,6 +460,7 @@ export const {
   phaseChange,
   preloadHint,
   roomSizeKnown,
+  reactionBudgetKnown,
   lobbyAssetsKnown,
   closedSummaryReceived,
   questionStart,
