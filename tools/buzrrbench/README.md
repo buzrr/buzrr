@@ -46,6 +46,10 @@ python3 -m venv .venv
 .venv/bin/python buzrrbench.py --url https://www.buzrr.in/join/ABC123 --users 100   # join link: code from the URL
 ```
 
+The URL may be the web app's: when it doesn't answer a Socket.IO handshake,
+the bench looks for the game server next to it (port 3001 beside a local web
+app on 3000, or `api.<host>`).
+
 | Option                | Default   | What                                                                          |
 | --------------------- | --------- | ----------------------------------------------------------------------------- |
 | `--kbps N`            | unlimited | Download bandwidth per player (kbit/s), e.g. `2000` for a weak phone/Wi-Fi.   |

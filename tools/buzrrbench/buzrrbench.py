@@ -1022,6 +1022,39 @@ def split_join_url(url: str) -> tuple[str, str | None]:
     return url.strip().rstrip("/"), None
 
 
+def find_api(base: str) -> str:
+    """Where the API (REST + socket) answers: the given server when it
+    answers a Socket.IO handshake, else a sibling — port 3001 next to a local web app on
+    3000 (`yarn dev`), or api.<host>. Falls back to the given server."""
+    import urllib.request
+
+    def is_api(url: str) -> bool:
+        # The Socket.IO handshake: what the bots need, and what a web app
+        # alone doesn't answer.
+        try:
+            probe = f"{url}/socket.io/?EIO=4&transport=polling"
+            with urllib.request.urlopen(probe, timeout=5) as r:
+                return r.status == 200 and b'"sid"' in r.read()
+        except Exception:  # noqa: BLE001
+            return False
+
+    if is_api(base):
+        return base
+    u = urlparse(base)
+    candidates = []
+    if u.port == 3000:
+        candidates.append(f"{u.scheme}://{u.hostname}:3001")
+    if u.hostname and not u.hostname.startswith("api."):
+        host = u.hostname[4:] if u.hostname.startswith("www.") else u.hostname
+        candidates.append(f"{u.scheme}://api.{host}")
+    for c in candidates:
+        if is_api(c):
+            print(f"API found at {c} (the web app is on {base})")
+            return c
+    print(f"warning: no game server answered at {base} — trying it anyway")
+    return base
+
+
 def ask(prompt: str, default: str | None = None) -> str:
     suffix = f" [{default}]" if default else ""
     val = input(f"{prompt}{suffix}: ").strip()
@@ -1261,6 +1294,7 @@ def main() -> None:
         args.url or ask("Server URL or join link", "https://www.buzrr.in")
     )
     code = (args.code or link_code or ask("Room code")).strip().upper()
+    base = find_api(base)
     users = args.users or int(ask("Parallel users", "20"))
     if not code or users < 1:
         sys.exit("room code and a positive number of users are required")
