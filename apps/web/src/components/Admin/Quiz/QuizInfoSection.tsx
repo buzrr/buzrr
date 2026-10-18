@@ -27,6 +27,7 @@ import type { QuizDetail } from "@/lib/modules/quizzes/api";
 import { useInstance } from "@/lib/instance-context";
 import { useT, pl } from "@/lib/i18n/context";
 import ModerationSettingsCard from "@/components/Admin/Quiz/ModerationSettingsCard";
+import { dropTargetClass, useFileDrop } from "@/hooks/useFileDrop";
 
 function formatSessionDate(createdAt: string | Date) {
   const d = typeof createdAt === "string" ? new Date(createdAt) : createdAt;
@@ -142,6 +143,11 @@ function LogoSetting({ quiz }: { quiz: QuizDetail }) {
       onError: (err) => toast.error(getApiErrorMessage(err)),
     });
   const hasPro = useHasPro();
+  // A picture dropped onto the row becomes the logo.
+  const { over, dropProps } = useFileDrop((file) => {
+    if (file.type.startsWith("image/")) upload(file);
+    else toast.error(t("Drop a picture"));
+  }, logoMutation.isPending);
   if (hasPro === false && !logo) {
     // A Pro feature (an existing logo can still be removed).
     return (
@@ -152,13 +158,16 @@ function LogoSetting({ quiz }: { quiz: QuizDetail }) {
     );
   }
   return (
-    <div className="flex items-center gap-3 mt-3 mb-1">
+    <div className="flex items-center gap-3 mt-3 mb-1" {...dropProps}>
       <button
         type="button"
         onClick={() => input.current?.click()}
         disabled={logoMutation.isPending}
         title={logo ? t("Change logo") : t("Upload a logo")}
-        className="relative size-14 shrink-0 rounded-xl border-[1.5px] border-dashed border-lprimary/25 dark:border-white/15 bg-light-bg dark:bg-card-dark flex items-center justify-center overflow-hidden cursor-pointer hover:border-dprimary"
+        className={clsx(
+          "relative size-14 shrink-0 rounded-xl border-[1.5px] border-dashed border-lprimary/25 dark:border-white/15 bg-light-bg dark:bg-card-dark flex items-center justify-center overflow-hidden cursor-pointer hover:border-dprimary",
+          over && dropTargetClass,
+        )}
       >
         {logo ? (
           <Image

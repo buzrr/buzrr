@@ -52,6 +52,7 @@ import {
   QuestionTypeIcon,
 } from "@/components/QuestionTypes";
 import { useT, tx, pl } from "@/lib/i18n/context";
+import { dropTargetClass } from "@/hooks/useFileDrop";
 import {
   OPTION_KEYS,
   OptionKey,
@@ -507,11 +508,15 @@ const AddQuesForm = (props: {
 
   // Drag and drop a file anywhere on the editor: a picture becomes the
   // question's image, an audio file its sound.
-  const [dropping, setDropping] = useState(false);
+  // What is being dragged (its box gets the drop border); "any" when the
+  // browser doesn't tell the type before the drop.
+  const [dropping, setDropping] = useState<"image" | "audio" | "any" | null>(
+    null,
+  );
   const AUDIO_EXT = /\.(mp3|wav|ogg|oga|opus|flac|m4a|aac|webm)$/i;
   function onDropFile(e: React.DragEvent) {
     e.preventDefault();
-    setDropping(false);
+    setDropping(null);
     const f = e.dataTransfer.files?.[0];
     if (!f) return;
     if (f.type.startsWith("image/")) {
@@ -689,11 +694,20 @@ const AddQuesForm = (props: {
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes("Files")) {
           e.preventDefault();
-          setDropping(true);
+          const type = e.dataTransfer.items[0]?.type ?? "";
+          setDropping(
+            type.startsWith("image/")
+              ? "image"
+              : type.startsWith("audio/")
+                ? "audio"
+                : "any",
+          );
         }
       }}
       onDragLeave={(e) => {
-        if (e.currentTarget === e.target) setDropping(false);
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setDropping(null);
+        }
       }}
       onDrop={onDropFile}
       className={clsx(
@@ -809,6 +823,8 @@ const AddQuesForm = (props: {
                 <label
                   className={clsx(
                     "flex items-center gap-3.5 rounded-2xl border-[1.5px] border-dashed px-4 py-3 cursor-pointer transition-colors border-lprimary/25 dark:border-white/15 hover:border-dprimary bg-light-bg dark:bg-card-dark",
+                    (dropping === "image" || dropping === "any") &&
+                      dropTargetClass,
                   )}
                 >
                   <span className="size-10 shrink-0 rounded-xl flex items-center justify-center bg-lprimary/10 dark:bg-white/5 text-lprimary dark:text-dprimary">
@@ -870,7 +886,13 @@ const AddQuesForm = (props: {
                   </select>
                 </label>
               ) : (
-                <label className="flex items-center gap-3.5 rounded-2xl border-[1.5px] border-dashed px-4 py-3 cursor-pointer transition-colors border-lprimary/25 dark:border-white/15 hover:border-dprimary bg-light-bg dark:bg-card-dark">
+                <label
+                  className={clsx(
+                    "flex items-center gap-3.5 rounded-2xl border-[1.5px] border-dashed px-4 py-3 cursor-pointer transition-colors border-lprimary/25 dark:border-white/15 hover:border-dprimary bg-light-bg dark:bg-card-dark",
+                    (dropping === "audio" || dropping === "any") &&
+                      dropTargetClass,
+                  )}
+                >
                   <span className="size-10 shrink-0 rounded-xl flex items-center justify-center bg-lprimary/10 dark:bg-white/5 text-lprimary dark:text-dprimary">
                     <LuMusic size={20} />
                   </span>

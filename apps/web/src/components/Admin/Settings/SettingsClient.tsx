@@ -22,6 +22,8 @@ import { authClient } from "@/lib/auth-client";
 import { useEntitlementsQuery } from "@/lib/modules/billing/hooks";
 import { useInstance } from "@/lib/instance-context";
 import { LuImagePlus, LuTrash2 } from "react-icons/lu";
+import clsx from "clsx";
+import { dropTargetClass, useFileDrop } from "@/hooks/useFileDrop";
 import { BUILTIN_SOUND_SKINS } from "@buzrr/contract";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { BUILTIN_SKINS, type BuiltinSkinId } from "@/lib/sound/synth";
@@ -134,6 +136,12 @@ function GameDefaultsCard() {
   const logo = prefs.data?.defaultLogo ?? null;
   const onErr = (err: unknown) => toast.error(getApiErrorMessage(err));
   const hasPro = useHasPro();
+  // A picture dropped onto the logo field becomes the default logo.
+  const { over, dropProps } = useFileDrop((file) => {
+    if (file.type.startsWith("image/"))
+      setLogo.mutate(file, { onError: onErr });
+    else toast.error(t("Drop a picture"));
+  }, setLogo.isPending);
   const defaultSkin = prefs.data?.defaultSoundSkin ?? "builtin:show";
   const defaultSkinName = (BUILTIN_SOUND_SKINS as readonly string[]).includes(
     defaultSkin,
@@ -153,13 +161,16 @@ function GameDefaultsCard() {
           hasPro === false && !logo ? (
             <ProLock what={t("Your own logo")} />
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2" {...dropProps}>
               <button
                 type="button"
                 onClick={() => logoInput.current?.click()}
                 disabled={setLogo.isPending}
                 title={logo ? t("Change logo") : t("Upload a logo")}
-                className="size-14 shrink-0 rounded-xl border-[1.5px] border-dashed border-lprimary/25 dark:border-white/15 flex items-center justify-center overflow-hidden cursor-pointer hover:border-dprimary"
+                className={clsx(
+                  "size-14 shrink-0 rounded-xl border-[1.5px] border-dashed border-lprimary/25 dark:border-white/15 flex items-center justify-center overflow-hidden cursor-pointer hover:border-dprimary",
+                  over && dropTargetClass,
+                )}
               >
                 {logo ? (
                   // eslint-disable-next-line @next/next/no-img-element -- signed upload URL

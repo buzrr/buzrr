@@ -980,6 +980,7 @@ export const DE: Record<string, string> = {
   "In rooms with more than {n} players the background music plays on the host only.":
     "In Räumen mit mehr als {n} Spielern läuft die Hintergrundmusik nur beim Host.",
   "Drop a picture or an audio file": "Ein Bild oder eine Audiodatei ablegen",
+  "Drop a picture": "Ein Bild ablegen",
   "Go to quiz": "Zum Quiz",
   "Delete this game": "Dieses Spiel löschen",
   "Delete this game and its results?":
