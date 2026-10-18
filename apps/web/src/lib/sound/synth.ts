@@ -700,7 +700,7 @@ export function playArcadeBlopp(volume = 0.08) {
 }
 
 /** Arcade reaction: a quick rising three-note arpeggio. */
-export function playArcadePling(volume = 0.09) {
+export function playArcadePling(volume = 0.045) {
   const c = chipBus(volume);
   if (!c) return;
   const root = 19 + Math.floor(Math.random() * 3) * 2;

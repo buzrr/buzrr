@@ -57,7 +57,9 @@ export type EngineEvent =
   /** Close the open question now (everyone connected has answered). */
   | { type: "close-question"; qIndex: number }
   /** The roster shrank or a player dropped (kick, ban, leave, disconnect). */
-  | { type: "roster-changed" };
+  | { type: "roster-changed" }
+  /** The host, while the countdown waits for downloads: keep waiting or go. */
+  | { type: "downloads-decision"; wait: boolean };
 
 /**
  * What the shell must load for each event. `answer-recorded` runs once per
@@ -75,6 +77,13 @@ export const PARTS_FOR: Record<EngineEvent["type"], readonly StatePart[]> = {
   "close-question": ["questions", "roster", "answers", "scores"],
   // Questions too: whether the open one may close early depends on its type.
   "roster-changed": ["questions", "roster", "answers", "scores"],
+  "downloads-decision": [
+    "questions",
+    "roster",
+    "answers",
+    "scores",
+    "preloads",
+  ],
 };
 
 export interface StepContext {
@@ -123,6 +132,8 @@ export function step(
       return onDeadline(state, now, pacing, ctx);
     case "answer-recorded":
       return onAnswerRecorded(state, event.qIndex, event.answered);
+    case "downloads-decision":
+      return downloadsDecision(state, event.wait, now, ctx);
     case "close-question":
       // Only the question that met the early-close condition: if another
       // path already revealed it and opened the next, this is stale.
@@ -530,6 +541,7 @@ function openQuestion(
     qStartAt: now,
     qDeadline: deadline,
     preloadWaitSince: 0,
+    preloadWaitAll: 0,
     ...(plan ? { botAnswer: JSON.stringify(plan.answer), botAnswerAt } : {}),
   };
 
@@ -792,11 +804,17 @@ function waitForDownloads(state: GameState, now: number): Transition | null {
     state.roster.filter((p) => p.connected).map((p) => p.id),
   );
   if (meta.hostConnected) connected.add("host");
-  const pending = Object.entries(state.preloads).filter(
-    ([id, s]) => connected.has(id) && !s.done && now - s.at < DOWNLOAD_STALL_MS,
+  const here = Object.entries(state.preloads).filter(([id]) =>
+    connected.has(id),
+  );
+  const pending = here.filter(
+    ([, s]) => !s.done && now - s.at < DOWNLOAD_STALL_MS,
   ).length;
   const since = meta.preloadWaitSince || now;
-  if (pending === 0 || now - since >= DOWNLOAD_MAX_WAIT_MS) return null;
+  // The host may lift the time limit ("wait until all are done"); stalled
+  // devices are still ignored, so no single phone can hold the room.
+  const capped = !meta.preloadWaitAll && now - since >= DOWNLOAD_MAX_WAIT_MS;
+  if (pending === 0 || capped) return null;
   const at = now + DOWNLOAD_RECHECK_MS;
   const patch = { preloadWaitSince: since, qDeadline: at };
   return {
@@ -813,12 +831,36 @@ function waitForDownloads(state: GameState, now: number): Transition | null {
             phase: "starting",
             qIndex: meta.qIndex,
             waitingFor: pending,
+            downloadDevices: here.length,
+            downloadsDone: here.filter(([, s]) => s.done).length,
+            ...(meta.preloadWaitAll ? { waitAll: true } : {}),
           },
           deadline: at,
         },
       },
       { kind: "arm-timer", at },
     ],
+  };
+}
+
+/**
+ * The host's answer while the countdown waits for downloads: open the
+ * question now, or wait for every device (no `DOWNLOAD_MAX_WAIT_MS`). Only
+ * while actually waiting — a late click after the question opened is stale.
+ */
+function downloadsDecision(
+  state: GameState,
+  wait: boolean,
+  now: number,
+  ctx: StepContext,
+): Transition {
+  const { meta } = state;
+  if (meta.phase !== "starting" || !meta.preloadWaitSince) return noop(state);
+  if (!wait) return openQuestion(state, meta.qIndex, now, ctx);
+  const patch = { preloadWaitAll: 1 };
+  return {
+    state: withMeta(state, patch),
+    effects: [{ kind: "patch-meta", patch }],
   };
 }
 

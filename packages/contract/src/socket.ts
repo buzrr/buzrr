@@ -209,7 +209,32 @@ export const phaseChangeSchema = z.object({
   remainingMs: z.number().optional(),
   /** "starting", countdown over: devices still downloading the question's sound. */
   waitingFor: z.number().int().optional(),
+  /** With `waitingFor`: devices that report this question's download, and how many are done. */
+  downloadDevices: z.number().int().optional(),
+  downloadsDone: z.number().int().optional(),
+  /** With `waitingFor`: the host chose to wait until every download is done. */
+  waitAll: z.boolean().optional(),
 });
+
+/** A device asks for one of the room's download slots (`preload-slot`). */
+export const preloadSlotSchema = z.object({
+  qIndex: z.number().int().nonnegative(),
+});
+/**
+ * `go`: start downloading now. Otherwise wait for `preload-go` — the server
+ * hands out at most MAX_PARALLEL_AUDIO_DOWNLOADS slots per room at a time.
+ * `limited`: slots are rationed (the device needn't spread its start itself).
+ */
+export interface PreloadSlotAck {
+  go: boolean;
+  limited: boolean;
+}
+/** The host's answer while the countdown waits for downloads. */
+export const downloadsDecisionSchema = z.object({
+  /** true = wait until every device is done (no time limit), false = open the question now. */
+  wait: z.boolean(),
+});
+export type DownloadsDecisionPayload = z.infer<typeof downloadsDecisionSchema>;
 
 /** A device's download progress for question `qIndex`'s sound clips. */
 export const preloadStatusSchema = z.object({
@@ -540,6 +565,8 @@ export interface ServerToClientEvents {
   "phase-change": (payload: PhaseChangePayload) => void;
   /** Download the next question's (encrypted) sound clips now. */
   preload: (payload: PreloadPayload) => void;
+  /** This device's download slot for question `qIndex` is free (see `preload-slot`). */
+  "preload-go": (payload: { qIndex: number }) => void;
   /**
    * Host only, moderated "closed" step: how the room answered, before the
    * answer is shown (the host screen keeps the correct one hidden).
@@ -608,6 +635,13 @@ export interface ClientToServerEvents {
   "set-avatar": (payload: { profilePic: string }) => void;
   /** Download progress of the next question's sound (see `preload`). */
   "preload-status": (payload: PreloadStatusPayload) => void;
+  /** Ask for a download slot before fetching the question's sound. */
+  "preload-slot": (
+    payload: z.infer<typeof preloadSlotSchema>,
+    ack: (result: PreloadSlotAck) => void,
+  ) => void;
+  /** Host: keep waiting for downloads, or open the question now. */
+  "downloads-decision": (payload: DownloadsDecisionPayload) => void;
   // -- host intents (the server decides what each one means) --
   "remove-player": (player: { id: string }, gameCode?: string) => void;
   "start-game": (gameCode?: string) => void;

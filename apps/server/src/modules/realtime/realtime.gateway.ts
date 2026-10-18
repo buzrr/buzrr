@@ -4,7 +4,9 @@ import {
   REACTIONS_PER_WINDOW,
   REACTION_WINDOW_MS,
   bubbleStatsSchema,
+  downloadsDecisionSchema,
   duelQueueSchema,
+  preloadSlotSchema,
   preloadStatusSchema,
   reactionSchema,
   submitAnswerSchema,
@@ -24,6 +26,7 @@ import { MatchmakingService } from "../duel/matchmaking.service";
 import { GameEngineService } from "../game-engine/game-engine.service";
 import { GameStoreService } from "../game-engine/game-store.service";
 import { RealtimeService } from "./realtime.service";
+import { AudioSlots, type Grant } from "./audio-slots";
 import type {
   DuelInviteAcceptAck,
   TypedServer,
@@ -62,6 +65,11 @@ export class RealtimeGateway
   @WebSocketServer()
   server: TypedServer;
 
+  /** MAX_PARALLEL_AUDIO_DOWNLOADS per room (unset/0 = unlimited). */
+  private readonly slots = new AudioSlots(
+    Math.max(0, Number(process.env.MAX_PARALLEL_AUDIO_DOWNLOADS) || 0),
+  );
+
   constructor(
     private readonly realtimeService: RealtimeService,
     private readonly engine: GameEngineService,
@@ -74,6 +82,19 @@ export class RealtimeGateway
     this.engine.setServer(server);
     this.matchmaking.setServer(server);
     this.invites.setServer(server);
+    if (this.slots.limited) {
+      setInterval(
+        () => this.grant(this.slots.sweep(Date.now())),
+        1_000,
+      ).unref();
+    }
+  }
+
+  /** Queued devices whose download slot came free. */
+  private grant(grants: Grant[]): void {
+    for (const g of grants) {
+      this.server.to(g.socketId).emit("preload-go", { qIndex: g.qIndex });
+    }
   }
 
   async handleConnection(socket: TypedSocket): Promise<void> {
@@ -490,14 +511,31 @@ export class RealtimeGateway
     id: string,
   ) {
     let last = 0;
+    socket.on("preload-slot", (payload, ack) => {
+      const parsed = preloadSlotSchema.safeParse(payload);
+      if (!parsed.success || typeof ack !== "function") return;
+      const go = this.slots.request(
+        gameCode,
+        parsed.data.qIndex,
+        id,
+        socket.id,
+        Date.now(),
+      );
+      ack({ go, limited: this.slots.limited });
+    });
+    socket.once("disconnect", () =>
+      this.grant(this.slots.leave(gameCode, id, socket.id, Date.now())),
+    );
     socket.on("preload-status", (payload) => {
       const parsed = preloadStatusSchema.safeParse(payload);
       if (!parsed.success) return;
       const now = Date.now();
-      // Progress at most every 300 ms; "done" always gets through.
-      if (!parsed.data.done && now - last < 300) return;
-      last = now;
       const { qIndex, loaded, total, done } = parsed.data;
+      if (done) this.grant(this.slots.release(gameCode, qIndex, id, now));
+      else this.slots.touch(gameCode, qIndex, id, now);
+      // Progress at most every 300 ms; "done" always gets through.
+      if (!done && now - last < 300) return;
+      last = now;
       void this.store
         .setPreloadStatus(gameCode, qIndex, id, {
           loaded,
@@ -544,6 +582,16 @@ export class RealtimeGateway
         await this.engine.hostNext(gameCode);
       } catch (error) {
         this.logger.error("Error advancing game:", error);
+      }
+    });
+
+    socket.on("downloads-decision", async (payload) => {
+      const parsed = downloadsDecisionSchema.safeParse(payload);
+      if (!parsed.success) return;
+      try {
+        await this.engine.downloadsDecision(gameCode, parsed.data.wait);
+      } catch (error) {
+        this.logger.error("Error applying the downloads decision:", error);
       }
     });
 

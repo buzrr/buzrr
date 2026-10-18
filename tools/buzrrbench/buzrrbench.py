@@ -6,14 +6,17 @@ Joins N simulated players to a room (by game code), pops lobby bubbles until
 the host starts the game, then answers every question at random after a random
 0.5-20 s delay (late answers are sent on purpose; their rejections are counted).
 Every player picks three reaction emojis (mostly smileys) and taps one now and
-then during the game, sometimes a burst, often right after an answer is shown.
+then in the lobby, sometimes a burst. During the game few do: 3 % of the players
+tap 1-3 times 10 s into a question, 10 % right after the answer is shown.
 
 Each player also downloads what its browser would, with its own cache:
   - the player context and the quiz's sound skin (if it is a user skin)
   - question images, as each question opens
   - question sounds: the encrypted clips announced by `preload` (with
     `preload-status` progress reports, like a phone, so the countdown can wait
-    for slow devices), or an external sound file when the question opens
+    for slow devices; with the server's download slots a device first asks
+    for one and waits for `preload-go`), or an external sound file when the
+    question opens
   - the skin's sound files for each phase and the preloaded final song, on
     devices where game sounds are on (`--sound-optin` decides how many players
     switch sound on when the quiz plays it on the host only)
@@ -81,9 +84,19 @@ HEARTBEAT_EVERY = 10.0  # HEARTBEAT_INTERVAL_MS in the contract
 # The run stops this long after DONE_SHARE of the connected players are done.
 DONE_SHARE = 0.95
 DONE_GRACE = 30.0
+# While queued for a download slot: "still here, loaded 0" this often.
+QUEUED_REPORT_EVERY = 1.5
+SLOT_ACK_TIMEOUT = 10.0
+SLOT_GIVE_UP = 90.0  # like the web client: start anyway after this long
+# During the game, reactions are rare: this share of all players taps 1-3
+# times once a question has run QUESTION_REACT_AFTER s, and this share
+# right after the answer is shown. In the lobby they tap regularly.
+QUESTION_REACT_SHARE = 0.03
+QUESTION_REACT_AFTER = 10.0
+REVEAL_REACT_SHARE = 0.10
 PRELOAD_REPORT_EVERY = 0.4  # like the web client's throttle
 # Tries per download, like the web client (lib/sound/preload.ts).
-DOWNLOAD_TRIES = 3
+DOWNLOAD_TRIES = 6
 CHUNK = 64 * 1024
 
 BUILTIN_SKINS = {"builtin:show", "builtin:arcade", "builtin:chill"}
@@ -92,8 +105,8 @@ EMOJI_POOL = [
     "😀", "😂", "🤣", "😅", "😍", "🥰", "😎", "🤔", "😱", "😭",
     "🥳", "🤯", "🙈", "😬", "🤩", "😇", "👍", "❤️", "🔥", "🎉", "👏",
 ]
-# Phases in which the player screen shows the reaction bar.
-REACTION_PHASES = {"starting", "question", "reveal", "closed", "scores", "ready", "final"}
+# Phases in which the player screen shows the reaction bar (inline in the lobby).
+REACTION_PHASES = {"idle", "lobby", "starting", "question", "reveal", "closed", "scores", "ready", "final"}
 
 
 # -- metrics -------------------------------------------------------------------
@@ -256,6 +269,7 @@ class Bot:
     question_audio: dict | None = None
     seen_q: set = field(default_factory=set)
     wait_started: dict = field(default_factory=dict)  # qIndex -> first "waiting for downloads"
+    slot_go: dict = field(default_factory=dict)  # qIndex -> asyncio.Event (preload-go)
     frozen_at: float = 0.0  # --timeout-*: when this player stopped sending (perf_counter)
 
     # -- helpers ------------------------------------------------------------------
@@ -493,10 +507,43 @@ class Bot:
         if not self.assets or not self.sound_here(data.get("playOn")):
             return
         urls = data.get("urls") or []
-        self.tracked = (data["qIndex"], [u.split("?")[0] for u in urls], time.perf_counter())
+        q = data["qIndex"]
+        self.tracked = (q, [u.split("?")[0] for u in urls], time.perf_counter())
+        self.notify()
+        if all(u.split("?")[0] in self.cache for u in urls):
+            self.start_preload(urls)
+        else:
+            self.spawn(self._preload_in_turn(q, urls))
+
+    def start_preload(self, urls: list) -> None:
         for u in urls:
             self.download(u, "question sound (preload)")
         self.notify()
+
+    async def _preload_in_turn(self, q: int, urls: list) -> None:
+        """Like the web client: ask for a download slot, wait for `preload-go`
+        if queued (reporting "loaded 0" meanwhile), then download."""
+        t0 = time.perf_counter()
+        go = self.slot_go.setdefault(q, asyncio.Event())
+        try:
+            ack = await self.sio.call("preload-slot", {"qIndex": q}, timeout=SLOT_ACK_TIMEOUT)
+        except Exception:  # noqa: BLE001 - no answer (older server): just go
+            ack = {"go": True}
+        if not ack.get("go"):
+            M.counts["download slot: queued"] += 1
+            deadline = t0 + SLOT_GIVE_UP
+            while not go.is_set() and time.perf_counter() < deadline:
+                try:
+                    await asyncio.wait_for(go.wait(), QUEUED_REPORT_EVERY)
+                except asyncio.TimeoutError:
+                    self.last_report = 0.0  # a keepalive, not throttled away
+                    self.notify()
+            if not go.is_set():
+                M.counts["download slot: gave up waiting"] += 1
+            M.add("download slot wait", (time.perf_counter() - t0) * 1000)
+        else:
+            M.counts["download slot: at once"] += 1
+        self.start_preload(urls)
 
     def on_question(self, q_index: int, question: dict) -> None:
         """What the question screen loads as it opens: image, sound."""
@@ -589,6 +636,10 @@ class Bot:
         async def _preload(data):
             self.on_preload(data)
 
+        @s.on("preload-go")
+        async def _preload_go(data):
+            self.slot_go.setdefault(data["qIndex"], asyncio.Event()).set()
+
         @s.on("question-start")
         async def _qstart(data):
             q = data["index"]
@@ -599,6 +650,9 @@ class Bot:
             M.recv[("question-start", q)].append(time.time())
             self.on_question(q, data["question"])
             self.schedule_answer(q, data["question"])
+            if self.reacting and random.random() < QUESTION_REACT_SHARE:
+                self.spawn(self.tap(delay=QUESTION_REACT_AFTER + random.uniform(0, 3),
+                                    taps=random.randint(1, 3)))
 
         @s.on("question-end")
         async def _qend(data):
@@ -609,8 +663,8 @@ class Bot:
                 # Decrypting the reveal clip: preloaded, unless the device joined late.
                 self.download(audio.get("revealUrl"), "question sound (late)")
             # The answer is out: a good moment for a smiley.
-            if self.reacting and random.random() < 0.3:
-                self.spawn(self.tap(delay=random.uniform(0.5, 3.0)))
+            if self.reacting and random.random() < REVEAL_REACT_SHARE:
+                self.spawn(self.tap(delay=random.uniform(0.5, 3.0), taps=random.randint(1, 3)))
 
         @s.on("answer-result")
         async def _res(data):
@@ -680,19 +734,21 @@ class Bot:
                 M.err("bubble-stats emit failed")
 
     async def react(self) -> None:
-        """Now and then a smiley from the player's three — sometimes a burst."""
+        """Lobby: now and then a smiley from the player's three — sometimes a
+        burst. During the game only the question / reveal moments tap."""
         if not self.reacting:
             return
         while True:
             await asyncio.sleep(random.uniform(6, 30))
-            await self.tap()
+            if self.phase in ("idle", "lobby"):
+                await self.tap()
 
-    async def tap(self, delay: float = 0.0) -> None:
+    async def tap(self, delay: float = 0.0, taps: int | None = None) -> None:
         await asyncio.sleep(delay)
         if self.frozen or not self.reactions_on or self.phase not in REACTION_PHASES:
             return
         emoji = random.choice(self.emojis)
-        burst = random.randint(3, 10) if random.random() < 0.15 else random.choice([1, 1, 1, 2])
+        burst = taps or (random.randint(3, 10) if random.random() < 0.15 else random.choice([1, 1, 1, 2]))
         for _ in range(burst):
             try:
                 await self.sio.emit("reaction", {"emoji": emoji})

@@ -72,6 +72,10 @@ export interface GameLiveState {
   finalSoundKey: string | null;
   /** Countdown over, devices still downloading the question's sound. */
   waitingFor: number;
+  /** While waiting: devices reporting the download / done, and whether the host chose to wait for all. */
+  downloadDevices: number;
+  downloadsDone: number;
+  waitAll: boolean;
   /** Host, moderated "closed": how the room answered (answer still hidden). */
   closedSummary: QuestionEndPayload | null;
   /** Player: how long their answer to the open question took (from the ack). */
@@ -105,6 +109,9 @@ const initialState: GameLiveState = {
   finalSoundKey: null,
   myAnswerMs: null,
   waitingFor: 0,
+  downloadDevices: 0,
+  downloadsDone: 0,
+  waitAll: false,
   closedSummary: null,
 };
 
@@ -228,6 +235,9 @@ const gameSlice = createSlice({
         state.liveSummary = null;
       }
       state.waitingFor = p.waitingFor ?? 0;
+      state.downloadDevices = p.downloadDevices ?? 0;
+      state.downloadsDone = p.downloadsDone ?? 0;
+      state.waitAll = p.waitAll ?? false;
       if (p.phase === "starting") {
         const ms = p.remainingMs ?? 0;
         state.deadline = Date.now() + ms;

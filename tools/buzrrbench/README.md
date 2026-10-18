@@ -4,17 +4,20 @@ Load test for a Buzrr classic room: N simulated players join by room code, pop
 lobby bubbles (sending `bubble-stats`) until the host starts, then answer every
 question at random after 0.5–20 s (late answers on purpose; rejections counted).
 Each player picks three reaction emojis (mostly smileys) and taps one now and
-then during the game — sometimes a burst, often right after the answer is shown.
+then in the lobby — sometimes a burst. During the game few tap: 3 % of the
+players 1–3 times 10 s into a question, 10 % right after the answer is shown.
 
 Every player also downloads what its browser would, with its own cache: the
 play context and the quiz's sound skin, question images, the question sound's
-encrypted clips when `preload` announces them (reporting `preload-status`, so
-the countdown waits for slow devices), and — on devices where game sounds are
-on — the skin's sound files per phase and the preloaded final song. Like the
-web client, a failed download is retried twice after a random, growing pause
-(0.4–1.2 s, then 0.8–2.4 s); a clip given up still reports `done` with
-`failed: true`. The summary counts `download retries` and `downloads failed
-after 3 tries`.
+encrypted clips when `preload` announces them (asking the server for a
+download slot first and waiting for `preload-go` when queued, reporting
+`preload-status`, so the countdown waits for slow devices), and — on devices
+where game sounds are on — the skin's sound files per phase and the preloaded
+final song. Like the web client, a failed download is retried up to 5 times
+after a random, growing pause (0.4–1.2 s, 0.8–2.4 s, …); a clip given up still
+reports `done` with `failed: true`. The summary counts `download slot:
+queued` / `at once`, the `download slot wait`, `download retries` and
+`downloads failed after 6 tries`.
 
 Prints latencies (HTTP create/join/context, socket connect, request-sync RTT,
 submit-answer ack, downloads per kind, preload hint → clips downloaded), the

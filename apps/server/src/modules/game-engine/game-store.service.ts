@@ -39,6 +39,7 @@ const NUMERIC_META = new Set([
   "botAnswerAt",
   "pausedAt",
   "preloadWaitSince",
+  "preloadWaitAll",
 ]);
 const BOOLEAN_META = new Set(["hostConnected", "rated"]);
 

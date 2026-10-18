@@ -290,12 +290,22 @@ masked until the reveal (`buildSnapshot`).
   up to 3 s (`PRELOAD_SPREAD_MS`, `lib/sound/preload.ts`) and reports
   `preload-status` with `loaded: 0` at once, so the countdown counts it as
   downloading.
-- A failed download is retried twice after a random, growing pause; a clip
-  given up reports `done: true, failed: true` — the countdown never waits for
-  it. Clips are mono, 64 kbit/s.
+- **Download slots** (`MAX_PARALLEL_AUDIO_DOWNLOADS`, `audio-slots.ts`): a
+  device that has to download asks `preload-slot` first (ack `{ go, limited }`);
+  queued devices get `preload-go { qIndex }` as slots free up — on a `done`
+  report, a disconnect, or 8 s without progress (`SLOT_STALL_MS`). The host
+  never queues. While queued the device reports `loaded: 0` every 1.5 s, so
+  the countdown keeps counting it. In memory per server process; unlimited
+  when unset (the ack says `limited: false` and devices spread their own start).
+- A failed download is retried up to 5 times after a random, growing pause; a
+  clip given up reports `done: true, failed: true` — the countdown never
+  waits for it. Clips are mono, 64 kbit/s.
 - The countdown (`waitForDownloads`) waits for connected devices still
   downloading, ignores ones whose progress stalled for 4 s, and gives up
-  after 30 s. Questions with "∞" time have no countdown and no wait.
+  after 30 s. Its `phase-change` carries `waitingFor`, `downloadDevices` and
+  `downloadsDone`; the host answers with `downloads-decision { wait }`: go on
+  now, or wait without the 30 s limit (`preloadWaitAll`, then `waitAll: true`).
+  Questions with "∞" time have no countdown and no wait.
 
 ## Lobby extras: bubbles and reactions
 
@@ -311,8 +321,10 @@ masked until the reveal (`buildSnapshot`).
   `ROOM_REACTIONS_PER_S` (40) in a room within one second, only each
   player's first reaction of that second passes.
 - **Host lobby:** applies reactions in batches (every 500 ms) and joins every
-  250 ms; above 60 players no bubbles rise out of the cards, above 120 no
-  reorder animation.
+  250 ms; player cards are memoised, so an update re-renders only the cards
+  it changed. Above 40 players no reorder animation and no count-up numbers,
+  above 60 no bubbles rise out of the cards. The join ping plays at most
+  every 150 ms (Arcade's reaction pling at most every 5 s).
 
 ## Changing the socket contract — touch list
 

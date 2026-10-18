@@ -49,6 +49,8 @@ export interface GameMeta {
   finalSoundKey?: string;
   /** When the countdown started waiting for devices' downloads (0 = not waiting). */
   preloadWaitSince?: number;
+  /** 1 = the host chose to wait for every download (no time limit). */
+  preloadWaitAll?: number;
   /**
    * Duels only: when the match was frozen because no human was connected. 0
    * (or absent) means running; resumeDuel shifts every timestamp below by the

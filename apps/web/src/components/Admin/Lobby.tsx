@@ -2,6 +2,7 @@
 import clsx from "clsx";
 import { DEFAULT_AVATAR } from "@/constants";
 import {
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -243,6 +244,16 @@ const Lobby = (params: {
     );
   }
 
+  // Stable for the memoised cards; always calls the latest handler.
+  const removeRef = useRef(handlePlayerRemove);
+  useEffect(() => {
+    removeRef.current = handlePlayerRemove;
+  });
+  const onKick = useCallback(
+    (player: PlayerPayload) => removeRef.current(player),
+    [],
+  );
+
   function handleGameStart() {
     if (!socket?.connected) {
       toast.error(t("Not connected to the game server yet. Please wait."));
@@ -301,8 +312,10 @@ const Lobby = (params: {
     const tm = setInterval(() => setOrderIds(latest.current), REORDER_EVERY_MS);
     return () => clearInterval(tm);
   }, []);
-  const keep = orderIds.filter((id) => wanted.includes(id));
-  const ids = [...keep, ...wanted.filter((id) => !keep.includes(id))];
+  const wantedSet = new Set(wanted);
+  const keep = orderIds.filter((id) => wantedSet.has(id));
+  const keepSet = new Set(keep);
+  const ids = [...keep, ...wanted.filter((id) => !keepSet.has(id))];
   const byId = new Map(sortedPlayers.map((p) => [p.id, p]));
   const visiblePlayers = ids.map((id) => byId.get(id)!);
   const listRef = useRef<HTMLDivElement>(null);
@@ -515,67 +528,15 @@ const Lobby = (params: {
               className="md:flex-1 md:min-h-0 md:overflow-y-auto overflow-x-hidden px-4 py-3 md:px-[22px] md:py-4 grid grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] auto-rows-[58px] gap-2.5 content-start"
             >
               {visiblePlayers.map((player) => (
-                <div
+                <PlayerCard
                   key={player.id}
-                  data-player-card={player.id}
-                  data-flip-id={player.id}
-                  className="group relative flex items-center gap-[11px] min-w-0 h-[58px] rounded-[14px] border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 hover:border-dprimary pr-2 pl-[9px] transition-colors animate-pop-in"
-                >
-                  <Image
-                    src={player.profilePic || DEFAULT_AVATAR}
-                    width={36}
-                    height={36}
-                    alt=""
-                    className="size-9 shrink-0 rounded-full object-cover"
-                  />
-                  <span className="flex-1 min-w-0 flex flex-col">
-                    <span
-                      className="truncate text-[14.5px] font-medium"
-                      title={player.name ?? undefined}
-                    >
-                      {player.name}
-                    </span>
-                    {/* Always one line, so the card's height never changes. */}
-                    {bubbles[player.id] ? (
-                      <BubbleLine stats={bubbles[player.id]!} plain={crowded} />
-                    ) : (
-                      <span className="text-xs">&nbsp;</span>
-                    )}
-                  </span>
-                  {fresh(player.id) && (
-                    <span
-                      key={fresh(player.id)!.at}
-                      aria-label={`Reacted ${fresh(player.id)!.emoji}`}
-                      className="pointer-events-none absolute -top-2 left-6 text-xl leading-none animate-pop-in drop-shadow"
-                    >
-                      {fresh(player.id)!.emoji}
-                    </span>
-                  )}
-                  <span className="flex gap-0.5 shrink-0 md:opacity-55 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
-                    <button
-                      type="button"
-                      aria-label={t("Ban {name} from this room", {
-                        name: player.name ?? "",
-                      })}
-                      title={t("Ban (can't rejoin)")}
-                      onClick={() => setPlayerToBan(player)}
-                      className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
-                    >
-                      <LuBan size={17} />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={t("Remove {name}", {
-                        name: player.name ?? "",
-                      })}
-                      title={t("Kick (can rejoin)")}
-                      onClick={() => handlePlayerRemove(player)}
-                      className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
-                    >
-                      <LuX size={17} />
-                    </button>
-                  </span>
-                </div>
+                  player={player}
+                  stats={bubbles[player.id]}
+                  reaction={fresh(player.id)}
+                  plain={crowded}
+                  onBan={setPlayerToBan}
+                  onKick={onKick}
+                />
               ))}
               {visiblePlayers.length === 0 && (
                 <div className="col-span-full text-center text-sm py-10 text-[#8a8896] dark:text-muted-dark">
@@ -644,7 +605,7 @@ const FLUSH_MS = 500;
 /** Above this many players no bubbles rise out of the cards. */
 const FLYER_PLAYER_LIMIT = 60;
 /** Above this many players: no reorder animation, plain numbers. */
-const CROWD_LIMIT = 120;
+const CROWD_LIMIT = 40;
 /** The waiting list re-sorts (bubble score, reactions) at most this often. */
 const REORDER_EVERY_MS = 5000;
 /** A player's reactions move them to the top of the list at most this often. */
@@ -698,6 +659,91 @@ function useFlip2d(
     last.current = next;
   }, [container, orderKey]);
 }
+
+/**
+ * One waiting player. Memoised: with hundreds in the room, a join, a
+ * reaction or a bubble batch re-renders only the cards whose data changed
+ * (the whole grid re-rendering several times a second froze the host page).
+ */
+const PlayerCard = memo(function PlayerCard({
+  player,
+  stats,
+  reaction,
+  plain,
+  onBan,
+  onKick,
+}: {
+  player: PlayerPayload;
+  stats: { hits: number; misses: number } | undefined;
+  reaction: { emoji: string; at: number } | null;
+  plain: boolean;
+  onBan: (player: PlayerPayload) => void;
+  onKick: (player: PlayerPayload) => void;
+}) {
+  const t = useT();
+  return (
+    <div
+      data-player-card={player.id}
+      data-flip-id={player.id}
+      className="group relative flex items-center gap-[11px] min-w-0 h-[58px] rounded-[14px] border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 hover:border-dprimary pr-2 pl-[9px] transition-colors animate-pop-in"
+    >
+      <Image
+        src={player.profilePic || DEFAULT_AVATAR}
+        width={36}
+        height={36}
+        alt=""
+        className="size-9 shrink-0 rounded-full object-cover"
+      />
+      <span className="flex-1 min-w-0 flex flex-col">
+        <span
+          className="truncate text-[14.5px] font-medium"
+          title={player.name ?? undefined}
+        >
+          {player.name}
+        </span>
+        {/* Always one line, so the card's height never changes. */}
+        {stats ? (
+          <BubbleLine stats={stats} plain={plain} />
+        ) : (
+          <span className="text-xs">&nbsp;</span>
+        )}
+      </span>
+      {reaction && (
+        <span
+          key={reaction.at}
+          aria-label={`Reacted ${reaction.emoji}`}
+          className="pointer-events-none absolute -top-2 left-6 text-xl leading-none animate-pop-in drop-shadow"
+        >
+          {reaction.emoji}
+        </span>
+      )}
+      <span className="flex gap-0.5 shrink-0 md:opacity-55 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
+        <button
+          type="button"
+          aria-label={t("Ban {name} from this room", {
+            name: player.name ?? "",
+          })}
+          title={t("Ban (can't rejoin)")}
+          onClick={() => onBan(player)}
+          className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
+        >
+          <LuBan size={17} />
+        </button>
+        <button
+          type="button"
+          aria-label={t("Remove {name}", {
+            name: player.name ?? "",
+          })}
+          title={t("Kick (can rejoin)")}
+          onClick={() => onKick(player)}
+          className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
+        >
+          <LuX size={17} />
+        </button>
+      </span>
+    </div>
+  );
+});
 
 /** "🫧 12 · 80% hits" — the tally ticks up as the server relays new totals. */
 function BubbleLine({

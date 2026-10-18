@@ -809,7 +809,14 @@ export const DE: Record<string, string> = {
   VS: "VS",
   "Waiting for players to join…": "Warte auf Spieler…",
   "Waiting for sound downloads · {n} left":
-    "Warte auf Ton-Downloads · noch {n}",
+    "Warte auf Audio Downloads · noch {n}",
+  "Audio downloads: {done} of {n} done":
+    "Audio Downloads: {done} von {n} fertig",
+  "Wait for them?": "Warten?",
+  "Waiting until every download is done.":
+    "Es wird gewartet, bis alle fertig sind.",
+  "No, go on": "Nein, weiter",
+  "Yes, wait until done": "Ja, warten bis fertig",
   "Waiting for the final results": "Warte auf den Endstand",
   "Waiting for the first responses": "Warte auf die ersten Antworten",
   "Waiting for the host": "Warte auf den Spielleiter",

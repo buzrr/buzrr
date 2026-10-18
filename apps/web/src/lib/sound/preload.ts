@@ -53,12 +53,13 @@ async function download(url: string, key: string): Promise<ArrayBuffer> {
 }
 
 /** Tries per clip; between them a random pause that grows with each try. */
-const DOWNLOAD_TRIES = 3;
+const DOWNLOAD_TRIES = 6;
 
 /**
  * A crowd downloading at once makes some requests fail (timeouts, refused
- * connections): try again after a random pause (0.4–1.2 s, then 0.8–2.4 s) so
- * the retries don't all land together. Only then is the clip given up.
+ * connections): try again after a random pause (0.4–1.2 s, 0.8–2.4 s, … up
+ * to 2–6 s) so the retries don't all land together. Only then is the clip
+ * given up.
  */
 async function downloadWithRetry(
   url: string,
@@ -146,6 +147,19 @@ export function onPreloadProgress(listener: (r: Report) => void) {
 
 /** The longest random pause before a device starts its question preload. */
 const PRELOAD_SPREAD_MS = 3000;
+/** While queued for a slot: "still here, loaded 0" this often (server stall limit 4 s). */
+const QUEUED_REPORT_MS = 1500;
+
+/**
+ * Waits for the server's download slot for question `qIndex` (a room hands
+ * out MAX_PARALLEL_AUDIO_DOWNLOADS at a time). `limited` false: no
+ * rationing, so the device spreads its own start. Set by the game socket.
+ */
+type SlotGate = (qIndex: number) => Promise<{ limited: boolean }>;
+let slotGate: SlotGate | null = null;
+export function setSlotGate(gate: SlotGate | null) {
+  slotGate = gate;
+}
 
 /**
  * Start downloading clips; with `qIndex` their progress is reported (the
@@ -154,6 +168,7 @@ const PRELOAD_SPREAD_MS = 3000;
  * room doesn't hit the server in the same second — the "loaded 0" report
  * goes out at once, so the countdown counts the device as downloading
  * (under the server's 4 s stall limit) rather than as done or stalled.
+ * With download slots, the device first queues for its turn.
  */
 export function preloadClips(urls: string[], qIndex?: number) {
   const start = () => {
@@ -166,7 +181,26 @@ export function preloadClips(urls: string[], qIndex?: number) {
   }
   tracked = { qIndex, keys: urls.map(bare) };
   notify();
-  setTimeout(start, Math.random() * PRELOAD_SPREAD_MS);
+  const spread = () => setTimeout(start, Math.random() * PRELOAD_SPREAD_MS);
+  if (urls.every((u) => cache.has(bare(u)))) {
+    start(); // already here or on the way: nothing to queue for
+    return;
+  }
+  if (!slotGate) {
+    spread();
+    return;
+  }
+  // Queued: keep reporting "loaded 0" so the countdown counts this device
+  // as still downloading, not as stalled.
+  const mine = tracked;
+  const alive = setInterval(() => {
+    if (tracked === mine) notify();
+  }, QUEUED_REPORT_MS);
+  void slotGate(qIndex).then(({ limited }) => {
+    clearInterval(alive);
+    if (limited) start();
+    else spread();
+  });
 }
 
 /** Decrypts a clip (12-byte IV, AES-256-GCM ciphertext + tag) to an object URL. */

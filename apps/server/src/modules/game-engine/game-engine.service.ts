@@ -510,6 +510,11 @@ export class GameEngineService
     await this.dispatch(gameCode, { type: "host-next" });
   }
 
+  /** Host, countdown waiting for downloads: keep waiting (no limit) or go. */
+  async downloadsDecision(gameCode: string, wait: boolean): Promise<void> {
+    await this.dispatch(gameCode, { type: "downloads-decision", wait });
+  }
+
   async endGame(
     gameCode: string,
     opts?: { forfeitLoserId?: string; abandoned?: boolean },

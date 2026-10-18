@@ -367,6 +367,53 @@ describe("the countdown waits for sound downloads", () => {
     );
   });
 
+  it("reports how many devices are done", () => {
+    const done = { loaded: 100, total: 100, done: true, at: T0 };
+    const { effects } = step(
+      counting({ p1: loading(T0), p2: done }),
+      { type: "deadline" },
+      T0,
+    );
+    const pc = emitted(effects).find((e) => e.event === "phase-change");
+    expect(pc?.message).toMatchObject({
+      payload: { waitingFor: 1, downloadDevices: 2, downloadsDone: 1 },
+    });
+  });
+
+  it("the host can go on now, or lift the time limit", () => {
+    const waiting = counting({ p1: loading(T0) }, T0 - 1_000);
+    expect(
+      step(waiting, { type: "downloads-decision", wait: false }, T0).state.meta
+        .phase,
+    ).toBe("question");
+    const all = step(
+      waiting,
+      { type: "downloads-decision", wait: true },
+      T0,
+    ).state;
+    expect(all.meta.preloadWaitAll).toBe(1);
+    // Past the 30 s cap, still waiting for the device that is downloading.
+    const later = { ...all, preloads: { p1: loading(T0 + 40_000) } };
+    const { state: next, effects } = step(
+      later,
+      { type: "deadline" },
+      T0 + 40_000,
+    );
+    expect(next.meta.phase).toBe("starting");
+    const pc = emitted(effects).find((e) => e.event === "phase-change");
+    expect(pc?.message).toMatchObject({ payload: { waitAll: true } });
+  });
+
+  it("ignores a decision when nothing is waiting", () => {
+    const fresh = counting({ p1: loading(T0) });
+    const { state: next } = step(
+      fresh,
+      { type: "downloads-decision", wait: false },
+      T0,
+    );
+    expect(next.meta.phase).toBe("starting");
+  });
+
   it("a question without sound doesn't wait at all", () => {
     const plain = state({
       preloads: { p1: loading(T0) },

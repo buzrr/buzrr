@@ -10,6 +10,7 @@ import {
   dangerButtonClass,
   mutedText,
   panelClass,
+  primaryButtonClass,
 } from "@/components/Game/GameUI";
 
 /**
@@ -20,10 +21,13 @@ import {
 export default function GetReady({
   title,
   onSkip,
+  onDownloads,
 }: {
   title?: string;
   /** Host with nobody playing: skip the countdown. */
   onSkip?: () => void;
+  /** Host, while devices still download the sound: wait for all (true) or go on. */
+  onDownloads?: (wait: boolean) => void;
 }) {
   const t = useT();
   const phase = useAppSelector((state) => state.game.phase);
@@ -31,6 +35,9 @@ export default function GetReady({
   const countdownMs = useAppSelector((state) => state.game.countdownMs);
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const waitingFor = useAppSelector((state) => state.game.waitingFor);
+  const devices = useAppSelector((state) => state.game.downloadDevices);
+  const done = useAppSelector((state) => state.game.downloadsDone);
+  const waitAll = useAppSelector((state) => state.game.waitAll);
   const remaining = useServerCountdown(phase === "starting" ? deadline : 0);
   const seconds = Math.ceil(remaining);
   // Countdown over but devices are still downloading the sound: spin instead.
@@ -73,6 +80,13 @@ export default function GetReady({
                 ? t("Question {n} coming up", { n: qIndex + 1 })
                 : t("First question coming up")}
             </p>
+          ) : waitingFor > 0 && onDownloads ? (
+            <WaitingDots>
+              {t("Audio downloads: {done} of {n} done", {
+                done,
+                n: devices,
+              })}
+            </WaitingDots>
           ) : waitingFor > 0 ? (
             <WaitingDots>
               {t("Waiting for sound downloads · {n} left", { n: waitingFor })}
@@ -81,6 +95,33 @@ export default function GetReady({
             <WaitingDots>{t("Waiting for the question")}</WaitingDots>
           )}
         </div>
+        {onDownloads && phase === "starting" && waitingFor > 0 && (
+          <div className="relative flex flex-col items-center gap-3">
+            <p className={clsx("text-sm", mutedText)}>
+              {waitAll
+                ? t("Waiting until every download is done.")
+                : t("Wait for them?")}
+            </p>
+            <div className="flex flex-wrap justify-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => onDownloads(false)}
+                className={dangerButtonClass}
+              >
+                {t("No, go on")}
+              </button>
+              {!waitAll && (
+                <button
+                  type="button"
+                  onClick={() => onDownloads(true)}
+                  className={primaryButtonClass}
+                >
+                  {t("Yes, wait until done")}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </section>
       {onSkip && phase === "starting" && (
         // Skip sits bottom left, like on the question screen.

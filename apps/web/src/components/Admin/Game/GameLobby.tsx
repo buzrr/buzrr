@@ -117,6 +117,7 @@ const GameLobby = (params: {
                 ? undefined
                 : () => socket.emit("host-next")
             }
+            onDownloads={(wait) => socket.emit("downloads-decision", { wait })}
           />
         </>
       ) : (

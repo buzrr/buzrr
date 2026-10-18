@@ -378,7 +378,7 @@ export function LiveSounds({ socket }: { socket: GameSocket | null }) {
   const on = Boolean(s?.on);
   useEffect(() => {
     if (!socket || !on) return;
-    const last = { blopp: 0, pling: 0 };
+    const last = { blopp: 0, pling: 0, join: 0 };
     const limited = (
       kind: keyof typeof last,
       gapMs: number,
@@ -392,9 +392,14 @@ export function LiveSounds({ socket }: { socket: GameSocket | null }) {
     const hits: Record<string, number> = {};
     // The Arcade skin has its own 8-bit pickups.
     const arcade = s?.settings.skin === "builtin:arcade";
-    const ping = () => (arcade ? playArcadeJoin() : playPing());
+    // A crowd joining at once: one ping per 150 ms is plenty.
+    const ping = () =>
+      limited("join", 150, () => (arcade ? playArcadeJoin() : playPing()));
+    // Arcade's chip pling cuts through: at most one every 5 s.
     const onReaction = () =>
-      limited("pling", 90, () => (arcade ? playArcadePling() : playPling()));
+      arcade
+        ? limited("pling", 5000, () => playArcadePling())
+        : limited("pling", 90, () => playPling());
     // One batch a second: the room's new pops spread over that second
     // (at most 12 blopps — a full room shouldn't drone).
     const onStats = ({

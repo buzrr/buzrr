@@ -22,7 +22,7 @@ import {
   setConnection,
 } from "@/state/game/gameSlice";
 import type { GameSocket } from "@/types/socket";
-import { onPreloadProgress } from "@/lib/sound/preload";
+import { onPreloadProgress, setSlotGate } from "@/lib/sound/preload";
 
 export interface UseGameSocketOptions {
   userType: "admin" | "player" | "duel";
@@ -58,6 +58,11 @@ export function resyncOnReturn(
  * so reconnects need no client-side bookkeeping — the whole screen re-renders
  * from the fresh snapshot.
  */
+/** How long the server gets to answer `preload-slot`. */
+const SLOT_ACK_MS = 10_000;
+/** A queued device starts anyway after this long (the countdown has moved on by then). */
+const SLOT_GIVE_UP_MS = 90_000;
+
 export function useGameSocket({
   userType,
   gameCode,
@@ -143,6 +148,37 @@ export function useGameSocket({
       lastReport = now;
       if (conn.connected) conn.emit("preload-status", r);
     });
+    // Download slots: ask the server before fetching a question's sound; a
+    // queued device waits for `preload-go` (asking again after a reconnect).
+    // No answer (an older server) or no turn within SLOT_GIVE_UP_MS: go.
+    setSlotGate(
+      (qIndex) =>
+        new Promise((resolve) => {
+          let settled = false;
+          const finish = (limited: boolean) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(giveUp);
+            conn.off("preload-go", onGo);
+            conn.off("connect", ask);
+            resolve({ limited });
+          };
+          const onGo = (p: { qIndex: number }) => {
+            if (p.qIndex === qIndex) finish(true);
+          };
+          const ask = () =>
+            conn
+              .timeout(SLOT_ACK_MS)
+              .emit("preload-slot", { qIndex }, (err, res) => {
+                if (err) finish(false);
+                else if (res.go) finish(res.limited);
+              });
+          const giveUp = setTimeout(() => finish(true), SLOT_GIVE_UP_MS);
+          conn.on("preload-go", onGo);
+          conn.on("connect", ask);
+          if (conn.connected) ask();
+        }),
+    );
 
     conn.on("question-start", (payload) => dispatch(questionStart(payload)));
     conn.on("question-end", (payload) => dispatch(questionEnd(payload)));
@@ -177,6 +213,7 @@ export function useGameSocket({
     return () => {
       clearInterval(heartbeat);
       offProgress();
+      setSlotGate(null);
       conn.io.off("reconnect_failed", onReconnectFailed);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       conn.disconnect();
