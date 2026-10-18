@@ -18,7 +18,7 @@ import ConfirmationModal from "@/components/Admin/ConfirmationModal";
 import { usePlayerSocket } from "@/hooks/usePlayerSocket";
 import { ReactionBar } from "@/components/Game/Flyers";
 import { GameSounds, SoundToggle } from "@/lib/sound/director";
-import { quizSettingsSchema } from "@buzrr/contract";
+import { SCORES_EMOJI_TOP, quizSettingsSchema } from "@buzrr/contract";
 import { playersApi } from "@/lib/modules/players/api";
 import { useT } from "@/lib/i18n/context";
 import { saveFinalResult } from "@/lib/final-result";
@@ -66,6 +66,7 @@ const GamePage = (params: {
   const mine = leaderboard.find((e) => e.playerId === params.player.id);
   const question = useAppSelector((state) => state.game.question);
   const you = useAppSelector((state) => state.game.you);
+  const qIndex = useAppSelector((state) => state.game.qIndex);
 
   const { socket } = usePlayerSocket({
     playerId: params.player.id,
@@ -146,7 +147,17 @@ const GamePage = (params: {
       {reactionsOn &&
         phase !== "ended" &&
         phase !== "idle" &&
-        phase !== "lobby" && <ReactionBar socket={socket} />}
+        phase !== "lobby" &&
+        (phase === "scores" ? (
+          // The scores step: the top SCORES_EMOJI_TOP send one emoji each,
+          // shown on their row of the host's board.
+          you?.rank != null &&
+          you.rank <= SCORES_EMOJI_TOP && (
+            <ReactionBar key={`scores-${qIndex}`} socket={socket} oneShot />
+          )
+        ) : (
+          <ReactionBar socket={socket} />
+        ))}
       {phase !== "question" && phase !== "reveal" && phase !== "closed" && (
         <ConnectionStatusPill className="fixed left-3 bottom-3 z-40" />
       )}

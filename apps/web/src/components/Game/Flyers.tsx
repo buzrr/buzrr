@@ -278,11 +278,15 @@ function ReactionButton({
 export function ReactionBar({
   socket,
   inline = false,
+  oneShot = false,
 }: {
   socket: GameSocket | null;
   inline?: boolean;
+  /** One emoji, then the bar goes (the scores step's top players). */
+  oneShot?: boolean;
 }) {
   const t = useT();
+  const [shot, setShot] = useState(false);
   const { spawn, layer } = useFlyers();
   const [custom, setCustom] = useState<string[]>([]);
   // null = closed; "add" = new slot; number = editing that own reaction.
@@ -364,6 +368,7 @@ export function ReactionBar({
       setBlockedUntil(taps.current[0]! + windowMs.current);
     }
     if (socket?.connected) socket.emit("reaction", { emoji });
+    if (oneShot) setShot(true);
     const r = el.getBoundingClientRect();
     spawn({
       emoji,
@@ -379,6 +384,9 @@ export function ReactionBar({
     setCustom(next);
     saveCustomReactions(next);
   };
+
+  // Sent: the flyer finishes, the bar is gone.
+  if (shot) return <>{layer}</>;
 
   return (
     <>

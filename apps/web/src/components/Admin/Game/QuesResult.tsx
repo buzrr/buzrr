@@ -30,6 +30,7 @@ import {
 import { AnimatedNumber, useFlipReorder } from "@/components/Game/motion";
 import {
   HOST_LEADERBOARD_TOP,
+  SCORES_EMOJI_TOP,
   denseRanks,
   type LeaderboardEntry,
 } from "@buzrr/contract";
@@ -230,6 +231,20 @@ export default function QuesResult(props: QuesResultProps) {
     [leaderboard, settled],
   );
   const playerCount = leaderboardTotal ?? leaderboard.length;
+
+  // The scores step: an emoji from one of the top SCORES_EMOJI_TOP stays on
+  // their row (this question's board only — it remounts with the next).
+  const [rowEmoji, setRowEmoji] = useState<Record<string, string>>({});
+  const onScores = phase === "scores";
+  useEffect(() => {
+    if (!socket || !onScores) return;
+    const onReaction = (r: { playerId: string; emoji: string }) =>
+      setRowEmoji((m) => ({ ...m, [r.playerId]: r.emoji }));
+    socket.on("reaction", onReaction);
+    return () => {
+      socket.off("reaction", onReaction);
+    };
+  }, [socket, onScores]);
   const listRef = useRef<HTMLDivElement>(null);
   useFlipReorder(listRef, rows.map((r) => r.playerId).join());
   const connectedById = new Map(players.map((p) => [p.id, p.connected]));
@@ -432,6 +447,16 @@ export default function QuesResult(props: QuesResultProps) {
                     <span className="flex-1 min-w-0 truncate text-[15px] font-semibold">
                       {lead.name}
                     </span>
+                    {lead.rank <= SCORES_EMOJI_TOP &&
+                      rowEmoji[lead.playerId] && (
+                        <span
+                          key={rowEmoji[lead.playerId]}
+                          aria-hidden
+                          className="shrink-0 text-2xl leading-none animate-pop-in"
+                        >
+                          {rowEmoji[lead.playerId]}
+                        </span>
+                      )}
                     {lead.delta !== undefined && (
                       <span
                         className={clsx(
