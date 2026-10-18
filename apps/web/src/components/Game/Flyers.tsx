@@ -132,6 +132,23 @@ export function useFlyers(): {
  * Host screens: every reaction a player taps floats up the right-hand side,
  * with the player's name (`nameOf`) under it.
  */
+const PODIUM_EVENT = "buzrr:podium-emoji";
+
+/** An emoji rising from a winner's avatar on the final podium (host). */
+export function podiumEmoji(playerId: string, emoji: string) {
+  window.dispatchEvent(
+    new CustomEvent(PODIUM_EVENT, { detail: { playerId, emoji } }),
+  );
+}
+
+/** A player's avatar on the final podium, if it is on screen. */
+function podiumAvatar(playerId: string): DOMRect | null {
+  const el = document.querySelector(
+    `[data-podium-player="${CSS.escape(playerId)}"]`,
+  );
+  return el ? el.getBoundingClientRect() : null;
+}
+
 export function ReactionOverlay({
   socket,
   nameOf,
@@ -149,6 +166,23 @@ export function ReactionOverlay({
     const onReaction = (r: { playerId: string; emoji: string }) => {
       const w = window.innerWidth;
       const h = window.innerHeight;
+      // The final top three: their emojis fly off their heads.
+      const head = podiumAvatar(r.playerId);
+      if (head) {
+        spawn({
+          emoji: r.emoji,
+          x:
+            head.left +
+            head.width / 2 +
+            (Math.random() - 0.5) * head.width * 0.4,
+          y: head.top,
+          dx: (Math.random() - 0.5) * 160,
+          rise: Math.max(160, head.top * (0.8 + Math.random() * 0.2)),
+          size: 34 + Math.random() * 14,
+          duration: 2200 + Math.random() * 1200,
+        });
+        return;
+      }
       spawn({
         emoji: r.emoji,
         x: w - 40 - Math.random() * Math.min(220, w * 0.25),
@@ -160,9 +194,15 @@ export function ReactionOverlay({
         label: nameRef.current?.(r.playerId),
       });
     };
+    const onPodium = (e: Event) =>
+      onReaction(
+        (e as CustomEvent<{ playerId: string; emoji: string }>).detail,
+      );
     socket.on("reaction", onReaction);
+    window.addEventListener(PODIUM_EVENT, onPodium);
     return () => {
       socket.off("reaction", onReaction);
+      window.removeEventListener(PODIUM_EVENT, onPodium);
     };
   }, [socket, spawn]);
   return <>{layer}</>;
@@ -268,12 +308,20 @@ export function ReactionBar({
       limit: number;
       windowMs: number;
       reset?: boolean;
+      winner?: boolean;
     }) => {
-      limit.current = p.limit;
+      // 0 = no limit (the final top three).
+      limit.current = p.limit > 0 ? p.limit : Infinity;
       windowMs.current = p.windowMs;
       if (p.reset) {
         taps.current = [];
         setBlockedUntil(0);
+      }
+      if (p.winner) {
+        toast.success(t("You're on the podium — send emojis!"), {
+          toastId: "podium-emojis",
+          autoClose: 6000,
+        });
       }
     };
     const onLimited = ({ retryInMs }: { retryInMs: number }) => {

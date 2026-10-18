@@ -236,9 +236,14 @@ export class GameEngineService
     }
   }
 
-  /** Told when a new round begins (a question opens, the final standings). */
-  private roundListeners = new Set<(gameCode: string) => void>();
-  onNewRound(listener: (gameCode: string) => void): void {
+  /**
+   * Told when a new round begins (a question opens, the final standings —
+   * then with the players on places 1–3).
+   */
+  private roundListeners = new Set<
+    (gameCode: string, winners?: string[]) => void
+  >();
+  onNewRound(listener: (gameCode: string, winners?: string[]) => void): void {
     this.roundListeners.add(listener);
   }
 
@@ -246,12 +251,18 @@ export class GameEngineService
     if (!this.io) {
       throw new Error("GameEngineService used before gateway init");
     }
+    if ("room" in to && message.event === "question-start") {
+      for (const l of this.roundListeners) l(gameCode);
+    }
     if (
       "room" in to &&
-      (message.event === "question-start" ||
-        (message.event === "leaderboard" && message.payload.isFinal))
+      message.event === "leaderboard" &&
+      message.payload.isFinal
     ) {
-      for (const l of this.roundListeners) l(gameCode);
+      const winners = message.payload.entries
+        .filter((e) => e.rank <= 3)
+        .map((e) => e.playerId);
+      for (const l of this.roundListeners) l(gameCode, winners);
     }
     // Per-player rooms work cross-instance via the redis adapter.
     const target =

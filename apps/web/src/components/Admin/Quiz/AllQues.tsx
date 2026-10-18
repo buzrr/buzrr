@@ -4,7 +4,7 @@ import clsx from "clsx";
 import { isUnlimitedTime } from "@buzrr/contract";
 import ShowMedia from "./ShowMediaComp";
 import Image from "next/image";
-import { LuClock, LuGripVertical } from "react-icons/lu";
+import { LuClock, LuGripVertical, LuImage, LuMusic } from "react-icons/lu";
 import AddQuesForm from "./AddQuesForm";
 import QuestionCardBody, {
   QuestionTypeTag,
@@ -241,11 +241,28 @@ export default function AllQues(props: { quizId: string }) {
                                 />
                               )}
                             </BasicModal>
-                            {ques.disabled && (
-                              <span className="ml-auto text-xs font-bold tracking-[0.06em] uppercase rounded-full px-2.5 py-0.5 bg-black/10 dark:bg-white/10 text-off-dark dark:text-muted-dark">
-                                {t("Disabled · skipped")}
-                              </span>
-                            )}
+                            <span className="ml-auto flex items-center gap-2.5 text-off-dark dark:text-muted-dark">
+                              {ques.disabled && (
+                                <span className="text-xs font-bold tracking-[0.06em] uppercase rounded-full px-2.5 py-0.5 bg-black/10 dark:bg-white/10">
+                                  {t("Disabled · skipped")}
+                                </span>
+                              )}
+                              {/* What the question brings along. */}
+                              {ques.media && ques.mediaType !== "audio" && (
+                                <LuImage
+                                  size={17}
+                                  aria-label={t("With a picture")}
+                                  role="img"
+                                />
+                              )}
+                              {ques.audio && (
+                                <LuMusic
+                                  size={17}
+                                  aria-label={t("With music")}
+                                  role="img"
+                                />
+                              )}
+                            </span>
                             {ques.media && (
                               <ShowMedia
                                 media={ques.media}

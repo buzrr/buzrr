@@ -17,6 +17,11 @@ import {
 import type { LeaderboardEntry } from "@buzrr/contract";
 import { useT, pl } from "@/lib/i18n/context";
 import { rankBadgeClass } from "./QuesResult";
+import { podiumEmoji } from "@/components/Game/Flyers";
+
+/** The podium's hearts: the first after this long, then one per place. */
+const PODIUM_HEART_MS = 1200;
+const PODIUM_HEART_GAP_MS = 700;
 
 const PODIUM = {
   1: {
@@ -48,10 +53,25 @@ function PodiumSpot({
 }) {
   const t = useT();
   const p = PODIUM[place];
+  // Once the podium stands: a heart rises from each winner, one by one.
+  const playerId = entry?.playerId;
+  useEffect(() => {
+    if (!playerId) return;
+    const tm = setTimeout(
+      () => podiumEmoji(playerId, "❤️"),
+      PODIUM_HEART_MS + (place - 1) * PODIUM_HEART_GAP_MS,
+    );
+    return () => clearTimeout(tm);
+  }, [playerId, place]);
   if (!entry) return <div />;
   return (
     <div className="flex flex-col items-center gap-1.5 min-w-0">
-      <span className="rounded-full p-1" style={{ background: p.color }}>
+      {/* Their reactions fly from here (ReactionOverlay). */}
+      <span
+        className="rounded-full p-1"
+        style={{ background: p.color }}
+        data-podium-player={entry.playerId}
+      >
         <Image
           src={entry.profilePic || DEFAULT_AVATAR}
           width={104}

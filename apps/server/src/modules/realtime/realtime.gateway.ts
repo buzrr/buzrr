@@ -84,7 +84,9 @@ export class RealtimeGateway
     this.engine.setServer(server);
     this.matchmaking.setServer(server);
     this.invites.setServer(server);
-    this.engine.onNewRound((code) => this.resetReactions(code));
+    this.engine.onNewRound((code, winners) =>
+      this.resetReactions(code, winners),
+    );
     if (this.slots.limited) {
       setInterval(
         () => this.grant(this.slots.sweep(Date.now())),
@@ -102,14 +104,30 @@ export class RealtimeGateway
     );
   }
 
-  /** A new question / the final standings: everyone's budget starts afresh. */
-  private resetReactions(gameCode: string): void {
+  /** The final standings' top three per room: they may react without limit. */
+  private readonly winners = new Map<string, Set<string>>();
+
+  /**
+   * A new question / the final standings: everyone's budget starts afresh;
+   * at the end the top three get no limit at all.
+   */
+  private resetReactions(gameCode: string, winners?: string[]): void {
     this.reactionBudgets.reset(gameCode);
+    if (winners) this.winners.set(gameCode, new Set(winners));
+    else this.winners.delete(gameCode);
     this.server.to(gameCode).emit("reaction-limit", {
       limit: this.reactionLimit(gameCode),
       windowMs: REACTION_WINDOW_MS,
       reset: true,
     });
+    for (const id of winners ?? []) {
+      this.server.to(`player:${id}`).emit("reaction-limit", {
+        limit: 0,
+        windowMs: REACTION_WINDOW_MS,
+        reset: true,
+        winner: true,
+      });
+    }
   }
 
   /** Queued devices whose download slot came free. */
@@ -648,9 +666,13 @@ export class RealtimeGateway
     // player is told how long to wait. When the whole room floods (over
     // ROOM_REACTIONS_PER_S in a second), only each player's first reaction
     // of that second goes through.
+    const winner =
+      !!socket.data.playerId &&
+      !!this.winners.get(gameCode)?.has(socket.data.playerId);
     socket.emit("reaction-limit", {
-      limit: this.reactionLimit(gameCode),
+      limit: winner ? 0 : this.reactionLimit(gameCode),
       windowMs: REACTION_WINDOW_MS,
+      ...(winner ? { winner: true } : {}),
     });
     socket.on("reaction", (payload) => {
       const playerId = socket.data.playerId;
@@ -658,6 +680,13 @@ export class RealtimeGateway
       const now = Date.now();
       const parsed = reactionSchema.safeParse(payload);
       if (!parsed.success) return;
+      // The final top three: as many as they like.
+      if (this.winners.get(gameCode)?.has(playerId)) {
+        this.server
+          .to(`host:${gameCode}`)
+          .emit("reaction", { playerId, emoji: parsed.data.emoji });
+        return;
+      }
       if (!this.roomAdmitsReaction(gameCode, playerId, now)) return;
       const budget = this.reactionBudgets.take(
         gameCode,

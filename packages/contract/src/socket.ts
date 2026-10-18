@@ -328,11 +328,16 @@ export function reactionLimitFor(players: number): number {
   if (players < 500) return 5;
   return 2;
 }
-/** The room's current reaction budget; `reset`: start counting afresh. */
+/**
+ * The room's current reaction budget; `reset`: start counting afresh.
+ * `limit` 0 = no limit: the top three on the final standings (`winner`)
+ * may send as many as they like.
+ */
 export interface ReactionLimitPayload {
   limit: number;
   windowMs: number;
   reset?: boolean;
+  winner?: boolean;
 }
 
 export const playerReactionSchema = reactionSchema.extend({

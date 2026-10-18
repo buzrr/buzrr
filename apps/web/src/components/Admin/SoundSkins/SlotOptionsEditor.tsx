@@ -206,12 +206,16 @@ export function SlotOptionsEditor({
               label=""
               value={draft.nextAtMs}
               onChange={(nextAtMs) => change({ nextAtMs })}
+              onFocus={() => setCueKey("next")}
             />
           )}
           {draft.nextAtMs === undefined ? (
             <button
               type="button"
-              onClick={() => change({ nextAtMs: draft.endMs ?? 0 })}
+              onClick={() => {
+                change({ nextAtMs: draft.endMs ?? 0 });
+                setCueKey("next");
+              }}
               className="text-xs underline cursor-pointer"
             >
               {t("set")}
@@ -241,6 +245,7 @@ export function SlotOptionsEditor({
           label={t("Start at")}
           value={draft.startMs ?? 0}
           onChange={(startMs) => change({ startMs })}
+          onFocus={() => setCueKey("main")}
         />
       )}
 
@@ -252,6 +257,7 @@ export function SlotOptionsEditor({
             }
             value={draft.endMs ?? 0}
             onChange={(endMs) => change({ endMs })}
+            onFocus={() => setCueKey("main")}
           />
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-40">
@@ -281,10 +287,13 @@ function TimeField({
   label,
   value,
   onChange,
+  onFocus,
 }: {
   label: string;
   value: number;
   onChange: (ms: number) => void;
+  /** Focused: e.g. pick the matching waveform cue. */
+  onFocus?: () => void;
 }) {
   // While typing: the text as typed; otherwise the value (it also follows
   // the waveform).
@@ -296,7 +305,10 @@ function TimeField({
       {label && <span className="w-40">{label}</span>}
       <input
         value={text}
-        onFocus={() => setEditing(formatMs(value))}
+        onFocus={() => {
+          setEditing(formatMs(value));
+          onFocus?.();
+        }}
         onChange={(e) => {
           setEditing(e.target.value);
           const ms = parseMs(e.target.value);

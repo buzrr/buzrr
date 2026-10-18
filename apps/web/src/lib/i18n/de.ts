@@ -955,6 +955,8 @@ export const DE: Record<string, string> = {
   "Show the scores on click": "Punkte nach Klick",
   "Reactions again in {s} s": "Reaktionen wieder in {s} s",
   "Limit reached — wait a little.": "Limit erreicht – warte ein bisschen.",
+  "You're on the podium — send emojis!":
+    "Du bist auf dem Treppchen – sende Emojis!",
   Volume: "Lautstärke",
   "Fade in at the start": "Am Anfang einblenden",
   "Fade time": "Einblendzeit",
@@ -969,6 +971,8 @@ export const DE: Record<string, string> = {
   "The song plays on this long after the end, then fades out.":
     "So lange läuft der Song nach dem Ende weiter, dann wird er ausgeblendet.",
   "Test bench": "Testlauf",
+  "With a picture": "Mit Bild",
+  "With music": "Mit Musik",
   "A click sets:": "Ein Klick setzt:",
   "Zero point (0)": "Nullpunkt (0)",
   "Start point": "Startpunkt",
