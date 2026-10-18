@@ -117,7 +117,9 @@ export default async function RootLayout({
             </ReduxProvider>
           </InstanceProvider>
         </I18nProvider>
-        <Analytics />
+        {/* Vercel serves its script only to apps it hosts: elsewhere (self-
+            hosting) it would be a 404 on every page. */}
+        {process.env.VERCEL && <Analytics />}
       </body>
     </html>
   );
