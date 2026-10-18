@@ -12,12 +12,14 @@ import { mutedText } from "@/components/Game/GameUI";
 import { useT } from "@/lib/i18n/context";
 import { decodePeaks } from "@/lib/sound/peaks";
 import { fetchClip } from "@/lib/sound/preload";
-import { fadeInOf, formatMs, playSong } from "@/lib/sound/song";
+import { fadeInOf, formatMs, playSong, repeatOf } from "@/lib/sound/song";
 import type { SoundHandle } from "@/lib/sound/synth";
 
 const COUNTDOWN_MS = 5000;
 const START_COLOR = "#7c4ddb";
 const EXTEND_COLOR = "#e0a020";
+/** Wall clock (read in callbacks only). */
+const clockMs = () => Date.now();
 
 /**
  * A skin song's waveform with its cue: the start point, or — end-aligned —
@@ -47,6 +49,17 @@ export function SongWaveform({
   const [questionSec, setQuestionSec] = useState(20);
   const preview = useRef<SoundHandle | null>(null);
   const [playing, setPlaying] = useState(false);
+  // Preview time: ms since it started (drives the counter and playhead).
+  const startedAt = useRef(0);
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!playing) return;
+    const tick = setInterval(
+      () => setElapsed(clockMs() - startedAt.current),
+      100,
+    );
+    return () => clearInterval(tick);
+  }, [playing]);
 
   useEffect(() => {
     let alive = true;
@@ -79,6 +92,17 @@ export function SongWaveform({
     : windowMs
       ? Math.min(wave?.durationMs ?? 0, cueMs + windowMs)
       : (wave?.durationMs ?? 0);
+
+  // Where in the file the preview is (end-aligned: it reaches the end
+  // point when the counter reaches 0).
+  const loops = !endAligned && repeatOf(slot, options);
+  const headMs = !playing
+    ? null
+    : endAligned
+      ? cueMs - (windowMs ?? 0) + elapsed
+      : loops && wave && wave.durationMs > from
+        ? from + (elapsed % (wave.durationMs - from))
+        : from + elapsed;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -126,7 +150,11 @@ export function SongWaveform({
     }
     ctx.fillStyle = endAligned ? EXTEND_COLOR : START_COLOR;
     ctx.fillRect(x(cueMs) - 1, 0, 2, h);
-  }, [wave, from, to, extendMs, fadeMs, cueMs, endAligned]);
+    if (headMs !== null && headMs >= 0 && headMs <= wave.durationMs) {
+      ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+      ctx.fillRect(x(headMs) - 1, 0, 2, h);
+    }
+  }, [wave, from, to, extendMs, fadeMs, cueMs, endAligned, headMs]);
 
   const dragging = useRef(false);
   const msAt = (e: PointerEvent<HTMLCanvasElement>) => {
@@ -167,16 +195,29 @@ export function SongWaveform({
       { untilEndMs: windowMs },
       url,
     );
+    startedAt.current = clockMs();
+    setElapsed(0);
     setPlaying(true);
     if (windowMs) {
       // Stops like the phase would (an end-aligned song plays its extend).
       const handle = preview.current;
-      setTimeout(() => {
-        handle.stop();
-        setPlaying((p) => (preview.current === handle ? false : p));
-      }, windowMs);
+      setTimeout(() => handle.stop(), windowMs);
+      setTimeout(
+        () => setPlaying((p) => (preview.current === handle ? false : p)),
+        windowMs + extendMs + 400,
+      );
     }
   };
+
+  // The counter: −20 … 0 up to the end point, then +x.x s of the extend
+  // (the plain elapsed time for songs that aren't timed to an end).
+  const counter = !playing
+    ? null
+    : endAligned && windowMs
+      ? elapsed < windowMs
+        ? `−${Math.ceil((windowMs - elapsed) / 1000)}`
+        : `+${((elapsed - windowMs) / 1000).toFixed(1)} s`
+      : `${(elapsed / 1000).toFixed(1)} s`;
 
   if (error) {
     return (
@@ -235,6 +276,18 @@ export function SongWaveform({
         >
           {playing ? <LuSquare size={12} /> : <LuPlay size={12} />}
           {t("Preview")}
+          {counter && (
+            <span
+              className={clsx(
+                "ml-1 min-w-12 text-right tabular-nums",
+                endAligned && windowMs && elapsed >= windowMs
+                  ? "text-[#e0a020]"
+                  : "",
+              )}
+            >
+              {counter}
+            </span>
+          )}
         </button>
       </div>
     </div>
