@@ -33,7 +33,7 @@ Measures:
     countdowns waited for downloads
 
 Usage:
-  python3 buzrrbench.py [--url https://quiz.woikn.de] [--code ABC123] [--users 50]
+  python3 buzrrbench.py [--url https://www.buzrr.in] [--code ABC123] [--users 50]
                         [--kbps 2000] [--sound-optin 0.3] [--no-assets] [--no-reactions]
                         [--timeout-after 60 --timeout-users 5] [--procs 4] [--probe-bots 20]
 
@@ -65,7 +65,7 @@ import tempfile
 import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 try:
     import aiohttp
@@ -993,6 +993,15 @@ class Bot:
 # -- driver -------------------------------------------------------------------------
 
 
+def split_join_url(url: str) -> tuple[str, str | None]:
+    """A join link (https://host/join/ABC123) gives the server and the room code."""
+    u = urlparse(url.strip())
+    parts = [p for p in u.path.split("/") if p]
+    if u.scheme and u.netloc and len(parts) >= 2 and parts[-2] == "join":
+        return f"{u.scheme}://{u.netloc}", parts[-1].upper()
+    return url.strip().rstrip("/"), None
+
+
 def ask(prompt: str, default: str | None = None) -> str:
     suffix = f" [{default}]" if default else ""
     val = input(f"{prompt}{suffix}: ").strip()
@@ -1039,7 +1048,7 @@ def report(started: float, no_game_end: int | None = None) -> None:
 
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Buzrr room load test")
-    ap.add_argument("--url", help="server URL, e.g. https://quiz.woikn.de")
+    ap.add_argument("--url", help="server URL, e.g. https://www.buzrr.in")
     ap.add_argument("--code", help="room code (Teilnahmecode)")
     ap.add_argument("--users", type=int, help="number of parallel players")
     ap.add_argument("--ramp", type=float, default=20.0, help="players started per second (default 20)")
@@ -1228,8 +1237,10 @@ def run_parent(args: argparse.Namespace, base: str, code: str, users: int) -> No
 
 def main() -> None:
     args = parse_args()
-    base = (args.url or ask("Server URL", "https://quiz.woikn.de")).rstrip("/")
-    code = (args.code or ask("Room code")).strip().upper()
+    base, link_code = split_join_url(
+        args.url or ask("Server URL or join link", "https://www.buzrr.in")
+    )
+    code = (args.code or link_code or ask("Room code")).strip().upper()
     users = args.users or int(ask("Parallel users", "20"))
     if not code or users < 1:
         sys.exit("room code and a positive number of users are required")

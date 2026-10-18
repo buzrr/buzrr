@@ -42,7 +42,8 @@ python3 -m venv .venv
 
 ```sh
 .venv/bin/python buzrrbench.py                       # asks for URL, code, users
-.venv/bin/python buzrrbench.py --url https://quiz.woikn.de --code ABC123 --users 100 --ramp 20
+.venv/bin/python buzrrbench.py --url https://www.buzrr.in --code ABC123 --users 100 --ramp 20
+.venv/bin/python buzrrbench.py --url https://www.buzrr.in/join/ABC123 --users 100   # join link: code from the URL
 ```
 
 | Option                | Default   | What                                                                          |
