@@ -59,6 +59,8 @@ export interface Timeline {
   fileStartMs: number;
   /** A repeating sound wraps from `toMs` back to `fromMs`. */
   loop?: { fromMs: number; toMs: number };
+  /** The file's length, when known. */
+  durationMs?: number;
 }
 
 /** The file position at wall time `now`; null before it starts. */
@@ -185,6 +187,7 @@ export function playSong(
         onTimeline?.({
           startWall: Date.now() + (when - ctx.currentTime) * 1000,
           fileStartMs: offset * 1000,
+          durationMs: buf.duration * 1000,
           ...(src.loop
             ? { loop: { fromMs: offset * 1000, toMs: buf.duration * 1000 } }
             : {}),

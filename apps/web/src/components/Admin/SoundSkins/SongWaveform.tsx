@@ -18,6 +18,8 @@ import type { BuiltinSkinId } from "@/lib/sound/synth";
 const COUNTDOWN_MS = 5000;
 const START_COLOR = "#7c4ddb";
 const EXTEND_COLOR = "#e0a020";
+/** Countdowns: where the question music starts. */
+const NEXT_COLOR = "#2bb673";
 /** Wall clock (read in callbacks only). */
 const clockMs = () => Date.now();
 
@@ -75,6 +77,7 @@ export function SongWaveform({
   timeline,
   onChange,
   onPastEnd,
+  cueKey = "main",
 }: {
   source: WaveSource;
   slot: SoundSlot;
@@ -86,6 +89,8 @@ export function SongWaveform({
   onChange?: (patch: Partial<SoundSlotOptions>) => void;
   /** A sound that doesn't repeat ran past the file's end. */
   onPastEnd?: () => void;
+  /** What a click sets: the slot's cue, or (countdowns) the question music's start. */
+  cueKey?: "main" | "next";
 }) {
   const t = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -186,12 +191,28 @@ export function SongWaveform({
     if (timed) {
       ctx.fillStyle = endAligned ? EXTEND_COLOR : START_COLOR;
       ctx.fillRect(x(cueMs) - 1, 0, 2, h);
+      if (options.nextAtMs !== undefined && isCountdownSlot(slot)) {
+        ctx.fillStyle = NEXT_COLOR;
+        ctx.fillRect(x(options.nextAtMs) - 1, 0, 3, h);
+      }
     }
     if (head !== null && head >= 0 && head <= wave.durationMs) {
       ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
       ctx.fillRect(x(head) - 1, 0, 2, h);
     }
-  }, [wave, from, to, extendMs, fadeMs, cueMs, endAligned, head, timed, slot]);
+  }, [
+    wave,
+    from,
+    to,
+    extendMs,
+    fadeMs,
+    cueMs,
+    endAligned,
+    head,
+    timed,
+    slot,
+    options.nextAtMs,
+  ]);
 
   const dragging = useRef(false);
   const msAt = (e: PointerEvent<HTMLCanvasElement>) => {
@@ -203,7 +224,13 @@ export function SongWaveform({
   };
   const place = (ms: number) => {
     const v = Math.round(Math.max(0, Math.min(wave?.durationMs ?? 0, ms)));
-    onChange?.(endAligned ? { endMs: v } : { startMs: v });
+    onChange?.(
+      cueKey === "next"
+        ? { nextAtMs: v }
+        : endAligned
+          ? { endMs: v }
+          : { startMs: v },
+    );
   };
   const onPointerDown = (e: PointerEvent<HTMLCanvasElement>) => {
     if (!wave || !editable) return;

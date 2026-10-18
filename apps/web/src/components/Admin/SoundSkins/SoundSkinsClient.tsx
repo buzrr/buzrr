@@ -174,10 +174,18 @@ function TestToggle({ open, onClick }: { open: boolean; onClick: () => void }) {
   );
 }
 
-/** How long a countdown song plays on after 0 (end-aligned only). */
+/**
+ * How long after 0 the question music waits for the countdown song: until
+ * its "question music starts" point, else its extend (end-aligned).
+ */
+function tailOf(o: SoundSlotOptions | undefined, hasFile: boolean): number {
+  if (!hasFile || !o) return 0;
+  const zero = o.align === "end" ? (o.endMs ?? 0) : (o.startMs ?? 0) + 5000;
+  if (o.nextAtMs !== undefined) return Math.max(0, o.nextAtMs - zero);
+  return o.align === "end" ? (o.extendSec ?? 0) * 1000 : 0;
+}
 function countdownTail(skin: SoundSkin, slot: "countdown" | "lastCountdown") {
-  const o = skin.options?.[slot];
-  return skin.slots[slot] && o?.align === "end" ? (o.extendSec ?? 0) * 1000 : 0;
+  return tailOf(skin.options?.[slot], Boolean(skin.slots[slot]));
 }
 
 /**
@@ -328,10 +336,8 @@ function BuiltinSkinCard({
         )
       : builtinStarter(id, slot, optionsOf(slot), extra);
   };
-  const tail = (slot: "countdown" | "lastCountdown") => {
-    const o = optionsOf(slot);
-    return fileOf(slot) && o?.align === "end" ? (o.extendSec ?? 0) * 1000 : 0;
-  };
+  const tail = (slot: "countdown" | "lastCountdown") =>
+    tailOf(optionsOf(slot), Boolean(fileOf(slot)));
 
   return (
     <section

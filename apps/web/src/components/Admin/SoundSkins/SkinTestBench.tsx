@@ -134,7 +134,8 @@ export function SkinTestBench({
         const revealEnd = withReveal ? REVEAL_SHOW_MS : REVEAL_AFTER_END_MS;
         // Leaving the reveal: its song fades out, the scores start after it.
         at(revealEnd, () => revealSong?.stop(FADE_OUT_MS / 1000));
-        const scoresAt = withReveal ? revealEnd + FADE_OUT_MS : revealEnd;
+        // Like the game: the scores start at once, over the reveal's fade.
+        const scoresAt = revealEnd;
         if (withScores) {
           at(scoresAt, () => {
             enter("scores", SCORES_SHOW_MS);

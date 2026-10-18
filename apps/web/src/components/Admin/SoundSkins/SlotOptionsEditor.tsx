@@ -78,6 +78,10 @@ export function SlotOptionsEditor({
   const tusch = slot === "end";
   const alignable = !builtin && (isCountdownSlot(slot) || isQuestionSlot(slot));
   const endAligned = alignable && draft.align === "end";
+  // Countdowns: a click on the waveform sets the zero / start point, or
+  // where the question music starts.
+  const countdown = !builtin && isCountdownSlot(slot);
+  const [cueKey, setCueKey] = useState<"main" | "next">("main");
   const volume = draft.volume ?? DEFAULT_SONG_VOLUME;
 
   return (
@@ -150,6 +154,34 @@ export function SlotOptionsEditor({
         </div>
       )}
 
+      {wave && countdown && (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <span className={mutedText}>{t("A click sets:")}</span>
+          {(
+            [
+              ["main", endAligned ? t("Zero point (0)") : t("Start point")],
+              ["next", t("Question music starts")],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={cueKey === key}
+              onClick={() => setCueKey(key)}
+              className={clsx(
+                "px-2.5 py-1 rounded-lg font-bold cursor-pointer",
+                cueKey === key
+                  ? key === "next"
+                    ? "bg-[#2bb673] text-white"
+                    : "bg-[#7c4ddb] text-white"
+                  : "bg-lprimary/8 dark:bg-white/5",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
       {wave && (
         <SongWaveform
           source={wave}
@@ -159,7 +191,41 @@ export function SlotOptionsEditor({
           timeline={timeline}
           onChange={change}
           onPastEnd={onPastEnd}
+          cueKey={countdown ? cueKey : "main"}
         />
+      )}
+      {countdown && (
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="w-40">{t("Question music starts")}</span>
+          {draft.nextAtMs === undefined ? (
+            <span className={clsx("text-xs", mutedText)}>
+              {t("when the countdown song is over")}
+            </span>
+          ) : (
+            <TimeField
+              label=""
+              value={draft.nextAtMs}
+              onChange={(nextAtMs) => change({ nextAtMs })}
+            />
+          )}
+          {draft.nextAtMs === undefined ? (
+            <button
+              type="button"
+              onClick={() => change({ nextAtMs: draft.endMs ?? 0 })}
+              className="text-xs underline cursor-pointer"
+            >
+              {t("set")}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => change({ nextAtMs: undefined })}
+              className="text-xs underline cursor-pointer"
+            >
+              {t("automatic")}
+            </button>
+          )}
+        </div>
       )}
 
       {tusch && !builtin && (
@@ -227,7 +293,7 @@ function TimeField({
   const valid = parseMs(text) !== null;
   return (
     <label className="flex flex-wrap items-center gap-3">
-      <span className="w-40">{label}</span>
+      {label && <span className="w-40">{label}</span>}
       <input
         value={text}
         onFocus={() => setEditing(formatMs(value))}

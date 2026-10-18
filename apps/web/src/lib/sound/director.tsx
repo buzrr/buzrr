@@ -33,7 +33,7 @@ import {
   fetchSkinFiles,
   preloadClips,
 } from "./preload";
-import { DEFAULT_SONG_VOLUME, fadeInOf, playSong } from "./song";
+import { DEFAULT_SONG_VOLUME, fadeInOf, playSong, type Timeline } from "./song";
 import { useT } from "@/lib/i18n/context";
 import {
   audioContext,
@@ -194,6 +194,8 @@ interface PlayExtra {
   remainingMs?: number;
   /** …and the wall clock when it ends (exact; preferred where known). */
   endsAt?: number;
+  /** Told where in the file it plays. */
+  onTimeline?: (tl: Timeline) => void;
   /** Start the file here instead of its own start point. */
   startMs?: number;
 }
@@ -316,7 +318,10 @@ export function GameSounds({
   // While the lobby / reveal / scores song fades out, the next one waits.
   const holdUntil = useRef(0);
   const play = (slot: SoundSlot, extra?: PlayExtra): SoundHandle | null => {
-    const wait = holdUntil.current - clockMs();
+    // The scoreboard and the final standings start at once (on the host's
+    // click), over the reveal's fade-out.
+    const wait =
+      slot === "scores" || slot === "final" ? 0 : holdUntil.current - clockMs();
     if (wait <= 0) return playNow(slot, extra);
     // Starts after the fade; a countdown keeps its end where it was.
     let inner: SoundHandle | null = null;
@@ -386,6 +391,7 @@ export function GameSounds({
             : slotOpts(slot),
           timing,
           url,
+          extra?.onTimeline,
         )
       : null;
   };
@@ -428,6 +434,7 @@ export function GameSounds({
         ? builtinTuschZeroMs(settings.skin as BuiltinSkinId)
         : 0;
   const countdownSlot = useRef<"countdown" | "lastCountdown">("countdown");
+  const countdownTl = useRef<Timeline | null>(null);
   const left = useRef(phase);
   useEffect(() => {
     const from = left.current;
@@ -455,13 +462,28 @@ export function GameSounds({
     if (from === "starting" && countdown.current) {
       countdown.current.stop();
       countdown.current = null;
+      // When the question music may start: the countdown song's "question
+      // music starts" point, else when that song is over (file end, or the
+      // end of its extend).
       const o = slotOpts(countdownSlot.current);
-      const tail =
-        files[countdownSlot.current] && o?.align === "end"
-          ? (o.extendSec ?? 0) * 1000
-          : 0;
-      if (tail > 0) {
-        holdUntil.current = Math.max(holdUntil.current, clockMs() + tail);
+      const tl = countdownTl.current;
+      let startAt = 0;
+      if (files[countdownSlot.current] && tl) {
+        const wallOf = (fileMs: number) =>
+          tl.startWall + (fileMs - tl.fileStartMs);
+        if (o?.nextAtMs !== undefined) {
+          startAt = wallOf(o.nextAtMs);
+        } else if (o?.align === "end") {
+          const zero = wallOf(o.endMs ?? tl.durationMs ?? 0);
+          const stops = zero + (o.extendSec ?? 0) * 1000;
+          startAt =
+            tl.durationMs !== undefined
+              ? Math.min(stops, wallOf(tl.durationMs))
+              : stops;
+        }
+      }
+      if (startAt > clockMs()) {
+        holdUntil.current = Math.max(holdUntil.current, startAt);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- on phase changes only
@@ -554,9 +576,13 @@ export function GameSounds({
         (builtinSkin || Boolean(files.lastCountdown));
       countdownSlot.current = lastCd ? "lastCountdown" : "countdown";
       // 0 is the deadline itself: beeps and the song's zero point land on it.
+      countdownTl.current = null;
       countdown.current = play(countdownSlot.current, {
         remainingMs: countdownMs,
         ...(deadline > 0 ? { endsAt: deadline } : {}),
+        onTimeline: (tl) => {
+          countdownTl.current = tl;
+        },
       });
     }
     // The tusch: planned so its zero point lands on the question's end (a

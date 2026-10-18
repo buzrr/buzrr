@@ -156,6 +156,12 @@ export const soundSlotOptionsSchema = z.object({
   align: z.enum(["start", "end"]).optional(),
   endMs: z.number().int().min(0).max(3_600_000).optional(),
   extendSec: z.number().min(0).max(5).optional(),
+  /**
+   * Countdowns: where in the song the question music starts (it waits for
+   * that point). Unset: when the countdown song is over (its file end, or
+   * the end of its extend).
+   */
+  nextAtMs: z.number().int().min(0).max(3_600_000).optional(),
   /** Cue slots of a user skin: which sound plays (default: its file, else Show's). */
   source: cueSourceSchema.optional(),
 });
