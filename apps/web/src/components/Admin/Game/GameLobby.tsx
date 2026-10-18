@@ -126,7 +126,7 @@ const GameLobby = (params: {
       ) : (
         // No site footer here: the game uses the full height (the admin
         // layout's footer padding is taken back with -mb-12).
-        <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 -mb-12 min-h-[100dvh] md:min-h-0 md:h-[100dvh] text-dark dark:text-white">
+        <div className="w-full flex flex-col px-4 sm:px-6 lg:px-8 -mb-12 min-h-[100dvh] md:min-h-0 md:h-[100dvh] text-dark dark:text-white">
           <ConnectionBanner />
           <ReactionOverlay
             socket={socket}

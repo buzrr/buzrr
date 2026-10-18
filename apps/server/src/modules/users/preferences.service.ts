@@ -15,7 +15,11 @@ import {
   MediaUnavailableError,
   UnsupportedMediaError,
 } from "../../common/storage/media-storage";
-import { toAvatarPng } from "../../common/storage/image-resize";
+import {
+  LOGO_MAX,
+  shrinkImage,
+  toAvatarPng,
+} from "../../common/storage/image-resize";
 import {
   loadSharedAvatars,
   preferencesOf,
@@ -121,9 +125,17 @@ export class PreferencesService {
     if (file && !file.mimetype.startsWith("image/")) {
       throw new BadRequestException("The logo must be an image");
     }
-    prefs.defaultLogo = file
-      ? await this.store(file.buffer, file.mimetype, file.originalname, "image")
-      : null;
+    // Every device in a room loads it: stored scaled down.
+    const small = file ? await shrinkImage(file.buffer, LOGO_MAX) : null;
+    prefs.defaultLogo =
+      file && small
+        ? await this.store(
+            small,
+            small === file.buffer ? file.mimetype : "image/webp",
+            file.originalname,
+            "image",
+          )
+        : null;
     await this.save(userId, prefs);
     if (old && old !== prefs.defaultLogo) {
       const inUse = await this.prisma.db.quiz.count({ where: { logo: old } });

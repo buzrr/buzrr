@@ -209,7 +209,8 @@ const FADING_BEDS: readonly SoundSlot[] = ["lobby", "reveal", "scores"];
 /** Which bed (loop) a phase plays; null = none. */
 function bedFor(phase: string): SoundSlot | null {
   switch (phase) {
-    case "idle":
+    // "idle" is a page that hasn't heard from the server yet (e.g. the host's
+    // game screen right after "Start"): no song until the real phase comes.
     case "lobby":
       return "lobby";
     // "Be prepared!" before a moderated question.
@@ -622,19 +623,20 @@ export function GameSounds({
   }, [preload]);
 
   // The skin's final song: fetched encrypted while the game runs — each
-  // device at a random moment within a minute of the start, so they don't
-  // all download at once — and playable once the final leaderboard brings
-  // the key.
+  // player at a random moment within a minute of the start, so they don't
+  // all download at once; the host at once, already in the lobby — and
+  // playable once the final leaderboard brings the key.
   const finalUrl = builtinSkin ? null : (skin?.finalClipUrl ?? null);
   const gameRunning = phase !== "idle" && phase !== "lobby";
+  const fetchFinal = role === "host" ? phase !== "idle" : gameRunning;
   useEffect(() => {
-    if (!on || !settings.music || !gameRunning || !finalUrl) return;
+    if (!on || !settings.music || !fetchFinal || !finalUrl) return;
     const t = setTimeout(
       () => void fetchSkinFiles([finalUrl]),
-      Math.random() * 60_000,
+      role === "host" ? 0 : Math.random() * 60_000,
     );
     return () => clearTimeout(t);
-  }, [on, gameRunning, finalUrl]);
+  }, [on, fetchFinal, finalUrl, role]);
 
   // One-shots on transitions.
   const prev = useRef(phase);

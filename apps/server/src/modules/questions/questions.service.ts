@@ -1,11 +1,14 @@
 import { randomUUID } from "node:crypto";
+import type Redis from "ioredis";
 import {
   Logger,
   type OnApplicationBootstrap,
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
 } from "@nestjs/common";
 import {
@@ -22,6 +25,10 @@ import {
 } from "../../common/storage/media-storage";
 import { cutClip, toMp3 } from "../../common/storage/audio-transcode";
 import { encryptClip } from "../../common/storage/clip-crypto";
+import {
+  QUESTION_IMAGE_MAX,
+  shrinkImage,
+} from "../../common/storage/image-resize";
 import { stripAssetSignature } from "../../common/storage/asset-signing";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
@@ -32,6 +39,7 @@ import {
 } from "../question-types";
 import { CategoriesService } from "../categories/categories.service";
 import { ReorderQuestionsDto } from "./dto/reorder-questions.dto";
+import { REDIS } from "../../redis/redis.constants";
 
 type MultipartBody = Record<string, string | undefined>;
 
@@ -97,6 +105,7 @@ export class QuestionsService implements OnApplicationBootstrap {
     private readonly prisma: PrismaService,
     private readonly storage: MediaStorage,
     private readonly categories: CategoriesService,
+    @Optional() @Inject(REDIS) private readonly redis?: Redis,
   ) {}
 
   private async assertQuizOwned(quizId: string, userId: string) {
@@ -349,8 +358,18 @@ export class QuestionsService implements OnApplicationBootstrap {
           : null,
     };
 
+    // A new picture is stored scaled down: every device in a room loads it.
+    let picture: Buffer | null = null;
     if (file && file.size > 0) {
-      const uploaded = await store(file, "image");
+      picture = await shrinkImage(file.buffer, QUESTION_IMAGE_MAX);
+      const uploaded = await store(
+        {
+          ...file,
+          buffer: picture,
+          mimetype: picture === file.buffer ? file.mimetype : "image/webp",
+        },
+        "image",
+      );
       fileLink = uploaded.url;
       mediaType = uploaded.mediaType;
     } else if (file_link) {
@@ -358,10 +377,10 @@ export class QuestionsService implements OnApplicationBootstrap {
       mediaType = file_type ?? "";
     }
 
-    const picture = await this.mediaClip(
+    const pictureClip = await this.mediaClip(
       fileLink || null,
       mediaType,
-      file && file.size > 0 ? file.buffer : null,
+      picture,
       existing,
     );
     const timeOut = parseInt(time ?? "", 10) || DEFAULT_TIME_OUT;
@@ -396,7 +415,7 @@ export class QuestionsService implements OnApplicationBootstrap {
             timeOut,
             media: fileLink || null,
             mediaType: mediaType || null,
-            ...picture.fields,
+            ...pictureClip.fields,
             ...audioFields,
             ...clips.fields,
             moderationStatus,
@@ -421,7 +440,7 @@ export class QuestionsService implements OnApplicationBootstrap {
       if (existing?.audio && existing.audio !== audio) {
         await this.removeUnused(existing.audio);
       }
-      for (const old of [...clips.replaced, ...picture.replaced]) {
+      for (const old of [...clips.replaced, ...pictureClip.replaced]) {
         await this.removeUnused(old);
       }
     } else {
@@ -437,7 +456,7 @@ export class QuestionsService implements OnApplicationBootstrap {
             timeOut,
             media: fileLink || null,
             mediaType: mediaType || null,
-            ...picture.fields,
+            ...pictureClip.fields,
             ...audioFields,
             ...clips.fields,
             order: count + 1,
@@ -478,7 +497,12 @@ export class QuestionsService implements OnApplicationBootstrap {
         replaced: [],
       };
     }
-    const source = freshImage ?? (await this.storage.read(media));
+    // A fresh upload is scaled down already; a stored picture is here.
+    const source =
+      freshImage ??
+      (await this.storage
+        .read(media)
+        .then((b) => (b ? shrinkImage(b, QUESTION_IMAGE_MAX) : null)));
     // A picture we can't read (an external link) shows as before.
     if (!source) return { fields: none, replaced: old };
     const { blob, key } = encryptClip(source);
@@ -502,7 +526,9 @@ export class QuestionsService implements OnApplicationBootstrap {
     for (const row of rows) {
       const source = await this.storage.read(row.media!).catch(() => null);
       if (!source) continue;
-      const { blob, key } = encryptClip(source);
+      const { blob, key } = encryptClip(
+        await shrinkImage(source, QUESTION_IMAGE_MAX),
+      );
       const { url } = await this.storage.upload(blob, {
         contentType: "application/octet-stream",
         kind: "encrypted",
@@ -516,11 +542,55 @@ export class QuestionsService implements OnApplicationBootstrap {
     if (made > 0) log(`Encrypted ${made} question pictures for preloading`);
   }
 
+  /**
+   * Preload copies made before pictures were scaled down: remade once per
+   * installation from a scaled-down picture (the stored original stays).
+   * The old copies are left in place — a game running across a restart
+   * may still load them.
+   */
+  async shrinkMediaClips(log: (msg: string) => void): Promise<void> {
+    if (!this.redis) return;
+    const done = "media-clips:shrunk:v1";
+    if (await this.redis.get(done)) return;
+    // One instance does it.
+    const lock = await this.redis.set(`${done}:lock`, "1", "EX", 3600, "NX");
+    if (lock !== "OK") return;
+    const rows = await this.prisma.db.question.findMany({
+      where: {
+        mediaType: "image",
+        media: { not: null },
+        mediaClip: { not: null },
+      },
+      select: { id: true, media: true },
+    });
+    let made = 0;
+    for (const row of rows) {
+      const source = await this.storage.read(row.media!).catch(() => null);
+      if (!source) continue;
+      const small = await shrinkImage(source, QUESTION_IMAGE_MAX);
+      if (small === source) continue;
+      const { blob, key } = encryptClip(small);
+      const { url } = await this.storage.upload(blob, {
+        contentType: "application/octet-stream",
+        kind: "encrypted",
+      });
+      await this.prisma.db.question.update({
+        where: { id: row.id },
+        data: { mediaClip: url, mediaKey: key },
+      });
+      made++;
+    }
+    await this.redis.set(done, new Date().toISOString());
+    if (made > 0) log(`Scaled down ${made} question pictures for preloading`);
+  }
+
   onApplicationBootstrap(): void {
     setTimeout(() => {
-      this.backfillMediaClips((m) => this.logger.log(m)).catch((err) =>
-        this.logger.error("Encrypting question pictures failed", err),
-      );
+      this.backfillMediaClips((m) => this.logger.log(m))
+        .then(() => this.shrinkMediaClips((m) => this.logger.log(m)))
+        .catch((err) =>
+          this.logger.error("Encrypting question pictures failed", err),
+        );
     }, 15_000).unref();
   }
 

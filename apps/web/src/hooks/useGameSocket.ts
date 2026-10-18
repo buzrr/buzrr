@@ -169,48 +169,53 @@ export function useGameSocket({
     // Download slots: ask the server before fetching a question's sound or
     // the skin's files; a queued device waits for `preload-go` (asking again
     // after a reconnect). No answer (an older server) or no turn within
-    // SLOT_GIVE_UP_MS: go.
-    setSlotChannel({
-      keepAlive: (kind, qIndex) => {
-        // Asking again while holding the slot just refreshes it.
-        if (conn.connected) {
-          conn
-            .timeout(SLOT_ACK_MS)
-            .emit("preload-slot", { qIndex, kind }, () => undefined);
-        }
-      },
-      done: (kind, qIndex) => {
-        if (conn.connected) conn.emit("slot-done", { qIndex, kind });
-      },
-      wait: (kind, qIndex) =>
-        new Promise((resolve) => {
-          let settled = false;
-          const finish = (limited: boolean) => {
-            if (settled) return;
-            settled = true;
-            clearTimeout(giveUp);
-            conn.off("preload-go", onGo);
-            conn.off("connect", ask);
-            resolve({ limited });
-          };
-          const onGo = (p: { qIndex: number; kind?: string }) => {
-            if (p.qIndex === qIndex && (p.kind ?? "question") === kind) {
-              finish(true);
-            }
-          };
-          const ask = () =>
-            conn
-              .timeout(SLOT_ACK_MS)
-              .emit("preload-slot", { qIndex, kind }, (err, res) => {
-                if (err) finish(false);
-                else if (res.go) finish(res.limited);
-              });
-          const giveUp = setTimeout(() => finish(true), SLOT_GIVE_UP_MS);
-          conn.on("preload-go", onGo);
-          conn.on("connect", ask);
-          if (conn.connected) ask();
-        }),
-    });
+    // SLOT_GIVE_UP_MS: go. The host never queues: its screen plays every
+    // song, so it fetches them all at once.
+    setSlotChannel(
+      userType === "admin"
+        ? null
+        : {
+            keepAlive: (kind, qIndex) => {
+              // Asking again while holding the slot just refreshes it.
+              if (conn.connected) {
+                conn
+                  .timeout(SLOT_ACK_MS)
+                  .emit("preload-slot", { qIndex, kind }, () => undefined);
+              }
+            },
+            done: (kind, qIndex) => {
+              if (conn.connected) conn.emit("slot-done", { qIndex, kind });
+            },
+            wait: (kind, qIndex) =>
+              new Promise((resolve) => {
+                let settled = false;
+                const finish = (limited: boolean) => {
+                  if (settled) return;
+                  settled = true;
+                  clearTimeout(giveUp);
+                  conn.off("preload-go", onGo);
+                  conn.off("connect", ask);
+                  resolve({ limited });
+                };
+                const onGo = (p: { qIndex: number; kind?: string }) => {
+                  if (p.qIndex === qIndex && (p.kind ?? "question") === kind) {
+                    finish(true);
+                  }
+                };
+                const ask = () =>
+                  conn
+                    .timeout(SLOT_ACK_MS)
+                    .emit("preload-slot", { qIndex, kind }, (err, res) => {
+                      if (err) finish(false);
+                      else if (res.go) finish(res.limited);
+                    });
+                const giveUp = setTimeout(() => finish(true), SLOT_GIVE_UP_MS);
+                conn.on("preload-go", onGo);
+                conn.on("connect", ask);
+                if (conn.connected) ask();
+              }),
+          },
+    );
 
     conn.on("question-start", (payload) => dispatch(questionStart(payload)));
     conn.on("question-end", (payload) => dispatch(questionEnd(payload)));

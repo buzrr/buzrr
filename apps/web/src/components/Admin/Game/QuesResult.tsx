@@ -272,13 +272,13 @@ export default function QuesResult(props: QuesResultProps) {
       <div
         className={clsx(
           "flex-1 min-h-0 flex flex-col md:grid gap-3.5",
-          // Results two thirds, leaderboard one third. With the answer on
+          // Results to leaderboard 3:2. With the answer on
           // screen first, the standings open beside it ("show scores"): the
           // same two columns, the second growing from nothing.
           !showAnswerPanel
             ? "md:grid-cols-1 md:gap-5"
             : showBoard
-              ? "md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] md:gap-x-5"
+              ? "md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:gap-x-5"
               : "md:grid-cols-[minmax(0,1fr)_minmax(0,0fr)] md:gap-x-0",
           showAnswerPanel &&
             "md:transition-[grid-template-columns,column-gap] md:duration-700 md:ease-[cubic-bezier(.2,.8,.2,1)]",
