@@ -37,6 +37,19 @@ export function repeatOf(slot: SoundSlot, o: SoundSlotOptions | undefined) {
   return o?.repeat ?? slot === "lobby";
 }
 
+/** The question music fades in over this long unless its slot says otherwise. */
+export const QUESTION_FADE_IN_SEC = 2;
+
+/** Fade-in seconds for a slot (0 = none): set, or the question music's default. */
+export function fadeInOf(slot: SoundSlot, o: SoundSlotOptions | undefined) {
+  const on = o?.fadeIn ?? isQuestionSlot(slot);
+  if (!on) return 0;
+  return (
+    o?.fadeInSec ??
+    (isQuestionSlot(slot) ? QUESTION_FADE_IN_SEC : DEFAULT_FADE_IN_SEC)
+  );
+}
+
 export interface SongTiming {
   /** ms until the countdown / question ends (end-aligned songs). */
   untilEndMs?: number | null;
@@ -128,7 +141,7 @@ export function playSong(
           src.loopEnd = buf.duration;
         }
 
-        const fade = o.fadeIn ? (o.fadeInSec ?? DEFAULT_FADE_IN_SEC) : 0;
+        const fade = fadeInOf(slot, o);
         gain.gain.setValueAtTime(fade > 0 ? 0.0001 : volume, now);
         if (fade > 0) {
           gain.gain.setValueAtTime(0.0001, when);

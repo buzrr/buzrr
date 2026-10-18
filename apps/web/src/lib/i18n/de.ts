@@ -961,6 +961,16 @@ export const DE: Record<string, string> = {
   "The song plays on this long after the end, then fades out.":
     "So lange läuft der Song nach dem Ende weiter, dann wird er ausgeblendet.",
   "Test bench": "Testlauf",
+  "Zero point (0) at": "Nullpunkt (0) bei",
+  "Plays on after 0": "Danach noch",
+  "Waveform — click or drag to set the end point":
+    "Wellenform – klicken oder ziehen setzt den Endpunkt",
+  "Waveform — click or drag to set the start point":
+    "Wellenform – klicken oder ziehen setzt den Startpunkt",
+  "End point {t}": "Endpunkt {t}",
+  "Start {t}": "Start {t}",
+  "Preview question time": "Fragezeit für die Vorschau",
+  Preview: "Vorschau",
   "Last question": "Letzte Frage",
   "Music for the last question (empty: as above)":
     "Musik bei der letzten Frage (leer: wie oben)",

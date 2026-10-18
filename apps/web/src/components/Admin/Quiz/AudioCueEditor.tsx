@@ -4,46 +4,16 @@ import clsx from "clsx";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { LuPlay, LuSquare, LuTrash2 } from "react-icons/lu";
 import { playSegment } from "@/lib/audio-cues";
+import { decodePeaks } from "@/lib/sound/peaks";
 import { useT } from "@/lib/i18n/context";
 import { mutedText, subtleCardClass } from "@/components/Game/GameUI";
 
-const BARS = 480;
 const REVEAL_PREVIEW_MS = 10_000;
 
 function formatMs(ms: number) {
   const s = ms / 1000;
   const m = Math.floor(s / 60);
   return `${m}:${(s - m * 60).toFixed(1).padStart(4, "0")}`;
-}
-
-/** Peak per bar (0..1) of the decoded audio, for the waveform. */
-async function decodePeaks(
-  src: string,
-): Promise<{ peaks: number[]; durationMs: number }> {
-  const buf = await (await fetch(src)).arrayBuffer();
-  const ctx = new AudioContext();
-  try {
-    const audio = await ctx.decodeAudioData(buf);
-    const data = audio.getChannelData(0);
-    const step = Math.max(1, Math.floor(data.length / BARS));
-    const peaks: number[] = [];
-    for (let i = 0; i < BARS; i++) {
-      let max = 0;
-      const from = i * step;
-      for (let j = from; j < Math.min(data.length, from + step); j++) {
-        const v = Math.abs(data[j]!);
-        if (v > max) max = v;
-      }
-      peaks.push(max);
-    }
-    const top = Math.max(...peaks, 0.001);
-    return {
-      peaks: peaks.map((p) => p / top),
-      durationMs: Math.round(audio.duration * 1000),
-    };
-  } finally {
-    void ctx.close();
-  }
 }
 
 /**

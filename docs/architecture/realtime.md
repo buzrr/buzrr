@@ -320,7 +320,8 @@ empty: the usual question music plays). Each slot of a skin has options (`soundS
 skin in `sound_skins.options`, for the built-in skins in
 `builtin_sound_options` — only the superadmin changes those):
 
-- `volume` 0–100 (80 = the usual level), `fadeIn` + `fadeInSec`.
+- `volume` 0–100 (80 = the usual level), `fadeIn` + `fadeInSec` (the
+  question music fades in over 2 s unless set otherwise).
 - `repeat` (lobby, question, last question, scores, reveal, final): default off, on for
   the lobby. Built-in synth loops run until the phase ends unless repeat is
   set off (then 8 bars).
@@ -329,6 +330,16 @@ skin in `sound_skins.options`, for the built-in skins in
   starting later when there is less time left than song before that point;
   `extendSec` (0–5) keeps it playing after the phase ends, then it fades out.
   "∞" questions play from the start.
+
+The question music starts once the countdown is over: the countdown's song
+stops when the question opens, an end-aligned one after its "plays on after
+0" seconds, and the question music waits for that. Lobby, reveal and
+scoreboard songs fade out over 1 s when their phase ends, and the next
+sound waits for that too.
+
+The options editor shows the uploaded file's waveform: click or drag sets
+the start point (or, end-aligned, the end / zero point), with the part that
+plays, the extend and the fade-in drawn on it.
 
 Files play through Web Audio (`lib/sound/song.ts`: gain ramps work on iOS);
 an `<audio>` element is the fallback. The audio skins page has a test bench

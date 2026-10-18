@@ -33,8 +33,11 @@ export type SlotPlayer = (
 export function SkinTestBench({
   play,
   hasLastQuestion = false,
+  countdownTailMs = 0,
 }: {
   play: SlotPlayer;
+  /** How long the countdown song plays on after 0 (the question music waits). */
+  countdownTailMs?: number;
   /** The skin has a song for the last question: offer to test that one. */
   hasLastQuestion?: boolean;
 }) {
@@ -80,19 +83,30 @@ export function SkinTestBench({
     void audioContext()?.resume();
     const questionMs = seconds * 1000;
     enter("countdown", COUNTDOWN_MS);
-    keep(play("countdown", { remainingMs: COUNTDOWN_MS }));
+    const countdownSong = keep(
+      play("countdown", { remainingMs: COUNTDOWN_MS }),
+    );
     at(COUNTDOWN_MS, () => {
+      // Like the game: the countdown song stops (after its "after 0"
+      // seconds) and the question music starts once it is over.
+      countdownSong?.stop();
       enter("question", questionMs);
       const t0 = Date.now();
-      const bed = keep(
-        play(hasLastQuestion && lastQuestion ? "lastQuestion" : "question", {
-          remainingMs: questionMs,
-          progress: () => Math.min(1, (Date.now() - t0) / questionMs),
-        }),
-      );
+      const bed: { h: SoundHandle | null } = { h: null };
+      const tail = Math.min(countdownTailMs, questionMs);
+      const startBed = () => {
+        bed.h = keep(
+          play(hasLastQuestion && lastQuestion ? "lastQuestion" : "question", {
+            remainingMs: questionMs - tail,
+            progress: () => Math.min(1, (Date.now() - t0) / questionMs),
+          }),
+        );
+      };
+      if (tail > 0) at(tail, startBed);
+      else startBed();
       at(questionMs, () => {
         // Phase over: the bed stops (an end-aligned song plays on its extend).
-        bed?.stop();
+        bed.h?.stop();
         keep(play("end", {}));
         let revealSong: SoundHandle | null = null;
         if (withReveal) {

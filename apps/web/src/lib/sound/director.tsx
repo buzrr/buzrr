@@ -30,7 +30,7 @@ import {
   fetchSkinFiles,
   preloadClips,
 } from "./preload";
-import { DEFAULT_SONG_VOLUME, playSong } from "./song";
+import { DEFAULT_SONG_VOLUME, fadeInOf, playSong } from "./song";
 import { useT } from "@/lib/i18n/context";
 import {
   audioContext,
@@ -237,6 +237,9 @@ export function GameSounds({
 
   const skin = useSkin(settings.skin, role);
   const builtinOptions = useBuiltinOptions(settings.skin, role);
+  const builtinSkin = (BUILTIN_SOUND_SKINS as readonly string[]).includes(
+    settings.skin,
+  );
   const phase = useAppSelector((s) => s.game.phase);
   const qIndex = useAppSelector((s) => s.game.qIndex);
   const qCount = useAppSelector((s) => s.game.qCount);
@@ -311,7 +314,7 @@ export function GameSounds({
         // 80 (the default) = the usual synth level.
         volume:
           0.45 * ((o?.volume ?? DEFAULT_SONG_VOLUME) / DEFAULT_SONG_VOLUME),
-        fadeInSec: o?.fadeIn ? (o.fadeInSec ?? 2) : 0,
+        fadeInSec: fadeInOf(synthSlot, o),
         // Synth loops run until the phase ends unless repeat is set off.
         repeat: o?.repeat === false ? false : undefined,
         ...extra,
@@ -353,6 +356,7 @@ export function GameSounds({
   // over FADE_OUT_SEC, and the next song starts once it is gone. Runs before
   // the bed and one-shot effects below (effects run in order).
   const reveal = useRef<SoundHandle | null>(null);
+  const countdown = useRef<SoundHandle | null>(null);
   const left = useRef(phase);
   useEffect(() => {
     const from = left.current;
@@ -375,6 +379,21 @@ export function GameSounds({
       faded = true;
     }
     if (faded) holdUntil.current = clockMs() + FADE_OUT_SEC * 1000;
+    // The countdown is over: its song stops (an end-aligned one plays its
+    // "after 0" seconds first) and the question music waits for that.
+    if (from === "starting" && countdown.current) {
+      countdown.current.stop();
+      countdown.current = null;
+      const o = skin?.options?.countdown;
+      const tail =
+        !builtinSkin && skin?.slots.countdown && o?.align === "end"
+          ? (o.extendSec ?? 0) * 1000
+          : 0;
+      if (tail > 0) {
+        holdUntil.current = Math.max(holdUntil.current, clockMs() + tail);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- on phase changes only
   }, [phase]);
   useEffect(() => {
     if (bed.current?.key === bedKey) return;
@@ -451,7 +470,10 @@ export function GameSounds({
     const from = prev.current;
     prev.current = phase;
     if (!on || from === phase) return;
-    if (phase === "starting") play("countdown", { remainingMs: countdownMs });
+    if (phase === "starting") {
+      countdown.current?.stop();
+      countdown.current = play("countdown", { remainingMs: countdownMs });
+    }
     if (
       from === "question" &&
       (phase === "closed" || phase === "reveal" || phase === "scores")

@@ -13,10 +13,12 @@ import { useT } from "@/lib/i18n/context";
 import {
   DEFAULT_SONG_VOLUME,
   REPEATABLE_SLOTS,
+  fadeInOf,
   formatMs,
   parseMs,
   repeatOf,
 } from "@/lib/sound/song";
+import { SongWaveform } from "./SongWaveform";
 
 const SAVE_AFTER_MS = 600;
 
@@ -29,10 +31,13 @@ export function SlotOptionsEditor({
   slot,
   value,
   builtin,
+  url,
   onSave,
 }: {
   slot: SoundSlot;
   value: SoundSlotOptions | undefined;
+  /** The uploaded file (user skins): waveform to set the cue points. */
+  url?: string;
   /** Built-in (synthesized) skin: no timeline, so no start / end points. */
   builtin: boolean;
   onSave: (next: SoundSlotOptions) => void;
@@ -80,13 +85,13 @@ export function SlotOptionsEditor({
         <span className="w-40">{t("Fade in at the start")}</span>
         <Switch
           aria-label={t("Fade in at the start")}
-          checked={Boolean(draft.fadeIn)}
+          checked={fadeInOf(slot, draft) > 0}
           onCheckedChange={(on) => change({ fadeIn: on })}
         />
-        {draft.fadeIn && (
+        {fadeInOf(slot, draft) > 0 && (
           <SecondsInput
             label={t("Fade time")}
-            value={draft.fadeInSec ?? 2}
+            value={fadeInOf(slot, draft)}
             min={0.1}
             max={30}
             onChange={(fadeInSec) => change({ fadeInSec })}
@@ -129,6 +134,10 @@ export function SlotOptionsEditor({
         </div>
       )}
 
+      {url && !builtin && (
+        <SongWaveform url={url} slot={slot} options={draft} onChange={change} />
+      )}
+
       {!builtin && !endAligned && (
         <TimeField
           label={t("Start at")}
@@ -140,14 +149,20 @@ export function SlotOptionsEditor({
       {endAligned && (
         <>
           <TimeField
-            label={t("End point at")}
+            label={
+              slot === "countdown" ? t("Zero point (0) at") : t("End point at")
+            }
             value={draft.endMs ?? 0}
             onChange={(endMs) => change({ endMs })}
           />
           <div className="flex flex-wrap items-center gap-3">
-            <span className="w-40">{t("Extend by")}</span>
+            <span className="w-40">
+              {slot === "countdown" ? t("Plays on after 0") : t("Extend by")}
+            </span>
             <SecondsInput
-              label={t("Extend by")}
+              label={
+                slot === "countdown" ? t("Plays on after 0") : t("Extend by")
+              }
               value={draft.extendSec ?? 0}
               min={0}
               max={5}
@@ -173,19 +188,23 @@ function TimeField({
   value: number;
   onChange: (ms: number) => void;
 }) {
-  const [text, setText] = useState(formatMs(value));
+  // While typing: the text as typed; otherwise the value (it also follows
+  // the waveform).
+  const [editing, setEditing] = useState<string | null>(null);
+  const text = editing ?? formatMs(value);
   const valid = parseMs(text) !== null;
   return (
     <label className="flex flex-wrap items-center gap-3">
       <span className="w-40">{label}</span>
       <input
         value={text}
+        onFocus={() => setEditing(formatMs(value))}
         onChange={(e) => {
-          setText(e.target.value);
+          setEditing(e.target.value);
           const ms = parseMs(e.target.value);
           if (ms !== null) onChange(ms);
         }}
-        onBlur={() => valid && setText(formatMs(parseMs(text)!))}
+        onBlur={() => setEditing(null)}
         placeholder="0:00.000"
         inputMode="decimal"
         aria-invalid={!valid}

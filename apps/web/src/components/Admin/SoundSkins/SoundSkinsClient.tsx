@@ -37,7 +37,7 @@ import {
   type BuiltinSkinId,
   type SoundHandle,
 } from "@/lib/sound/synth";
-import { DEFAULT_SONG_VOLUME, playSong } from "@/lib/sound/song";
+import { DEFAULT_SONG_VOLUME, fadeInOf, playSong } from "@/lib/sound/song";
 import { fetchClip } from "@/lib/sound/preload";
 import { SlotOptionsEditor } from "./SlotOptionsEditor";
 import { SkinTestBench } from "./SkinTestBench";
@@ -110,7 +110,7 @@ function builtinHandle(
   return playBuiltin(id as BuiltinSkinId, slot, {
     progress: () => 0.85,
     volume: 0.45 * ((o?.volume ?? DEFAULT_SONG_VOLUME) / DEFAULT_SONG_VOLUME),
-    fadeInSec: o?.fadeIn ? (o.fadeInSec ?? 2) : 0,
+    fadeInSec: fadeInOf(slot, o),
     repeat: o?.repeat === false ? false : undefined,
     ...extra,
   });
@@ -472,6 +472,11 @@ function SkinCard({
       {testing && (
         <SkinTestBench
           hasLastQuestion={Boolean(skin.slots.lastQuestion)}
+          countdownTailMs={
+            skin.slots.countdown && skin.options?.countdown?.align === "end"
+              ? (skin.options.countdown.extendSec ?? 0) * 1000
+              : 0
+          }
           play={(slot, extra) => {
             const url = skin.slots[slot];
             return url
@@ -557,6 +562,7 @@ function SkinCard({
               <SlotOptionsEditor
                 slot={slot}
                 builtin={false}
+                url={url}
                 value={skin.options?.[slot]}
                 onSave={(next) =>
                   update.mutate(
