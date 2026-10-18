@@ -266,6 +266,7 @@ class Bot:
     react_limit: int = 5
     react_window: float = 60.0
     react_sent: list = field(default_factory=list)
+    room_size: int = 0  # from reaction-limit
     cache: dict = field(default_factory=dict)  # bare url -> download task
     failed_keys: set = field(default_factory=set)  # clips given up after all tries
     progress: dict = field(default_factory=dict)  # bare url -> (loaded, total, done)
@@ -718,7 +719,8 @@ class Bot:
 
         @s.on("reaction-limit")
         async def _react_limit(data):
-            self.react_limit = int(data.get("limit", self.react_limit))
+            self.react_limit = int(data.get("limit", self.react_limit)) or 10**9
+            self.room_size = int(data.get("players", self.room_size))
             self.react_window = float(data.get("windowMs", 60000)) / 1000
             if data.get("reset"):
                 self.react_sent = []

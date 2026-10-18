@@ -72,6 +72,8 @@ export interface GameLiveState {
   finalSoundKey: string | null;
   /** Countdown over, devices still downloading the question's sound. */
   waitingFor: number;
+  /** How many are in the room (server's `reaction-limit`); 0 = not told. */
+  roomSize: number;
   /** While waiting: devices reporting the download / done, and whether the host chose to wait for all. */
   downloadDevices: number;
   downloadsDone: number;
@@ -109,6 +111,7 @@ const initialState: GameLiveState = {
   finalSoundKey: null,
   myAnswerMs: null,
   waitingFor: 0,
+  roomSize: 0,
   downloadDevices: 0,
   downloadsDone: 0,
   waitAll: false,
@@ -210,6 +213,9 @@ const gameSlice = createSlice({
       state.countdownMs = action.payload.remainingMs;
       state.gameOver = false;
       state.moderation = action.payload.moderation ?? null;
+    },
+    roomSizeKnown: (state, action: PayloadAction<number>) => {
+      state.roomSize = action.payload;
     },
     preloadHint: (state, action: PayloadAction<PreloadPayload>) => {
       state.preload = action.payload;
@@ -359,6 +365,7 @@ export const {
   gameStarted,
   phaseChange,
   preloadHint,
+  roomSizeKnown,
   closedSummaryReceived,
   questionStart,
   questionEnd,

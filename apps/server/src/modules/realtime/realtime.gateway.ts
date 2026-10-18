@@ -106,11 +106,32 @@ export class RealtimeGateway
 
   private readonly reactionBudgets = new ReactionBudgets();
 
+  private roomSize(gameCode: string): number {
+    return this.server.sockets.adapter.rooms.get(gameCode)?.size ?? 0;
+  }
+
   /** The room's reaction budget per player: by how many are in it. */
   private reactionLimit(gameCode: string): number {
-    return reactionLimitFor(
-      this.server.sockets.adapter.rooms.get(gameCode)?.size ?? 0,
-    );
+    return reactionLimitFor(this.roomSize(gameCode));
+  }
+
+  /** Last tier told to each room (reaction limit, big room or not). */
+  private readonly roomTiers = new Map<string, string>();
+
+  /**
+   * A player joined: when the room reached another reaction limit,
+   * everyone hears about it.
+   */
+  private announceRoomSize(gameCode: string): void {
+    const players = this.roomSize(gameCode);
+    const tier = String(reactionLimitFor(players));
+    if (this.roomTiers.get(gameCode) === tier) return;
+    this.roomTiers.set(gameCode, tier);
+    this.server.to(gameCode).emit("reaction-limit", {
+      limit: reactionLimitFor(players),
+      windowMs: REACTION_WINDOW_MS,
+      players,
+    });
   }
 
   /** The final standings' top three per room: they may react without limit. */
@@ -128,6 +149,7 @@ export class RealtimeGateway
       limit: this.reactionLimit(gameCode),
       windowMs: REACTION_WINDOW_MS,
       reset: true,
+      players: this.roomSize(gameCode),
     });
     for (const id of winners ?? []) {
       this.server.to(`player:${id}`).emit("reaction-limit", {
@@ -681,8 +703,10 @@ export class RealtimeGateway
     socket.emit("reaction-limit", {
       limit: winner ? 0 : this.reactionLimit(gameCode),
       windowMs: REACTION_WINDOW_MS,
+      players: this.roomSize(gameCode),
       ...(winner ? { winner: true } : {}),
     });
+    this.announceRoomSize(gameCode);
     socket.on("reaction", (payload) => {
       const playerId = socket.data.playerId;
       if (!playerId) return;

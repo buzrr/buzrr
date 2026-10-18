@@ -12,6 +12,7 @@ import {
   gameStarted,
   phaseChange,
   preloadHint,
+  roomSizeKnown,
   closedSummaryReceived,
   leaderboardReceived,
   playerConnection,
@@ -137,6 +138,9 @@ export function useGameSocket({
     conn.on("game-started", (payload) => dispatch(gameStarted(payload)));
     conn.on("phase-change", (payload) => dispatch(phaseChange(payload)));
     conn.on("preload", (payload) => dispatch(preloadHint(payload)));
+    conn.on("reaction-limit", (p) => {
+      if (typeof p.players === "number") dispatch(roomSizeKnown(p.players));
+    });
     conn.on("closed-summary", (payload) =>
       dispatch(closedSummaryReceived(payload)),
     );

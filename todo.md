@@ -13,30 +13,30 @@ python3 tools/buzrrbench/buzrrbench.py --url https://quiz.woikn.de --code <CODE>
 
 Two runs at 510 players, same build (0a520b1):
 
-| Metric                              | VGH5AV (no skin music) | RPTZRU (skin with music) |
-| ----------------------------------- | ---------------------- | ------------------------ |
-| join HTTP 500                       | 0                      | 0                        |
-| join p50 / p95                      | 0.21 s / 1.4 s         | 0.26 s / 1.6 s           |
-| downloaded in total                 | 189 MB                 | **1 950 MB** (aborted)   |
-| download retries / failed for good  | 873 / 23               | ~4 800 / ~1 500          |
-| `submit-answer` ack p50 / p95       | 0.8 s / 4.4 s          | 2.0 s / 10.8 s           |
-| `request-sync` RTT p50              | 1.8 s                  | 5.9 s                    |
-| `question-start` spread             | 0.2 s (q4: 0.2 s)      | 29–38 s                  |
-| unexpected socket disconnects       | 168                    | 1 790                    |
-| reactions sent                      | 10 966                 | 15 901                   |
+| Metric                             | VGH5AV (no skin music) | RPTZRU (skin with music) |
+| ---------------------------------- | ---------------------- | ------------------------ |
+| join HTTP 500                      | 0                      | 0                        |
+| join p50 / p95                     | 0.21 s / 1.4 s         | 0.26 s / 1.6 s           |
+| downloaded in total                | 189 MB                 | **1 950 MB** (aborted)   |
+| download retries / failed for good | 873 / 23               | ~4 800 / ~1 500          |
+| `submit-answer` ack p50 / p95      | 0.8 s / 4.4 s          | 2.0 s / 10.8 s           |
+| `request-sync` RTT p50             | 1.8 s                  | 5.9 s                    |
+| `question-start` spread            | 0.2 s (q4: 0.2 s)      | 29–38 s                  |
+| unexpected socket disconnects      | 168                    | 1 790                    |
+| reactions sent                     | 10 966                 | 15 901                   |
 
 The RPTZRU run fell apart: bots ended up in different phases, answers came in
 late, the host screen stalled. Cause: the skin's sound files, which every
 device with sound fetches.
 
-| Skin slot (RPTZRU)  | size per device | devices | total  |
-| ------------------- | --------------- | ------- | ------ |
-| lobby               | 1.4 MB          | 481     | 669 MB |
-| question            | 2.4 MB          | 127     | 307 MB |
-| reveal              | 2.6 MB          | 136     | 352 MB |
-| scores              | 0.7 MB          | 269     | 192 MB |
-| final song (clip)   | 0.6 MB          | 476     | 291 MB |
-| countdown           | 0.2 MB          | 476     | 100 MB |
+| Skin slot (RPTZRU) | size per device | devices | total  |
+| ------------------ | --------------- | ------- | ------ |
+| lobby              | 1.4 MB          | 481     | 669 MB |
+| question           | 2.4 MB          | 127     | 307 MB |
+| reveal             | 2.6 MB          | 136     | 352 MB |
+| scores             | 0.7 MB          | 269     | 192 MB |
+| final song (clip)  | 0.6 MB          | 476     | 291 MB |
+| countdown          | 0.2 MB          | 476     | 100 MB |
 
 - The question, reveal and scores beds start downloading on **every device
   at the same moment** (phase change). At the question start that is
@@ -48,24 +48,11 @@ device with sound fetches.
 
 ---
 
-## 1. Make skin sounds small
-
-`apps/server/src/modules/sound-skins/sound-skins.service.ts` (around line
-181): skin slots go through `toMp3` only (stereo, `-q:a 4` ≈ 165 kbit/s,
-full length). Only the final song is cut (`cutClip(mp3, 0, FINAL_CLIP_MS)`).
-
-- Encode every slot like the question clips: mono, `CLIP_BITRATE` (64k,
-  `apps/server/src/common/storage/audio-transcode.ts`).
-- Cap each slot's length. Beds loop on the device anyway: lobby, question,
-  reveal and scores at most 30 s; countdown and end at most 5 s. Put the
-  limits next to `FINAL_CLIP_MS`.
-- Keep the original upload only if the editor needs it; devices get the
-  small file.
-- Existing skins: one-off re-encode of the stored slots (script or
-  migration), since only new uploads would get the small files otherwise.
-
-**Done when:** every slot a device loads is ≤ 250 KB (30 s × 64 kbit/s), and
-the RPTZRU skin's slots are re-encoded.
+Done since: 1 (small player copies of skin files, full length — the host
+keeps full quality), 3 (reaction budgets 30 / 10 / 5 / 2 by room size, per
+player, afresh per question), 4 (`--react-share`), the cache headers of 6.
+Dropped: 5 — players get the music whenever the quiz plays it on their
+devices, whatever the room size (loaded in the lobby, cached).
 
 ## 2. All encrypted assets load in the lobby; the lobby bar shows it; start waits for it
 
@@ -91,6 +78,7 @@ New behaviour:
    opens, so the lobby can hand them out. The device starts after a random
    delay of 0–3 s (as in `director.tsx` now), so a QR-code crowd doesn't
    start at once.
+
 2. **Report progress.** The device reports `preload-status` per file as
    today (`loaded`, `total`, `done`, `failed`). The server keeps one state
    per player: assets done yes/no (done or failed after the retries both
@@ -132,77 +120,12 @@ New behaviour:
 - `question sound still loading when it opened` is 0 for players who were in
   the lobby.
 
-## 3. Reactions: 5 per player per 60 s, reset with every question and at the end
+## 6. A CDN for `/uploads` (infrastructure decision, open)
 
-Now: `REACTIONS_PER_WINDOW = 5` within `REACTION_WINDOW_MS = 20_000`, a
-sliding window per socket (`packages/contract/src/socket.ts` around line 197;
-server check in `apps/server/src/modules/realtime/realtime.gateway.ts`, the
-`socket.on("reaction")` handler around line 570; client check in
-`apps/web/src/components/Game/Flyers.tsx` around line 253).
-
-New:
-
-- `REACTION_WINDOW_MS = 60_000`, still 5 reactions.
-- The budget resets on every `question-start` and on the final standings
-  (`final` / `game-over`): the player has 5 again right away.
-- Keep the budget **per player** (not per socket), so a reconnect doesn't
-  give 5 new ones. E.g. a per-room map `playerId → timestamps`, cleared on
-  question start and at the end; or a Redis key per player with TTL 60 s if
-  several API instances serve one room.
-- The client (`Flyers.tsx`) mirrors the rule: also reset its `taps` on
-  question start and on the final screen, so it doesn't block buttons the
-  server would accept.
-- The room-flood rule (`roomAdmitsReaction`, `ROOM_REACTIONS_PER_S`) stays.
-
-**Done when:** a unit test shows: 5 accepted, the 6th dropped, after a new
-`question-start` 5 accepted again; after 60 s without a question 5 accepted
-again; a reconnect doesn't reset the budget.
-
-## 4. Bench: only 20 % of players send reactions
-
-`tools/buzrrbench/buzrrbench.py`, where the bots are made (around line 858):
-`reacting=not args.no_reactions and random.random() < 0.7`.
-
-- Change 0.7 to 0.2.
-- Make it an option: `--react-share 0.2` (default 0.2), passed on to the
-  child processes like `--no-reactions` (around line 975).
-- Bots that react follow the new limit (item 3): at most 5 per 60 s, reset on
-  question start and at the end.
-- Note it in `tools/buzrrbench/README.md` (options table).
-
-**Done when:** `--users 500` sends reactions from about 100 bots, and the
-summary shows no rejected reactions beyond the limit.
-
-## 5. Big rooms: background music on the host only
-
-Even small (item 1), the beds go to every device whose sound is on. With
-`playOn: "both"` / `"players"` that is every player.
-
-- From a room size (e.g. more than 100 connected players, a constant in the
-  contract) the beds (lobby, question, reveal, scores) play on the host
-  only. Players keep the short effects (countdown, end) and the question
-  clips.
-- `apps/web/src/lib/sound/director.tsx` decides per slot; the player count
-  comes from the lobby/snapshot.
-- Mention it in the sound-skin editor ("in Räumen über 100 Spielern läuft
-  die Hintergrundmusik nur beim Host").
-
-**Done when:** at 500 bots with a music skin no player device loads the
-lobby/question/reveal/scores bed.
-
-## 6. Serve `/uploads` apart from the sockets
-
-At 500 players the downloads (even small ones) share the server's line with
-the WebSocket traffic.
-
-- Check the proxy in front of the API: limits for parallel connections and
-  bandwidth on `/uploads`, and long cache headers (`Cache-Control: public,
-  max-age=31536000, immutable`; the file names are content keys).
-- Better: put `/uploads` behind a CDN or a separate static host, so a
-  download burst can't slow down the game sockets.
-
-**Done when:** at 500 bots with a music skin the `question-start` spread stays
-under 1 s and unexpected disconnects are under 1 %.
+Cache headers are done (`immutable`; public avatar / built-in files a year).
+Still open: put `/uploads` behind a CDN or a separate static host, so a
+download burst can't slow down the game sockets. Needs a decision on the
+hosting side.
 
 ---
 

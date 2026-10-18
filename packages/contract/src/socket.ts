@@ -342,6 +342,8 @@ export interface ReactionLimitPayload {
   windowMs: number;
   reset?: boolean;
   winner?: boolean;
+  /** How many are in the room (its reaction limit follows it). */
+  players?: number;
 }
 
 export const playerReactionSchema = reactionSchema.extend({
