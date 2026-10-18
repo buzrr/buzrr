@@ -170,6 +170,10 @@ function useBuiltinOptions(skinId: string, role: Role): BuiltinSoundOptions {
 }
 
 const SKIN_SLOTS = soundSlotSchema.options;
+/** Lobby, reveal and scoreboard songs fade out this long before the next starts. */
+const FADE_OUT_SEC = 1;
+/** Wall clock for the fade hold (only read in effects and event callbacks). */
+const clockMs = () => Date.now();
 /** Background music (off with "no music"). */
 const MUSIC_SLOTS: readonly SoundSlot[] = [
   "lobby",
@@ -246,10 +250,38 @@ export function GameSounds({
     return p.allowed && (pref ?? p.defaultOn);
   };
 
+  // While the lobby / reveal / scores song fades out, the next one waits.
+  const holdUntil = useRef(0);
   const play = (
     slot: SoundSlot,
     extra?: { progress?: () => number; remainingMs?: number },
-  ) => {
+  ): SoundHandle | null => {
+    const wait = holdUntil.current - clockMs();
+    if (wait <= 0) return playNow(slot, extra);
+    // Starts after the fade; a countdown keeps its end where it was.
+    let inner: SoundHandle | null = null;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      if (cancelled) return;
+      inner = playNow(slot, {
+        ...extra,
+        ...(extra?.remainingMs !== undefined
+          ? { remainingMs: Math.max(0, extra.remainingMs - wait) }
+          : {}),
+      });
+    }, wait);
+    return {
+      stop: (fadeSec?: number) => {
+        cancelled = true;
+        clearTimeout(timer);
+        inner?.stop(fadeSec);
+      },
+    };
+  };
+  const playNow = (
+    slot: SoundSlot,
+    extra?: { progress?: () => number; remainingMs?: number },
+  ): SoundHandle | null => {
     const ctx = audioContext();
     if (ctx && ctx.state !== "running") void ctx.resume();
     // End-aligned songs need the time left in the countdown / question.
@@ -304,6 +336,34 @@ export function GameSounds({
   const bedKey = bedSlot
     ? `${bedSlot}:${settings.skin}:${skin?.id ?? ""}:${bedSlot === "question" ? qIndex : ""}:${bedSlot === "final" ? (finalSoundKey ?? "") : ""}`
     : "";
+
+  // Leaving the lobby, the reveal or the scoreboard: their song fades out
+  // over FADE_OUT_SEC, and the next song starts once it is gone. Runs before
+  // the bed and one-shot effects below (effects run in order).
+  const reveal = useRef<SoundHandle | null>(null);
+  const left = useRef(phase);
+  useEffect(() => {
+    const from = left.current;
+    left.current = phase;
+    if (from === phase) return;
+    let faded = false;
+    const fromBed = bedFor(from);
+    if (
+      bed.current &&
+      (fromBed === "lobby" || fromBed === "scores") &&
+      bedFor(phase) !== fromBed
+    ) {
+      bed.current.handle?.stop(FADE_OUT_SEC);
+      bed.current = null;
+      faded = true;
+    }
+    if (from === "reveal" && reveal.current) {
+      reveal.current.stop(FADE_OUT_SEC);
+      reveal.current = null;
+      faded = true;
+    }
+    if (faded) holdUntil.current = clockMs() + FADE_OUT_SEC * 1000;
+  }, [phase]);
   useEffect(() => {
     if (bed.current?.key === bedKey) return;
     bed.current?.handle?.stop();
@@ -318,7 +378,7 @@ export function GameSounds({
         progress: () =>
           1 - Math.max(0, deadlineRef.current - Date.now()) / total,
         ...(timed
-          ? { remainingMs: Math.max(0, deadlineRef.current - Date.now()) }
+          ? { remainingMs: Math.max(0, deadlineRef.current - clockMs()) }
           : {}),
       }),
     };
@@ -387,7 +447,12 @@ export function GameSounds({
     }
     if (phase === "reveal") {
       // After the tusch if the question just closed.
-      setTimeout(() => play("reveal"), from === "question" ? 900 : 0);
+      setTimeout(
+        () => {
+          if (left.current === "reveal") reveal.current = play("reveal");
+        },
+        from === "question" ? 900 : 0,
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);

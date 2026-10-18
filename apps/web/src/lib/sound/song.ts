@@ -64,9 +64,10 @@ export function playSong(
   const volume = (o.volume ?? DEFAULT_SONG_VOLUME) / 100;
   const ctx = audioContext();
   let stopped = false;
-  let stopNow: (() => void) | null = null;
+  let stopNow: ((fadeSec?: number) => void) | null = null;
   let stopLater: (() => void) | null = null;
   let fallback: HTMLAudioElement | null = null;
+  let endAlignedSong = false;
 
   const startFallback = () => {
     if (stopped || !fallbackUrl) return;
@@ -130,26 +131,27 @@ export function playSong(
         }
         src.start(when, offset);
 
-        const fadeOutAt = (t: number) => {
+        const fadeOutAt = (t: number, fadeSec = STOP_FADE_SEC) => {
           const from = Math.max(t, ctx.currentTime);
           // Scheduled ahead: the level it will have then (the fade-in is over).
           const level =
             from > ctx.currentTime + 0.05 ? volume : gain.gain.value;
           gain.gain.cancelScheduledValues(from);
           gain.gain.setValueAtTime(level, from);
-          gain.gain.linearRampToValueAtTime(0.0001, from + STOP_FADE_SEC);
+          gain.gain.linearRampToValueAtTime(0.0001, from + fadeSec);
           try {
-            src.stop(from + STOP_FADE_SEC + 0.05);
+            src.stop(from + fadeSec + 0.05);
           } catch {
             // already stopped
           }
           setTimeout(
             () => gain.disconnect(),
-            (from - ctx.currentTime + STOP_FADE_SEC + 0.2) * 1000,
+            (from - ctx.currentTime + fadeSec + 0.2) * 1000,
           );
         };
-        stopNow = () => fadeOutAt(ctx.currentTime);
+        stopNow = (fadeSec?: number) => fadeOutAt(ctx.currentTime, fadeSec);
         // An end-aligned song plays on `extendSec` after the phase ends.
+        endAlignedSong = endAligned;
         stopLater = () =>
           fadeOutAt(Math.min(endAt ?? Infinity, ctx.currentTime + extend));
         if (endAt !== null) fadeOutAt(endAt);
@@ -158,11 +160,14 @@ export function playSong(
   }
 
   return {
-    stop: () => {
+    stop: (fadeSec?: number) => {
       if (stopped) return;
       stopped = true;
-      if (fallback) fadeOutAndPause(fallback);
-      (stopLater ?? stopNow)?.();
+      if (fallback)
+        fadeOutAndPause(fallback, (fadeSec ?? STOP_FADE_SEC) * 1000);
+      // An end-aligned song keeps its extend; any other fades out now.
+      if (stopLater && endAlignedSong) stopLater();
+      else stopNow?.(fadeSec);
     },
   };
 }

@@ -318,7 +318,8 @@ function chord(
 
 /** A running loop or one-shot; `stop` fades it out. */
 export interface SoundHandle {
-  stop: () => void;
+  /** Stop, fading out over `fadeSec` (default: a short fade). */
+  stop: (fadeSec?: number) => void;
 }
 
 /**
@@ -356,12 +357,12 @@ export function playBuiltin(
   // Arcade: an 8-bit kick (a triangle sweep, like an old console's).
   const K = skinId === "builtin:arcade" ? chipKick : kick;
 
-  const fadeOut = () => {
+  const fadeOut = (fadeSec = 0.4) => {
     const now = ctx.currentTime;
     bus.gain.cancelScheduledValues(now);
     bus.gain.setValueAtTime(bus.gain.value, now);
-    bus.gain.linearRampToValueAtTime(0.0001, now + 0.4);
-    setTimeout(() => bus.disconnect(), 600);
+    bus.gain.linearRampToValueAtTime(0.0001, now + fadeSec);
+    setTimeout(() => bus.disconnect(), fadeSec * 1000 + 200);
   };
 
   // -- Arcade one-shots: 8-bit, square waves only ---------------------------
@@ -618,9 +619,9 @@ export function playBuiltin(
   const timer = setInterval(run, 40);
   run();
   return {
-    stop: () => {
+    stop: (fadeSec?: number) => {
       clearInterval(timer);
-      if (!ended) fadeOut();
+      if (!ended) fadeOut(fadeSec);
       ended = true;
     },
   };

@@ -14,6 +14,8 @@ const COUNTDOWN_MS = 5000;
 const REVEAL_AFTER_END_MS = 900;
 const REVEAL_SHOW_MS = 5000;
 const SCORES_SHOW_MS = 10_000;
+/** Like the game: reveal / scores songs fade out this long before the next. */
+const FADE_OUT_MS = 1000;
 
 type Stage = "countdown" | "question" | "reveal" | "scores";
 
@@ -84,19 +86,23 @@ export function SkinTestBench({ play }: { play: SlotPlayer }) {
         // Phase over: the bed stops (an end-aligned song plays on its extend).
         bed?.stop();
         keep(play("end", {}));
+        let revealSong: SoundHandle | null = null;
         if (withReveal) {
           enter("reveal", REVEAL_SHOW_MS);
-          at(REVEAL_AFTER_END_MS, () => keep(play("reveal", {})));
+          at(REVEAL_AFTER_END_MS, () => {
+            revealSong = keep(play("reveal", {}));
+          });
         }
-        const scoresAt = withReveal ? REVEAL_SHOW_MS : REVEAL_AFTER_END_MS;
+        const revealEnd = withReveal ? REVEAL_SHOW_MS : REVEAL_AFTER_END_MS;
+        // Leaving the reveal: its song fades out, the scores start after it.
+        at(revealEnd, () => revealSong?.stop(FADE_OUT_MS / 1000));
+        const scoresAt = withReveal ? revealEnd + FADE_OUT_MS : revealEnd;
         if (withScores) {
           at(scoresAt, () => {
             enter("scores", SCORES_SHOW_MS);
             const bedScores = keep(play("scores", {}));
-            at(SCORES_SHOW_MS, () => {
-              bedScores?.stop();
-              stopAll();
-            });
+            at(SCORES_SHOW_MS, () => bedScores?.stop(FADE_OUT_MS / 1000));
+            at(SCORES_SHOW_MS + FADE_OUT_MS, stopAll);
           });
         } else {
           at(scoresAt + 1500, stopAll);
