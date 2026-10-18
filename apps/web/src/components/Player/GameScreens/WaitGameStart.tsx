@@ -8,6 +8,8 @@ import { DEFAULT_AVATAR } from "@/constants";
 import type { GameSession } from "@/types/db";
 import { useT } from "@/lib/i18n/context";
 import { useGameSound } from "@/lib/sound/director";
+import { useAppSelector } from "@/state/hooks";
+import { BUBBLE_CROWD, BUBBLE_CROWD_EVERY_MS } from "@buzrr/contract";
 import Image from "next/image";
 
 interface PlayerWithProfile {
@@ -37,6 +39,8 @@ const WaitGameStart = (params: {
 }) => {
   const t = useT();
   const sound = useGameSound();
+  // A big room: bubble totals go out less often.
+  const roomSize = useAppSelector((state) => state.game.roomSize);
   const game = params.game;
   const [pic, setPic] = useState(params.player.profilePic || DEFAULT_AVATAR);
   const [picking, setPicking] = useState(false);
@@ -152,6 +156,9 @@ const WaitGameStart = (params: {
             <div className="md:hidden">{picker}</div>
             <Game
               onStats={params.onBubbleStats}
+              reportEveryMs={
+                roomSize >= BUBBLE_CROWD ? BUBBLE_CROWD_EVERY_MS : 1000
+              }
               // Their own pops, when sound is on here.
               onPop={() => {
                 if (sound?.on) sound.playCueSound("bubble");

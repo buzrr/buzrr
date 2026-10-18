@@ -59,6 +59,8 @@ interface Ring {
 
 const GRAVITY = 520; // px/s² pulling droplets down
 const MAX_BUBBLES = 18;
+/** Unchanged totals are sent again this often. */
+const STATS_REFRESH_MS = 15_000;
 
 /** Hits and misses (taps that popped nothing). */
 export interface BubbleStats {
@@ -69,10 +71,13 @@ export interface BubbleStats {
 const Game = ({
   onStats,
   onPop,
+  reportEveryMs = 1000,
 }: {
   onStats?: (stats: BubbleStats) => void;
   /** A bubble popped (e.g. to play its sound). */
   onPop?: () => void;
+  /** Changed totals go out at most this often. */
+  reportEveryMs?: number;
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -88,14 +93,28 @@ const Game = ({
   const missesRef = useRef(0);
   const onStatsRef = useRef(onStats);
   const onPopRef = useRef(onPop);
+  const reportEveryRef = useRef(reportEveryMs);
   useEffect(() => {
     onStatsRef.current = onStats;
     onPopRef.current = onPop;
+    reportEveryRef.current = reportEveryMs;
   });
 
-  // Report the running totals once a second (the host's lobby shows them).
+  // Report the running totals (the host's lobby shows them): at most every
+  // `reportEveryMs` and only when they changed — an idle phone sends nothing —
+  // plus a refresh every STATS_REFRESH_MS for a host or connection that
+  // missed one.
   useEffect(() => {
+    let last = "";
+    let lastAt = 0;
     const timer = setInterval(() => {
+      const key = `${scoreRef.current}:${missesRef.current}`;
+      const now = Date.now();
+      const since = now - lastAt;
+      if (since < reportEveryRef.current) return;
+      if (key === last && since < STATS_REFRESH_MS) return;
+      last = key;
+      lastAt = now;
       onStatsRef.current?.({
         hits: scoreRef.current,
         misses: missesRef.current,

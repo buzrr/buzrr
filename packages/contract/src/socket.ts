@@ -588,6 +588,9 @@ export const PLAYER_LEADERBOARD_TOP = 10;
  */
 export const HOST_LEADERBOARD_TOP = 50;
 
+/** On the scores step the top this many may each send one emoji, shown on their row. */
+export const SCORES_EMOJI_TOP = 20;
+
 export const leaderboardSchema = z.object({
   entries: z.array(leaderboardEntrySchema),
   /** How many players there are, when `entries` is only the top. */
@@ -748,6 +751,15 @@ export const HEARTBEAT_TIMEOUT_MS = 35_000;
  * The lobby's bubble mini-game: a player's running totals, sent about once a
  * second while they wait; relayed to the host only (`host:{gameCode}`).
  */
+/**
+ * Lobby bubble totals: a device reports at most once a second, and only
+ * when they changed — in a room of BUBBLE_CROWD or more at most every
+ * BUBBLE_CROWD_EVERY_MS. The same boundary as a reaction-limit step, so
+ * devices hear the room size when it is crossed.
+ */
+export const BUBBLE_CROWD = 150;
+export const BUBBLE_CROWD_EVERY_MS = 10_000;
+
 export const bubbleStatsSchema = z.object({
   hits: z.number().int().min(0).max(1_000_000),
   misses: z.number().int().min(0).max(1_000_000),

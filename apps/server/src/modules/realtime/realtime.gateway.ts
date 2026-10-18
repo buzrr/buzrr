@@ -44,6 +44,8 @@ type DuelInviteAck = (result: DuelInviteAcceptAck) => void;
 const HEARTBEAT_CHECK_MS = 5_000;
 /** Lobby bubble totals go to the host this often (one batch per room). */
 const BUBBLE_BATCH_MS = 1000;
+/** Every this many batches the host may be sent unchanged totals again. */
+const BUBBLE_RESEND_BATCHES = 15;
 /** Above this many reactions a second in a room, one per player and second. */
 const ROOM_REACTIONS_PER_S = 40;
 /** A disconnected lobby player keeps their place at least this long. */
@@ -178,8 +180,9 @@ export class RealtimeGateway
   private readonly roomTiers = new Map<string, string>();
 
   /**
-   * A player joined: when the room reached another reaction limit,
-   * everyone hears about it.
+   * A player joined: when the room reached another reaction limit, everyone
+   * hears about it (its size too — from BUBBLE_CROWD on, devices report
+   * bubbles less often).
    */
   private announceRoomSize(gameCode: string): void {
     const players = this.roomSize(gameCode);
@@ -531,16 +534,21 @@ export class RealtimeGateway
     string,
     {
       pending: Map<string, { hits: number; misses: number }>;
+      /** What the host was last sent per player ("hits:misses"). */
+      sent: Map<string, string>;
       timer: ReturnType<typeof setInterval>;
       idle: number;
+      ticks: number;
     }
   >();
 
   /**
    * Lobby bubble totals reach the host as one `bubble-stats-batch` a second
-   * per room (only players that changed), instead of one event per player
-   * and update: 500 players would be ~500 events a second otherwise. A room
-   * quiet for 10 batches stops its timer.
+   * per room (only players whose totals changed), instead of one event per
+   * player and update: 500 players would be ~500 events a second otherwise.
+   * What was sent is forgotten every BUBBLE_RESEND_BATCHES, so the players'
+   * periodic refresh reaches a host that reconnected. A room quiet for 10
+   * batches stops its timer.
    */
   private queueBubbleStats(
     gameCode: string,
@@ -553,6 +561,7 @@ export class RealtimeGateway
       const timer = setInterval(() => {
         const b = this.bubbleBatches.get(gameCode);
         if (!b) return;
+        if (++b.ticks % BUBBLE_RESEND_BATCHES === 0) b.sent.clear();
         if (b.pending.size === 0) {
           if (++b.idle >= 10) {
             clearInterval(b.timer);
@@ -568,9 +577,12 @@ export class RealtimeGateway
           .emit("bubble-stats-batch", { players });
       }, BUBBLE_BATCH_MS);
       timer.unref();
-      batch = { pending, timer, idle: 0 };
+      batch = { pending, sent: new Map(), timer, idle: 0, ticks: 0 };
       this.bubbleBatches.set(gameCode, batch);
     }
+    const key = `${stats.hits}:${stats.misses}`;
+    if (batch.sent.get(playerId) === key) return;
+    batch.sent.set(playerId, key);
     batch.pending.set(playerId, stats);
   }
 

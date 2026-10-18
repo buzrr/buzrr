@@ -81,6 +81,13 @@ ANSWER_DELAY = (0.5, 20.0)
 ACK_TIMEOUT = 15.0
 SYNC_PROBE_EVERY = 10.0  # only --probe-bots players probe
 HEARTBEAT_EVERY = 10.0  # HEARTBEAT_INTERVAL_MS in the contract
+# Share of players who play the lobby bubble game; how often totals may go
+# out (BUBBLE_CROWD / BUBBLE_CROWD_EVERY_MS in the contract) and unchanged
+# ones are sent again, as the web client does.
+BUBBLE_PLAYER_SHARE = 0.4
+BUBBLE_CROWD = 150
+BUBBLE_CROWD_EVERY_S = 10.0
+BUBBLE_REFRESH_S = 15.0
 # The run stops this long after DONE_SHARE of the connected players are done.
 DONE_SHARE = 0.95
 DONE_GRACE = 30.0
@@ -877,13 +884,26 @@ class Bot:
             await asyncio.sleep(HEARTBEAT_EVERY)
 
     async def pop_bubbles(self) -> None:
-        """Lobby: 'pop' a few bubbles (some misses) and report once a second."""
+        """Lobby: some players pop bubbles now and then (some misses). Like the
+        web client, totals go out only when they changed — at most once a
+        second, every 10 s in a room of 150 or more — plus a refresh every
+        15 s."""
+        plays = random.random() < BUBBLE_PLAYER_SHARE
+        last, last_at = None, 0.0
         while True:
             await asyncio.sleep(1.0)
             if self.frozen or self.phase not in ("idle", "lobby"):
                 continue
-            self.hits += random.randint(0, 3)
-            self.misses += random.randint(0, 2)
+            if plays and random.random() < 0.6:
+                self.hits += random.randint(0, 3)
+                self.misses += random.randint(0, 2)
+            now = time.monotonic()
+            every = BUBBLE_CROWD_EVERY_S if self.room_size >= BUBBLE_CROWD else 1.0
+            if now - last_at < every:
+                continue
+            if (self.hits, self.misses) == last and now - last_at < BUBBLE_REFRESH_S:
+                continue
+            last, last_at = (self.hits, self.misses), now
             try:
                 await self.sio.emit("bubble-stats", {"hits": self.hits, "misses": self.misses})
                 M.counts["bubble-stats sent"] += 1

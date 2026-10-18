@@ -404,12 +404,17 @@ optionally reveal and scoreboard, timed like a game.
 
 ## Lobby extras: bubbles and reactions
 
-- **Bubble game:** players send `bubble-stats` (their running hits/misses,
-  about once a second). The gateway keeps the latest totals per player in a
-  per-room map and sends the host one `bubble-stats-batch` a second with the
-  players that changed (`players: { [playerId]: { hits, misses } }`). A room
-  quiet for 10 batches stops its timer. At 500 players that is one event a
-  second into the host's browser instead of about 500.
+- **Bubble game:** players send `bubble-stats` (their running hits/misses)
+  only when they changed — at most once a second, in a room of
+  `BUBBLE_CROWD` (150) or more at most every `BUBBLE_CROWD_EVERY_MS` (10 s;
+  the room size comes with `reaction-limit`, whose step changes at 150 too) —
+  plus a refresh every 15 s; an idle phone sends nothing else. The gateway keeps the latest
+  totals per player in a per-room map and sends the host one
+  `bubble-stats-batch` a second with the players whose totals changed since
+  it last told the host (`players: { [playerId]: { hits, misses } }`); what
+  was sent is forgotten every 15 batches, so the refreshes reach a host that
+  reconnected. A room quiet for 10 batches stops its timer. At 500 players
+  that is one event a second into the host's browser instead of about 500.
 - **Reactions:** relayed to `host:{code}` one by one, within a budget per
   player (`reactionLimitFor` the room's size: < 50 → 30, < 150 → 10,
   < 500 → 5, else 2) per `REACTION_WINDOW_MS` (60 s), counted per player
