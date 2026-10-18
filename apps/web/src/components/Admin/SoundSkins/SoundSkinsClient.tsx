@@ -15,8 +15,10 @@ import {
 import {
   BUILTIN_SOUND_SKINS,
   isCountdownSlot,
+  isCueSlot,
   isQuestionSlot,
   soundSlotSchema,
+  type CueSource,
   type SoundSkin,
   type SoundSlot,
   type SoundSlotOptions,
@@ -34,7 +36,9 @@ import {
 import {
   BUILTIN_SKINS,
   audioContext,
+  builtinTuschZeroMs,
   playBuiltin,
+  playCue,
   type BuiltinSkinId,
   type SoundHandle,
 } from "@/lib/sound/synth";
@@ -58,6 +62,9 @@ export const SLOT_LABELS: Record<SoundSlot, string> = {
   lobby: "Background music (lobby, get ready)",
   countdown: "Countdown before a question",
   lastCountdown: "Countdown before the last question (empty: as above)",
+  join: "Ping when a player joins (host, lobby)",
+  bubble: "Bubble pop (host, lobby)",
+  reaction: "Reaction from a player (host)",
   question: "Music while a question runs",
   lastQuestion: "Music for the last question (empty: as above)",
   end: "Tusch when a question ends",
@@ -266,6 +273,7 @@ export default function SoundSkinsClient() {
           </div>
           {testing === id && (
             <SkinTestBench
+              tuschZeroMs={builtinTuschZeroMs(id as BuiltinSkinId)}
               play={(slot, extra) =>
                 builtinHandle(
                   id,
@@ -494,6 +502,7 @@ function SkinCard({
             skin.slots.lastQuestion || skin.slots.lastCountdown,
           )}
           countdownTailMs={countdownTail(skin, "countdown")}
+          tuschZeroMs={skin.slots.end ? (skin.options?.end?.endMs ?? 0) : 0}
           lastCountdownTailMs={
             skin.slots.lastCountdown
               ? countdownTail(skin, "lastCountdown")
@@ -509,7 +518,9 @@ function SkinCard({
               ? playSong(
                   () => fetchClip(url),
                   slot,
-                  skin.options?.[slot],
+                  extra.startMs !== undefined
+                    ? { ...skin.options?.[slot], startMs: extra.startMs }
+                    : skin.options?.[slot],
                   { untilEndMs: extra.remainingMs ?? null },
                   url,
                 )
@@ -520,11 +531,77 @@ function SkinCard({
       {SLOTS.map((slot) => {
         const url = skin.slots[slot];
         const key = `${skin.id}:${slot}`;
+        // Lobby cues: a built-in skin's sound, none, or the uploaded file.
+        const cue = isCueSlot(slot);
+        const source: CueSource | null = cue
+          ? (skin.options?.[slot]?.source ?? (url ? "custom" : "builtin:show"))
+          : null;
+        const ownFile = !cue || source === "custom";
         return (
           <div key={slot} className="flex flex-col gap-1.5">
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="w-64 max-w-full">{t(SLOT_LABELS[slot])}</span>
-              {url ? (
+              {cue && (
+                <>
+                  <select
+                    value={source!}
+                    aria-label={t(SLOT_LABELS[slot])}
+                    onChange={(e) =>
+                      update.mutate(
+                        {
+                          id: skin.id,
+                          options: {
+                            ...skin.options,
+                            [slot]: {
+                              ...skin.options?.[slot],
+                              source: e.target.value as CueSource,
+                            },
+                          },
+                        },
+                        { onError },
+                      )
+                    }
+                    className="rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent px-2 py-1 text-xs"
+                  >
+                    {BUILTIN_SOUND_SKINS.map((id) => (
+                      <option key={id} value={id}>
+                        {t(BUILTIN_SKINS[id as BuiltinSkinId].name)}
+                      </option>
+                    ))}
+                    <option value="off">{t("Off")}</option>
+                    <option value="custom">{t("Own file")}</option>
+                  </select>
+                  {source !== "custom" && source !== "off" && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          preview.play(key, () => {
+                            playCue(
+                              source as BuiltinSkinId,
+                              slot,
+                              (skin.options?.[slot]?.volume ??
+                                DEFAULT_SONG_VOLUME) / DEFAULT_SONG_VOLUME,
+                            );
+                            return { stop: () => undefined };
+                          })
+                        }
+                        className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold bg-lprimary/10 dark:bg-white/5 cursor-pointer"
+                      >
+                        <LuPlay size={11} />
+                        {t("Play")}
+                      </button>
+                      <OptionsToggle
+                        open={openSlot === slot}
+                        onClick={() =>
+                          setOpenSlot(openSlot === slot ? null : slot)
+                        }
+                      />
+                    </>
+                  )}
+                </>
+              )}
+              {!ownFile ? null : url ? (
                 <>
                   <button
                     type="button"
@@ -561,34 +638,36 @@ function SkinCard({
                   {t("silent")}
                 </span>
               )}
-              <label className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold border border-dashed border-lprimary/30 cursor-pointer">
-                <LuUpload size={11} />
-                {url ? "Replace" : "Upload"}
-                <input
-                  type="file"
-                  accept="audio/*,.mp3,.wav,.ogg,.oga,.opus,.flac,.m4a,.aac,.webm"
-                  className="sr-only"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    e.target.value = "";
-                    if (file) {
-                      setSlot.mutate(
-                        { id: skin.id, slot, file },
-                        {
-                          onSuccess: () => toast.success(t("Sound uploaded")),
-                          onError,
-                        },
-                      );
-                    }
-                  }}
-                />
-              </label>
+              {ownFile && (
+                <label className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold border border-dashed border-lprimary/30 cursor-pointer">
+                  <LuUpload size={11} />
+                  {url ? "Replace" : "Upload"}
+                  <input
+                    type="file"
+                    accept="audio/*,.mp3,.wav,.ogg,.oga,.opus,.flac,.m4a,.aac,.webm"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file) {
+                        setSlot.mutate(
+                          { id: skin.id, slot, file },
+                          {
+                            onSuccess: () => toast.success(t("Sound uploaded")),
+                            onError,
+                          },
+                        );
+                      }
+                    }}
+                  />
+                </label>
+              )}
             </div>
-            {url && openSlot === slot && (
+            {(url || cue) && openSlot === slot && (
               <SlotOptionsEditor
                 slot={slot}
                 builtin={false}
-                url={url}
+                url={ownFile ? url : undefined}
                 value={skin.options?.[slot]}
                 onSave={(next) =>
                   update.mutate(

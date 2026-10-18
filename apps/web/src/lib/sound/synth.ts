@@ -1,6 +1,6 @@
 "use client";
 
-import type { SoundSlot } from "@buzrr/contract";
+import { isCueSlot, type CueSlot, type SoundSlot } from "@buzrr/contract";
 
 /**
  * The built-in sound skins, synthesized with the Web Audio API — no audio
@@ -371,6 +371,13 @@ export function playBuiltin(
     setTimeout(() => bus.disconnect(), fadeSec * 1000 + 200);
   };
 
+  // -- lobby cues (join / bubble / reaction): the skin's own variant ---------
+  if (isCueSlot(slot)) {
+    bus.disconnect();
+    playCue(skinId, slot, (opts.volume ?? 0.45) / 0.45);
+    return { stop: () => undefined };
+  }
+
   // -- Arcade one-shots: 8-bit, square waves only ---------------------------
   if (skinId === "builtin:arcade") {
     if (slot === "countdown") {
@@ -633,6 +640,10 @@ export function playBuiltin(
   };
 }
 
+/** When the built-in tusch hits (after its drum roll / fall), in ms. */
+export const builtinTuschZeroMs = (skinId: BuiltinSkinId) =>
+  skinId === "builtin:arcade" ? 300 : 500;
+
 /** A built-in loop with "repeat" off plays this many bars. */
 export const BUILTIN_PASS_BARS = 8;
 
@@ -745,6 +756,73 @@ export function playArcadePling(volume = 0.045) {
   [0, 4, 7].forEach((step, i) =>
     chip(c.ctx, c.bus, c.t + i * 0.045, hz(root + step), 0.07, 0.45),
   );
+}
+
+/** A soft bus for Chill's cues: warm, low-passed, quiet. */
+function softBus(volume: number) {
+  const ctx = audioContext();
+  if (!ctx) return null;
+  const bus = ctx.createGain();
+  bus.gain.value = volume;
+  bus.connect(ctx.destination);
+  setTimeout(() => bus.disconnect(), 1500);
+  return { ctx, bus, t: ctx.currentTime + 0.01 };
+}
+
+/** Chill join: two mellow notes a sixth apart, slowly ringing out. */
+export function playChillJoin(volume = 0.3) {
+  const c = softBus(volume);
+  if (!c) return;
+  tone(c.ctx, c.bus, c.t, hz(7), 0.5, "triangle", 0.4, 2400); // G5
+  tone(c.ctx, c.bus, c.t + 0.14, hz(16), 0.8, "sine", 0.35, 2400); // E6
+}
+
+/** Chill bubble: a low, round drop. */
+export function playChillBlopp(volume = 0.12) {
+  const ctx = audioContext();
+  if (!ctx) return;
+  const t = ctx.currentTime + 0.01;
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = "sine";
+  const f0 = 300 + Math.random() * 90;
+  o.frequency.setValueAtTime(f0, t);
+  o.frequency.exponentialRampToValueAtTime(f0 * 0.5, t + 0.16);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(volume, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+  o.connect(g).connect(ctx.destination);
+  o.start(t);
+  o.stop(t + 0.25);
+}
+
+/** Chill reaction: a soft chime. */
+export function playChillPling(volume = 0.1) {
+  const c = softBus(volume);
+  if (!c) return;
+  const f = hz(19 + Math.floor(Math.random() * 3) * 2);
+  tone(c.ctx, c.bus, c.t, f, 0.6, "sine", 0.5, 5000);
+  tone(c.ctx, c.bus, c.t, f * 1.5, 0.4, "triangle", 0.12, 5000);
+}
+
+/**
+ * A lobby cue in a built-in skin's variant; `scale` 1 = its usual level
+ * (the skin's volume option: 80 → 1).
+ */
+export function playCue(skinId: BuiltinSkinId, cue: CueSlot, scale = 1) {
+  if (skinId === "builtin:arcade") {
+    if (cue === "join") playArcadeJoin(0.16 * scale);
+    else if (cue === "bubble") playArcadeBlopp(0.08 * scale);
+    else playArcadePling(0.045 * scale);
+  } else if (skinId === "builtin:chill") {
+    if (cue === "join") playChillJoin(0.3 * scale);
+    else if (cue === "bubble") playChillBlopp(0.12 * scale);
+    else playChillPling(0.1 * scale);
+  } else {
+    if (cue === "join") playPing(0.35 * scale);
+    else if (cue === "bubble") playBlopp(0.35 * SOFT * scale);
+    else playPling(0.35 * SOFT * scale);
+  }
 }
 
 /** 8-bit kick: a triangle wave swept down fast. */

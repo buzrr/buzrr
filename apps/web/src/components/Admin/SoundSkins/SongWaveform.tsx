@@ -73,16 +73,28 @@ export function SongWaveform({
   }, [url]);
   useEffect(() => () => preview.current?.stop(), []);
 
-  const endAligned = options.align === "end";
-  const windowMs = isCountdownSlot(slot)
-    ? COUNTDOWN_MS
-    : isQuestionSlot(slot)
-      ? questionSec * 1000
-      : null;
-  const cueMs = endAligned
-    ? (options.endMs ?? wave?.durationMs ?? 0)
-    : (options.startMs ?? 0);
-  const extendMs = endAligned ? (options.extendSec ?? 0) * 1000 : 0;
+  // The tusch: its zero point lands on the question's end; the lead-in
+  // before it plays while the question runs, the rest after it.
+  const tusch = slot === "end";
+  const endAligned = tusch || options.align === "end";
+  const tuschZero = options.endMs ?? 0;
+  const windowMs = tusch
+    ? tuschZero
+    : isCountdownSlot(slot)
+      ? COUNTDOWN_MS
+      : isQuestionSlot(slot)
+        ? questionSec * 1000
+        : null;
+  const cueMs = tusch
+    ? tuschZero
+    : endAligned
+      ? (options.endMs ?? wave?.durationMs ?? 0)
+      : (options.startMs ?? 0);
+  const extendMs = tusch
+    ? Math.max(0, (wave?.durationMs ?? 0) - tuschZero)
+    : endAligned
+      ? (options.extendSec ?? 0) * 1000
+      : 0;
   const fadeMs = fadeInOf(slot, options) * 1000;
 
   // The part that plays: [from, to] in the file, plus the extend after it.
@@ -201,7 +213,8 @@ export function SongWaveform({
     if (windowMs) {
       // Stops like the phase would (an end-aligned song plays its extend).
       const handle = preview.current;
-      setTimeout(() => handle.stop(), windowMs);
+      // The tusch isn't stopped: it plays out on top of everything.
+      if (!tusch) setTimeout(() => handle.stop(), windowMs);
       setTimeout(
         () => setPlaying((p) => (preview.current === handle ? false : p)),
         windowMs + extendMs + 400,

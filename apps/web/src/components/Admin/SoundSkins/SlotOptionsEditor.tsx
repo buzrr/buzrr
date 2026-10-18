@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { useEffect, useRef, useState } from "react";
 import {
   isCountdownSlot,
+  isCueSlot,
   isQuestionSlot,
   type SoundSlot,
   type SoundSlotOptions,
@@ -63,6 +64,10 @@ export function SlotOptionsEditor({
     timer.current = setTimeout(() => saveRef.current(next), SAVE_AFTER_MS);
   };
 
+  // Lobby cues are short sounds: volume only. The tusch has a zero point
+  // (it lands on the question's end) instead of a start point.
+  const cue = isCueSlot(slot);
+  const tusch = slot === "end";
   const alignable = !builtin && (isCountdownSlot(slot) || isQuestionSlot(slot));
   const endAligned = alignable && draft.align === "end";
   const volume = draft.volume ?? DEFAULT_SONG_VOLUME;
@@ -82,23 +87,25 @@ export function SlotOptionsEditor({
         <span className="w-10 text-right tabular-nums">{volume}</span>
       </label>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="w-40">{t("Fade in at the start")}</span>
-        <Switch
-          aria-label={t("Fade in at the start")}
-          checked={fadeInOf(slot, draft) > 0}
-          onCheckedChange={(on) => change({ fadeIn: on })}
-        />
-        {fadeInOf(slot, draft) > 0 && (
-          <SecondsInput
-            label={t("Fade time")}
-            value={fadeInOf(slot, draft)}
-            min={0.1}
-            max={30}
-            onChange={(fadeInSec) => change({ fadeInSec })}
+      {!cue && (
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="w-40">{t("Fade in at the start")}</span>
+          <Switch
+            aria-label={t("Fade in at the start")}
+            checked={fadeInOf(slot, draft) > 0}
+            onCheckedChange={(on) => change({ fadeIn: on })}
           />
-        )}
-      </div>
+          {fadeInOf(slot, draft) > 0 && (
+            <SecondsInput
+              label={t("Fade time")}
+              value={fadeInOf(slot, draft)}
+              min={0.1}
+              max={30}
+              onChange={(fadeInSec) => change({ fadeInSec })}
+            />
+          )}
+        </div>
+      )}
 
       {REPEATABLE_SLOTS.includes(slot) && !endAligned && (
         <div className="flex flex-wrap items-center gap-3">
@@ -135,11 +142,19 @@ export function SlotOptionsEditor({
         </div>
       )}
 
-      {url && !builtin && (
+      {url && !builtin && !cue && (
         <SongWaveform url={url} slot={slot} options={draft} onChange={change} />
       )}
 
-      {!builtin && !endAligned && (
+      {tusch && !builtin && (
+        <TimeField
+          label={t("Zero point (0) at")}
+          value={draft.endMs ?? 0}
+          onChange={(endMs) => change({ endMs })}
+        />
+      )}
+
+      {!builtin && !endAligned && !cue && !tusch && (
         <TimeField
           label={t("Start at")}
           value={draft.startMs ?? 0}

@@ -11,11 +11,14 @@ import {
 import { LuVolume2, LuVolumeX } from "react-icons/lu";
 import {
   BUILTIN_SOUND_SKINS,
+  isCueSlot,
   isQuestionSlot,
   isUnlimitedTime,
   quizSettingsSchema,
   soundSlotSchema,
   type BuiltinSoundOptions,
+  type CueSlot,
+  type CueSource,
   type QuestionAudio,
   type SoundSettings,
   type SoundSkin,
@@ -34,13 +37,9 @@ import { DEFAULT_SONG_VOLUME, fadeInOf, playSong } from "./song";
 import { useT } from "@/lib/i18n/context";
 import {
   audioContext,
+  builtinTuschZeroMs,
   playBuiltin,
-  playArcadeBlopp,
-  playArcadeJoin,
-  playArcadePling,
-  playBlopp,
-  playPing,
-  playPling,
+  playCue,
   type BuiltinSkinId,
   type SoundHandle,
 } from "./synth";
@@ -106,6 +105,10 @@ interface SoundState {
   setOn: (on: boolean) => void;
   /** Whether a question's own sound plays on this device. */
   questionAudioHere: (audio: QuestionAudio | null | undefined) => boolean;
+  /** Where a lobby cue comes from for this skin. */
+  cueSource: (cue: CueSlot) => CueSource;
+  /** Play a lobby cue now (the caller rate-limits). */
+  playCueSound: (cue: CueSlot) => void;
 }
 
 const SoundCtx = createContext<SoundState | null>(null);
@@ -184,6 +187,15 @@ const MUSIC_SLOTS: readonly SoundSlot[] = [
   "final",
 ];
 
+/** What `play` takes besides the slot. */
+interface PlayExtra {
+  progress?: () => number;
+  /** Countdown / question: time until it ends. */
+  remainingMs?: number;
+  /** Start the file here instead of its own start point. */
+  startMs?: number;
+}
+
 /** Which bed (loop) a phase plays; null = none. */
 function bedFor(phase: string): SoundSlot | null {
   switch (phase) {
@@ -256,12 +268,44 @@ export function GameSounds({
     return p.allowed && (pref ?? p.defaultOn);
   };
 
+  // Lobby cues: a built-in skin plays its own; a user skin picks per cue
+  // (default: its uploaded file, else Show's).
+  const cueSource = (cue: CueSlot): CueSource => {
+    if (builtinSkin) return settings.skin as CueSource;
+    return (
+      skin?.options?.[cue]?.source ??
+      (skin?.slots[cue] ? "custom" : "builtin:show")
+    );
+  };
+  const playCueSound = (cue: CueSlot) => {
+    const source = cueSource(cue);
+    if (source === "off") return;
+    const o = builtinSkin
+      ? builtinOptions[settings.skin]?.[cue]
+      : skin?.options?.[cue];
+    if (source === "custom") {
+      const url = skin?.slots[cue];
+      if (!url) return;
+      playSong(
+        async () => {
+          await fetchSkinFiles([url]);
+          return fetchClip(url);
+        },
+        cue,
+        o,
+      );
+      return;
+    }
+    playCue(
+      source,
+      cue,
+      (o?.volume ?? DEFAULT_SONG_VOLUME) / DEFAULT_SONG_VOLUME,
+    );
+  };
+
   // While the lobby / reveal / scores song fades out, the next one waits.
   const holdUntil = useRef(0);
-  const play = (
-    slot: SoundSlot,
-    extra?: { progress?: () => number; remainingMs?: number },
-  ): SoundHandle | null => {
+  const play = (slot: SoundSlot, extra?: PlayExtra): SoundHandle | null => {
     const wait = holdUntil.current - clockMs();
     if (wait <= 0) return playNow(slot, extra);
     // Starts after the fade; a countdown keeps its end where it was.
@@ -284,10 +328,7 @@ export function GameSounds({
       },
     };
   };
-  const playNow = (
-    slot: SoundSlot,
-    extra?: { progress?: () => number; remainingMs?: number },
-  ): SoundHandle | null => {
+  const playNow = (slot: SoundSlot, extra?: PlayExtra): SoundHandle | null => {
     const ctx = audioContext();
     if (ctx && ctx.state !== "running") void ctx.resume();
     // End-aligned songs need the time left in the countdown / question.
@@ -333,7 +374,15 @@ export function GameSounds({
       return fetchClip(url!);
     };
     return url
-      ? playSong(load, slot, skin?.options?.[slot], timing, url)
+      ? playSong(
+          load,
+          slot,
+          extra?.startMs !== undefined
+            ? { ...skin?.options?.[slot], startMs: extra.startMs }
+            : skin?.options?.[slot],
+          timing,
+          url,
+        )
       : null;
   };
 
@@ -362,6 +411,18 @@ export function GameSounds({
   // the bed and one-shot effects below (effects run in order).
   const reveal = useRef<SoundHandle | null>(null);
   const countdown = useRef<SoundHandle | null>(null);
+  const tusch = useRef<{
+    played: boolean;
+    timer?: ReturnType<typeof setTimeout>;
+  }>({ played: true });
+  useEffect(() => () => clearTimeout(tusch.current.timer), []);
+  /** Where the tusch's hit is: the skin's zero point, or the synth's roll. */
+  const tuschZeroMs = () =>
+    builtinSkin
+      ? builtinTuschZeroMs(settings.skin as BuiltinSkinId)
+      : skin?.slots.end
+        ? (skin.options?.end?.endMs ?? 0)
+        : 0;
   const countdownSlot = useRef<"countdown" | "lastCountdown">("countdown");
   const left = useRef(phase);
   useEffect(() => {
@@ -434,7 +495,9 @@ export function GameSounds({
       : SKIN_SLOTS.filter(
           (s) =>
             (settings.music || !MUSIC_SLOTS.includes(s)) &&
-            !(s === "final" && skin.finalClipUrl),
+            !(s === "final" && skin.finalClipUrl) &&
+            // Lobby cues play on the host only, and only its own files.
+            (!isCueSlot(s) || (role === "host" && cueSource(s) === "custom")),
         )
           .map((s) => skin.slots[s])
           .filter((u): u is string => Boolean(u));
@@ -488,11 +551,37 @@ export function GameSounds({
         remainingMs: countdownMs,
       });
     }
+    // The tusch: planned so its zero point lands on the question's end (a
+    // drum roll runs in during the last seconds), on top of the music —
+    // nothing stops it. If the question closes early, it comes in right at
+    // its zero point.
+    if (phase === "question") {
+      clearTimeout(tusch.current.timer);
+      tusch.current = { played: false };
+      const zero = tuschZeroMs();
+      const left = deadline - clockMs();
+      if (zero > 0 && !isUnlimitedTime(question?.timeOut) && left > 0) {
+        const fire = (startMs?: number) => {
+          tusch.current.played = true;
+          play("end", startMs !== undefined ? { startMs } : undefined);
+        };
+        if (left > zero) {
+          tusch.current.timer = setTimeout(() => fire(), left - zero);
+        } else if (!builtinSkin) {
+          fire(zero - left); // less time than lead-in: join it midway
+        }
+      }
+    }
     if (
       from === "question" &&
       (phase === "closed" || phase === "reveal" || phase === "scores")
     ) {
-      play("end");
+      clearTimeout(tusch.current.timer);
+      if (!tusch.current.played) {
+        const zero = tuschZeroMs();
+        play("end", zero > 0 && !builtinSkin ? { startMs: zero } : undefined);
+      }
+      tusch.current = { played: true };
     }
     if (phase === "reveal") {
       // After the tusch if the question just closed.
@@ -508,7 +597,16 @@ export function GameSounds({
 
   return (
     <SoundCtx.Provider
-      value={{ role, settings, on, allowed, setOn, questionAudioHere }}
+      value={{
+        role,
+        settings,
+        on,
+        allowed,
+        setOn,
+        questionAudioHere,
+        cueSource,
+        playCueSound,
+      }}
     >
       {children}
     </SoundCtx.Provider>
@@ -524,6 +622,11 @@ export function GameSounds({
 export function LiveSounds({ socket }: { socket: GameSocket | null }) {
   const s = useGameSound();
   const on = Boolean(s?.on);
+  // The latest sound state for the handlers (the skin may load later).
+  const sound = useRef(s);
+  useEffect(() => {
+    sound.current = s;
+  });
   useEffect(() => {
     if (!socket || !on) return;
     const last = { blopp: 0, pling: 0, join: 0 };
@@ -537,17 +640,17 @@ export function LiveSounds({ socket }: { socket: GameSocket | null }) {
       last[kind] = now;
       play();
     };
+    const cue = (c: CueSlot) => sound.current?.playCueSound(c);
     const hits: Record<string, number> = {};
-    // The Arcade skin has its own 8-bit pickups.
-    const arcade = s?.settings.skin === "builtin:arcade";
     // A crowd joining at once: one ping per 150 ms is plenty.
-    const ping = () =>
-      limited("join", 150, () => (arcade ? playArcadeJoin() : playPing()));
+    const ping = () => limited("join", 150, () => cue("join"));
     // Arcade's chip pling cuts through: at most one every 5 s.
     const onReaction = () =>
-      arcade
-        ? limited("pling", 5000, () => playArcadePling())
-        : limited("pling", 90, () => playPling());
+      limited(
+        "pling",
+        sound.current?.cueSource("reaction") === "builtin:arcade" ? 5000 : 90,
+        () => cue("reaction"),
+      );
     // One batch a second: the room's new pops spread over that second
     // (at most 12 blopps — a full room shouldn't drone).
     const onStats = ({
@@ -564,10 +667,7 @@ export function LiveSounds({ socket }: { socket: GameSocket | null }) {
       fresh = Math.min(12, fresh);
       for (let i = 0; i < fresh; i++) {
         setTimeout(
-          () =>
-            limited("blopp", 70, () =>
-              arcade ? playArcadeBlopp() : playBlopp(),
-            ),
+          () => limited("blopp", 70, () => cue("bubble")),
           (i * 900) / fresh,
         );
       }
@@ -580,7 +680,7 @@ export function LiveSounds({ socket }: { socket: GameSocket | null }) {
       socket.off("reaction", onReaction);
       socket.off("bubble-stats-batch", onStats);
     };
-  }, [socket, on, s?.settings.skin]);
+  }, [socket, on]);
   return null;
 }
 

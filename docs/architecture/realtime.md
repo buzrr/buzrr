@@ -332,6 +332,16 @@ skin in `sound_skins.options`, for the built-in skins in
   `extendSec` (0–5) keeps it playing after the phase ends, then it fades out.
   "∞" questions play from the start.
 
+Lobby cues (`join`, `bubble`, `reaction`, host only): a built-in skin plays
+its own variant (Show, Arcade's 8-bit, Chill's soft ones); a user skin picks
+per cue — a built-in variant, off, or its own file (`source`; default: the
+file if there is one, else Show's) — with a volume.
+
+The tusch (`end`) plays on top of everything and is never stopped. Its zero
+point (`endMs`; the synth skins' hit after their roll) lands on the question's
+end: it is started that long before the deadline; if the question closes
+early, it comes in right at the zero point.
+
 The question music starts once the countdown is over: the countdown's song
 stops when the question opens, an end-aligned one after its "plays on after
 0" seconds, and the question music waits for that. Lobby, reveal and

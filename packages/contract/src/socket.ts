@@ -80,7 +80,26 @@ export const soundSlotSchema = z.enum([
   "scores",
   /** More party at the very end, on the final leaderboard (loops). */
   "final",
+  /** Host lobby cues: a player joins, a bubble pops, a reaction comes in. */
+  "join",
+  "bubble",
+  "reaction",
 ]);
+
+/** The host's short lobby cues (not songs: volume and source only). */
+export const CUE_SLOTS = ["join", "bubble", "reaction"] as const;
+export type CueSlot = (typeof CUE_SLOTS)[number];
+export const isCueSlot = (slot: SoundSlot): slot is CueSlot =>
+  (CUE_SLOTS as readonly string[]).includes(slot);
+/** Where a user skin's cue comes from: a built-in skin's, none, or its own file. */
+export const cueSourceSchema = z.enum([
+  "builtin:show",
+  "builtin:arcade",
+  "builtin:chill",
+  "off",
+  "custom",
+]);
+export type CueSource = z.infer<typeof cueSourceSchema>;
 
 /** Ids of the built-in, synthesized skins (no audio files involved). */
 export const BUILTIN_SOUND_SKINS = [
@@ -137,6 +156,8 @@ export const soundSlotOptionsSchema = z.object({
   align: z.enum(["start", "end"]).optional(),
   endMs: z.number().int().min(0).max(3_600_000).optional(),
   extendSec: z.number().min(0).max(5).optional(),
+  /** Cue slots of a user skin: which sound plays (default: its file, else Show's). */
+  source: cueSourceSchema.optional(),
 });
 export type SoundSlotOptions = z.infer<typeof soundSlotOptionsSchema>;
 export const soundSkinOptionsSchema = z.partialRecord(

@@ -963,6 +963,11 @@ export const DE: Record<string, string> = {
   "Test bench": "Testlauf",
   "Zero point (0) at": "Nullpunkt (0) bei",
   "Plays on after 0": "Danach noch",
+  "Ping when a player joins (host, lobby)":
+    "Ping, wenn ein Spieler beitritt (Host, Lobby)",
+  "Bubble pop (host, lobby)": "Blase platzt (Host, Lobby)",
+  "Reaction from a player (host)": "Reaktion eines Spielers (Host)",
+  "Own file": "Eigene Datei",
   "Waveform — click or drag to set the end point":
     "Wellenform – klicken oder ziehen setzt den Endpunkt",
   "Waveform — click or drag to set the start point":

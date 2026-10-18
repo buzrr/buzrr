@@ -22,7 +22,7 @@ type Stage = "countdown" | "question" | "reveal" | "scores";
 /** Plays one slot the way the game does; null = this skin has nothing there. */
 export type SlotPlayer = (
   slot: SoundSlot,
-  extra: { remainingMs?: number; progress?: () => number },
+  extra: { remainingMs?: number; progress?: () => number; startMs?: number },
 ) => SoundHandle | null;
 
 /**
@@ -35,12 +35,15 @@ export function SkinTestBench({
   hasLastQuestion = false,
   countdownTailMs = 0,
   lastCountdownTailMs,
+  tuschZeroMs = 0,
 }: {
   play: SlotPlayer;
   /** How long the countdown song plays on after 0 (the question music waits). */
   countdownTailMs?: number;
   /** The same for the last question's countdown (default: as above). */
   lastCountdownTailMs?: number;
+  /** The tusch's zero point: it starts this long before the question ends. */
+  tuschZeroMs?: number;
   /** The skin has a song for the last question: offer to test that one. */
   hasLastQuestion?: boolean;
 }) {
@@ -114,10 +117,13 @@ export function SkinTestBench({
       };
       if (tail > 0) at(tail, startBed);
       else startBed();
+      // Like the game: the tusch's zero point lands on the question's end.
+      const zero = Math.min(tuschZeroMs, questionMs);
+      if (zero > 0) at(questionMs - zero, () => keep(play("end", {})));
       at(questionMs, () => {
         // Phase over: the bed stops (an end-aligned song plays on its extend).
         bed.h?.stop();
-        keep(play("end", {}));
+        if (!(tuschZeroMs > 0)) keep(play("end", {}));
         let revealSong: SoundHandle | null = null;
         if (withReveal) {
           enter("reveal", REVEAL_SHOW_MS);

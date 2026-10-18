@@ -89,7 +89,8 @@ QUEUED_REPORT_EVERY = 1.5
 SLOT_ACK_TIMEOUT = 10.0
 SLOT_GIVE_UP = 90.0  # like the web client: start anyway after this long
 SKIN_KEEPALIVE_EVERY = 4.0  # holding the skin slot: ask again, refreshes it
-MUSIC_SLOTS = {"lobby", "question", "scores", "final"}
+MUSIC_SLOTS = {"lobby", "question", "lastQuestion", "scores", "final"}
+CUE_SLOTS = {"join", "bubble", "reaction"}  # the host's lobby cues: not on players
 # During the game, reactions are rare: this share of all players taps 1-3
 # times once a question has run QUESTION_REACT_AFTER s, and this share
 # right after the answer is shown. In the lobby they tap regularly.
@@ -567,7 +568,7 @@ class Bot:
         music = self.sound.get("music", True) is not False
         urls = [
             u for slot, u in slots.items()
-            if u and (music or slot not in MUSIC_SLOTS)
+            if u and (music or slot not in MUSIC_SLOTS) and slot not in CUE_SLOTS
             and not (slot == "final" and self.skin.get("finalClipUrl"))
         ]
         if urls:
