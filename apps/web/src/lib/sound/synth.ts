@@ -351,6 +351,8 @@ export function playBuiltin(
     volume?: number;
     progress?: () => number;
     remainingMs?: number;
+    /** Wall clock (ms) when the countdown hits 0 (preferred over remainingMs). */
+    endsAt?: number;
     /** Fade in over this many seconds (superadmin's skin options). */
     fadeInSec?: number;
     /** Loops: false = one pass of BUILTIN_PASS_BARS bars, then fade out. */
@@ -398,14 +400,14 @@ export function playBuiltin(
   // -- Arcade one-shots: 8-bit, square waves only ---------------------------
   if (skinId === "builtin:arcade") {
     if (slot === "countdown" || slot === "lastCountdown") {
-      // A race-start beep per second, the last one an octave up and long.
-      const secs = Math.max(1, Math.round((opts.remainingMs ?? 5000) / 1000));
-      for (let i = 0; i < secs; i++) {
-        chip(ctx, bus, t0 + i, hz(12 + up), 0.12, 0.35);
-        if (last) chip(ctx, bus, t0 + i + 0.5, hz(12 + up), 0.06, 0.2);
+      // A race-start beep per second, the last one (on 0) an octave up, long.
+      const { zero, beeps } = countdownBeats(ctx, opts);
+      for (const at of beeps) {
+        chip(ctx, bus, at, hz(12 + up), 0.12, 0.35);
+        if (last) chip(ctx, bus, at + 0.5, hz(12 + up), 0.06, 0.2);
       }
-      chip(ctx, bus, t0 + secs, hz(24 + up), last ? 0.9 : 0.5, 0.4);
-      if (last) chip(ctx, bus, t0 + secs, hz(31 + up), 0.9, 0.25);
+      chip(ctx, bus, zero, hz(24 + up), last ? 0.9 : 0.5, 0.4);
+      if (last) chip(ctx, bus, zero, hz(31 + up), 0.9, 0.25);
       return { stop: fadeOut };
     }
     if (slot === "end") {
@@ -432,22 +434,24 @@ export function playBuiltin(
 
   // -- one-shots ------------------------------------------------------------
   if (slot === "countdown" || slot === "lastCountdown") {
-    const secs = Math.max(1, Math.round((opts.remainingMs ?? 5000) / 1000));
-    for (let i = 0; i < secs; i++) {
+    // A beep on every whole second left, the hit exactly on 0.
+    const { zero, beeps } = countdownBeats(ctx, opts);
+    beeps.forEach((at, i) => {
       tone(
         ctx,
         bus,
-        t0 + i,
+        at,
         hz(p.scale[i % p.scale.length]! + 3 + up),
         0.18,
         p.lead,
         0.3,
         p.cutoff,
       );
-      K(ctx, bus, t0 + i, 0.5 * d);
+      K(ctx, bus, at, 0.5 * d);
       // The last one: a heartbeat — a second kick on every half second.
-      if (last) K(ctx, bus, t0 + i + 0.5, 0.35 * d + 0.1);
-    }
+      if (last) K(ctx, bus, at + 0.5, 0.35 * d + 0.1);
+    });
+    const secs = zero - t0;
     chord(
       ctx,
       bus,
@@ -458,8 +462,8 @@ export function playBuiltin(
       0.12,
       p.cutoff,
     );
-    crash(ctx, bus, t0 + secs, d);
-    if (last) crash(ctx, bus, t0 + secs + 0.02, 1);
+    crash(ctx, bus, zero, d);
+    if (last) crash(ctx, bus, zero + 0.02, 1);
     return { stop: fadeOut };
   }
   if (slot === "end") {
@@ -724,6 +728,27 @@ export async function renderBuiltin(
 /** When the built-in tusch hits (after its drum roll / fall), in ms. */
 export const builtinTuschZeroMs = (skinId: BuiltinSkinId) =>
   skinId === "builtin:arcade" ? 300 : 500;
+
+/**
+ * When a countdown hits 0 on the audio clock, and its beeps: one on every
+ * whole second before it (5, 4, 3, 2, 1 — when the digit changes).
+ */
+function countdownBeats(
+  ctx: BaseAudioContext,
+  opts: { remainingMs?: number; endsAt?: number },
+) {
+  const leftSec =
+    typeof opts.endsAt === "number" && !rendering
+      ? Math.max(0, (opts.endsAt - Date.now()) / 1000)
+      : (opts.remainingMs ?? 5000) / 1000;
+  const zero = ctx.currentTime + leftSec;
+  const beeps: number[] = [];
+  for (let k = Math.ceil(leftSec - 0.001); k >= 1; k--) {
+    const at = zero - k;
+    if (at >= ctx.currentTime - 0.01) beeps.push(Math.max(at, ctx.currentTime));
+  }
+  return { zero, beeps };
+}
 
 /** A built-in loop with "repeat" off plays this many bars. */
 export const BUILTIN_PASS_BARS = 8;

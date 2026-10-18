@@ -76,6 +76,11 @@ export function headAt(tl: Timeline, now: number): number | null {
 export interface SongTiming {
   /** ms until the countdown / question ends (end-aligned songs). */
   untilEndMs?: number | null;
+  /**
+   * Wall clock (ms) when it ends — preferred: measured once the file is
+   * decoded, so decoding time doesn't push the end point late.
+   */
+  endsAt?: number | null;
 }
 
 /** "1:05.250" ⇄ 65250 ms. */
@@ -144,7 +149,10 @@ export function playSong(
         let when = now;
         let offset = at(o.startMs, 0);
         // End-aligned: the end point lands on the countdown's / question's end.
-        const until = timing.untilEndMs;
+        const until =
+          typeof timing.endsAt === "number"
+            ? timing.endsAt - Date.now()
+            : timing.untilEndMs;
         const endAligned =
           o.align === "end" &&
           (isCountdownSlot(slot) || isQuestionSlot(slot)) &&

@@ -192,6 +192,8 @@ interface PlayExtra {
   progress?: () => number;
   /** Countdown / question: time until it ends. */
   remainingMs?: number;
+  /** …and the wall clock when it ends (exact; preferred where known). */
+  endsAt?: number;
   /** Start the file here instead of its own start point. */
   startMs?: number;
 }
@@ -340,7 +342,10 @@ export function GameSounds({
     const ctx = audioContext();
     if (ctx && ctx.state !== "running") void ctx.resume();
     // End-aligned songs need the time left in the countdown / question.
-    const timing = { untilEndMs: extra?.remainingMs ?? null };
+    const timing = {
+      untilEndMs: extra?.remainingMs ?? null,
+      endsAt: extra?.endsAt ?? null,
+    };
     if (slot === "final" && !builtinSkin && skin?.finalClipUrl) {
       const url = skin.finalClipUrl;
       return finalSoundKey
@@ -476,7 +481,10 @@ export function GameSounds({
         progress: () =>
           1 - Math.max(0, deadlineRef.current - Date.now()) / total,
         ...(timed
-          ? { remainingMs: Math.max(0, deadlineRef.current - clockMs()) }
+          ? {
+              remainingMs: Math.max(0, deadlineRef.current - clockMs()),
+              endsAt: deadlineRef.current,
+            }
           : {}),
       }),
     };
@@ -545,8 +553,10 @@ export function GameSounds({
         qIndex === qCount - 1 &&
         (builtinSkin || Boolean(files.lastCountdown));
       countdownSlot.current = lastCd ? "lastCountdown" : "countdown";
+      // 0 is the deadline itself: beeps and the song's zero point land on it.
       countdown.current = play(countdownSlot.current, {
         remainingMs: countdownMs,
+        ...(deadline > 0 ? { endsAt: deadline } : {}),
       });
     }
     // The tusch: planned so its zero point lands on the question's end (a

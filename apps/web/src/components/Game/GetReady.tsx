@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { useAppSelector } from "@/state/hooks";
-import { useServerCountdown } from "@/hooks/useServerCountdown";
+import { useEffect, useState } from "react";
 import { LuSkipForward } from "react-icons/lu";
 import { useT } from "@/lib/i18n/context";
 import {
@@ -38,10 +38,15 @@ export default function GetReady({
   const devices = useAppSelector((state) => state.game.downloadDevices);
   const done = useAppSelector((state) => state.game.downloadsDone);
   const waitAll = useAppSelector((state) => state.game.waitAll);
-  const remaining = useServerCountdown(phase === "starting" ? deadline : 0);
+  // Every frame, so the digits and the ring hit 0 exactly at the deadline
+  // (with the countdown's beep).
+  const remaining = useFrameCountdown(phase === "starting" ? deadline : 0);
   const seconds = Math.ceil(remaining);
-  // Countdown over but devices are still downloading the sound: spin instead.
-  const counting = phase === "starting" && deadline > 0 && waitingFor === 0;
+  const counting =
+    phase === "starting" && deadline > 0 && remaining > 0 && waitingFor === 0;
+  // 0 is the end: red, still — also while devices finish their downloads.
+  const zero =
+    phase === "starting" && deadline > 0 && (remaining <= 0 || waitingFor > 0);
 
   return (
     <div className="w-full max-w-3xl mx-auto flex flex-col justify-center px-4 py-6 md:py-10 min-h-[calc(100dvh-7.5rem)] text-dark dark:text-white">
@@ -68,13 +73,14 @@ export default function GetReady({
 
         <Countdown
           counting={counting}
+          zero={zero}
           seconds={seconds}
           remaining={remaining}
           total={countdownMs / 1000}
         />
 
         <div className="relative min-h-6 flex items-center justify-center">
-          {counting ? (
+          {counting || (zero && waitingFor === 0) ? (
             <p className={clsx("text-base md:text-lg font-medium", mutedText)}>
               {qIndex > 0
                 ? t("Question {n} coming up", { n: qIndex + 1 })
@@ -136,13 +142,33 @@ export default function GetReady({
   );
 }
 
+/** Seconds to `deadline` (local clock), updated every animation frame until 0. */
+function useFrameCountdown(deadline: number): number {
+  const [remaining, setRemaining] = useState(0);
+  useEffect(() => {
+    if (!deadline) return;
+    let raf = 0;
+    const tick = () => {
+      const left = Math.max(0, (deadline - Date.now()) / 1000);
+      setRemaining(left);
+      if (left > 0) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [deadline]);
+  return deadline ? remaining : 0;
+}
+
 function Countdown({
   counting,
+  zero,
   seconds,
   remaining,
   total,
 }: {
   counting: boolean;
+  /** Reached 0: the whole round turns red, a black 0, nothing moves. */
+  zero: boolean;
   seconds: number;
   remaining: number;
   total: number;
@@ -151,8 +177,9 @@ function Countdown({
   const c = 2 * Math.PI * r;
   const frac =
     counting && total > 0 ? Math.max(0, Math.min(1, remaining / total)) : 0;
-  // Counts down to 1; at zero the question simply appears.
-  const label = !counting || seconds <= 0 ? null : seconds;
+  const label = zero ? 0 : !counting || seconds <= 0 ? null : seconds;
+  // No countdown known yet (waiting for the question): a spinner.
+  const spinning = !counting && !zero;
   return (
     <div className="relative size-[150px] md:size-[190px]">
       <svg viewBox="0 0 100 100" className="block size-full -rotate-90">
@@ -162,31 +189,42 @@ function Countdown({
             <stop offset="1" style={{ stopColor: "var(--color-accent)" }} />
           </linearGradient>
         </defs>
-        <circle
-          cx="50"
-          cy="50"
-          r={r}
-          fill="none"
-          strokeWidth="6"
-          className="stroke-lprimary/10 dark:stroke-white/10"
-        />
-        <circle
-          cx="50"
-          cy="50"
-          r={r}
-          fill="none"
-          strokeWidth="6"
-          strokeLinecap="round"
-          stroke="url(#get-ready-ring)"
-          strokeDasharray={c}
-          strokeDashoffset={c * (1 - frac)}
-          className={clsx(
-            "transition-[stroke-dashoffset] duration-250 ease-linear",
-            !counting &&
-              "animate-spin origin-center [transform-box:fill-box] [animation-duration:2.4s]",
-          )}
-          style={counting ? undefined : { strokeDashoffset: c * 0.72 }}
-        />
+        {zero ? (
+          // 0: the whole round red — the end, nothing turns any more.
+          <circle
+            cx="50"
+            cy="50"
+            r={r + 3}
+            className="fill-red-light dark:fill-red-dark"
+          />
+        ) : (
+          <>
+            <circle
+              cx="50"
+              cy="50"
+              r={r}
+              fill="none"
+              strokeWidth="6"
+              className="stroke-lprimary/10 dark:stroke-white/10"
+            />
+            <circle
+              cx="50"
+              cy="50"
+              r={r}
+              fill="none"
+              strokeWidth="6"
+              strokeLinecap="round"
+              stroke="url(#get-ready-ring)"
+              strokeDasharray={c}
+              // Driven every frame (no CSS transition): it ends exactly on 0.
+              strokeDashoffset={spinning ? c * 0.72 : c * (1 - frac)}
+              className={clsx(
+                spinning &&
+                  "animate-spin origin-center [transform-box:fill-box] [animation-duration:2.4s]",
+              )}
+            />
+          </>
+        )}
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
         {label !== null && (
@@ -195,6 +233,7 @@ function Countdown({
             className={clsx(
               "font-extrabold leading-none tracking-[-0.03em] tabular-nums animate-pop-in",
               "text-6xl md:text-7xl",
+              zero && "text-black",
             )}
           >
             {label}
