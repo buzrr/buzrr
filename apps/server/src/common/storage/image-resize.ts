@@ -73,11 +73,37 @@ const UPRIGHT: Record<number, string> = {
   8: "transpose=2",
 };
 
+/** Whether a picture has any transparent pixel (checked on a small copy). */
+async function hasAlpha(input: Buffer): Promise<boolean> {
+  const rgba = await runFfmpeg(input, [
+    "-i",
+    "pipe:0",
+    "-vf",
+    "scale=64:-1,format=rgba",
+    "-frames:v",
+    "1",
+    "-f",
+    "rawvideo",
+    "pipe:1",
+  ]);
+  for (let i = 3; i < rgba.length; i += 4) {
+    if (rgba[i]! < 255) return true;
+  }
+  return false;
+}
+
+/** The MIME type of a stored picture (after `shrinkImage`). */
+export function imageType(buffer: Buffer): string {
+  return sniffImage(buffer).type;
+}
+
 /**
- * A picture scaled down to `maxSide` on its longest side, as WebP (which
- * keeps transparency) — what every device in a room downloads. A GIF (maybe
- * animated) passes through, as does anything ffmpeg can't read or a result
- * that isn't smaller.
+ * A picture scaled down to `maxSide` on its longest side — what every
+ * device in a room downloads — as JPEG, or PNG when it has transparency:
+ * formats every browser shows (WebP needs Safari 14 on macOS 11 / iOS 14).
+ * A GIF (maybe animated) passes through, as does anything ffmpeg can't read
+ * or a result that isn't smaller — except WebP / AVIF, which are always
+ * converted.
  */
 export async function shrinkImage(
   input: Buffer,
@@ -93,6 +119,7 @@ export async function shrinkImage(
   const upright = ext === "jpg" ? UPRIGHT[jpegOrientation(input)] : undefined;
   const scale = `scale='min(${maxSide},iw)':'min(${maxSide},ih)':force_original_aspect_ratio=decrease`;
   try {
+    const png = ext !== "jpg" && (await hasAlpha(input));
     const out = await runFfmpeg(input, [
       "-noautorotate",
       "-i",
@@ -103,15 +130,22 @@ export async function shrinkImage(
       "1",
       "-map_metadata",
       "-1",
-      "-c:v",
-      "libwebp",
-      "-quality",
-      "80",
-      "-f",
-      "webp",
+      ...(png
+        ? ["-c:v", "png", "-f", "image2pipe"]
+        : [
+            "-c:v",
+            "mjpeg",
+            "-q:v",
+            "4",
+            "-pix_fmt",
+            "yuvj420p",
+            "-f",
+            "image2pipe",
+          ]),
       "pipe:1",
     ]);
-    return out.length < input.length ? out : input;
+    const mustConvert = ext === "webp" || ext === "avif";
+    return mustConvert || out.length < input.length ? out : input;
   } catch {
     return input;
   }

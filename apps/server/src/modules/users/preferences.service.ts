@@ -17,6 +17,7 @@ import {
 } from "../../common/storage/media-storage";
 import {
   LOGO_MAX,
+  imageType,
   shrinkImage,
   toAvatarPng,
 } from "../../common/storage/image-resize";
@@ -131,7 +132,7 @@ export class PreferencesService {
       file && small
         ? await this.store(
             small,
-            small === file.buffer ? file.mimetype : "image/webp",
+            small === file.buffer ? file.mimetype : imageType(small),
             file.originalname,
             "image",
           )

@@ -27,6 +27,7 @@ import { cutClip, toMp3 } from "../../common/storage/audio-transcode";
 import { encryptClip } from "../../common/storage/clip-crypto";
 import {
   QUESTION_IMAGE_MAX,
+  imageType,
   shrinkImage,
 } from "../../common/storage/image-resize";
 import { stripAssetSignature } from "../../common/storage/asset-signing";
@@ -366,7 +367,8 @@ export class QuestionsService implements OnApplicationBootstrap {
         {
           ...file,
           buffer: picture,
-          mimetype: picture === file.buffer ? file.mimetype : "image/webp",
+          mimetype:
+            picture === file.buffer ? file.mimetype : imageType(picture),
         },
         "image",
       );
@@ -543,14 +545,15 @@ export class QuestionsService implements OnApplicationBootstrap {
   }
 
   /**
-   * Preload copies made before pictures were scaled down: remade once per
-   * installation from a scaled-down picture (the stored original stays).
+   * Preload copies made before pictures were scaled down (or scaled down to
+   * WebP): remade once per installation from a scaled-down JPEG / PNG (the
+   * stored picture stays).
    * The old copies are left in place — a game running across a restart
    * may still load them.
    */
   async shrinkMediaClips(log: (msg: string) => void): Promise<void> {
     if (!this.redis) return;
-    const done = "media-clips:shrunk:v1";
+    const done = "media-clips:shrunk:v2";
     if (await this.redis.get(done)) return;
     // One instance does it.
     const lock = await this.redis.set(`${done}:lock`, "1", "EX", 3600, "NX");
@@ -567,8 +570,9 @@ export class QuestionsService implements OnApplicationBootstrap {
     for (const row of rows) {
       const source = await this.storage.read(row.media!).catch(() => null);
       if (!source) continue;
+      // Always remade: the first run's copies were WebP, which older Safari
+      // can't show.
       const small = await shrinkImage(source, QUESTION_IMAGE_MAX);
-      if (small === source) continue;
       const { blob, key } = encryptClip(small);
       const { url } = await this.storage.upload(blob, {
         contentType: "application/octet-stream",

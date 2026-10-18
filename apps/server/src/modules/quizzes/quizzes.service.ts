@@ -31,7 +31,11 @@ import {
 } from "../question-types";
 import { CreateAiQuizDto } from "./dto/create-ai-quiz.dto";
 import { CreateQuizDto } from "./dto/create-quiz.dto";
-import { LOGO_MAX, shrinkImage } from "../../common/storage/image-resize";
+import {
+  LOGO_MAX,
+  imageType,
+  shrinkImage,
+} from "../../common/storage/image-resize";
 
 /**
  * Shape the model must return (sent to the provider as a JSON Schema for
@@ -119,7 +123,7 @@ export class QuizzesService {
         // Every device in a room loads it: stored scaled down.
         const small = await shrinkImage(file.buffer, LOGO_MAX);
         ({ url: logo } = await this.storage.upload(small, {
-          contentType: small === file.buffer ? file.mimetype : "image/webp",
+          contentType: small === file.buffer ? file.mimetype : imageType(small),
           filename: file.originalname,
           kind: "image",
         }));
