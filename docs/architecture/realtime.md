@@ -283,14 +283,21 @@ masked until the reveal (`buildSnapshot`).
   exactly what the current client speaks. Adding a compat alias "just in case"
   reintroduces the drift this removal cleared.
 
-## Question sounds: preload and the countdown's wait
+## Question sounds and pictures: preload and the countdown's wait
+
+A question's picture is encrypted too (`Question.mediaClip` / `mediaKey`,
+made on save; older pictures get theirs in the background after a server
+start): `preload` lists it in `images`, every device downloads it (sound
+only where it plays), the countdown waits for it like for the clips, and
+`question-start` brings `mediaKey` — the device decrypts it then. Pictures
+without a copy (external links) load as before.
 
 - During a reveal (or the get-ready slide) the room gets `preload` with the
   next question's encrypted clips. Each device starts after a random pause of
   up to 3 s (`PRELOAD_SPREAD_MS`, `lib/sound/preload.ts`) and reports
   `preload-status` with `loaded: 0` at once, so the countdown counts it as
   downloading.
-- **Download slots** (`MAX_PARALLEL_AUDIO_DOWNLOADS`, `audio-slots.ts`): a
+- **Download slots** (`MAX_PARALLEL_DOWNLOADS`, `audio-slots.ts`): a
   device that has to download asks `preload-slot` first (ack `{ go, limited }`);
   queued devices get `preload-go { qIndex }` as slots free up — on a `done`
   report, a disconnect, or 8 s without progress (`SLOT_STALL_MS`). The host

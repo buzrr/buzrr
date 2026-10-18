@@ -63,8 +63,10 @@ export type QuestionAudio = z.infer<typeof questionAudioSchema>;
 const publicBase = z.object({
   id: z.string(),
   title: z.string(),
+  /** The picture: encrypted (decrypt with `mediaKey`), or a plain file. */
   media: z.string().nullable(),
   mediaType: z.string().nullable(),
+  mediaKey: z.string().optional(),
   /** Seconds to answer. */
   timeOut: z.number().int().positive(),
   audio: questionAudioSchema.nullable().optional(),

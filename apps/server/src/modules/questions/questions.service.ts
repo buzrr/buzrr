@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
+  Logger,
+  type OnApplicationBootstrap,
   BadRequestException,
   ForbiddenException,
   Injectable,
@@ -88,7 +90,9 @@ function ownsQuestion(
 }
 
 @Injectable()
-export class QuestionsService {
+export class QuestionsService implements OnApplicationBootstrap {
+  private readonly logger = new Logger(QuestionsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: MediaStorage,
@@ -275,6 +279,8 @@ export class QuestionsService {
       audioClipKey: string | null;
       audioRevealClip: string | null;
       audioRevealKey: string | null;
+      mediaClip: string | null;
+      mediaKey: string | null;
     } | null = null;
     if (quesId) {
       const question = await this.prisma.db.question.findUnique({
@@ -352,6 +358,12 @@ export class QuestionsService {
       mediaType = file_type ?? "";
     }
 
+    const picture = await this.mediaClip(
+      fileLink || null,
+      mediaType,
+      file && file.size > 0 ? file.buffer : null,
+      existing,
+    );
     const timeOut = parseInt(time ?? "", 10) || DEFAULT_TIME_OUT;
     const clips = await this.audioClips(
       audio,
@@ -384,6 +396,7 @@ export class QuestionsService {
             timeOut,
             media: fileLink || null,
             mediaType: mediaType || null,
+            ...picture.fields,
             ...audioFields,
             ...clips.fields,
             moderationStatus,
@@ -408,7 +421,9 @@ export class QuestionsService {
       if (existing?.audio && existing.audio !== audio) {
         await this.removeUnused(existing.audio);
       }
-      for (const old of clips.replaced) await this.removeUnused(old);
+      for (const old of [...clips.replaced, ...picture.replaced]) {
+        await this.removeUnused(old);
+      }
     } else {
       await this.prisma.db.$transaction(async (tx) => {
         const count = await tx.question.count({ where: { quizId } });
@@ -422,6 +437,7 @@ export class QuestionsService {
             timeOut,
             media: fileLink || null,
             mediaType: mediaType || null,
+            ...picture.fields,
             ...audioFields,
             ...clips.fields,
             order: count + 1,
@@ -431,6 +447,81 @@ export class QuestionsService {
         });
       });
     }
+  }
+
+  /**
+   * The picture as devices load it ahead of time: an encrypted copy of the
+   * image (the key only goes out with `question-start`). Kept when the
+   * picture didn't change; `replaced` lists the old copy to delete.
+   */
+  private async mediaClip(
+    media: string | null,
+    mediaType: string,
+    freshImage: Buffer | null,
+    existing: {
+      media: string | null;
+      mediaClip: string | null;
+      mediaKey: string | null;
+    } | null,
+  ) {
+    const old = existing?.mediaClip ? [existing.mediaClip] : [];
+    const none = { mediaClip: null, mediaKey: null };
+    if (!media || mediaType !== "image") return { fields: none, replaced: old };
+    if (
+      !freshImage &&
+      existing?.media === media &&
+      existing.mediaClip &&
+      existing.mediaKey
+    ) {
+      return {
+        fields: { mediaClip: existing.mediaClip, mediaKey: existing.mediaKey },
+        replaced: [],
+      };
+    }
+    const source = freshImage ?? (await this.storage.read(media));
+    // A picture we can't read (an external link) shows as before.
+    if (!source) return { fields: none, replaced: old };
+    const { blob, key } = encryptClip(source);
+    const { url } = await this.storage.upload(blob, {
+      contentType: "application/octet-stream",
+      kind: "encrypted",
+    });
+    return { fields: { mediaClip: url, mediaKey: key }, replaced: old };
+  }
+
+  /**
+   * Pictures stored before they were encrypted for preloading: their copy,
+   * once, in the background after start.
+   */
+  async backfillMediaClips(log: (msg: string) => void): Promise<void> {
+    const rows = await this.prisma.db.question.findMany({
+      where: { mediaType: "image", media: { not: null }, mediaClip: null },
+      select: { id: true, media: true },
+    });
+    let made = 0;
+    for (const row of rows) {
+      const source = await this.storage.read(row.media!).catch(() => null);
+      if (!source) continue;
+      const { blob, key } = encryptClip(source);
+      const { url } = await this.storage.upload(blob, {
+        contentType: "application/octet-stream",
+        kind: "encrypted",
+      });
+      await this.prisma.db.question.update({
+        where: { id: row.id },
+        data: { mediaClip: url, mediaKey: key },
+      });
+      made++;
+    }
+    if (made > 0) log(`Encrypted ${made} question pictures for preloading`);
+  }
+
+  onApplicationBootstrap(): void {
+    setTimeout(() => {
+      this.backfillMediaClips((m) => this.logger.log(m)).catch((err) =>
+        this.logger.error("Encrypting question pictures failed", err),
+      );
+    }, 15_000).unref();
   }
 
   /**
@@ -603,6 +694,7 @@ export class QuestionsService {
             { media: url },
             { audio: url },
             { audioClip: url },
+            { mediaClip: url },
             { audioRevealClip: url },
           ],
         },

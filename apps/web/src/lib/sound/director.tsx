@@ -562,9 +562,14 @@ export function GameSounds({
   const wouldPlayHere = (playOn: QuestionAudio["playOn"]) =>
     questionAudioHere({ url: "", startMs: 0, revealMs: null, playOn });
   useEffect(() => {
-    if (preload && wouldPlayHere(preload.playOn)) {
-      preloadClips(preload.urls, preload.qIndex);
-    }
+    // The picture shows on every device; the sound only where it plays.
+    const urls = preload
+      ? [
+          ...(preload.images ?? []),
+          ...(wouldPlayHere(preload.playOn) ? preload.urls : []),
+        ]
+      : [];
+    if (preload && urls.length > 0) preloadClips(urls, preload.qIndex);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preload]);
 

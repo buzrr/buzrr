@@ -366,7 +366,7 @@ export const phaseChangeSchema = z.object({
 /**
  * What a download slot is for: a question's sound clips, or the sound skin's
  * files (fetched once, in the lobby). Each kind has its own
- * MAX_PARALLEL_AUDIO_DOWNLOADS per room.
+ * MAX_PARALLEL_DOWNLOADS per room.
  */
 export const downloadKindSchema = z.enum(["question", "skin"]);
 export type DownloadKind = z.infer<typeof downloadKindSchema>;
@@ -381,7 +381,7 @@ export const preloadSlotSchema = z.object({
 export const slotDoneSchema = preloadSlotSchema;
 /**
  * `go`: start downloading now. Otherwise wait for `preload-go` — the server
- * hands out at most MAX_PARALLEL_AUDIO_DOWNLOADS slots per room at a time.
+ * hands out at most MAX_PARALLEL_DOWNLOADS slots per room at a time.
  * `limited`: slots are rationed (the device needn't spread its start itself).
  */
 export interface PreloadSlotAck {
@@ -452,7 +452,10 @@ export const questionEndSchema = z.object({
  */
 export const preloadSchema = z.object({
   qIndex: z.number().int(),
+  /** The question sound's encrypted clips. */
   urls: z.array(z.string()),
+  /** Its encrypted picture: every device loads it (it shows everywhere). */
+  images: z.array(z.string()).optional(),
   /** The question sound's own placement, so devices that won't play it skip the download. */
   playOn: z.enum(["quiz", "host", "players", "both", "off"]),
 });

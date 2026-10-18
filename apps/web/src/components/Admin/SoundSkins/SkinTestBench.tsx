@@ -1,5 +1,6 @@
 "use client";
 
+import { QuestionSecondsInput } from "./QuestionSecondsInput";
 import clsx from "clsx";
 import { useEffect, useRef, useState } from "react";
 import { LuPlay, LuSquare } from "react-icons/lu";
@@ -164,16 +165,9 @@ export function SkinTestBench({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <label className="flex items-center gap-1.5">
           {t("Question time")}
-          <input
-            type="number"
-            min={3}
-            max={300}
+          <QuestionSecondsInput
             value={seconds}
-            onChange={(e) =>
-              setSeconds(
-                Math.min(300, Math.max(3, Number(e.target.value) || 3)),
-              )
-            }
+            onChange={setSeconds}
             className="w-20 rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent px-2 py-1 tabular-nums"
           />
           s

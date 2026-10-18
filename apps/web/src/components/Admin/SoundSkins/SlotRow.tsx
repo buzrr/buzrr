@@ -1,5 +1,6 @@
 "use client";
 
+import { QuestionSecondsInput } from "./QuestionSecondsInput";
 import clsx from "clsx";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LuChevronDown, LuPlay, LuSquare } from "react-icons/lu";
@@ -194,16 +195,9 @@ export function SlotRow({
           {showQuestionTime && (
             <label className="flex items-center gap-1 text-xs">
               {t("Preview question time")}
-              <input
-                type="number"
-                min={3}
-                max={300}
+              <QuestionSecondsInput
                 value={questionSec}
-                onChange={(e) =>
-                  setQuestionSec(
-                    Math.min(300, Math.max(3, Number(e.target.value) || 3)),
-                  )
-                }
+                onChange={setQuestionSec}
                 className="w-16 rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent px-1.5 py-0.5 tabular-nums"
               />
               s

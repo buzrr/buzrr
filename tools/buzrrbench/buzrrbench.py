@@ -522,9 +522,15 @@ class Bot:
 
     def on_preload(self, data: dict) -> None:
         M.counts["preload hints received"] += 1
-        if not self.assets or not self.sound_here(data.get("playOn")):
+        if not self.assets:
             return
-        urls = data.get("urls") or []
+        # Like the browser: the picture on every device, the sound only
+        # where it plays.
+        urls = list(data.get("images") or [])
+        if self.sound_here(data.get("playOn")):
+            urls += data.get("urls") or []
+        if not urls:
+            return
         q = data["qIndex"]
         self.tracked = (q, [u.split("?")[0] for u in urls], time.perf_counter())
         self.notify()

@@ -248,13 +248,6 @@ export default function AllQues(props: { quizId: string }) {
                                 </span>
                               )}
                               {/* What the question brings along. */}
-                              {ques.media && ques.mediaType !== "audio" && (
-                                <LuImage
-                                  size={17}
-                                  aria-label={t("With a picture")}
-                                  role="img"
-                                />
-                              )}
                               {ques.audio && (
                                 <LuMusic
                                   size={17}
@@ -262,13 +255,20 @@ export default function AllQues(props: { quizId: string }) {
                                   role="img"
                                 />
                               )}
+                              {/* The picture: its icon (opens it too), a
+                                  little gap, then "View image". */}
+                              {ques.media && (
+                                <ShowMedia
+                                  media={ques.media}
+                                  mediaType={ques.mediaType ?? ""}
+                                  icon={
+                                    ques.mediaType !== "audio" ? (
+                                      <LuImage size={17} />
+                                    ) : undefined
+                                  }
+                                />
+                              )}
                             </span>
-                            {ques.media && (
-                              <ShowMedia
-                                media={ques.media}
-                                mediaType={ques.mediaType ?? ""}
-                              />
-                            )}
                           </div>
                         </div>
                       </div>

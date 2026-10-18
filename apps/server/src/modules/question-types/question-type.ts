@@ -26,6 +26,9 @@ export interface LiveQuestion<T extends QuestionType = QuestionType> {
   title: string;
   media: string | null;
   mediaType: string | null;
+  /** The picture encrypted for preloading, and its key (sent at the start). */
+  mediaClip?: string | null;
+  mediaKey?: string | null;
   /** Seconds to answer. */
   timeOut: number;
   options: LiveOption[];

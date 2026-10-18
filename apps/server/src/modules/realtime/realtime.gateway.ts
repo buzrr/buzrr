@@ -67,9 +67,18 @@ export class RealtimeGateway
   @WebSocketServer()
   server: TypedServer;
 
-  /** MAX_PARALLEL_AUDIO_DOWNLOADS per room (unset/0 = unlimited). */
+  /**
+   * MAX_PARALLEL_DOWNLOADS per room and kind (unset/0 = unlimited); the
+   * older name MAX_PARALLEL_AUDIO_DOWNLOADS still works.
+   */
   private readonly slots = new AudioSlots(
-    Math.max(0, Number(process.env.MAX_PARALLEL_AUDIO_DOWNLOADS) || 0),
+    Math.max(
+      0,
+      Number(
+        process.env.MAX_PARALLEL_DOWNLOADS ??
+          process.env.MAX_PARALLEL_AUDIO_DOWNLOADS,
+      ) || 0,
+    ),
   );
 
   constructor(

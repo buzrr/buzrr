@@ -325,6 +325,8 @@ describe("toLiveQuestion", () => {
       ...live,
       config: { multiSelect: false },
       audio: null,
+      mediaClip: null,
+      mediaKey: null,
     });
   });
 
