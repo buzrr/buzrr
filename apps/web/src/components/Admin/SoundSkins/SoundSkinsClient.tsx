@@ -1,17 +1,9 @@
 "use client";
 
 import clsx from "clsx";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { toast } from "react-toastify";
-import {
-  LuCheck,
-  LuFlaskConical,
-  LuPlay,
-  LuSettings2,
-  LuSquare,
-  LuTrash2,
-  LuUpload,
-} from "react-icons/lu";
+import { LuCheck, LuFlaskConical, LuTrash2, LuUpload } from "react-icons/lu";
 import {
   BUILTIN_SOUND_SKINS,
   isCountdownSlot,
@@ -35,17 +27,17 @@ import {
 } from "@/lib/modules/preferences/hooks";
 import {
   BUILTIN_SKINS,
-  audioContext,
+  builtinRenderSec,
   builtinTuschZeroMs,
+  isLoopSlot,
   playBuiltin,
   playCue,
   type BuiltinSkinId,
-  type SoundHandle,
 } from "@/lib/sound/synth";
 import { DEFAULT_SONG_VOLUME, fadeInOf, playSong } from "@/lib/sound/song";
 import { fetchClip } from "@/lib/sound/preload";
-import { SlotOptionsEditor } from "./SlotOptionsEditor";
-import { SkinTestBench } from "./SkinTestBench";
+import { SkinTestBench, type SlotPlayer } from "./SkinTestBench";
+import { SlotRow, usePlayback, type SlotStarter } from "./SlotRow";
 import { useT } from "@/lib/i18n/context";
 import {
   useClearSoundSlot,
@@ -74,61 +66,87 @@ export const SLOT_LABELS: Record<SoundSlot, string> = {
 };
 
 const SLOTS = soundSlotSchema.options;
-/** The built-in skins have one question music (no separate last one). */
+/** The built-in skins have one countdown and question music. */
 const BUILTIN_SLOTS = SLOTS.filter(
   (s) => s !== "lastQuestion" && s !== "lastCountdown",
 );
 
-/** One preview at a time across the page. */
-function usePreview() {
-  const handle = useRef<SoundHandle | null>(null);
-  const [playing, setPlaying] = useState<string | null>(null);
-  useEffect(() => () => handle.current?.stop(), []);
-  const stop = () => {
-    handle.current?.stop();
-    handle.current = null;
-    setPlaying(null);
-  };
-  const play = (key: string, start: () => SoundHandle) => {
-    const same = playing === key;
-    stop();
-    if (same) return;
-    void audioContext()?.resume();
-    handle.current = start();
-    setPlaying(key);
-  };
-  return { playing, play, stop };
-}
+/** The last question's slots and what plays when they are empty. */
+const LAST_FALLBACK: Partial<Record<SoundSlot, SoundSlot>> = {
+  lastCountdown: "countdown",
+  lastQuestion: "question",
+};
 
-/** Preview of an uploaded song with its options (a 20 s question, the 5 s countdown). */
-function fileHandle(
-  url: string,
-  slot: SoundSlot,
-  options: SoundSlotOptions | undefined,
-): SoundHandle {
-  const untilEndMs = isCountdownSlot(slot)
-    ? 5000
-    : isQuestionSlot(slot)
-      ? 20_000
-      : null;
-  return playSong(() => fetchClip(url), slot, options, { untilEndMs }, url);
-}
+type PlayExtra = Parameters<SlotPlayer>[1];
 
-/** Preview of a built-in slot with the superadmin's options. */
-function builtinHandle(
-  id: string,
+/** A built-in slot with the superadmin's options, timed for its playhead. */
+function builtinStarter(
+  id: BuiltinSkinId,
   slot: SoundSlot,
   o: SoundSlotOptions | undefined,
-  extra: { remainingMs?: number; progress?: () => number } = {},
-): SoundHandle {
-  return playBuiltin(id as BuiltinSkinId, slot, {
-    progress: () => 0.85,
-    volume: 0.45 * ((o?.volume ?? DEFAULT_SONG_VOLUME) / DEFAULT_SONG_VOLUME),
-    fadeInSec: fadeInOf(slot, o),
-    repeat: o?.repeat === false ? false : undefined,
-    ...extra,
-  });
+  extra: PlayExtra = {},
+): SlotStarter {
+  return (onTimeline) => {
+    const handle = playBuiltin(id, slot, {
+      progress: () => 0.85,
+      volume: 0.45 * ((o?.volume ?? DEFAULT_SONG_VOLUME) / DEFAULT_SONG_VOLUME),
+      fadeInSec: fadeInOf(slot, o),
+      repeat: o?.repeat === false ? false : undefined,
+      remainingMs: extra.remainingMs ?? 5000,
+      ...(extra.progress ? { progress: extra.progress } : {}),
+    });
+    // The waveform shows a rendered stretch of the synth: loop over it.
+    const len = builtinRenderSec(slot) * 1000;
+    onTimeline({
+      startWall: Date.now(),
+      fileStartMs: 0,
+      ...(isLoopSlot(slot) && o?.repeat !== false
+        ? { loop: { fromMs: 0, toMs: len } }
+        : {}),
+    });
+    return handle;
+  };
 }
+
+/** A user skin's cue played in a built-in variant. */
+function cueStarter(
+  variant: BuiltinSkinId,
+  slot: SoundSlot,
+  o: SoundSlotOptions | undefined,
+): SlotStarter {
+  return (onTimeline) => {
+    if (!isCueSlot(slot)) return null;
+    playCue(
+      variant,
+      slot,
+      (o?.volume ?? DEFAULT_SONG_VOLUME) / DEFAULT_SONG_VOLUME,
+    );
+    onTimeline({ startWall: Date.now(), fileStartMs: 0 });
+    return { stop: () => undefined };
+  };
+}
+
+/** An uploaded song, played like the game (countdown 5 s, a question N s). */
+function fileStarter(
+  url: string,
+  slot: SoundSlot,
+  o: SoundSlotOptions | undefined,
+  untilEndMs: number | null,
+  startMs?: number,
+): SlotStarter {
+  return (onTimeline) =>
+    playSong(
+      () => fetchClip(url),
+      slot,
+      startMs !== undefined ? { ...o, startMs } : o,
+      { untilEndMs },
+      url,
+      onTimeline,
+    );
+}
+
+const previewUntilEnd = (slot: SoundSlot, questionMs: number) =>
+  isCountdownSlot(slot) ? 5000 : isQuestionSlot(slot) ? questionMs : null;
 
 /** "Test" toggle: a question round played like in a game. */
 function TestToggle({ open, onClick }: { open: boolean; onClick: () => void }) {
@@ -149,60 +167,24 @@ function TestToggle({ open, onClick }: { open: boolean; onClick: () => void }) {
   );
 }
 
-/** The last question's slots and what plays when they are empty. */
-const LAST_FALLBACK: Partial<Record<SoundSlot, SoundSlot>> = {
-  lastCountdown: "countdown",
-  lastQuestion: "question",
-};
-
 /** How long a countdown song plays on after 0 (end-aligned only). */
 function countdownTail(skin: SoundSkin, slot: "countdown" | "lastCountdown") {
   const o = skin.options?.[slot];
   return skin.slots[slot] && o?.align === "end" ? (o.extendSec ?? 0) * 1000 : 0;
 }
 
-/** The gear that opens a slot's options. */
-function OptionsToggle({
-  open,
-  onClick,
-}: {
-  open: boolean;
-  onClick: () => void;
-}) {
-  const t = useT();
-  return (
-    <button
-      type="button"
-      aria-expanded={open}
-      onClick={onClick}
-      className={clsx(
-        "flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold cursor-pointer",
-        open ? "bg-dprimary/20" : "bg-lprimary/10 dark:bg-white/5",
-      )}
-    >
-      <LuSettings2 size={11} />
-      {t("Options")}
-    </button>
-  );
-}
-
 /**
- * Built-in skins (preview only) and the user's own skins: an uploaded sound
- * per moment. Admins can offer a skin to every user.
+ * Built-in skins and the user's own skins, row by row the same: each slot
+ * with Play (opens it: waveform + playhead) and its options. Built-in skins
+ * have no uploads, and only the superadmin changes their options.
  */
 export default function SoundSkinsClient() {
   const t = useT();
   const role = useCurrentRole();
   const isAdmin = role === "admin" || role === "superadmin";
-  const isSuperadmin = role === "superadmin";
-  const builtinOptions = useBuiltinOptionsQuery();
-  const setBuiltin = useSetBuiltinOptions();
-  const [openBuiltin, setOpenBuiltin] = useState<string | null>(null);
-  const [testing, setTesting] = useState<string | null>(null);
   const query = useSoundSkinsQuery();
   const create = useCreateSoundSkin();
   const [name, setName] = useState("");
-  const preview = usePreview();
   const prefs = usePreferencesQuery();
   const defaultId = prefs.data?.defaultSoundSkin ?? "builtin:show";
 
@@ -214,134 +196,34 @@ export default function SoundSkinsClient() {
         )}
       </p>
       {BUILTIN_SOUND_SKINS.map((id) => (
-        <section
+        <BuiltinSkinCard
           key={id}
-          className={clsx(
-            panelClass,
-            "p-5 flex flex-col gap-3",
-            defaultId === id && defaultBoxClass,
-          )}
-        >
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="min-w-0">
-              <h2 className="text-lg font-bold">
-                {t(BUILTIN_SKINS[id as BuiltinSkinId].name)}
-              </h2>
-              <p className={clsx("text-xs", mutedText)}>
-                {t("Built in · synthesized in the browser")}
-              </p>
-            </div>
-            <span className="ml-auto">
-              <DefaultSkinButton id={id} />
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {BUILTIN_SLOTS.map((slot) => {
-              const key = `${id}:${slot}`;
-              return (
-                <button
-                  key={slot}
-                  type="button"
-                  title={t(SLOT_LABELS[slot])}
-                  onClick={() =>
-                    preview.play(key, () =>
-                      builtinHandle(
-                        id,
-                        slot,
-                        builtinOptions.data?.[id]?.[slot],
-                      ),
-                    )
-                  }
-                  className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold bg-lprimary/10 dark:bg-white/5 cursor-pointer"
-                >
-                  {preview.playing === key ? (
-                    <LuSquare size={11} />
-                  ) : (
-                    <LuPlay size={11} />
-                  )}
-                  {slot}
-                </button>
-              );
-            })}
-            <TestToggle
-              open={testing === id}
-              onClick={() => {
-                preview.stop();
-                setTesting(testing === id ? null : id);
-              }}
-            />
-          </div>
-          {testing === id && (
-            <SkinTestBench
-              tuschZeroMs={builtinTuschZeroMs(id as BuiltinSkinId)}
-              play={(slot, extra) =>
-                builtinHandle(
-                  id,
-                  slot,
-                  builtinOptions.data?.[id]?.[slot],
-                  extra,
-                )
-              }
-            />
-          )}
-          {isSuperadmin && (
-            // Only the superadmin tunes the built-in skins, for everyone.
-            <div className="flex flex-col gap-1.5">
-              <p className={clsx("text-xs", mutedText)}>
-                {t("Playback options (superadmin, for all users)")}
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {BUILTIN_SLOTS.map((slot) => {
-                  const key = `${id}:${slot}`;
-                  return (
-                    <span key={slot} className="flex items-center gap-1">
-                      <span className="text-xs">{slot}</span>
-                      <OptionsToggle
-                        open={openBuiltin === key}
-                        onClick={() =>
-                          setOpenBuiltin(openBuiltin === key ? null : key)
-                        }
-                      />
-                    </span>
-                  );
-                })}
-              </div>
-              {BUILTIN_SLOTS.filter(
-                (slot) => openBuiltin === `${id}:${slot}`,
-              ).map((slot) => (
-                <div key={slot} className="flex flex-col gap-1">
-                  <span className="text-xs font-bold">
-                    {t(SLOT_LABELS[slot])}
-                  </span>
-                  <SlotOptionsEditor
-                    slot={slot}
-                    builtin
-                    value={builtinOptions.data?.[id]?.[slot]}
-                    onSave={(next) =>
-                      setBuiltin.mutate(
-                        {
-                          skinId: id,
-                          options: {
-                            ...builtinOptions.data?.[id],
-                            [slot]: next,
-                          },
-                        },
-                        {
-                          onError: (err) =>
-                            toast.error(getApiErrorMessage(err)),
-                        },
-                      )
-                    }
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+          id={id as BuiltinSkinId}
+          isSuperadmin={role === "superadmin"}
+          isDefault={defaultId === id}
+        />
       ))}
 
+      {query.isPending ? (
+        <p className={mutedText}>{t("Loading…")}</p>
+      ) : (
+        (query.data ?? []).length > 0 && (
+          <section className={clsx(panelClass, "p-5 flex flex-col gap-3")}>
+            <h2 className="text-lg font-bold">{t("Your audio skins")}</h2>
+            {(query.data ?? []).map((skin) => (
+              <SkinCard
+                key={skin.id}
+                skin={skin}
+                isAdmin={isAdmin}
+                isDefault={defaultId === skin.id}
+              />
+            ))}
+          </section>
+        )
+      )}
+
       <section className={clsx(panelClass, "p-5 flex flex-col gap-3")}>
-        <h2 className="text-lg font-bold">{t("Your audio skins")}</h2>
+        <h2 className="text-lg font-bold">{t("New audio skin")}</h2>
         <form
           className="flex gap-2 max-w-md"
           onSubmit={(e) => {
@@ -363,21 +245,6 @@ export default function SoundSkinsClient() {
             {t("Create")}
           </Button>
         </form>
-        {query.isPending ? (
-          <p className={mutedText}>{t("Loading…")}</p>
-        ) : (query.data ?? []).length === 0 ? (
-          <p className={mutedText}>{t("No audio skins yet.")}</p>
-        ) : (
-          (query.data ?? []).map((skin) => (
-            <SkinCard
-              key={skin.id}
-              skin={skin}
-              isAdmin={isAdmin}
-              preview={preview}
-              isDefault={defaultId === skin.id}
-            />
-          ))
-        )}
       </section>
     </div>
   );
@@ -419,15 +286,93 @@ export function DefaultSkinButton({ id }: { id: string }) {
   );
 }
 
+function BuiltinSkinCard({
+  id,
+  isSuperadmin,
+  isDefault,
+}: {
+  id: BuiltinSkinId;
+  isSuperadmin: boolean;
+  isDefault: boolean;
+}) {
+  const t = useT();
+  const builtinOptions = useBuiltinOptionsQuery();
+  const setBuiltin = useSetBuiltinOptions();
+  const playback = usePlayback();
+  const [testing, setTesting] = useState(false);
+  const optionsOf = (slot: SoundSlot) => builtinOptions.data?.[id]?.[slot];
+
+  return (
+    <section
+      className={clsx(
+        panelClass,
+        "p-5 flex flex-col gap-2",
+        isDefault && defaultBoxClass,
+      )}
+    >
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-bold">{t(BUILTIN_SKINS[id].name)}</h2>
+          <p className={clsx("text-xs", mutedText)}>
+            {t("Built in · synthesized in the browser")}
+            {isSuperadmin &&
+              ` · ${t("Playback options (superadmin, for all users)")}`}
+          </p>
+        </div>
+        <DefaultSkinButton id={id} />
+        <TestToggle
+          open={testing}
+          onClick={() => {
+            playback.stopAll();
+            setTesting(!testing);
+          }}
+        />
+      </div>
+      {testing && (
+        <SkinTestBench
+          tuschZeroMs={builtinTuschZeroMs(id)}
+          play={(slot, extra) =>
+            playback.start(
+              slot,
+              builtinStarter(id, slot, optionsOf(slot), extra),
+              false,
+            )
+          }
+        />
+      )}
+      {BUILTIN_SLOTS.map((slot) => (
+        <SlotRow
+          key={slot}
+          slot={slot}
+          label={t(SLOT_LABELS[slot])}
+          playback={playback}
+          starter={() => builtinStarter(id, slot, optionsOf(slot))}
+          wave={{ skinId: id }}
+          options={optionsOf(slot)}
+          editable={isSuperadmin}
+          builtin
+          onSave={(next) =>
+            setBuiltin.mutate(
+              {
+                skinId: id,
+                options: { ...builtinOptions.data?.[id], [slot]: next },
+              },
+              { onError: (err) => toast.error(getApiErrorMessage(err)) },
+            )
+          }
+        />
+      ))}
+    </section>
+  );
+}
+
 function SkinCard({
   skin,
   isAdmin,
-  preview,
   isDefault,
 }: {
   skin: SoundSkin;
   isAdmin: boolean;
-  preview: ReturnType<typeof usePreview>;
   isDefault: boolean;
 }) {
   const t = useT();
@@ -436,8 +381,33 @@ function SkinCard({
   const clearSlot = useClearSoundSlot();
   const del = useDeleteSoundSkin();
   const onError = (err: unknown) => toast.error(getApiErrorMessage(err));
-  const [openSlot, setOpenSlot] = useState<SoundSlot | null>(null);
+  const playback = usePlayback();
   const [testing, setTesting] = useState(false);
+  const saveOptions = (slot: SoundSlot, next: SoundSlotOptions) =>
+    update.mutate(
+      { id: skin.id, options: { ...skin.options, [slot]: next } },
+      { onError },
+    );
+
+  const benchPlay: SlotPlayer = (asked, extra) => {
+    // No song for the last countdown / question: the usual one.
+    const slot: SoundSlot = skin.slots[asked]
+      ? asked
+      : (LAST_FALLBACK[asked] ?? asked);
+    const url = skin.slots[slot];
+    if (!url) return null;
+    return playback.start(
+      slot,
+      fileStarter(
+        url,
+        slot,
+        skin.options?.[slot],
+        extra.remainingMs ?? null,
+        extra.startMs,
+      ),
+      false,
+    );
+  };
 
   return (
     <div
@@ -479,7 +449,7 @@ function SkinCard({
         <TestToggle
           open={testing}
           onClick={() => {
-            preview.stop();
+            playback.stopAll();
             setTesting(!testing);
           }}
         />
@@ -508,58 +478,56 @@ function SkinCard({
               ? countdownTail(skin, "lastCountdown")
               : undefined
           }
-          play={(asked, extra) => {
-            // No song for the last countdown / question: the usual one.
-            const slot: SoundSlot = skin.slots[asked]
-              ? asked
-              : (LAST_FALLBACK[asked] ?? asked);
-            const url = skin.slots[slot];
-            return url
-              ? playSong(
-                  () => fetchClip(url),
-                  slot,
-                  extra.startMs !== undefined
-                    ? { ...skin.options?.[slot], startMs: extra.startMs }
-                    : skin.options?.[slot],
-                  { untilEndMs: extra.remainingMs ?? null },
-                  url,
-                )
-              : null;
-          }}
+          play={benchPlay}
         />
       )}
       {SLOTS.map((slot) => {
         const url = skin.slots[slot];
-        const key = `${skin.id}:${slot}`;
+        const o = skin.options?.[slot];
         // Lobby cues: a built-in skin's sound, none, or the uploaded file.
         const cue = isCueSlot(slot);
         const source: CueSource | null = cue
-          ? (skin.options?.[slot]?.source ?? (url ? "custom" : "builtin:show"))
+          ? (o?.source ?? (url ? "custom" : "builtin:show"))
           : null;
         const ownFile = !cue || source === "custom";
+        const variant =
+          source && source !== "custom" && source !== "off"
+            ? (source as BuiltinSkinId)
+            : null;
+        const wave = variant
+          ? { skinId: variant }
+          : ownFile && url
+            ? { url }
+            : null;
+        const starter = variant
+          ? () => cueStarter(variant, slot, o)
+          : ownFile && url
+            ? (questionMs: number) =>
+                fileStarter(url, slot, o, previewUntilEnd(slot, questionMs))
+            : null;
         return (
-          <div key={slot} className="flex flex-col gap-1.5">
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="w-64 max-w-full">{t(SLOT_LABELS[slot])}</span>
-              {cue && (
-                <>
+          <SlotRow
+            key={slot}
+            slot={slot}
+            label={t(SLOT_LABELS[slot])}
+            playback={playback}
+            starter={starter}
+            wave={wave}
+            options={o}
+            editable
+            builtin={false}
+            onSave={(next) => saveOptions(slot, next)}
+            controls={
+              <>
+                {cue && (
                   <select
                     value={source!}
                     aria-label={t(SLOT_LABELS[slot])}
                     onChange={(e) =>
-                      update.mutate(
-                        {
-                          id: skin.id,
-                          options: {
-                            ...skin.options,
-                            [slot]: {
-                              ...skin.options?.[slot],
-                              source: e.target.value as CueSource,
-                            },
-                          },
-                        },
-                        { onError },
-                      )
+                      saveOptions(slot, {
+                        ...o,
+                        source: e.target.value as CueSource,
+                      })
                     }
                     className="rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent px-2 py-1 text-xs"
                   >
@@ -571,116 +539,52 @@ function SkinCard({
                     <option value="off">{t("Off")}</option>
                     <option value="custom">{t("Own file")}</option>
                   </select>
-                  {source !== "custom" && source !== "off" && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          preview.play(key, () => {
-                            playCue(
-                              source as BuiltinSkinId,
-                              slot,
-                              (skin.options?.[slot]?.volume ??
-                                DEFAULT_SONG_VOLUME) / DEFAULT_SONG_VOLUME,
-                            );
-                            return { stop: () => undefined };
-                          })
-                        }
-                        className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold bg-lprimary/10 dark:bg-white/5 cursor-pointer"
-                      >
-                        <LuPlay size={11} />
-                        {t("Play")}
-                      </button>
-                      <OptionsToggle
-                        open={openSlot === slot}
-                        onClick={() =>
-                          setOpenSlot(openSlot === slot ? null : slot)
-                        }
-                      />
-                    </>
-                  )}
-                </>
-              )}
-              {!ownFile ? null : url ? (
-                <>
+                )}
+                {ownFile && !url && (
+                  <span className={clsx("text-xs", mutedText)}>
+                    {t("silent")}
+                  </span>
+                )}
+                {ownFile && url && (
                   <button
                     type="button"
-                    onClick={() =>
-                      preview.play(key, () =>
-                        fileHandle(url, slot, skin.options?.[slot]),
-                      )
-                    }
-                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold bg-lprimary/10 dark:bg-white/5 cursor-pointer"
-                  >
-                    {preview.playing === key ? (
-                      <LuSquare size={11} />
-                    ) : (
-                      <LuPlay size={11} />
-                    )}
-                    {t("Play")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      clearSlot.mutate({ id: skin.id, slot }, { onError })
-                    }
+                    onClick={() => {
+                      playback.stop(slot);
+                      clearSlot.mutate({ id: skin.id, slot }, { onError });
+                    }}
                     className="text-xs underline cursor-pointer"
                   >
                     {t("remove")}
                   </button>
-                  <OptionsToggle
-                    open={openSlot === slot}
-                    onClick={() => setOpenSlot(openSlot === slot ? null : slot)}
-                  />
-                </>
-              ) : (
-                <span className={clsx("text-xs", mutedText)}>
-                  {t("silent")}
-                </span>
-              )}
-              {ownFile && (
-                <label className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold border border-dashed border-lprimary/30 cursor-pointer">
-                  <LuUpload size={11} />
-                  {url ? "Replace" : "Upload"}
-                  <input
-                    type="file"
-                    accept="audio/*,.mp3,.wav,.ogg,.oga,.opus,.flac,.m4a,.aac,.webm"
-                    className="sr-only"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      e.target.value = "";
-                      if (file) {
-                        setSlot.mutate(
-                          { id: skin.id, slot, file },
-                          {
-                            onSuccess: () => toast.success(t("Sound uploaded")),
-                            onError,
-                          },
-                        );
-                      }
-                    }}
-                  />
-                </label>
-              )}
-            </div>
-            {(url || cue) && openSlot === slot && (
-              <SlotOptionsEditor
-                slot={slot}
-                builtin={false}
-                url={ownFile ? url : undefined}
-                value={skin.options?.[slot]}
-                onSave={(next) =>
-                  update.mutate(
-                    {
-                      id: skin.id,
-                      options: { ...skin.options, [slot]: next },
-                    },
-                    { onError },
-                  )
-                }
-              />
-            )}
-          </div>
+                )}
+                {ownFile && (
+                  <label className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold border border-dashed border-lprimary/30 cursor-pointer">
+                    <LuUpload size={11} />
+                    {url ? t("Replace") : t("Upload")}
+                    <input
+                      type="file"
+                      accept="audio/*,.mp3,.wav,.ogg,.oga,.opus,.flac,.m4a,.aac,.webm"
+                      className="sr-only"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (file) {
+                          setSlot.mutate(
+                            { id: skin.id, slot, file },
+                            {
+                              onSuccess: () =>
+                                toast.success(t("Sound uploaded")),
+                              onError,
+                            },
+                          );
+                        }
+                      }}
+                    />
+                  </label>
+                )}
+              </>
+            }
+          />
         );
       })}
     </div>

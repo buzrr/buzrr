@@ -20,7 +20,8 @@ import {
   parseMs,
   repeatOf,
 } from "@/lib/sound/song";
-import { SongWaveform } from "./SongWaveform";
+import { SongWaveform, type WaveSource } from "./SongWaveform";
+import type { Timeline } from "@/lib/sound/song";
 
 const SAVE_AFTER_MS = 600;
 
@@ -33,13 +34,20 @@ export function SlotOptionsEditor({
   slot,
   value,
   builtin,
-  url,
+  wave,
+  timeline,
+  questionMs,
+  onPastEnd,
   onSave,
 }: {
   slot: SoundSlot;
   value: SoundSlotOptions | undefined;
-  /** The uploaded file (user skins): waveform to set the cue points. */
-  url?: string;
+  /** The waveform shown on top (a file: also sets the cue points). */
+  wave?: WaveSource;
+  /** The sound playing in this slot (playhead). */
+  timeline?: Timeline | null;
+  questionMs?: number;
+  onPastEnd?: () => void;
   /** Built-in (synthesized) skin: no timeline, so no start / end points. */
   builtin: boolean;
   onSave: (next: SoundSlotOptions) => void;
@@ -142,8 +150,16 @@ export function SlotOptionsEditor({
         </div>
       )}
 
-      {url && !builtin && !cue && (
-        <SongWaveform url={url} slot={slot} options={draft} onChange={change} />
+      {wave && (
+        <SongWaveform
+          source={wave}
+          slot={slot}
+          options={draft}
+          questionMs={questionMs}
+          timeline={timeline}
+          onChange={change}
+          onPastEnd={onPastEnd}
+        />
       )}
 
       {tusch && !builtin && (

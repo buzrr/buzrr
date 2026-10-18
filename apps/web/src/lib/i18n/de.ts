@@ -961,6 +961,10 @@ export const DE: Record<string, string> = {
   "The song plays on this long after the end, then fades out.":
     "So lange läuft der Song nach dem Ende weiter, dann wird er ausgeblendet.",
   "Test bench": "Testlauf",
+  "New audio skin": "Neuer Audio-Skin",
+  Replace: "Ersetzen",
+  Upload: "Hochladen",
+  Waveform: "Wellenform",
   "Zero point (0) at": "Nullpunkt (0) bei",
   "Plays on after 0": "Danach noch",
   "Ping when a player joins (host, lobby)":

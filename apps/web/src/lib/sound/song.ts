@@ -51,6 +51,28 @@ export function fadeInOf(slot: SoundSlot, o: SoundSlotOptions | undefined) {
   );
 }
 
+/** Where a playing sound is in its file, for a playhead. */
+export interface Timeline {
+  /** Wall clock (ms) when the sound starts (may be in the future). */
+  startWall: number;
+  /** File position (ms) at that moment. */
+  fileStartMs: number;
+  /** A repeating sound wraps from `toMs` back to `fromMs`. */
+  loop?: { fromMs: number; toMs: number };
+}
+
+/** The file position at wall time `now`; null before it starts. */
+export function headAt(tl: Timeline, now: number): number | null {
+  const t = now - tl.startWall;
+  if (t < 0) return null;
+  let pos = tl.fileStartMs + t;
+  if (tl.loop && pos > tl.loop.toMs && tl.loop.toMs > tl.loop.fromMs) {
+    const len = tl.loop.toMs - tl.loop.fromMs;
+    pos = tl.loop.fromMs + ((pos - tl.loop.fromMs) % len);
+  }
+  return pos;
+}
+
 export interface SongTiming {
   /** ms until the countdown / question ends (end-aligned songs). */
   untilEndMs?: number | null;
@@ -78,6 +100,8 @@ export function playSong(
   timing: SongTiming = {},
   /** <audio> fallback source (a plain file URL), if any. */
   fallbackUrl?: string,
+  /** Told where in the file it plays (playheads). */
+  onTimeline?: (tl: Timeline) => void,
 ): SoundHandle {
   const o = options ?? {};
   const volume = (o.volume ?? DEFAULT_SONG_VOLUME) / 100;
@@ -96,6 +120,7 @@ export function playSong(
     a.currentTime = (o.startMs ?? 0) / 1000;
     void a.play().catch(() => undefined);
     fallback = a;
+    onTimeline?.({ startWall: Date.now(), fileStartMs: o.startMs ?? 0 });
   };
 
   if (!ctx) {
@@ -149,6 +174,13 @@ export function playSong(
           gain.gain.linearRampToValueAtTime(volume, when + fade);
         }
         src.start(when, offset);
+        onTimeline?.({
+          startWall: Date.now() + (when - ctx.currentTime) * 1000,
+          fileStartMs: offset * 1000,
+          ...(src.loop
+            ? { loop: { fromMs: offset * 1000, toMs: buf.duration * 1000 } }
+            : {}),
+        });
 
         const fadeOutAt = (t: number, fadeSec = STOP_FADE_SEC) => {
           const from = Math.max(t, ctx.currentTime);

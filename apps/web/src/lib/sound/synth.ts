@@ -213,8 +213,20 @@ const LOOP_SLOTS: SoundSlot[] = [
 export const isLoopSlot = (slot: SoundSlot) => LOOP_SLOTS.includes(slot);
 
 let sharedCtx: AudioContext | null = null;
+/**
+ * While `renderBuiltin` runs (synchronously): the offline context everything
+ * is scheduled on, and how many seconds it holds. Loops are then planned in
+ * full up front, and no cleanup timers run.
+ */
+let rendering: { ctx: OfflineAudioContext; seconds: number } | null = null;
+/** Cleanup after a sound (disconnecting its bus): skipped while rendering. */
+function later(fn: () => void, ms: number) {
+  if (!rendering) setTimeout(fn, ms);
+}
+
 /** One AudioContext for the page; resumed on the first user gesture. */
 export function audioContext(): AudioContext | null {
+  if (rendering) return rendering.ctx as unknown as AudioContext;
   if (typeof window === "undefined") return null;
   if (!sharedCtx) {
     const Ctx =
@@ -368,7 +380,7 @@ export function playBuiltin(
     bus.gain.cancelScheduledValues(now);
     bus.gain.setValueAtTime(bus.gain.value, now);
     bus.gain.linearRampToValueAtTime(0.0001, now + fadeSec);
-    setTimeout(() => bus.disconnect(), fadeSec * 1000 + 200);
+    later(() => bus.disconnect(), fadeSec * 1000 + 200);
   };
 
   // -- lobby cues (join / bubble / reaction): the skin's own variant ---------
@@ -466,8 +478,10 @@ export function playBuiltin(
     chord(ctx, bus, t0, p.roots[0]! + 12, 1.2, p.pad, 0.14, p.cutoff);
     crash(ctx, bus, t0, d);
   }
+  // Rendering offline: everything at once, the question building up over it.
+  const offline = rendering ? { seconds: rendering.seconds } : null;
   const tick = () => {
-    const ahead = ctx.currentTime + 0.12;
+    const ahead = offline ? t0 + offline.seconds : ctx.currentTime + 0.12;
     while (slot === "scores" && next < ahead) {
       // Scoreboard: four-on-the-floor, claps on 2 and 4, pumping offbeat
       // bass and its own riff — clearly not the question loop.
@@ -542,7 +556,14 @@ export function playBuiltin(
     while (slot !== "scores" && slot !== "final" && next < ahead) {
       // The question loop gets faster and denser towards the end.
       const prog =
-        slot === "question" ? Math.min(1, opts.progress?.() ?? 0) : 0;
+        slot === "question"
+          ? Math.min(
+              1,
+              offline
+                ? (next - t0) / offline.seconds
+                : (opts.progress?.() ?? 0),
+            )
+          : 0;
       const eighth = beat / 2 / (tempo * (1 + prog * 0.35));
       const bar = Math.floor(step / 8) % p.roots.length;
       const root = p.roots[bar]!;
@@ -616,6 +637,10 @@ export function playBuiltin(
       step++;
     }
   };
+  if (offline) {
+    tick();
+    return { stop: () => undefined };
+  }
   // Repeat off: one pass (a synth loop has no end of its own), then out.
   const passEnd = opts.repeat === false ? BUILTIN_PASS_BARS * 8 : Infinity;
   let ended = false;
@@ -640,6 +665,41 @@ export function playBuiltin(
   };
 }
 
+/** How much of each built-in slot `renderBuiltin` draws (loops: a stretch). */
+export function builtinRenderSec(slot: SoundSlot): number {
+  if (isCueSlot(slot)) return 1.5;
+  if (slot === "countdown" || slot === "lastCountdown") return 7;
+  if (slot === "end" || slot === "reveal") return 3;
+  return 20;
+}
+
+/**
+ * Renders a built-in slot offline (for its waveform): the same synthesis,
+ * into an OfflineAudioContext. Countdowns as the usual 5 s.
+ */
+export async function renderBuiltin(
+  skinId: BuiltinSkinId,
+  slot: SoundSlot,
+): Promise<AudioBuffer | null> {
+  if (typeof OfflineAudioContext === "undefined") return null;
+  const seconds = builtinRenderSec(slot);
+  const rate = 22050;
+  const ctx = new OfflineAudioContext(1, Math.ceil(rate * seconds), rate);
+  rendering = { ctx, seconds };
+  try {
+    const synthSlot =
+      slot === "lastQuestion"
+        ? "question"
+        : slot === "lastCountdown"
+          ? "countdown"
+          : slot;
+    playBuiltin(skinId, synthSlot, { volume: 0.45, remainingMs: 5000 });
+  } finally {
+    rendering = null;
+  }
+  return ctx.startRendering();
+}
+
 /** When the built-in tusch hits (after its drum roll / fall), in ms. */
 export const builtinTuschZeroMs = (skinId: BuiltinSkinId) =>
   skinId === "builtin:arcade" ? 300 : 500;
@@ -657,7 +717,7 @@ export function playPing(volume = 0.35) {
   const t = ctx.currentTime + 0.01;
   tone(ctx, bus, t, hz(15), 0.18, "sine", 0.5, 9000); // C6
   tone(ctx, bus, t + 0.09, hz(22), 0.35, "sine", 0.45, 9000); // G6
-  setTimeout(() => bus.disconnect(), 800);
+  later(() => bus.disconnect(), 800);
 }
 
 /** Half the ping's level: the lobby's bubble pops and reactions are frequent. */
@@ -693,7 +753,7 @@ export function playPling(volume = 0.35 * SOFT) {
   const f = hz(27 + Math.floor(Math.random() * 3) * 2); // C7..E7
   tone(ctx, bus, t, f, 0.3, "triangle", 0.5, 12000);
   tone(ctx, bus, t, f * 2, 0.15, "sine", 0.15, 12000);
-  setTimeout(() => bus.disconnect(), 600);
+  later(() => bus.disconnect(), 600);
 }
 
 // -- 8-bit effects (Arcade skin) -------------------------------------------------
@@ -726,7 +786,7 @@ function chipBus(volume: number) {
   const bus = ctx.createGain();
   bus.gain.value = volume;
   bus.connect(ctx.destination);
-  setTimeout(() => bus.disconnect(), 1200);
+  later(() => bus.disconnect(), 1200);
   return { ctx, bus, t: ctx.currentTime + 0.01 };
 }
 
@@ -765,7 +825,7 @@ function softBus(volume: number) {
   const bus = ctx.createGain();
   bus.gain.value = volume;
   bus.connect(ctx.destination);
-  setTimeout(() => bus.disconnect(), 1500);
+  later(() => bus.disconnect(), 1500);
   return { ctx, bus, t: ctx.currentTime + 0.01 };
 }
 
