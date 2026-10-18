@@ -505,6 +505,25 @@ const AddQuesForm = (props: {
     setFile(selectedFile);
   }
 
+  // Drag and drop a file anywhere on the editor: a picture becomes the
+  // question's image, an audio file its sound.
+  const [dropping, setDropping] = useState(false);
+  const AUDIO_EXT = /\.(mp3|wav|ogg|oga|opus|flac|m4a|aac|webm)$/i;
+  function onDropFile(e: React.DragEvent) {
+    e.preventDefault();
+    setDropping(false);
+    const f = e.dataTransfer.files?.[0];
+    if (!f) return;
+    if (f.type.startsWith("image/")) {
+      setFile(f);
+    } else if (f.type.startsWith("audio/") || AUDIO_EXT.test(f.name)) {
+      setAudioFile(f);
+      setAudioCues({ startMs: 0, revealMs: null });
+    } else {
+      toast.error(t("Drop a picture or an audio file"));
+    }
+  }
+
   function deleteFile() {
     setFile(null);
     setPreviewUrl(null);
@@ -665,7 +684,23 @@ const AddQuesForm = (props: {
   });
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col">
+    <form
+      onSubmit={onSubmit}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes("Files")) {
+          e.preventDefault();
+          setDropping(true);
+        }
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setDropping(false);
+      }}
+      onDrop={onDropFile}
+      className={clsx(
+        "flex flex-col rounded-2xl transition-shadow",
+        dropping && "ring-2 ring-dprimary ring-offset-2",
+      )}
+    >
       <div className="flex flex-col gap-4 px-5 pt-[18px] md:px-7 md:pt-4">
         <div className="flex flex-col gap-2">
           <span className={fieldLabelClass}>

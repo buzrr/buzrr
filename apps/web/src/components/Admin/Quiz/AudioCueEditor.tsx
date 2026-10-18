@@ -9,6 +9,8 @@ import { useT } from "@/lib/i18n/context";
 import { mutedText, subtleCardClass } from "@/components/Game/GameUI";
 
 const REVEAL_PREVIEW_MS = 10_000;
+/** A moved reveal cue: this pause, then its part plays from the new spot. */
+const REVEAL_RESTART_PAUSE_MS = 500;
 
 function formatMs(ms: number) {
   const s = ms / 1000;
@@ -67,6 +69,33 @@ export default function AudioCueEditor({
   }, [src]);
 
   useEffect(() => () => stopRef.current?.(), []);
+
+  // The reveal cue moved while its part plays: stop, a short pause, then
+  // play from the new spot (after the last move while dragging).
+  const playingRef = useRef(playing);
+  useEffect(() => {
+    playingRef.current = playing;
+  });
+  const restart = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastReveal = useRef(revealMs);
+  useEffect(() => {
+    if (lastReveal.current === revealMs) return;
+    lastReveal.current = revealMs;
+    if (playingRef.current !== "reveal" || revealMs === null) return;
+    stopRef.current?.();
+    stopRef.current = null;
+    if (restart.current) clearTimeout(restart.current);
+    restart.current = setTimeout(() => {
+      if (playingRef.current !== "reveal") return;
+      stopRef.current = playSegment(src, revealMs, REVEAL_PREVIEW_MS);
+    }, REVEAL_RESTART_PAUSE_MS);
+  }, [revealMs, src]);
+  useEffect(
+    () => () => {
+      if (restart.current) clearTimeout(restart.current);
+    },
+    [],
+  );
 
   // Draw: bars, the question window, and the reveal cue.
   useEffect(() => {
