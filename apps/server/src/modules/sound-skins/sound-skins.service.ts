@@ -2,6 +2,8 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
+  type OnApplicationBootstrap,
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
@@ -23,7 +25,11 @@ import {
   MediaUnavailableError,
   UnsupportedMediaError,
 } from "../../common/storage/media-storage";
-import { cutClip, toMp3 } from "../../common/storage/audio-transcode";
+import {
+  cutClip,
+  toMp3,
+  toPlayerMp3,
+} from "../../common/storage/audio-transcode";
 import { encryptClip } from "../../common/storage/clip-crypto";
 import { finalClipOf } from "./final-clip";
 import {
@@ -39,6 +45,7 @@ type SkinRow = {
   userId: string | null;
   isGlobal: boolean;
   slots: unknown;
+  playerSlots?: unknown;
   options?: unknown;
   finalClip?: unknown;
 };
@@ -69,12 +76,27 @@ function optionsOf(raw: unknown): SoundSkinOptions {
   return out;
 }
 
-const toSkin = (row: SkinRow): SoundSkin => ({
+/** Players' devices get the small copies (where made); the host the originals. */
+function playerView(
+  slots: SoundSkin["slots"],
+  small: unknown,
+): SoundSkin["slots"] {
+  const smallSlots = slotsOf(small);
+  const out: SoundSkin["slots"] = {};
+  for (const [k, url] of Object.entries(slots) as [SoundSlot, string][]) {
+    out[k] = smallSlots[k] ?? url;
+  }
+  return out;
+}
+
+const toSkin = (row: SkinRow, forPlayer = false): SoundSkin => ({
   id: row.id,
   name: row.name,
   isGlobal: row.isGlobal,
   ownerId: row.userId,
-  slots: slotsOf(row.slots),
+  slots: forPlayer
+    ? playerView(slotsOf(row.slots), row.playerSlots)
+    : slotsOf(row.slots),
   options: optionsOf(row.options),
   // The URL only — the key never leaves with the skin.
   finalClipUrl: finalClipOf(row.finalClip)?.url ?? null,
@@ -85,11 +107,22 @@ const toSkin = (row: SkinRow): SoundSkin => ({
  * admins can offer a skin to everyone (`isGlobal`) and edit global ones.
  */
 @Injectable()
-export class SoundSkinsService {
+export class SoundSkinsService implements OnApplicationBootstrap {
+  private readonly logger = new Logger(SoundSkinsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: MediaStorage,
   ) {}
+
+  /** Small player copies for files that have none yet (once, in the background). */
+  onApplicationBootstrap(): void {
+    setTimeout(() => {
+      this.backfillPlayerSlots((m) => this.logger.log(m)).catch((err) =>
+        this.logger.error("Making small sound files failed", err),
+      );
+    }, 10_000).unref();
+  }
 
   private async isAdmin(userId: string): Promise<boolean> {
     const u = await this.prisma.db.user.findUnique({
@@ -118,7 +151,7 @@ export class SoundSkinsService {
       where: { OR: [{ userId: user.userId }, { isGlobal: true }] },
       orderBy: [{ isGlobal: "desc" }, { createdAt: "asc" }],
     });
-    return rows.map(toSkin);
+    return rows.map((r) => toSkin(r));
   }
 
   /**
@@ -147,7 +180,7 @@ export class SoundSkinsService {
     ) {
       throw new NotFoundException("Sound skin not found");
     }
-    const skin = toSkin(row);
+    const skin = toSkin(row, isPlayerAuthUser(user));
     // Players get the final song only as the encrypted clip.
     if (isPlayerAuthUser(user) && skin.finalClipUrl) delete skin.slots.final;
     return skin;
@@ -193,7 +226,7 @@ export class SoundSkinsService {
    * Every built-in skin's options and files (anyone signed in or playing):
    * the superadmin's, else the defaults from the code.
    */
-  async builtinOptions(): Promise<BuiltinSoundOptions> {
+  async builtinOptions(forPlayer = false): Promise<BuiltinSoundOptions> {
     const rows = await this.prisma.db.builtinSoundOptions.findMany();
     const byId = new Map(rows.map((r) => [r.skinId, r]));
     const out: BuiltinSoundOptions = {};
@@ -203,7 +236,9 @@ export class SoundSkinsService {
       out[id] = {
         options: r ? optionsOf(r.options) : defaults,
         defaults,
-        slots: slotsOf(r?.slots),
+        slots: forPlayer
+          ? playerView(slotsOf(r?.slots), r?.playerSlots)
+          : slotsOf(r?.slots),
       };
     }
     return out;
@@ -259,6 +294,7 @@ export class SoundSkinsService {
     });
     const files = slotsOf(row?.slots);
     const slots: SoundSkin["slots"] = {};
+    const smallSlots: SoundSkin["slots"] = {};
     let finalClip: { url: string; key: string } | null = null;
     try {
       for (const [slot, url] of Object.entries(files) as [
@@ -269,6 +305,12 @@ export class SoundSkinsService {
         if (!buf) continue;
         slots[slot] = (
           await this.storage.upload(buf, {
+            contentType: "audio/mpeg",
+            kind: "audio",
+          })
+        ).url;
+        smallSlots[slot] = (
+          await this.storage.upload(await toPlayerMp3(buf), {
             contentType: "audio/mpeg",
             kind: "audio",
           })
@@ -311,6 +353,7 @@ export class SoundSkinsService {
         name: name.trim().slice(0, 60) || "My sounds",
         userId: user.userId,
         slots,
+        playerSlots: smallSlots,
         options: options as Prisma.InputJsonValue,
         ...(finalClip ? { finalClip } : {}),
       },
@@ -344,6 +387,7 @@ export class SoundSkinsService {
     const row = await this.editable(user, id);
     if (!file || file.size === 0) throw new BadRequestException("Missing file");
     let url: string;
+    let playerUrl: string;
     let finalClip: { url: string; key: string } | null = null;
     try {
       const mp3 = await toMp3(file.buffer);
@@ -351,6 +395,13 @@ export class SoundSkinsService {
         await this.storage.upload(mp3, {
           contentType: file.mimetype,
           filename: file.originalname,
+          kind: "audio",
+        })
+      ).url;
+      // Players' devices load a small copy; the host plays this one.
+      playerUrl = (
+        await this.storage.upload(await toPlayerMp3(mp3), {
+          contentType: "audio/mpeg",
           kind: "audio",
         })
       ).url;
@@ -373,17 +424,22 @@ export class SoundSkinsService {
       throw err;
     }
     const slots = slotsOf(row.slots);
+    const small = slotsOf(row.playerSlots);
     const old = slots[slot];
+    const oldSmall = small[slot];
     slots[slot] = url;
+    small[slot] = playerUrl;
     const oldFinal = slot === "final" ? finalClipOf(row.finalClip) : null;
     const updated = await this.prisma.db.soundSkin.update({
       where: { id },
       data: {
         slots,
+        playerSlots: small,
         ...(slot === "final" ? { finalClip: finalClip ?? Prisma.DbNull } : {}),
       },
     });
     if (old) await this.storage.remove(old);
+    if (oldSmall) await this.storage.remove(oldSmall);
     if (oldFinal) await this.storage.remove(oldFinal.url);
     return toSkin(updated);
   }
@@ -396,17 +452,22 @@ export class SoundSkinsService {
     const slot = this.slot(slotRaw);
     const row = await this.editable(user, id);
     const slots = slotsOf(row.slots);
+    const small = slotsOf(row.playerSlots);
     const old = slots[slot];
+    const oldSmall = small[slot];
     delete slots[slot];
+    delete small[slot];
     const oldFinal = slot === "final" ? finalClipOf(row.finalClip) : null;
     const updated = await this.prisma.db.soundSkin.update({
       where: { id },
       data: {
         slots,
+        playerSlots: small,
         ...(slot === "final" ? { finalClip: Prisma.DbNull } : {}),
       },
     });
     if (old) await this.storage.remove(old);
+    if (oldSmall) await this.storage.remove(oldSmall);
     if (oldFinal) await this.storage.remove(oldFinal.url);
     return toSkin(updated);
   }
@@ -416,9 +477,66 @@ export class SoundSkinsService {
     await this.prisma.db.soundSkin.delete({ where: { id } });
     const final = finalClipOf(row.finalClip);
     if (final) await this.storage.remove(final.url);
-    for (const url of Object.values(slotsOf(row.slots))) {
+    for (const url of [
+      ...Object.values(slotsOf(row.slots)),
+      ...Object.values(slotsOf(row.playerSlots)),
+    ]) {
       await this.storage.remove(url);
     }
+  }
+
+  /**
+   * Skin files that have no small copy for players yet (uploaded before
+   * there were any, and built-in skins' files): made once, one after the
+   * other, in the background after start.
+   */
+  async backfillPlayerSlots(log: (msg: string) => void): Promise<void> {
+    const small = async (url: string): Promise<string | null> => {
+      const buf = await this.storage.read(url);
+      if (!buf) return null;
+      return (
+        await this.storage.upload(await toPlayerMp3(buf), {
+          contentType: "audio/mpeg",
+          kind: "audio",
+        })
+      ).url;
+    };
+    let made = 0;
+    for (const row of await this.prisma.db.soundSkin.findMany()) {
+      const slots = slotsOf(row.slots);
+      const have = slotsOf(row.playerSlots);
+      const missing = (Object.keys(slots) as SoundSlot[]).filter(
+        (k) => !have[k],
+      );
+      if (missing.length === 0) continue;
+      for (const k of missing) {
+        const url = await small(slots[k]!).catch(() => null);
+        if (url) have[k] = url;
+      }
+      await this.prisma.db.soundSkin.update({
+        where: { id: row.id },
+        data: { playerSlots: have },
+      });
+      made += missing.length;
+    }
+    for (const row of await this.prisma.db.builtinSoundOptions.findMany()) {
+      const slots = slotsOf(row.slots);
+      const have = slotsOf(row.playerSlots);
+      const missing = (Object.keys(slots) as SoundSlot[]).filter(
+        (k) => !have[k],
+      );
+      if (missing.length === 0) continue;
+      for (const k of missing) {
+        const url = await small(slots[k]!).catch(() => null);
+        if (url) have[k] = url;
+      }
+      await this.prisma.db.builtinSoundOptions.update({
+        where: { skinId: row.skinId },
+        data: { playerSlots: have },
+      });
+      made += missing.length;
+    }
+    if (made > 0) log(`Made ${made} small sound files for players`);
   }
 
   private slot(raw: string): SoundSlot {

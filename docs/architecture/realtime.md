@@ -358,6 +358,11 @@ The options editor shows the uploaded file's waveform: click or drag sets
 the start point (or, end-aligned, the end / zero point), with the part that
 plays, the extend and the fade-in drawn on it.
 
+Every skin file has a small copy for players' devices (`player_slots`:
+mono, 64 kbit/s, full length so cue points still fit); players get those
+URLs, the host plays the originals. Files without one (older uploads,
+built-in skins' files) get it once in the background after the server starts.
+
 Files play through Web Audio (`lib/sound/song.ts`: gain ramps work on iOS);
 an `<audio>` element is the fallback. The audio skins page has a test bench
 per skin: a round with countdown, question (chosen length), tusch and
@@ -371,9 +376,13 @@ optionally reveal and scoreboard, timed like a game.
   players that changed (`players: { [playerId]: { hits, misses } }`). A room
   quiet for 10 batches stops its timer. At 500 players that is one event a
   second into the host's browser instead of about 500.
-- **Reactions:** relayed to `host:{code}` one by one, but each player may
-  send `REACTIONS_PER_WINDOW` (5) per `REACTION_WINDOW_MS` (20 s); the
-  player's buttons rest until the oldest tap leaves the window. Above
+- **Reactions:** relayed to `host:{code}` one by one, within a budget per
+  player (`reactionLimitFor` the room's size: < 50 → 30, < 150 → 10,
+  < 500 → 5, else 2) per `REACTION_WINDOW_MS` (60 s), counted per player
+  (a reconnect gets no new budget) and started afresh with every
+  `question-start` and the final standings (`reaction-limit` with
+  `reset`). Over it the player gets `reaction-limited { retryInMs }`: a
+  "limit reached" toast, the buttons fade until then. Above
   `ROOM_REACTIONS_PER_S` (40) in a room within one second, only each
   player's first reaction of that second passes.
 - **Host lobby:** applies reactions in batches (every 500 ms) and joins every

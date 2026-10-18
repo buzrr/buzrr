@@ -262,6 +262,10 @@ class Bot:
     reactions_on: bool = True
     skin: dict | None = None
     emojis: list = field(default_factory=lambda: list(DEFAULT_EMOJIS))
+    # The room's reaction budget, as the server sends it (reaction-limit).
+    react_limit: int = 5
+    react_window: float = 60.0
+    react_sent: list = field(default_factory=list)
     cache: dict = field(default_factory=dict)  # bare url -> download task
     failed_keys: set = field(default_factory=set)  # clips given up after all tries
     progress: dict = field(default_factory=dict)  # bare url -> (loaded, total, done)
@@ -706,6 +710,17 @@ class Bot:
         async def _preload(data):
             self.on_preload(data)
 
+        @s.on("reaction-limit")
+        async def _react_limit(data):
+            self.react_limit = int(data.get("limit", self.react_limit))
+            self.react_window = float(data.get("windowMs", 60000)) / 1000
+            if data.get("reset"):
+                self.react_sent = []
+
+        @s.on("reaction-limited")
+        async def _react_limited(_data=None):
+            M.counts["reactions rejected by the server"] += 1
+
         @s.on("preload-go")
         async def _preload_go(data):
             key = (data.get("kind") or "question", data["qIndex"])
@@ -821,6 +836,14 @@ class Bot:
         emoji = random.choice(self.emojis)
         burst = taps or (random.randint(3, 10) if random.random() < 0.15 else random.choice([1, 1, 1, 2]))
         for _ in range(burst):
+            # Like the web client: within the room's budget (the server
+            # rejects the rest and the phone shows "limit reached").
+            now = time.monotonic()
+            self.react_sent = [t for t in self.react_sent if now - t < self.react_window]
+            if len(self.react_sent) >= self.react_limit:
+                M.counts["reactions held back (budget used up)"] += 1
+                break
+            self.react_sent.append(now)
             try:
                 await self.sio.emit("reaction", {"emoji": emoji})
                 M.counts["reactions sent"] += 1
@@ -955,6 +978,8 @@ def parse_args() -> argparse.Namespace:
                     help="share of players who switch sound on when the quiz plays it on the host only (default 0.3)")
     ap.add_argument("--no-assets", action="store_true", help="skip all downloads (images, sounds)")
     ap.add_argument("--no-reactions", action="store_true", help="players send no reactions")
+    ap.add_argument("--react-share", type=float, default=0.2,
+                    help="share of players who send reactions at all (default 0.2)")
     ap.add_argument("--timeout-after", type=float, metavar="SEC",
                     help="after SEC seconds, --timeout-users players freeze (stop sending, heartbeat too)")
     ap.add_argument("--timeout-users", type=int, default=0, metavar="N",
@@ -982,7 +1007,7 @@ async def run_bots(args: argparse.Namespace, base: str, code: str, users: int) -
                 args.first_idx + i, base, code, http,
                 assets=not args.no_assets,
                 kbps=args.kbps,
-                reacting=not args.no_reactions and random.random() < 0.7,
+                reacting=not args.no_reactions and random.random() < args.react_share,
                 sound_pref=True if random.random() < args.sound_optin else None,
                 emojis=list(DEFAULT_EMOJIS) if random.random() < 0.3 else random.sample(EMOJI_POOL, 3),
             )
@@ -1101,6 +1126,7 @@ def run_parent(args: argparse.Namespace, base: str, code: str, users: int) -> No
             cmd.append("--no-assets")
         if args.no_reactions:
             cmd.append("--no-reactions")
+        cmd += ["--react-share", str(args.react_share)]
         if args.timeout_users and freeze[i]:
             cmd += ["--timeout-after", str(args.timeout_after), "--timeout-users", str(freeze[i])]
         children.append((out, subprocess.Popen(cmd)))

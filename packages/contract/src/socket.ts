@@ -310,9 +310,24 @@ export const reactionSchema = z.object({
     .regex(/^[\p{Extended_Pictographic}\p{Emoji_Component}\u200d\ufe0f]+$/u)
     .refine((s) => /\p{Extended_Pictographic}/u.test(s), "Not an emoji"),
 });
-/** A player may send this many reactions within REACTION_WINDOW_MS, then waits. */
-export const REACTIONS_PER_WINDOW = 5;
-export const REACTION_WINDOW_MS = 20_000;
+/**
+ * Reactions: a player may send `reactionLimitFor(players in the room)`
+ * within REACTION_WINDOW_MS, then waits. The budget is per player and starts
+ * afresh with every question and at the final standings.
+ */
+export const REACTION_WINDOW_MS = 60_000;
+export function reactionLimitFor(players: number): number {
+  if (players < 50) return 30;
+  if (players < 150) return 10;
+  if (players < 500) return 5;
+  return 2;
+}
+/** The room's current reaction budget; `reset`: start counting afresh. */
+export interface ReactionLimitPayload {
+  limit: number;
+  windowMs: number;
+  reset?: boolean;
+}
 
 export const playerReactionSchema = reactionSchema.extend({
   playerId: z.string(),
@@ -709,6 +724,10 @@ export interface ServerToClientEvents {
   "bubble-stats-batch": (payload: BubbleStatsBatchPayload) => void;
   /** Host only: one live reaction from a player (one per tap). */
   reaction: (payload: PlayerReactionPayload) => void;
+  /** Players: the room's reaction budget (on join, and afresh per question). */
+  "reaction-limit": (payload: ReactionLimitPayload) => void;
+  /** Players: that reaction was over the budget; try again in `retryInMs`. */
+  "reaction-limited": (payload: { retryInMs: number }) => void;
   "player-connection": (payload: PlayerConnectionPayload) => void;
   // -- duel matchmaking --
   "duel:matched": (payload: DuelMatchedPayload) => void;

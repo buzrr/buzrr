@@ -108,6 +108,29 @@ export async function cutClip(
   ]);
 }
 
+/**
+ * A whole MP3 re-encoded small (mono, CLIP_BITRATE) — the copy of a sound
+ * skin file that players' devices load; the host plays the original.
+ */
+export async function toPlayerMp3(mp3: Buffer): Promise<Buffer> {
+  return runFfmpeg(mp3, [
+    "-i",
+    "pipe:0",
+    "-vn",
+    "-map_metadata",
+    "-1",
+    "-ac",
+    "1",
+    "-codec:a",
+    "libmp3lame",
+    "-b:a",
+    CLIP_BITRATE,
+    "-f",
+    "mp3",
+    "pipe:1",
+  ]);
+}
+
 /** Runs ffmpeg on `input` (stdin → stdout, no temp files) with a timeout and an output cap. */
 export function runFfmpeg(input: Buffer, args: string[]): Promise<Buffer> {
   return new Promise((resolve, reject) => {

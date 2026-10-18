@@ -27,6 +27,7 @@ import type {
 import { RateLimitGuard } from "../../common/guards/rate-limit.guard";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { SoundSkinsService } from "./sound-skins.service";
+import { isPlayerAuthUser } from "../../common/decorators/current-user.decorator";
 import { soundSkinOptionsSchema } from "@buzrr/contract";
 
 const createSchema = z.object({ name: z.string().max(60) });
@@ -47,9 +48,9 @@ export class SoundSkinsController {
 
   /** The built-in skins' playback options (signed-in users and players). */
   @Get("builtin-options")
-  builtinOptions(@CurrentUser() _user: JwtRequestUser) {
-    void _user;
-    return this.skins.builtinOptions();
+  builtinOptions(@CurrentUser() user: JwtRequestUser) {
+    // Players' devices get the small copies of the files.
+    return this.skins.builtinOptions(isPlayerAuthUser(user));
   }
 
   /** Superadmin: one built-in skin's options, for everyone. */

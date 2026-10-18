@@ -46,6 +46,7 @@ python3 -m venv .venv
 | `--sound-optin F`     | `0.3`     | Share of players who switch sound on when the quiz plays it on the host only. |
 | `--no-assets`         |           | No downloads at all (sockets only, like before).                              |
 | `--no-reactions`      |           | Players send no reactions.                                                    |
+| `--react-share F`     | `0.2`     | Share of players who send reactions at all (within the room's budget).        |
 | `--timeout-after SEC` |           | With `--timeout-users`: when players time out (seconds after the start).      |
 | `--timeout-users N`   | `0`       | That many connected players freeze then: no heartbeat, answers or reactions.  |
 | `--probe-bots N`      | `20`      | Random players that probe the `request-sync` round trip in the lobby (10 s).  |

@@ -453,8 +453,10 @@ model SoundSkin {
   name      String
   userId    String?  @map("user_id")
   isGlobal  Boolean  @default(false) @map("is_global")
-  /// slot -> uploaded MP3 URL (`soundSlotSchema`)
+  /// slot -> uploaded MP3 URL (`soundSlotSchema`), full quality (the host)
   slots     Json     @default("{}")
+  /// slot -> the same, small (mono, 64 kbit/s), what players' devices load
+  playerSlots Json   @default("{}") @map("player_slots")
   /// The final song as devices load it ahead of time: encrypted
   /// ({ url, key }); the key goes out only with the final leaderboard.
   finalClip Json?    @map("final_clip")
@@ -476,6 +478,8 @@ model BuiltinSoundOptions {
   options   Json     @default("{}")
   /// slot -> file URL (public `builtin-*` uploads); slots without one are synthesized
   slots     Json     @default("{}")
+  /// slot -> the same, small, for players' devices
+  playerSlots Json   @default("{}") @map("player_slots")
   /// unused: the defaults live in the code (`BUILTIN_DEFAULT_OPTIONS`)
   defaults  Json     @default("{}")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")

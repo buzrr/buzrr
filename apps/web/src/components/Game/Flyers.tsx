@@ -14,7 +14,7 @@ import { LuPlus } from "react-icons/lu";
 import { toast } from "react-toastify";
 import modalStyle from "@/utils/modalStyle";
 import type { GameSocket } from "@/types/socket";
-import { REACTIONS_PER_WINDOW, REACTION_WINDOW_MS } from "@buzrr/contract";
+import { REACTION_WINDOW_MS } from "@buzrr/contract";
 import { useT } from "@/lib/i18n/context";
 import {
   BASE_REACTION_EMOJIS,
@@ -250,10 +250,44 @@ export function ReactionBar({
   // localStorage isn't readable during SSR; pick up the saved set on mount.
   useEffect(() => setCustom(loadCustomReactions()), []);
 
-  // Same limit as the server: REACTIONS_PER_WINDOW per REACTION_WINDOW_MS,
-  // then the buttons rest until the oldest tap drops out of the window.
+  // Same budget as the server (it sends the room's limit, and starts it
+  // afresh with every question): after that the buttons rest until the
+  // oldest tap drops out of the window; a tap then says so.
   const taps = useRef<number[]>([]);
+  const limit = useRef(5);
+  const windowMs = useRef(REACTION_WINDOW_MS);
   const [blockedUntil, setBlockedUntil] = useState(0);
+  const limitReached = () =>
+    toast.info(t("Limit reached — wait a little."), {
+      toastId: "reaction-limit",
+      autoClose: 2500,
+    });
+  useEffect(() => {
+    if (!socket) return;
+    const onLimit = (p: {
+      limit: number;
+      windowMs: number;
+      reset?: boolean;
+    }) => {
+      limit.current = p.limit;
+      windowMs.current = p.windowMs;
+      if (p.reset) {
+        taps.current = [];
+        setBlockedUntil(0);
+      }
+    };
+    const onLimited = ({ retryInMs }: { retryInMs: number }) => {
+      setBlockedUntil(Date.now() + retryInMs);
+      limitReached();
+    };
+    socket.on("reaction-limit", onLimit);
+    socket.on("reaction-limited", onLimited);
+    return () => {
+      socket.off("reaction-limit", onLimit);
+      socket.off("reaction-limited", onLimited);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket]);
   // Seconds left of the pause (updated by a timer, not read during render).
   const [blockedFor, setBlockedFor] = useState(0);
   useEffect(() => {
@@ -272,11 +306,14 @@ export function ReactionBar({
 
   const send = (emoji: string, el: HTMLElement) => {
     const now = Date.now();
-    taps.current = taps.current.filter((at) => now - at < REACTION_WINDOW_MS);
-    if (taps.current.length >= REACTIONS_PER_WINDOW) return;
+    taps.current = taps.current.filter((at) => now - at < windowMs.current);
+    if (now < blockedUntil || taps.current.length >= limit.current) {
+      limitReached();
+      return;
+    }
     taps.current.push(now);
-    if (taps.current.length >= REACTIONS_PER_WINDOW) {
-      setBlockedUntil(taps.current[0]! + REACTION_WINDOW_MS);
+    if (taps.current.length >= limit.current) {
+      setBlockedUntil(taps.current[0]! + windowMs.current);
     }
     if (socket?.connected) socket.emit("reaction", { emoji });
     const r = el.getBoundingClientRect();
@@ -303,7 +340,8 @@ export function ReactionBar({
           inline
             ? "mx-auto mt-2 w-fit max-w-full flex-row flex-wrap justify-center"
             : "fixed z-40 shadow-lg backdrop-blur flex-row bottom-14 left-1/2 -translate-x-1/2 md:flex-col md:left-auto md:translate-x-0 md:right-2 md:bottom-14",
-          blockedFor > 0 && "opacity-45 pointer-events-none",
+          // Faded, but a tap still says why nothing happens.
+          blockedFor > 0 && "opacity-45",
         )}
       >
         {BASE_REACTION_EMOJIS.map((emoji) => (

@@ -1,8 +1,8 @@
 import { signAssetsDeep } from "../../common/storage/asset-signing";
 import {
   HEARTBEAT_TIMEOUT_MS,
-  REACTIONS_PER_WINDOW,
   REACTION_WINDOW_MS,
+  reactionLimitFor,
   bubbleStatsSchema,
   downloadsDecisionSchema,
   duelQueueSchema,
@@ -28,6 +28,7 @@ import { GameEngineService } from "../game-engine/game-engine.service";
 import { GameStoreService } from "../game-engine/game-store.service";
 import { RealtimeService } from "./realtime.service";
 import { AudioSlots, type Grant } from "./audio-slots";
+import { ReactionBudgets } from "./reaction-budgets";
 import type {
   DuelInviteAcceptAck,
   TypedServer,
@@ -83,12 +84,32 @@ export class RealtimeGateway
     this.engine.setServer(server);
     this.matchmaking.setServer(server);
     this.invites.setServer(server);
+    this.engine.onNewRound((code) => this.resetReactions(code));
     if (this.slots.limited) {
       setInterval(
         () => this.grant(this.slots.sweep(Date.now())),
         1_000,
       ).unref();
     }
+  }
+
+  private readonly reactionBudgets = new ReactionBudgets();
+
+  /** The room's reaction budget per player: by how many are in it. */
+  private reactionLimit(gameCode: string): number {
+    return reactionLimitFor(
+      this.server.sockets.adapter.rooms.get(gameCode)?.size ?? 0,
+    );
+  }
+
+  /** A new question / the final standings: everyone's budget starts afresh. */
+  private resetReactions(gameCode: string): void {
+    this.reactionBudgets.reset(gameCode);
+    this.server.to(gameCode).emit("reaction-limit", {
+      limit: this.reactionLimit(gameCode),
+      windowMs: REACTION_WINDOW_MS,
+      reset: true,
+    });
   }
 
   /** Queued devices whose download slot came free. */
@@ -622,21 +643,32 @@ export class RealtimeGateway
     }
     // Lobby bubble game: the latest totals per player are collected per room
     // and go to the host once a second as one batch (bubbleBatches).
-    // Live reactions: at most REACTIONS_PER_WINDOW per player within
-    // REACTION_WINDOW_MS, then blocked until the window moves on. When the
-    // whole room floods (over ROOM_REACTIONS_PER_S in a second), only each
-    // player's first reaction of that second goes through.
-    const sent: number[] = [];
+    // Live reactions: a budget per player (reactionLimitFor the room's size)
+    // within REACTION_WINDOW_MS, afresh with every question; over it, the
+    // player is told how long to wait. When the whole room floods (over
+    // ROOM_REACTIONS_PER_S in a second), only each player's first reaction
+    // of that second goes through.
+    socket.emit("reaction-limit", {
+      limit: this.reactionLimit(gameCode),
+      windowMs: REACTION_WINDOW_MS,
+    });
     socket.on("reaction", (payload) => {
       const playerId = socket.data.playerId;
       if (!playerId) return;
       const now = Date.now();
-      while (sent.length && now - sent[0]! >= REACTION_WINDOW_MS) sent.shift();
-      if (sent.length >= REACTIONS_PER_WINDOW) return;
       const parsed = reactionSchema.safeParse(payload);
       if (!parsed.success) return;
       if (!this.roomAdmitsReaction(gameCode, playerId, now)) return;
-      sent.push(now);
+      const budget = this.reactionBudgets.take(
+        gameCode,
+        playerId,
+        this.reactionLimit(gameCode),
+        now,
+      );
+      if (!budget.ok) {
+        socket.emit("reaction-limited", { retryInMs: budget.retryInMs });
+        return;
+      }
       this.server
         .to(`host:${gameCode}`)
         .emit("reaction", { playerId, emoji: parsed.data.emoji });

@@ -236,9 +236,22 @@ export class GameEngineService
     }
   }
 
+  /** Told when a new round begins (a question opens, the final standings). */
+  private roundListeners = new Set<(gameCode: string) => void>();
+  onNewRound(listener: (gameCode: string) => void): void {
+    this.roundListeners.add(listener);
+  }
+
   private send(gameCode: string, to: Audience, message: Outbound): void {
     if (!this.io) {
       throw new Error("GameEngineService used before gateway init");
+    }
+    if (
+      "room" in to &&
+      (message.event === "question-start" ||
+        (message.event === "leaderboard" && message.payload.isFinal))
+    ) {
+      for (const l of this.roundListeners) l(gameCode);
     }
     // Per-player rooms work cross-instance via the redis adapter.
     const target =

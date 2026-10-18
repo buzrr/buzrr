@@ -954,6 +954,7 @@ export const DE: Record<string, string> = {
     "Auflösung nach Klick (erst die Abstimmung zeigen)",
   "Show the scores on click": "Punkte nach Klick",
   "Reactions again in {s} s": "Reaktionen wieder in {s} s",
+  "Limit reached — wait a little.": "Limit erreicht – warte ein bisschen.",
   Volume: "Lautstärke",
   "Fade in at the start": "Am Anfang einblenden",
   "Fade time": "Einblendzeit",
