@@ -177,6 +177,7 @@ export default function ModerationSettingsCard({ quiz }: { quiz: QuizDetail }) {
           </label>
         )}
       </div>
+      <span className="mt-1 text-sm font-semibold">{t("Quiz settings")}</span>
       <div className="flex items-center gap-2">
         <Switch
           aria-label={t("Live reactions")}

@@ -712,6 +712,7 @@ export const DE: Record<string, string> = {
   Sound: "Audio",
   "Sound uploaded": "Audio hochgeladen",
   Sounds: "Audio",
+  "Quiz settings": "Quiz-Einstellungen",
   "Start 1v1": "1v1 starten",
   "Start a duel": "Duell starten",
   "Start Game": "Spiel starten",
