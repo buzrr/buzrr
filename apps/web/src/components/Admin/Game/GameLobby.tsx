@@ -137,6 +137,10 @@ const GameLobby = (params: {
             logo={params.quizQuestions?.logo}
             roomId={params.roomId}
             alreadyEnded={alreadyEnded}
+            // Fewer than two players: a try-out — back to editing the quiz.
+            {...(roster.length < 2 && params.quizQuestions?.id
+              ? { endRedirect: `/admin/quiz/${params.quizQuestions.id}` }
+              : {})}
             middle={
               <>
                 {(phase === "reveal" ||

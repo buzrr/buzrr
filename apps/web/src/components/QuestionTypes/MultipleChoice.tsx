@@ -173,7 +173,8 @@ export function OptionsReveal({
           : density >= 1
             ? "gap-1.5"
             : "gap-3.5",
-        density >= 1 && "[&_.reveal-row]:gap-1 [&_.reveal-label]:text-[14px]",
+        density >= 1 &&
+          "[&_.reveal-row]:gap-1 [&_.reveal-label]:text-base md:[&_.reveal-label]:text-lg",
       )}
     >
       {options.map((opt, i) => {
@@ -184,7 +185,7 @@ export function OptionsReveal({
           <div className="reveal-row flex flex-col gap-[7px]">
             <div
               className={clsx(
-                "reveal-label flex items-center gap-2.5 text-[15px] font-semibold",
+                "reveal-label flex items-center gap-2.5 text-lg md:text-[22px] font-semibold",
                 ok && "text-green-600 dark:text-green-500",
               )}
             >

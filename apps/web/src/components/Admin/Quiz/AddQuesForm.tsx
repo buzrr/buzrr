@@ -837,7 +837,7 @@ const AddQuesForm = (props: {
               <span className={fieldLabelClass}>
                 {t("Sound")}
                 <span className={counterClass}>
-                  {t("Optional · plays on your screen")}
+                  {t("Optional · plays on the host's screen")}
                 </span>
               </span>
               {audioPreview || audioLink ? (
@@ -863,7 +863,7 @@ const AddQuesForm = (props: {
                     className="w-44 rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent dark:bg-dark px-2 py-1"
                   >
                     <option value="quiz">{t("Like the quiz")}</option>
-                    <option value="host">{t("Your screen")}</option>
+                    <option value="host">{t("Host's screen")}</option>
                     <option value="players">{t("Players' devices")}</option>
                     <option value="both">{t("Both")}</option>
                     <option value="off">{t("Off")}</option>

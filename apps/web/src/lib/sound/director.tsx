@@ -202,13 +202,18 @@ interface PlayExtra {
   startMs?: number;
 }
 
+/** Songs that fade out over FADE_OUT_SEC when the next one takes over. */
+const FADING_BEDS: readonly SoundSlot[] = ["lobby", "reveal", "scores"];
+
 /** Which bed (loop) a phase plays; null = none. */
 function bedFor(phase: string): SoundSlot | null {
   switch (phase) {
     case "idle":
     case "lobby":
-    case "ready":
       return "lobby";
+    // "Be prepared!" before a moderated question.
+    case "ready":
+      return "reveal";
     case "question":
       return "question";
     case "scores":
@@ -398,8 +403,24 @@ export function GameSounds({
       : null;
   };
 
+  // "Show answer" (closed → reveal) starts the scoreboard song, and "show
+  // scores" lets it play on. After a question with its own sound it waits
+  // for the scores.
+  const [seenPhase, setSeenPhase] = useState(phase);
+  const [scoresEarly, setScoresEarly] = useState(false);
+  if (seenPhase !== phase) {
+    setSeenPhase(phase);
+    setScoresEarly(
+      seenPhase === "closed" && phase === "reveal" && !question?.audio,
+    );
+  }
+
   // Bed for the phase. A question with its own sound here plays no bed.
-  const bed = useRef<{ key: string; handle: SoundHandle | null } | null>(null);
+  const bed = useRef<{
+    key: string;
+    slot: SoundSlot;
+    handle: SoundHandle | null;
+  } | null>(null);
   const deadlineRef = useRef(deadline);
   useEffect(() => {
     deadlineRef.current = deadline;
@@ -416,7 +437,12 @@ export function GameSounds({
     }
   });
   // "No music": effects (countdown, tusch, reveal, pings) only.
-  const phaseBed = on && !ownAudio && settings.music ? bedFor(phase) : null;
+  const phaseBed =
+    on && !ownAudio && settings.music
+      ? scoresEarly && phase === "reveal"
+        ? "scores"
+        : bedFor(phase)
+      : null;
   // The last question has its own song when the skin has one.
   const lastQuestion =
     phaseBed === "question" &&
@@ -454,11 +480,10 @@ export function GameSounds({
     left.current = phase;
     if (from === phase) return;
     let faded = false;
-    const fromBed = bedFor(from);
     if (
       bed.current &&
-      (fromBed === "lobby" || fromBed === "scores") &&
-      bedFor(phase) !== fromBed
+      FADING_BEDS.includes(bed.current.slot) &&
+      bed.current.key !== bedKey
     ) {
       bed.current.handle?.stop(FADE_OUT_SEC);
       bed.current = null;
@@ -473,7 +498,11 @@ export function GameSounds({
       }
     }
     if (phase === "question") questionDeadline.current = deadline;
-    if (from === "reveal" && reveal.current) {
+    // Leaving the reveal, or the scoreboard song taking over on "Show answer".
+    if (
+      (from === "reveal" || (phase === "reveal" && bedSlot === "scores")) &&
+      reveal.current
+    ) {
       reveal.current.stop(FADE_OUT_SEC);
       reveal.current = null;
       faded = true;
@@ -521,6 +550,7 @@ export function GameSounds({
       isQuestionSlot(bedSlot) && !isUnlimitedTime(question?.timeOut);
     bed.current = {
       key: bedKey,
+      slot: bedSlot,
       handle: play(bedSlot, {
         progress: () =>
           1 - Math.max(0, deadlineRef.current - Date.now()) / total,
