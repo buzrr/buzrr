@@ -124,6 +124,15 @@ export class SoundSkinsService implements OnApplicationBootstrap {
     }, 10_000).unref();
   }
 
+  /** Only the superadmin shares skins with everyone (and edits shared ones). */
+  private async isSuperadmin(userId: string): Promise<boolean> {
+    const u = await this.prisma.db.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    return u?.role === "superadmin";
+  }
+
   private async isAdmin(userId: string): Promise<boolean> {
     const u = await this.prisma.db.user.findUnique({
       where: { id: userId },
@@ -138,7 +147,7 @@ export class SoundSkinsService implements OnApplicationBootstrap {
     if (!row) throw new NotFoundException("Sound skin not found");
     if (
       row.userId !== user.userId &&
-      !(row.isGlobal && (await this.isAdmin(user.userId)))
+      !(row.isGlobal && (await this.isSuperadmin(user.userId)))
     ) {
       throw new ForbiddenException("Not your sound skin");
     }
@@ -202,9 +211,12 @@ export class SoundSkinsService implements OnApplicationBootstrap {
     patch: { name?: string; isGlobal?: boolean; options?: SoundSkinOptions },
   ): Promise<SoundSkin> {
     await this.editable(user, id);
-    if (patch.isGlobal !== undefined && !(await this.isAdmin(user.userId))) {
+    if (
+      patch.isGlobal !== undefined &&
+      !(await this.isSuperadmin(user.userId))
+    ) {
       throw new ForbiddenException(
-        "Only admins can share a skin with everyone",
+        "Only the superadmin can share a skin with everyone",
       );
     }
     const row = await this.prisma.db.soundSkin.update({

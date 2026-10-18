@@ -1,3 +1,4 @@
+import { EntitlementsService } from "../billing/entitlements.service";
 import {
   Body,
   Controller,
@@ -20,6 +21,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 const preferencesPatchSchema = z.object({
   defaultSoundSkin: z.string().max(64).optional(),
   defaultAvatarSkin: z.string().max(16).optional(),
+  shareCustomAvatars: z.boolean().optional(),
 });
 
 @Controller("users")
@@ -27,7 +29,14 @@ export class UsersController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly preferences: PreferencesService,
+    private readonly entitlements: EntitlementsService,
   ) {}
+
+  /** The avatar skin the superadmin shares with everyone ("shared"). */
+  @Get("shared-avatars")
+  sharedAvatars() {
+    return this.preferences.sharedAvatars();
+  }
 
   @Get("me/preferences")
   myPreferences(@CurrentAccountUser() user: AuthUser) {
@@ -48,10 +57,12 @@ export class UsersController {
   @UseInterceptors(
     FileInterceptor("file", { limits: { fileSize: 5 * 1024 * 1024 } }),
   )
-  setLogo(
+  async setLogo(
     @CurrentAccountUser() user: AuthUser,
     @UploadedFile() file?: Express.Multer.File,
   ) {
+    // Clearing it is always allowed.
+    if (file) await this.entitlements.assertPro(user.userId, "Your own logo");
     return this.preferences.setLogo(user.userId, file ?? null);
   }
 
@@ -60,10 +71,11 @@ export class UsersController {
   @UseInterceptors(
     FileInterceptor("file", { limits: { fileSize: 10 * 1024 * 1024 } }),
   )
-  addAvatar(
+  async addAvatar(
     @CurrentAccountUser() user: AuthUser,
     @UploadedFile() file?: Express.Multer.File,
   ) {
+    await this.entitlements.assertPro(user.userId, "Your own avatar skin");
     return this.preferences.addAvatar(user.userId, file);
   }
 

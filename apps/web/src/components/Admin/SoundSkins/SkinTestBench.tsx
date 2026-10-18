@@ -11,7 +11,8 @@ import { audioContext, type SoundHandle } from "@/lib/sound/synth";
 
 /** Like the game: the countdown before a question, the tusch → reveal gap. */
 const COUNTDOWN_MS = 5000;
-const REVEAL_AFTER_END_MS = 900;
+// Like the game: the reveal sound starts as the question ends.
+const REVEAL_AFTER_END_MS = 0;
 const REVEAL_SHOW_MS = 5000;
 const SCORES_SHOW_MS = 10_000;
 /** Like the game: reveal / scores songs fade out this long before the next. */

@@ -1,3 +1,4 @@
+import { EntitlementsService } from "../billing/entitlements.service";
 import {
   Body,
   Controller,
@@ -39,7 +40,10 @@ const updateSchema = z.object({
 
 @Controller("sound-skins")
 export class SoundSkinsController {
-  constructor(private readonly skins: SoundSkinsService) {}
+  constructor(
+    private readonly skins: SoundSkinsService,
+    private readonly entitlements: EntitlementsService,
+  ) {}
 
   @Get()
   list(@CurrentAccountUser() user: AuthUser) {
@@ -75,12 +79,13 @@ export class SoundSkinsController {
 
   /** A built-in skin copied into the user's own skins. */
   @Post("builtin/:skinId/clone")
-  cloneBuiltin(
+  async cloneBuiltin(
     @CurrentAccountUser() user: AuthUser,
     @Param("skinId") skinId: string,
     @Body(new ZodValidationPipe(createSchema))
     body: z.infer<typeof createSchema>,
   ) {
+    await this.entitlements.assertPro(user.userId, "Your own audio skins");
     return this.skins.cloneBuiltin(user, skinId, body.name);
   }
 
@@ -95,11 +100,12 @@ export class SoundSkinsController {
   }
 
   @Post()
-  create(
+  async create(
     @CurrentAccountUser() user: AuthUser,
     @Body(new ZodValidationPipe(createSchema))
     body: z.infer<typeof createSchema>,
   ) {
+    await this.entitlements.assertPro(user.userId, "Your own audio skins");
     return this.skins.create(user, body.name);
   }
 
@@ -117,12 +123,13 @@ export class SoundSkinsController {
   @UseInterceptors(
     FileInterceptor("file", { limits: { fileSize: 20 * 1024 * 1024 } }),
   )
-  setSlot(
+  async setSlot(
     @CurrentAccountUser() user: AuthUser,
     @Param("id") id: string,
     @Param("slot") slot: string,
     @UploadedFile() file?: Express.Multer.File,
   ) {
+    await this.entitlements.assertPro(user.userId, "Your own audio skins");
     return this.skins.setSlot(user, id, slot, file);
   }
 

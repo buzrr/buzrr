@@ -176,6 +176,8 @@ function useBuiltinOptions(skinId: string, role: Role): BuiltinSoundOptions {
 const SKIN_SLOTS = soundSlotSchema.options;
 /** Lobby, reveal and scoreboard songs fade out this long before the next starts. */
 const FADE_OUT_SEC = 1;
+/** Closed this long before its deadline: an early close (music fades at once). */
+const EARLY_CLOSE_MS = 500;
 /** Wall clock for the fade hold (only read in effects and event callbacks). */
 const clockMs = () => Date.now();
 /** Background music (off with "no music"). */
@@ -336,10 +338,10 @@ export function GameSounds({
       });
     }, wait);
     return {
-      stop: (fadeSec?: number) => {
+      stop: (fadeSec?: number, now?: boolean) => {
         cancelled = true;
         clearTimeout(timer);
-        inner?.stop(fadeSec);
+        inner?.stop(fadeSec, now);
       },
     };
   };
@@ -403,6 +405,16 @@ export function GameSounds({
     deadlineRef.current = deadline;
   });
   const ownAudio = phase === "question" && questionAudioHere(question?.audio);
+  // The open question has its own sound with a reveal part, on this device.
+  const ownRevealHere = useRef(false);
+  useEffect(() => {
+    if (phase === "question") {
+      ownRevealHere.current =
+        questionAudioHere(question?.audio) &&
+        question?.audio?.revealMs !== null &&
+        question?.audio?.revealMs !== undefined;
+    }
+  });
   // "No music": effects (countdown, tusch, reveal, pings) only.
   const phaseBed = on && !ownAudio && settings.music ? bedFor(phase) : null;
   // The last question has its own song when the skin has one.
@@ -420,6 +432,7 @@ export function GameSounds({
   // over FADE_OUT_SEC, and the next song starts once it is gone. Runs before
   // the bed and one-shot effects below (effects run in order).
   const reveal = useRef<SoundHandle | null>(null);
+  const questionDeadline = useRef(0);
   const countdown = useRef<SoundHandle | null>(null);
   const tusch = useRef<{
     played: boolean;
@@ -451,6 +464,15 @@ export function GameSounds({
       bed.current = null;
       faded = true;
     }
+    // The question closed early (everyone answered, the host moved on): its
+    // music fades out over a second at once, no extend.
+    if (from === "question" && bed.current) {
+      if (questionDeadline.current - clockMs() > EARLY_CLOSE_MS) {
+        bed.current.handle?.stop(FADE_OUT_SEC, true);
+        bed.current = null;
+      }
+    }
+    if (phase === "question") questionDeadline.current = deadline;
     if (from === "reveal" && reveal.current) {
       reveal.current.stop(FADE_OUT_SEC);
       reveal.current = null;
@@ -617,14 +639,15 @@ export function GameSounds({
       }
       tusch.current = { played: true };
     }
-    if (phase === "reveal") {
-      // After the tusch if the question just closed.
-      setTimeout(
-        () => {
-          if (left.current === "reveal") reveal.current = play("reveal");
-        },
-        from === "question" ? 900 : 0,
-      );
+    // The reveal sound: right as the question ends (with the tusch on top),
+    // and it plays on when the answer is shown. Not for a question with its
+    // own sound here: its reveal part plays instead, with nothing under it.
+    if (
+      from === "question" &&
+      (phase === "closed" || phase === "reveal") &&
+      !ownRevealHere.current
+    ) {
+      reveal.current = play("reveal");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);

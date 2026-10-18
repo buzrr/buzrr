@@ -1,3 +1,4 @@
+import { EntitlementsService } from "../billing/entitlements.service";
 import { importQuizSchema, type ImportQuiz } from "@buzrr/contract";
 import { FileInterceptor } from "@nestjs/platform-express";
 import {
@@ -33,7 +34,10 @@ const changeOwnerSchema = z.object({
 
 @Controller("quizzes")
 export class QuizzesController {
-  constructor(private readonly quizzes: QuizzesService) {}
+  constructor(
+    private readonly quizzes: QuizzesService,
+    private readonly entitlements: EntitlementsService,
+  ) {}
 
   @Get()
   list(@CurrentAccountUser() user: AuthUser) {
@@ -97,11 +101,12 @@ export class QuizzesController {
   @UseInterceptors(
     FileInterceptor("file", { limits: { fileSize: 5 * 1024 * 1024 } }),
   )
-  setLogo(
+  async setLogo(
     @CurrentAccountUser() user: AuthUser,
     @Param("id") id: string,
     @UploadedFile() file?: Express.Multer.File,
   ) {
+    if (file) await this.entitlements.assertPro(user.userId, "A quiz logo");
     return this.quizzes.setLogo(user, id, file ?? null);
   }
 

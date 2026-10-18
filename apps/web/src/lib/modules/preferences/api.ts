@@ -15,6 +15,7 @@ export const preferencesApi = {
   update: async (patch: {
     defaultSoundSkin?: string;
     defaultAvatarSkin?: string;
+    shareCustomAvatars?: boolean;
   }) =>
     (
       await getAuthApiClient().patch<UserPreferences>(
@@ -22,6 +23,9 @@ export const preferencesApi = {
         patch,
       )
     ).data,
+  /** The superadmin's avatar skin shared with everyone (empty: none). */
+  sharedAvatars: async () =>
+    (await getAuthApiClient().get<string[]>("/users/shared-avatars")).data,
   setLogo: (file: File | null) => upload("/users/me/logo", file),
   addAvatar: (file: File) => upload("/users/me/avatars", file),
   removeAvatar: async (url: string) =>

@@ -79,9 +79,10 @@ async function playBuffer(
     const now = ctx.currentTime;
     gain.gain.cancelScheduledValues(now);
     gain.gain.setValueAtTime(gain.gain.value, now);
-    gain.gain.linearRampToValueAtTime(0.0001, now + 0.3);
+    // A second's fade: the reveal part makes way for the scoreboard music.
+    gain.gain.linearRampToValueAtTime(0.0001, now + 1);
     try {
-      src.stop(now + 0.35);
+      src.stop(now + 1.05);
     } catch {
       // already ended
     }

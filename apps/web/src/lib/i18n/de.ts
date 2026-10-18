@@ -971,6 +971,12 @@ export const DE: Record<string, string> = {
   "The song plays on this long after the end, then fades out.":
     "So lange läuft der Song nach dem Ende weiter, dann wird er ausgeblendet.",
   "Test bench": "Testlauf",
+  "{what} is a Pro feature": "{what} ist eine Pro-Funktion",
+  "Your own logo": "Eigenes Logo",
+  "A quiz logo": "Ein Quiz-Logo",
+  "Your own avatar skin": "Eigener Avatar-Skin",
+  "Your own audio skins": "Eigene Audio-Skins",
+  Pro: "Pro",
   "With a picture": "Mit Bild",
   "With music": "Mit Musik",
   "A click sets:": "Ein Klick setzt:",

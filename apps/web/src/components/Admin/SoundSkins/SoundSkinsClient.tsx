@@ -1,5 +1,6 @@
 "use client";
 
+import { ProLock, useHasPro } from "@/components/Billing/ProFeature";
 import clsx from "clsx";
 import { useState } from "react";
 import { toast } from "react-toastify";
@@ -196,12 +197,14 @@ function countdownTail(skin: SoundSkin, slot: "countdown" | "lastCountdown") {
 export default function SoundSkinsClient() {
   const t = useT();
   const role = useCurrentRole();
-  const isAdmin = role === "admin" || role === "superadmin";
+  // Only the superadmin shares a skin with everyone.
+  const isAdmin = role === "superadmin";
   const query = useSoundSkinsQuery();
   const create = useCreateSoundSkin();
   const [name, setName] = useState("");
   const prefs = usePreferencesQuery();
   const defaultId = prefs.data?.defaultSoundSkin ?? "builtin:show";
+  const hasPro = useHasPro();
 
   return (
     <div className="mt-4 flex flex-col gap-5 text-dark dark:text-white max-w-5xl">
@@ -238,28 +241,33 @@ export default function SoundSkinsClient() {
       )}
 
       <section className={clsx(panelClass, "p-5 flex flex-col gap-3")}>
-        <h2 className="text-lg font-bold">{t("New audio skin")}</h2>
-        <form
-          className="flex gap-2 max-w-md"
-          onSubmit={(e) => {
-            e.preventDefault();
-            create.mutate(name || "My sounds", {
-              onSuccess: () => setName(""),
-              onError: (err) => toast.error(getApiErrorMessage(err)),
-            });
-          }}
-        >
-          <TextInput
-            placeholder={t("New audio skin name")}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={60}
-            containerClassName="flex-1"
-          />
-          <Button size="sm" type="submit" disabled={create.isPending}>
-            {t("Create")}
-          </Button>
-        </form>
+        <h2 className="text-lg font-bold flex items-center gap-2">
+          {t("New audio skin")}
+          {hasPro === false && <ProLock what={t("Your own audio skins")} />}
+        </h2>
+        {hasPro !== false && (
+          <form
+            className="flex gap-2 max-w-md"
+            onSubmit={(e) => {
+              e.preventDefault();
+              create.mutate(name || "My sounds", {
+                onSuccess: () => setName(""),
+                onError: (err) => toast.error(getApiErrorMessage(err)),
+              });
+            }}
+          >
+            <TextInput
+              placeholder={t("New audio skin name")}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={60}
+              containerClassName="flex-1"
+            />
+            <Button size="sm" type="submit" disabled={create.isPending}>
+              {t("Create")}
+            </Button>
+          </form>
+        )}
       </section>
     </div>
   );
@@ -315,6 +323,7 @@ function BuiltinSkinCard({
   const setBuiltin = useSetBuiltinOptions();
   const reset = useResetBuiltinOptions();
   const clone = useCloneBuiltin();
+  const hasPro = useHasPro();
   const playback = usePlayback();
   const [testing, setTesting] = useState(false);
   const data = builtinOptions.data?.[id];
@@ -364,26 +373,31 @@ function BuiltinSkinCard({
             setTesting(!testing);
           }}
         />
-        <button
-          type="button"
-          disabled={clone.isPending}
-          onClick={() =>
-            clone.mutate(
-              {
-                skinId: id,
-                name: t("{name} (copy)", { name: t(BUILTIN_SKINS[id].name) }),
-              },
-              {
-                onSuccess: () => toast.success(t("Copied to your audio skins")),
-                onError: (err) => toast.error(getApiErrorMessage(err)),
-              },
-            )
-          }
-          className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold bg-lprimary/10 dark:bg-white/5 cursor-pointer disabled:opacity-50"
-        >
-          <LuCopy size={11} />
-          {t("Clone to own")}
-        </button>
+        {hasPro === false ? (
+          <ProLock what={t("Your own audio skins")} />
+        ) : (
+          <button
+            type="button"
+            disabled={clone.isPending}
+            onClick={() =>
+              clone.mutate(
+                {
+                  skinId: id,
+                  name: t("{name} (copy)", { name: t(BUILTIN_SKINS[id].name) }),
+                },
+                {
+                  onSuccess: () =>
+                    toast.success(t("Copied to your audio skins")),
+                  onError: (err) => toast.error(getApiErrorMessage(err)),
+                },
+              )
+            }
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold bg-lprimary/10 dark:bg-white/5 cursor-pointer disabled:opacity-50"
+          >
+            <LuCopy size={11} />
+            {t("Clone to own")}
+          </button>
+        )}
         {isSuperadmin && (
           <button
             type="button"

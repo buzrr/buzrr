@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import { ProLock, useHasPro } from "@/components/Billing/ProFeature";
 import { toast } from "react-toastify";
 import { z } from "zod";
 import GridListToggle from "@/components/Admin/GridListToggle";
@@ -132,6 +133,14 @@ function GameDefaultsCard() {
   const logoInput = useRef<HTMLInputElement>(null);
   const logo = prefs.data?.defaultLogo ?? null;
   const onErr = (err: unknown) => toast.error(getApiErrorMessage(err));
+  const hasPro = useHasPro();
+  const defaultSkin = prefs.data?.defaultSoundSkin ?? "builtin:show";
+  const defaultSkinName = (BUILTIN_SOUND_SKINS as readonly string[]).includes(
+    defaultSkin,
+  )
+    ? t(BUILTIN_SKINS[defaultSkin as BuiltinSkinId].name)
+    : ((skins.data ?? []).find((sk) => sk.id === defaultSkin)?.name ??
+      t("Audio skin"));
   return (
     <SettingsCard
       title={t("Game defaults")}
@@ -141,79 +150,67 @@ function GameDefaultsCard() {
         label={t("Default logo")}
         description={t("Shown on game screens instead of the site logo.")}
         control={
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => logoInput.current?.click()}
-              disabled={setLogo.isPending}
-              title={logo ? t("Change logo") : t("Upload a logo")}
-              className="size-14 shrink-0 rounded-xl border-[1.5px] border-dashed border-lprimary/25 dark:border-white/15 flex items-center justify-center overflow-hidden cursor-pointer hover:border-dprimary"
-            >
-              {logo ? (
-                // eslint-disable-next-line @next/next/no-img-element -- signed upload URL
-                <img
-                  src={logo}
-                  alt={t("Default logo")}
-                  className="max-h-full max-w-full object-contain p-1"
-                />
-              ) : (
-                <LuImagePlus
-                  size={22}
-                  className="text-lprimary dark:text-dprimary"
-                />
-              )}
-            </button>
-            {logo && (
+          hasPro === false && !logo ? (
+            <ProLock what={t("Your own logo")} />
+          ) : (
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                aria-label={t("Remove default logo")}
-                onClick={() => setLogo.mutate(null, { onError: onErr })}
-                className="size-8 rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:text-[#e5544e] cursor-pointer"
+                onClick={() => logoInput.current?.click()}
+                disabled={setLogo.isPending}
+                title={logo ? t("Change logo") : t("Upload a logo")}
+                className="size-14 shrink-0 rounded-xl border-[1.5px] border-dashed border-lprimary/25 dark:border-white/15 flex items-center justify-center overflow-hidden cursor-pointer hover:border-dprimary"
               >
-                <LuTrash2 size={16} />
+                {logo ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- signed upload URL
+                  <img
+                    src={logo}
+                    alt={t("Default logo")}
+                    className="max-h-full max-w-full object-contain p-1"
+                  />
+                ) : (
+                  <LuImagePlus
+                    size={22}
+                    className="text-lprimary dark:text-dprimary"
+                  />
+                )}
               </button>
-            )}
-            <input
-              ref={logoInput}
-              type="file"
-              accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif"
-              className="sr-only"
-              onChange={(e) => {
-                const f = e.target.files?.[0] ?? null;
-                e.target.value = "";
-                if (f) setLogo.mutate(f, { onError: onErr });
-              }}
-            />
-          </div>
+              {logo && (
+                <button
+                  type="button"
+                  aria-label={t("Remove default logo")}
+                  onClick={() => setLogo.mutate(null, { onError: onErr })}
+                  className="size-8 rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:text-[#e5544e] cursor-pointer"
+                >
+                  <LuTrash2 size={16} />
+                </button>
+              )}
+              <input
+                ref={logoInput}
+                type="file"
+                accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif"
+                className="sr-only"
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  e.target.value = "";
+                  if (f) setLogo.mutate(f, { onError: onErr });
+                }}
+              />
+            </div>
+          )
         }
       />
       <PreferenceRow
         label={t("Default audio skin")}
         description={t("Music and effects of quizzes set to “Default”.")}
         control={
-          <select
-            aria-label={t("Default audio skin")}
-            value={prefs.data?.defaultSoundSkin ?? "builtin:show"}
-            disabled={update.isPending || !prefs.data}
-            onChange={(e) =>
-              update.mutate(
-                { defaultSoundSkin: e.target.value },
-                { onError: onErr },
-              )
-            }
-            className="w-44 rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent dark:bg-dark px-2 py-1 text-[13px] text-dark dark:text-white"
+          // Like the avatar skin: a link to the page where it is picked.
+          <Link
+            href="/admin/audio-skins"
+            className="text-sm font-semibold text-lprimary dark:text-dprimary hover:underline whitespace-nowrap"
           >
-            {BUILTIN_SOUND_SKINS.map((id) => (
-              <option key={id} value={id}>
-                {t(BUILTIN_SKINS[id as BuiltinSkinId].name)}
-              </option>
-            ))}
-            {(skins.data ?? []).map((sk) => (
-              <option key={sk.id} value={sk.id}>
-                {sk.name}
-              </option>
-            ))}
-          </select>
+            {defaultSkinName} →
+          </Link>
         }
       />
       <PreferenceRow

@@ -1,6 +1,7 @@
 import { signAssetUrl } from "../../common/storage/asset-signing";
 import {
   assignAvatar,
+  loadSharedAvatars,
   resolveGameLook,
 } from "../../common/game-look/game-look";
 import {
@@ -82,7 +83,12 @@ export class GameSessionsService {
     const limit = rejoin
       ? 0
       : await this.entitlements.maxPlayersFor(game.creatorId);
-    const { avatars } = resolveGameLook(game.quiz, game.quiz.user?.preferences);
+    const { avatars } = resolveGameLook(
+      game.quiz,
+      game.quiz.user?.preferences,
+      (await this.entitlements.resolvePlan(game.creatorId)) === "pro",
+      await loadSharedAvatars(this.prisma.db),
+    );
     const profilePic = avatars.includes(player.profilePic ?? "")
       ? undefined
       : assignAvatar(avatars, playerId);
@@ -392,7 +398,12 @@ export class GameSessionsService {
     }
     // The owner's defaults filled in (audio / avatar skin, logo).
     const { user: owner, ...rest } = quiz;
-    const look = resolveGameLook(quiz, owner?.preferences);
+    const look = resolveGameLook(
+      quiz,
+      owner?.preferences,
+      plan === "pro",
+      await loadSharedAvatars(this.prisma.db),
+    );
     return {
       room,
       players,
@@ -416,7 +427,12 @@ export class GameSessionsService {
     const loaded = await this.loadGameForPlay(player.gameId);
     if (!loaded) return { player, game: null };
     const { user: owner, ...quiz } = loaded.quiz;
-    const look = resolveGameLook(quiz, owner?.preferences);
+    const look = resolveGameLook(
+      quiz,
+      owner?.preferences,
+      (await this.entitlements.resolvePlan(loaded.creatorId)) === "pro",
+      await loadSharedAvatars(this.prisma.db),
+    );
     // A public route: the logo gets its signature here (players of this room
     // are the ones who may see it).
     const game = {

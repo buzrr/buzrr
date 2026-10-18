@@ -44,9 +44,21 @@ export default function GetReady({
   const seconds = Math.ceil(remaining);
   const counting =
     phase === "starting" && deadline > 0 && remaining > 0 && waitingFor === 0;
+  // Whether this question's countdown really ran (one with time on it):
+  // without one ("∞" questions, a host skipping it) there is no 0 to show.
+  const [counted, setCounted] = useState<number | null>(null);
+  if (phase === "starting" && countdownMs > 0 && counted !== qIndex) {
+    setCounted(qIndex);
+  }
   // 0 is the end: red, still — also while devices finish their downloads.
   const zero =
-    phase === "starting" && deadline > 0 && (remaining <= 0 || waitingFor > 0);
+    counted === qIndex &&
+    phase === "starting" &&
+    deadline > 0 &&
+    (remaining <= 0 || waitingFor > 0);
+  // No countdown at all: an empty, still round.
+  const empty =
+    phase === "starting" && !counting && !zero && counted !== qIndex;
 
   return (
     <div className="w-full max-w-3xl mx-auto flex flex-col justify-center px-4 py-6 md:py-10 min-h-[calc(100dvh-7.5rem)] text-dark dark:text-white">
@@ -74,13 +86,14 @@ export default function GetReady({
         <Countdown
           counting={counting}
           zero={zero}
+          empty={empty}
           seconds={seconds}
           remaining={remaining}
           total={countdownMs / 1000}
         />
 
         <div className="relative min-h-6 flex items-center justify-center">
-          {counting || (zero && waitingFor === 0) ? (
+          {counting || ((zero || empty) && waitingFor === 0) ? (
             <p className={clsx("text-base md:text-lg font-medium", mutedText)}>
               {qIndex > 0
                 ? t("Question {n} coming up", { n: qIndex + 1 })
@@ -162,6 +175,7 @@ function useFrameCountdown(deadline: number): number {
 function Countdown({
   counting,
   zero,
+  empty,
   seconds,
   remaining,
   total,
@@ -169,6 +183,8 @@ function Countdown({
   counting: boolean;
   /** Reached 0: the whole round turns red, a black 0, nothing moves. */
   zero: boolean;
+  /** No countdown here: just the empty ring. */
+  empty: boolean;
   seconds: number;
   remaining: number;
   total: number;
@@ -179,7 +195,7 @@ function Countdown({
     counting && total > 0 ? Math.max(0, Math.min(1, remaining / total)) : 0;
   const label = zero ? 0 : !counting || seconds <= 0 ? null : seconds;
   // No countdown known yet (waiting for the question): a spinner.
-  const spinning = !counting && !zero;
+  const spinning = !counting && !zero && !empty;
   return (
     <div className="relative size-[150px] md:size-[190px]">
       <svg viewBox="0 0 100 100" className="block size-full -rotate-90">
@@ -217,7 +233,9 @@ function Countdown({
               stroke="url(#get-ready-ring)"
               strokeDasharray={c}
               // Driven every frame (no CSS transition): it ends exactly on 0.
-              strokeDashoffset={spinning ? c * 0.72 : c * (1 - frac)}
+              strokeDashoffset={
+                spinning ? c * 0.72 : empty ? c : c * (1 - frac)
+              }
               className={clsx(
                 spinning &&
                   "animate-spin origin-center [transform-box:fill-box] [animation-duration:2.4s]",

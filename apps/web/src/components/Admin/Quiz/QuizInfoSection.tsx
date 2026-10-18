@@ -1,5 +1,6 @@
 "use client";
 
+import { ProLock, useHasPro } from "@/components/Billing/ProFeature";
 import clsx from "clsx";
 import Image from "next/image";
 import Link from "next/link";
@@ -140,6 +141,16 @@ function LogoSetting({ quiz }: { quiz: QuizDetail }) {
         toast.success(file ? t("Logo saved") : t("Logo removed")),
       onError: (err) => toast.error(getApiErrorMessage(err)),
     });
+  const hasPro = useHasPro();
+  if (hasPro === false && !logo) {
+    // A Pro feature (an existing logo can still be removed).
+    return (
+      <div className="flex items-center gap-3 mt-3 mb-1">
+        <span className="text-sm font-semibold">{t("Quiz logo")}</span>
+        <ProLock what={t("A quiz logo")} />
+      </div>
+    );
+  }
   return (
     <div className="flex items-center gap-3 mt-3 mb-1">
       <button

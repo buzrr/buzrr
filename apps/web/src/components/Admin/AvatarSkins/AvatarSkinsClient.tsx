@@ -1,5 +1,9 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
+import { Switch } from "@/components/ui/Switch";
+import { useCurrentRole } from "@/components/SessionProvider";
+import { ProLock, useHasPro } from "@/components/Billing/ProFeature";
 import clsx from "clsx";
 import { useRef } from "react";
 import { LuCheck, LuImagePlus, LuTrash2 } from "react-icons/lu";
@@ -12,6 +16,7 @@ import {
 import { getApiErrorMessage } from "@/lib/api/errors";
 import {
   useAddAvatar,
+  useSharedAvatarsQuery,
   usePreferencesQuery,
   useRemoveAvatar,
   useUpdatePreferences,
@@ -25,6 +30,7 @@ export const AVATAR_SKIN_NAMES: Record<AvatarSkin, string> = {
   crazy: "Variant 2 · Crazy food",
   faces: "Variant 3 · Funny faces",
   custom: "Your skin",
+  shared: "Shared skin",
 };
 
 const DESCRIPTIONS: Record<AvatarSkin, string> = {
@@ -33,6 +39,7 @@ const DESCRIPTIONS: Record<AvatarSkin, string> = {
   crazy: "Googly-eyed pizza, donuts, tacos & friends.",
   faces: "Friendly flat-style faces: all kinds of people, all smiling.",
   custom: "Your own pictures — up to {n}, cropped to a square automatically.",
+  shared: "Offered to everyone by the superadmin.",
 };
 
 function Avatar({ src }: { src: string }) {
@@ -54,6 +61,7 @@ function Avatar({ src }: { src: string }) {
  */
 export default function AvatarSkinsClient() {
   const t = useT();
+  const hasPro = useHasPro();
   const prefs = usePreferencesQuery();
   const update = useUpdatePreferences();
   const add = useAddAvatar();
@@ -61,6 +69,11 @@ export default function AvatarSkinsClient() {
   const input = useRef<HTMLInputElement>(null);
   const current = prefs.data?.defaultAvatarSkin ?? "original";
   const custom = prefs.data?.customAvatars ?? [];
+  const role = useCurrentRole();
+  const isSuperadmin = role === "superadmin";
+  const shared = useSharedAvatarsQuery();
+  const qc = useQueryClient();
+  const sharing = prefs.data?.shareCustomAvatars ?? false;
 
   const makeDefault = (skin: AvatarSkin) =>
     update.mutate(
@@ -94,7 +107,18 @@ export default function AvatarSkinsClient() {
     }
   };
 
-  const skins: AvatarSkin[] = ["original", "comic", "crazy", "faces", "custom"];
+  // "Shared": the superadmin's skin, for everyone else (the superadmin
+  // shares their own "Your skin" with a switch on it).
+  const skins: AvatarSkin[] = [
+    "original",
+    "comic",
+    "crazy",
+    "faces",
+    ...(!isSuperadmin && (shared.data ?? []).length > 0
+      ? (["shared"] as const)
+      : []),
+    "custom",
+  ];
   return (
     <div className="mt-4 flex flex-col gap-5 max-w-5xl">
       <p className={clsx("text-sm", mutedText)}>
@@ -103,7 +127,12 @@ export default function AvatarSkinsClient() {
         )}
       </p>
       {skins.map((skin) => {
-        const pics = skin === "custom" ? custom : BUILTIN_AVATARS[skin];
+        const pics =
+          skin === "custom"
+            ? custom
+            : skin === "shared"
+              ? (shared.data ?? [])
+              : BUILTIN_AVATARS[skin];
         const isDefault = current === skin;
         return (
           <section
@@ -125,7 +154,32 @@ export default function AvatarSkinsClient() {
                 </p>
               </div>
               <div className="ml-auto flex items-center gap-2">
-                {skin === "custom" && (
+                {skin === "custom" && isSuperadmin && (
+                  <label className="flex items-center gap-2 text-sm">
+                    <Switch
+                      aria-label={t("For all users")}
+                      checked={sharing}
+                      onCheckedChange={(on) =>
+                        update.mutate(
+                          { shareCustomAvatars: on },
+                          {
+                            onSuccess: () =>
+                              qc.invalidateQueries({
+                                queryKey: ["shared-avatars"],
+                              }),
+                            onError: (err) =>
+                              toast.error(getApiErrorMessage(err)),
+                          },
+                        )
+                      }
+                    />
+                    {t("For all users")}
+                  </label>
+                )}
+                {skin === "custom" && hasPro === false && (
+                  <ProLock what={t("Your own avatar skin")} />
+                )}
+                {skin === "custom" && hasPro !== false && (
                   <>
                     <span className={clsx("text-xs", mutedText)}>
                       {custom.length} / {MAX_CUSTOM_AVATARS}

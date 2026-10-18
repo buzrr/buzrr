@@ -222,13 +222,14 @@ export function playSong(
   }
 
   return {
-    stop: (fadeSec?: number) => {
+    stop: (fadeSec?: number, now?: boolean) => {
       if (stopped) return;
       stopped = true;
       if (fallback)
         fadeOutAndPause(fallback, (fadeSec ?? STOP_FADE_SEC) * 1000);
-      // An end-aligned song keeps its extend; any other fades out now.
-      if (stopLater && endAlignedSong) stopLater();
+      // An end-aligned song keeps its extend (unless `now`); any other
+      // fades out now.
+      if (stopLater && endAlignedSong && !now) stopLater();
       else stopNow?.(fadeSec);
     },
   };

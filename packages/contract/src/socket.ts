@@ -244,6 +244,8 @@ export const AVATAR_SKINS = [
   "crazy",
   "faces",
   "custom",
+  /** The superadmin's own skin, shared with everyone (if they share it). */
+  "shared",
 ] as const;
 export const avatarSkinSchema = z.enum(AVATAR_SKINS);
 export type AvatarSkin = z.infer<typeof avatarSkinSchema>;
@@ -258,7 +260,7 @@ const numbered = (dir: string, prefix: string, n: number) =>
 
 /** The built-in sets' files (web public paths). */
 export const BUILTIN_AVATARS: Record<
-  Exclude<AvatarSkin, "custom">,
+  Exclude<AvatarSkin, "custom" | "shared">,
   string[]
 > = {
   original: [
@@ -287,6 +289,8 @@ export const userPreferencesSchema = z.object({
   defaultAvatarSkin: avatarSkinSchema.default("original"),
   /** The "custom" avatar skin: own uploads, square, resized on upload. */
   customAvatars: z.array(z.string()).max(MAX_CUSTOM_AVATARS).default([]),
+  /** Superadmin only: offer "Your skin" to every user (as "shared"). */
+  shareCustomAvatars: z.boolean().default(false),
 });
 export type UserPreferences = z.infer<typeof userPreferencesSchema>;
 

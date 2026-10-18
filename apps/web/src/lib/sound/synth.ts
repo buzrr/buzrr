@@ -336,8 +336,11 @@ function chord(
 
 /** A running loop or one-shot; `stop` fades it out. */
 export interface SoundHandle {
-  /** Stop, fading out over `fadeSec` (default: a short fade). */
-  stop: (fadeSec?: number) => void;
+  /**
+   * Stop, fading out over `fadeSec` (default: a short fade). `now`: right
+   * away, even for an end-aligned song that would play on its extend.
+   */
+  stop: (fadeSec?: number, now?: boolean) => void;
 }
 
 /**

@@ -38,7 +38,9 @@ export default function UpgradePrompt({
   const title =
     limit?.limit === "quizzes"
       ? "You've reached your quiz limit"
-      : "You're out of AI generations";
+      : limit?.limit === "feature"
+        ? "This is a Pro feature"
+        : "You're out of AI generations";
 
   return (
     <Modal

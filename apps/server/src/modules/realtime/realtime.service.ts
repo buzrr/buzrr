@@ -1,4 +1,8 @@
-import { resolveGameLook } from "../../common/game-look/game-look";
+import { EntitlementsService } from "../billing/entitlements.service";
+import {
+  loadSharedAvatars,
+  resolveGameLook,
+} from "../../common/game-look/game-look";
 import { Injectable, Logger } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -10,6 +14,7 @@ export class RealtimeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   /**
@@ -33,6 +38,8 @@ export class RealtimeService {
     const { avatars } = resolveGameLook(
       session.quiz,
       session.quiz.user?.preferences,
+      (await this.entitlements.resolvePlan(session.creatorId)) === "pro",
+      await loadSharedAvatars(this.prisma.db),
     );
     if (!avatars.includes(profilePic)) return null;
     const updated = await this.prisma.db.player.updateMany({

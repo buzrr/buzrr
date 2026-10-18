@@ -1,4 +1,6 @@
+import type { PrismaService } from "../../prisma/prisma.service";
 import {
+  BUILTIN_SOUND_SKINS,
   BUILTIN_AVATARS,
   quizSettingsSchema,
   userPreferencesSchema,
@@ -20,30 +22,47 @@ export function preferencesOf(raw: unknown): UserPreferences {
 export function resolveGameLook(
   quiz: { settings: unknown; logo: string | null },
   ownerPreferences: unknown,
+  /**
+   * The host has Pro (or the instance runs without billing): own audio
+   * skins, own avatars and logos. Without, the built-in ones play.
+   */
+  pro = true,
+  /** The superadmin's shared avatar skin ("shared"); empty: not shared. */
+  shared: string[] = [],
 ): { settings: QuizSettings; logo: string | null; avatars: string[] } {
   const prefs = preferencesOf(ownerPreferences);
   const parsed = quizSettingsSchema.safeParse(quiz.settings ?? {});
   const settings = parsed.success ? parsed.data : quizSettingsSchema.parse({});
+  const chosenSkin =
+    settings.sound.skin === "default"
+      ? prefs.defaultSoundSkin
+      : settings.sound.skin;
   const sound = {
     ...settings.sound,
     skin:
-      settings.sound.skin === "default"
-        ? prefs.defaultSoundSkin
-        : settings.sound.skin,
+      pro || (BUILTIN_SOUND_SKINS as readonly string[]).includes(chosenSkin)
+        ? chosenSkin
+        : BUILTIN_SOUND_SKINS[0],
   };
-  const avatarSkin =
+  const chosenAvatars =
     settings.avatarSkin === "default"
       ? prefs.defaultAvatarSkin
       : settings.avatarSkin;
+  const avatarSkin =
+    !pro && chosenAvatars === "custom" ? "original" : chosenAvatars;
   const avatars =
     avatarSkin === "custom"
       ? prefs.customAvatars.length > 0
         ? prefs.customAvatars
         : BUILTIN_AVATARS.original
-      : BUILTIN_AVATARS[avatarSkin];
+      : avatarSkin === "shared"
+        ? shared.length > 0
+          ? shared
+          : BUILTIN_AVATARS.original
+        : BUILTIN_AVATARS[avatarSkin];
   return {
     settings: { ...settings, sound, avatarSkin },
-    logo: quiz.logo ?? prefs.defaultLogo,
+    logo: pro ? (quiz.logo ?? prefs.defaultLogo) : null,
     avatars,
   };
 }
@@ -53,4 +72,20 @@ export function assignAvatar(avatars: string[], playerId: string): string {
   let h = 0;
   for (const ch of playerId) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return avatars[h % avatars.length]!;
+}
+
+/**
+ * The avatar skin the superadmin shares with everyone ("shared"): their own
+ * pictures, if they switched sharing on. Empty otherwise.
+ */
+export async function loadSharedAvatars(
+  db: PrismaService["db"],
+): Promise<string[]> {
+  const admin = await db.user.findFirst({
+    where: { role: "superadmin" },
+    select: { preferences: true },
+    orderBy: { createdAt: "asc" },
+  });
+  const prefs = preferencesOf(admin?.preferences);
+  return prefs.shareCustomAvatars ? prefs.customAvatars : [];
 }

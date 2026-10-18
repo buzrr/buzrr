@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   ServiceUnavailableException,
 } from "@nestjs/common";
@@ -15,7 +16,10 @@ import {
   UnsupportedMediaError,
 } from "../../common/storage/media-storage";
 import { toAvatarPng } from "../../common/storage/image-resize";
-import { preferencesOf } from "../../common/game-look/game-look";
+import {
+  loadSharedAvatars,
+  preferencesOf,
+} from "../../common/game-look/game-look";
 
 /** A user's defaults (Settings) and own avatar pictures ("Your skin"). */
 @Injectable()
@@ -24,6 +28,11 @@ export class PreferencesService {
     private readonly prisma: PrismaService,
     private readonly storage: MediaStorage,
   ) {}
+
+  /** The superadmin's shared avatar skin (empty if not shared). */
+  sharedAvatars(): Promise<string[]> {
+    return loadSharedAvatars(this.prisma.db);
+  }
 
   async get(userId: string): Promise<UserPreferences> {
     const user = await this.prisma.db.user.findUnique({
@@ -43,9 +52,25 @@ export class PreferencesService {
 
   async update(
     userId: string,
-    patch: { defaultSoundSkin?: string; defaultAvatarSkin?: string },
+    patch: {
+      defaultSoundSkin?: string;
+      defaultAvatarSkin?: string;
+      shareCustomAvatars?: boolean;
+    },
   ): Promise<UserPreferences> {
     const prefs = await this.get(userId);
+    if (patch.shareCustomAvatars !== undefined) {
+      const u = await this.prisma.db.user.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      });
+      if (u?.role !== "superadmin") {
+        throw new ForbiddenException(
+          "Only the superadmin can share an avatar skin with everyone",
+        );
+      }
+      prefs.shareCustomAvatars = patch.shareCustomAvatars;
+    }
     if (patch.defaultSoundSkin !== undefined) {
       const s = patch.defaultSoundSkin.trim();
       if (!s || s.length > 64 || s === "default") {
