@@ -112,31 +112,74 @@ function StandingChip({ standing }: { standing: Standing }) {
   );
 }
 
-/** Rank, field size and total under the verdict — phones only. */
-function StandingStrip({
+/** Podium places in medal colours; everyone else in the brand colour. */
+const PLACE_TEXT: Record<number, string> = {
+  1: "text-[#c99a0e] dark:text-[#f4c542]",
+  2: "text-[#7d8494] dark:text-[#b9bfcc]",
+  3: "text-[#b8703c] dark:text-[#e0a173]",
+};
+
+/** A line of encouragement for where the player stands. */
+function standingMessage(rank: number, playerCount: number): string {
+  if (playerCount <= 1) return "Playing solo — every point counts!";
+  if (rank === 1) return "You're in the lead — keep it up!";
+  if (rank <= 3) return "Congrats, you're on the podium — keep it up!";
+  const below = rank - 3;
+  return below === 1
+    ? "Just 1 place below the podium — you've got this!"
+    : `${below} places below the podium — keep going!`;
+}
+
+/** The player's place after this question, under the answers. */
+function StandingCard({
   standing,
   playerCount,
 }: {
   standing: Standing;
   playerCount: number;
 }) {
+  const podium = standing.rank <= 3 && playerCount > 1;
   return (
     <div
       className={clsx(
-        "md:hidden mt-3 flex items-center justify-center gap-2 rounded-full px-4 py-2 text-[14.5px] animate-fade-up",
+        "mt-4 md:mt-6 w-full max-w-[420px] rounded-2xl px-5 py-4 md:py-5 flex flex-col items-center gap-1.5 animate-fade-up [animation-delay:250ms]",
         subtleCardClass,
       )}
     >
-      <b className="text-dark dark:text-white">{ordinal(standing.rank)}</b>
-      {playerCount > 0 && <span className={mutedText}>of {playerCount}</span>}
-      <RankMove move={rankMove(standing)} />
-      <span className={mutedText} aria-hidden="true">
-        ·
+      <span
+        className={clsx(
+          "text-[12.5px] font-bold tracking-[0.06em] uppercase",
+          mutedText,
+        )}
+      >
+        Your standing
       </span>
-      <b className="text-dark dark:text-white tabular-nums">
-        {standing.totalScore.toLocaleString()}
-      </b>
-      <span className={mutedText}>pts</span>
+      <p className="flex flex-wrap items-baseline justify-center gap-x-2 text-lg md:text-xl font-semibold">
+        <span>You&apos;re in</span>
+        <b
+          className={clsx(
+            "inline-flex items-center gap-1.5 text-[30px] md:text-[36px] font-extrabold tracking-[-0.02em] leading-none",
+            PLACE_TEXT[standing.rank] ?? "text-lprimary dark:text-dprimary",
+          )}
+        >
+          {podium && <LuTrophy size={24} aria-hidden="true" />}
+          {ordinal(standing.rank)}
+        </b>
+        <span>
+          place
+          {playerCount > 1 && ` out of ${playerCount}`}
+        </span>
+        <RankMove move={rankMove(standing)} />
+      </p>
+      <p className="text-[15px] font-semibold">
+        {standingMessage(standing.rank, playerCount)}
+      </p>
+      <p className={clsx("text-[13.5px]", mutedText)}>
+        <b className="text-dark dark:text-white tabular-nums">
+          {standing.totalScore.toLocaleString()}
+        </b>{" "}
+        points in total
+      </p>
     </div>
   );
 }
@@ -427,9 +470,6 @@ const QuestionAndResult = (params: {
                   ? "Not scored — thanks for answering"
                   : `+${params.points ?? 0} points`}
             </span>
-            {standing && standing.qIndex === qIndex && (
-              <StandingStrip standing={standing} playerCount={players.length} />
-            )}
             <div className="mt-3 md:mt-[22px] flex flex-col gap-3 md:gap-4 w-full max-w-[420px] animate-fade-up [animation-delay:150ms]">
               <AnswerRow
                 label="Your answer"
@@ -450,6 +490,9 @@ const QuestionAndResult = (params: {
                   </AnswerRow>
                 ))}
             </div>
+            {standing && standing.qIndex === qIndex && (
+              <StandingCard standing={standing} playerCount={players.length} />
+            )}
             <div className="mt-4 md:mt-[26px]">
               <WaitingDots>
                 {params.hideRoomCode
