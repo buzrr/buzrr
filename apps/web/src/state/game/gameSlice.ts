@@ -9,6 +9,7 @@ import type {
   LeaderboardEntry,
   ModerationSettings,
   PhaseChangePayload,
+  PreloadAllPayload,
   PreloadPayload,
   PublicQuestion,
   QuestionEndPayload,
@@ -74,6 +75,8 @@ export interface GameLiveState {
   waitingFor: number;
   /** How many are in the room (server's `reaction-limit`); 0 = not told. */
   roomSize: number;
+  /** Everything to load ahead in the lobby (`preload-all`). */
+  lobbyAssets: PreloadAllPayload | null;
   /** While waiting: devices reporting the download / done, and whether the host chose to wait for all. */
   downloadDevices: number;
   downloadsDone: number;
@@ -112,6 +115,7 @@ const initialState: GameLiveState = {
   myAnswerMs: null,
   waitingFor: 0,
   roomSize: 0,
+  lobbyAssets: null,
   downloadDevices: 0,
   downloadsDone: 0,
   waitAll: false,
@@ -213,6 +217,9 @@ const gameSlice = createSlice({
       state.countdownMs = action.payload.remainingMs;
       state.gameOver = false;
       state.moderation = action.payload.moderation ?? null;
+    },
+    lobbyAssetsKnown: (state, action: PayloadAction<PreloadAllPayload>) => {
+      state.lobbyAssets = action.payload;
     },
     roomSizeKnown: (state, action: PayloadAction<number>) => {
       state.roomSize = action.payload;
@@ -366,6 +373,7 @@ export const {
   phaseChange,
   preloadHint,
   roomSizeKnown,
+  lobbyAssetsKnown,
   closedSummaryReceived,
   questionStart,
   questionEnd,

@@ -277,6 +277,8 @@ class Bot:
     question_audio: dict | None = None
     seen_q: set = field(default_factory=set)
     wait_started: dict = field(default_factory=dict)  # qIndex -> first "waiting for downloads"
+    lobby_total: int = 0  # files from preload-all
+    lobby_done: bool = False
     slot_go: dict = field(default_factory=dict)  # (kind, qIndex) -> asyncio.Event (preload-go)
     frozen_at: float = 0.0  # --timeout-*: when this player stopped sending (perf_counter)
 
@@ -580,6 +582,60 @@ class Bot:
         await self.wait_for_slot("question", q, keepalive)
         self.start_preload(urls)
 
+    async def preload_all(self, data: dict) -> None:
+        """Like the browser in the lobby: every question's picture, and its
+        sound where it plays here, through the "lobby" download slot, one
+        after the other, reporting assets-status."""
+        if not self.assets:
+            return
+        # It comes with the connect: wait until the client counts as connected.
+        for _ in range(50):
+            if self.sio.connected:
+                break
+            await asyncio.sleep(0.1)
+        urls = []
+        for q in data.get("questions") or []:
+            urls += q.get("images") or []
+            if self.sound_here(q.get("playOn")):
+                urls += q.get("urls") or []
+        self.lobby_total = len(urls)
+        missing = [u for u in urls if u.split("?")[0] not in self.cache]
+        loaded = len(urls) - len(missing)
+        t0 = time.perf_counter()
+
+        async def status(done: bool, failed: bool = False):
+            payload = {"loaded": loaded, "total": len(urls), "done": done}
+            if failed:
+                payload["failed"] = True
+            await self._emit("assets-status", payload)
+
+        await status(not missing)
+        if not missing:
+            self.lobby_done = True
+            return
+        await self.wait_for_slot("lobby", 0)
+
+        async def keepalive():
+            while True:
+                await asyncio.sleep(SKIN_KEEPALIVE_EVERY)
+                self.spawn(self._emit_ack("preload-slot", {"qIndex": 0, "kind": "lobby"}))
+                await status(False)
+        alive = asyncio.create_task(keepalive())
+        failed = False
+        try:
+            for u in missing:
+                try:
+                    await self.fetch(u, "lobby preload")
+                except Exception:  # noqa: BLE001 - counted in the download
+                    failed = True
+                loaded += 1
+        finally:
+            alive.cancel()
+            self.spawn(self._emit("slot-done", {"qIndex": 0, "kind": "lobby"}))
+        await status(True, failed)
+        self.lobby_done = True
+        M.add("lobby preload (all assets)", (time.perf_counter() - t0) * 1000)
+
     def prefetch_skin(self) -> None:
         """Like the web client: the skin's files once, in the lobby, through
         the room's skin download slot (only what plays on this device)."""
@@ -701,6 +757,13 @@ class Bot:
         async def _started(_data=None):
             self.set_phase("starting")
             M.recv[("game-started", 0)].append(time.time())
+            if self.lobby_total:
+                M.counts["assets ready at start" if self.lobby_done
+                         else "assets still loading at start"] += 1
+
+        @s.on("preload-all")
+        async def _preload_all(data):
+            self.spawn(self.preload_all(data))
 
         @s.on("phase-change")
         async def _phase(data):

@@ -13,6 +13,7 @@ import {
   phaseChange,
   preloadHint,
   roomSizeKnown,
+  lobbyAssetsKnown,
   closedSummaryReceived,
   leaderboardReceived,
   playerConnection,
@@ -23,7 +24,11 @@ import {
   setConnection,
 } from "@/state/game/gameSlice";
 import type { GameSocket } from "@/types/socket";
-import { onPreloadProgress, setSlotChannel } from "@/lib/sound/preload";
+import {
+  onAssetsProgress,
+  onPreloadProgress,
+  setSlotChannel,
+} from "@/lib/sound/preload";
 
 export interface UseGameSocketOptions {
   userType: "admin" | "player" | "duel";
@@ -138,6 +143,15 @@ export function useGameSocket({
     conn.on("game-started", (payload) => dispatch(gameStarted(payload)));
     conn.on("phase-change", (payload) => dispatch(phaseChange(payload)));
     conn.on("preload", (payload) => dispatch(preloadHint(payload)));
+    conn.on("preload-all", (p) => dispatch(lobbyAssetsKnown(p)));
+    // Lobby downloads: progress at most every second, "done" always.
+    let lastAssets = 0;
+    const offAssets = onAssetsProgress((r) => {
+      const now = Date.now();
+      if (!r.done && now - lastAssets < 1000) return;
+      lastAssets = now;
+      if (conn.connected) conn.emit("assets-status", r);
+    });
     conn.on("reaction-limit", (p) => {
       if (typeof p.players === "number") dispatch(roomSizeKnown(p.players));
     });
@@ -231,6 +245,7 @@ export function useGameSocket({
     return () => {
       clearInterval(heartbeat);
       offProgress();
+      offAssets();
       setSlotChannel(null);
       conn.io.off("reconnect_failed", onReconnectFailed);
       document.removeEventListener("visibilitychange", onVisibilityChange);

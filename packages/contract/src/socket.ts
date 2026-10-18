@@ -370,7 +370,7 @@ export const phaseChangeSchema = z.object({
  * files (fetched once, in the lobby). Each kind has its own
  * MAX_PARALLEL_DOWNLOADS per room.
  */
-export const downloadKindSchema = z.enum(["question", "skin"]);
+export const downloadKindSchema = z.enum(["question", "skin", "lobby"]);
 export type DownloadKind = z.infer<typeof downloadKindSchema>;
 
 /** A device asks for one of the room's download slots (`preload-slot`). */
@@ -461,6 +461,37 @@ export const preloadSchema = z.object({
   /** The question sound's own placement, so devices that won't play it skip the download. */
   playOn: z.enum(["quiz", "host", "players", "both", "off"]),
 });
+
+/**
+ * Everything encrypted a device can load ahead (every question's clips and
+ * picture), sent when it joins the lobby — and to anyone joining later.
+ */
+export const preloadAllSchema = z.object({
+  questions: z.array(preloadSchema),
+});
+export type PreloadAllPayload = z.infer<typeof preloadAllSchema>;
+
+/** A device's progress on `preload-all` (files, not bytes); done counts failures too. */
+export const assetsStatusSchema = z.object({
+  loaded: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+  done: z.boolean(),
+  failed: z.boolean().optional(),
+});
+export type AssetsStatusPayload = z.infer<typeof assetsStatusSchema>;
+
+/**
+ * Host lobby: how many connected players have everything (`ready` of
+ * `total`), how many are still downloading (`pending`; quiet ones don't
+ * count), and from when the host may start anyway (`forceAt`, epoch ms; 0
+ * = no wait). The start button waits for `pending` 0 or `forceAt`.
+ */
+export interface LobbyReadyPayload {
+  ready: number;
+  total: number;
+  pending: number;
+  forceAt: number;
+}
 
 /** Answers received so far for the open question (classic host meter). */
 export const answerCountSchema = z.object({
@@ -729,6 +760,10 @@ export interface ServerToClientEvents {
   "phase-change": (payload: PhaseChangePayload) => void;
   /** Download the next question's (encrypted) sound clips now. */
   preload: (payload: PreloadPayload) => void;
+  /** Everything to load ahead, on joining the lobby (see `assets-status`). */
+  "preload-all": (payload: PreloadAllPayload) => void;
+  /** Host only: the lobby's download readiness, at most once a second. */
+  "lobby-ready": (payload: LobbyReadyPayload) => void;
   /** This device's download slot for question `qIndex` is free (see `preload-slot`). */
   "preload-go": (payload: { qIndex: number; kind?: DownloadKind }) => void;
   /**
@@ -803,6 +838,8 @@ export interface ClientToServerEvents {
   "set-avatar": (payload: { profilePic: string }) => void;
   /** Download progress of the next question's sound (see `preload`). */
   "preload-status": (payload: PreloadStatusPayload) => void;
+  /** Progress on `preload-all`. */
+  "assets-status": (payload: AssetsStatusPayload) => void;
   /** Ask for a download slot before fetching the question's sound. */
   "preload-slot": (
     payload: z.input<typeof preloadSlotSchema>,

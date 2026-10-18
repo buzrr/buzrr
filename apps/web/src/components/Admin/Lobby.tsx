@@ -36,7 +36,7 @@ import {
   useBanRoomPlayerMutation,
   useRemoveRoomPlayerMutation,
 } from "@/lib/modules/game-sessions/hooks";
-import type { PlayerPayload } from "@buzrr/contract";
+import type { LobbyReadyPayload, PlayerPayload } from "@buzrr/contract";
 import ConfirmationModal from "@/components/Admin/ConfirmationModal";
 import { buildJoinUrl } from "@/lib/join-link";
 import EndQuizButton from "@/components/Admin/EndQuizButton";
@@ -95,6 +95,18 @@ const Lobby = (params: {
     },
     onGameStarted: handleGameStarted,
   });
+
+  // Downloads ahead: how many have everything; start waits for them (or for
+  // the server's "start anyway" time).
+  const [readiness, setReadiness] = useState<LobbyReadyPayload | null>(null);
+  useEffect(() => {
+    if (!socket) return;
+    const onReady = (p: LobbyReadyPayload) => setReadiness(p);
+    socket.on("lobby-ready", onReady);
+    return () => {
+      socket.off("lobby-ready", onReady);
+    };
+  }, [socket]);
 
   // Live bubble mini-game totals per waiting player (relayed by the server).
   const [bubbles, setBubbles] = useState<
@@ -345,7 +357,18 @@ const Lobby = (params: {
   // `socket.connected` doesn't re-render when it flips; the slice's
   // connection status does (with nobody joining, nothing else would).
   const connection = useAppSelector((state) => state.game.connection);
-  const startDisabled = load || !socket || connection !== "connected";
+  const pendingDownloads = readiness?.pending ?? 0;
+  const clock = useNow(pendingDownloads > 0);
+  const forceAt = readiness?.forceAt ?? 0;
+  const canForce = pendingDownloads > 0 && forceAt > 0 && clock >= forceAt;
+  const waitingForDownloads = pendingDownloads > 0 && !canForce;
+  const forceIn = Math.max(0, Math.ceil((forceAt - clock) / 1000));
+  const readyPct = Math.min(
+    100,
+    ((readiness?.ready ?? 0) / Math.max(1, maxPlayers)) * 100,
+  );
+  const startDisabled =
+    load || !socket || connection !== "connected" || waitingForDownloads;
 
   return (
     <GameSounds role="host" quizSettings={params.quizSettings}>
@@ -473,17 +496,35 @@ const Lobby = (params: {
                   / {maxPlayers}
                 </span>
               </div>
-              <div className="h-2 rounded-lg overflow-hidden bg-lprimary/8 dark:bg-white/5">
+              {/* Light: who is here; strong: who has downloaded everything. */}
+              <div className="relative h-2 rounded-lg overflow-hidden bg-lprimary/8 dark:bg-white/5">
                 <div
                   className={clsx(
-                    "h-full rounded-lg transition-[width] duration-300",
+                    "absolute inset-y-0 left-0 rounded-lg transition-[width] duration-300",
+                    isFull
+                      ? "bg-red-light/40 dark:bg-red-dark/40"
+                      : "bg-[#9a6cf5]/35 dark:bg-accent/35",
+                  )}
+                  style={{ width: `${fillPct}%` }}
+                />
+                <div
+                  className={clsx(
+                    "absolute inset-y-0 left-0 rounded-lg transition-[width] duration-300",
                     isFull
                       ? "bg-red-light dark:bg-red-dark"
                       : "bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep",
                   )}
-                  style={{ width: `${fillPct}%` }}
+                  style={{ width: `${readiness ? readyPct : fillPct}%` }}
                 />
               </div>
+              {readiness && readiness.total > 0 && (
+                <p className="text-[12.5px] font-semibold text-dark dark:text-white">
+                  {t("{ready} / {n} ready", {
+                    ready: readiness.ready,
+                    n: readiness.total,
+                  })}
+                </p>
+              )}
               <p className="text-[12.5px] text-off-dark dark:text-muted-dark">
                 {t("This room can hold up to {n} players.", { n: maxPlayers })}
                 {billing && params.plan === "free" && (
@@ -569,7 +610,16 @@ const Lobby = (params: {
                   ? "Loading..."
                   : players.length === 0
                     ? t("Start without players")
-                    : t("Start Game")}
+                    : waitingForDownloads
+                      ? t("Waiting for downloads ({n} left · {s} s)", {
+                          n: pendingDownloads,
+                          s: forceIn,
+                        })
+                      : canForce
+                        ? t("Start anyway ({n} still loading)", {
+                            n: pendingDownloads,
+                          })
+                        : t("Start Game")}
               </button>
             </div>
           </section>

@@ -971,6 +971,10 @@ export const DE: Record<string, string> = {
   "The song plays on this long after the end, then fades out.":
     "So lange läuft der Song nach dem Ende weiter, dann wird er ausgeblendet.",
   "Test bench": "Testlauf",
+  "{ready} / {n} ready": "{ready} / {n} bereit",
+  "Waiting for downloads ({n} left · {s} s)":
+    "Warte auf Downloads (noch {n} · {s} s)",
+  "Start anyway ({n} still loading)": "Trotzdem starten ({n} laden noch)",
   "In rooms with more than {n} players the background music plays on the host only.":
     "In Räumen mit mehr als {n} Spielern läuft die Hintergrundmusik nur beim Host.",
   "Drop a picture or an audio file": "Ein Bild oder eine Audiodatei ablegen",

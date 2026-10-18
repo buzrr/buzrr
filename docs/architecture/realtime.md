@@ -283,6 +283,22 @@ masked until the reveal (`buildSnapshot`).
   exactly what the current client speaks. Adding a compat alias "just in case"
   reintroduces the drift this removal cleared.
 
+## The lobby: everything ahead, start when ready
+
+A device joining a room (lobby, a reconnect, or late in the game) gets
+`preload-all`: every playable question's encrypted clips and picture (no
+keys; `GameEngineService.lobbyAssets`, from Postgres, kept a minute). It
+downloads them through one `lobby` download slot, one after the other, and
+reports `assets-status` (files, `done` also after failures). The host gets
+`lobby-ready { ready, total, pending, forceAt }` at most once a second
+(`LobbyReadiness`): the lobby bar shows who is here (light) and who has
+everything (strong), "412 / 480 ready". `start-game` waits until no
+connected player is still downloading — devices quiet for 8 s don't count —
+or until `forceAt` (30 s after the last join or the first try): then the
+button says "Start anyway (n still loading)". The server checks the same
+rule. In the game the per-question `preload` hints then find the files in
+the cache (the client keeps up to 600), so the countdown rarely waits.
+
 ## Question sounds and pictures: preload and the countdown's wait
 
 A question's picture is encrypted too (`Question.mediaClip` / `mediaKey`,

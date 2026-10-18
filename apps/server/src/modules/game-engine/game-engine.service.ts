@@ -8,6 +8,7 @@ import {
   HEARTBEAT_TIMEOUT_MS,
   PLAYER_LEADERBOARD_TOP,
   quizSettingsSchema,
+  type PreloadAllPayload,
 } from "@buzrr/contract";
 import { signAssetsDeep } from "../../common/storage/asset-signing";
 import { finalClipOf } from "../sound-skins/final-clip";
@@ -27,9 +28,14 @@ import {
   acceptsMoreAnswers,
   isScored,
   mergeAnswers,
+  preloadImageUrls,
+  preloadUrls,
   summarizeAnswers,
   toLiveQuestion,
 } from "../question-types";
+
+/** How long a room's lobby download list is reused (joins come in waves). */
+const LOBBY_ASSETS_TTL_MS = 60_000;
 import { answerEntries, topOfLeaderboard } from "./core/views";
 import type {
   SocketData,
@@ -453,6 +459,53 @@ export class GameEngineService
   }
 
   // -- host intents ------------------------------------------------------------
+
+  /** Per room: what devices load in the lobby, kept a minute (many joins). */
+  private lobbyAssetCache = new Map<
+    string,
+    { at: number; payload: PreloadAllPayload }
+  >();
+
+  /**
+   * Everything a device can download ahead for this room: every playable
+   * question's encrypted clips and picture (no keys), in play order. Read
+   * from Postgres (the questions only reach Redis at the start).
+   */
+  async lobbyAssets(gameCode: string): Promise<PreloadAllPayload> {
+    const cached = this.lobbyAssetCache.get(gameCode);
+    if (cached && Date.now() - cached.at < LOBBY_ASSETS_TTL_MS) {
+      return cached.payload;
+    }
+    const session = await this.prisma.db.gameSession.findUnique({
+      where: { gameCode },
+      include: {
+        quiz: {
+          include: {
+            questions: {
+              where: { disabled: false },
+              orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+              include: { options: { orderBy: { createdAt: "asc" } } },
+            },
+          },
+        },
+      },
+    });
+    const questions = (session?.quiz.questions ?? [])
+      .map((q) => toLiveQuestion(q))
+      .filter((q): q is LiveQuestion => q !== null);
+    const payload: PreloadAllPayload = {
+      questions: questions
+        .map((q, qIndex) => ({
+          qIndex,
+          urls: preloadUrls(q),
+          images: preloadImageUrls(q),
+          playOn: q.audio?.playOn ?? "quiz",
+        }))
+        .filter((p) => p.urls.length > 0 || p.images.length > 0),
+    };
+    this.lobbyAssetCache.set(gameCode, { at: Date.now(), payload });
+    return payload;
+  }
 
   async startGame(gameCode: string): Promise<void> {
     const state = await this.store.loadState(gameCode, PARTS_FOR.start);

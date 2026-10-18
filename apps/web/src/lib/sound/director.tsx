@@ -31,6 +31,7 @@ import {
   decryptClipBuffer,
   fetchClip,
   fetchSkinFiles,
+  preloadAll,
   preloadClips,
 } from "./preload";
 import { DEFAULT_SONG_VOLUME, fadeInOf, playSong, type Timeline } from "./song";
@@ -561,6 +562,19 @@ export function GameSounds({
   // play them. They stay unplayable until the question hands out the key.
   const wouldPlayHere = (playOn: QuestionAudio["playOn"]) =>
     questionAudioHere({ url: "", startMs: 0, revealMs: null, playOn });
+  // The lobby: everything ahead — every question's picture, and its sound
+  // where it plays here. Cached; the per-question hints then find it.
+  const lobbyAssets = useAppSelector((s) => s.game.lobbyAssets);
+  useEffect(() => {
+    if (!lobbyAssets) return;
+    const urls = lobbyAssets.questions.flatMap((q) => [
+      ...(q.images ?? []),
+      ...(wouldPlayHere(q.playOn) ? q.urls : []),
+    ]);
+    void preloadAll(urls);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lobbyAssets]);
+
   useEffect(() => {
     // The picture shows on every device; the sound only where it plays.
     const urls = preload

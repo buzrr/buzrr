@@ -7,6 +7,11 @@ Each player picks three reaction emojis (mostly smileys) and taps one now and
 then in the lobby — sometimes a burst. During the game few tap: 3 % of the
 players 1–3 times 10 s into a question, 10 % right after the answer is shown.
 
+In the lobby each player downloads everything encrypted the quiz has
+(`preload-all`: every question's picture, and its sound where it plays —
+through the room's `lobby` download slot, reporting `assets-status`); the
+summary counts `assets ready at start` / `assets still loading at start`.
+
 Every player also downloads what its browser would, with its own cache: the
 play context and the quiz's sound skin, question images, the question sound's
 encrypted clips when `preload` announces them (asking the server for a

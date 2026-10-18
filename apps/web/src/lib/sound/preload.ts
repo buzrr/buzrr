@@ -11,8 +11,9 @@ const progress = new Map<
   string,
   { loaded: number; total: number; done: boolean; failed?: boolean }
 >();
-// Question clips plus a skin's files (up to 7 songs and the final clip).
-const MAX_ENTRIES = 32;
+// Every question's clips and picture (all loaded in the lobby) plus a
+// skin's files: a whole quiz has to fit.
+const MAX_ENTRIES = 600;
 
 const bare = (url: string) => url.split("?")[0]!;
 
@@ -263,4 +264,69 @@ export async function decryptClipBuffer(
     data.subarray(12),
   );
   return plain;
+}
+
+// -- the lobby: everything ahead (`preload-all`) -------------------------------
+
+type AssetsReport = {
+  loaded: number;
+  total: number;
+  done: boolean;
+  failed?: boolean;
+};
+const assetListeners = new Set<(r: AssetsReport) => void>();
+/** Subscribe to the lobby download's progress (`assets-status`). */
+export function onAssetsProgress(listener: (r: AssetsReport) => void) {
+  assetListeners.add(listener);
+  return () => void assetListeners.delete(listener);
+}
+const reportAssets = (r: AssetsReport) => {
+  for (const l of assetListeners) l(r);
+};
+let lobbyRun = 0;
+
+/**
+ * Everything encrypted the quiz can play here, downloaded while waiting in
+ * the lobby: one download slot (kind "lobby"), the files one after the
+ * other, progress reported per file. Files already here count at once;
+ * failures count as done (after their retries), so nobody waits forever.
+ * Later `preload` hints then find them in the cache.
+ */
+export async function preloadAll(urls: string[]): Promise<void> {
+  const run = ++lobbyRun;
+  const total = urls.length;
+  const missing = urls.filter((u) => !cache.has(bare(u)));
+  let loaded = total - missing.length;
+  let failed = false;
+  reportAssets({ loaded, total, done: missing.length === 0 });
+  if (missing.length === 0) return;
+  const channel = slots;
+  if (channel) await channel.wait("lobby", 0);
+  const alive = channel
+    ? setInterval(() => {
+        channel.keepAlive("lobby", 0);
+        reportAssets({ loaded, total, done: false });
+      }, SKIN_KEEPALIVE_MS)
+    : null;
+  try {
+    for (const u of missing) {
+      if (run !== lobbyRun) return; // a newer list replaced this one
+      await fetchClip(u).catch(() => {
+        failed = true;
+      });
+      loaded++;
+      reportAssets({ loaded, total, done: loaded >= total });
+    }
+  } finally {
+    if (alive) clearInterval(alive);
+    channel?.done("lobby", 0);
+    if (run === lobbyRun) {
+      reportAssets({
+        loaded: total,
+        total,
+        done: true,
+        ...(failed ? { failed } : {}),
+      });
+    }
+  }
 }
