@@ -225,3 +225,15 @@ issue? See [SECURITY.md](SECURITY.md).
 ## 📄 License
 
 [AGPL-3.0](LICENSE) © Buzrr contributors
+
+### Sound recordings
+
+The TV Game Show recordings in
+[`apps/web/public/sounds/tv-game-show/`](apps/web/public/sounds/tv-game-show/)
+were generated with Suno (suno.com) on a paid Pro/Premier plan and downloaded
+through Suno's download, which grants commercial use rights under Suno's Terms
+of Service. They remain subject to those terms (no removal of Suno's metadata,
+no use to train AI models), and Suno gives no assurance that copyright
+subsists in AI-generated output — they are not covered by this repository's
+AGPL license. `end.mp3` there is not from Suno and free to use. Details:
+[NOTICE.md](apps/web/public/sounds/tv-game-show/NOTICE.md).
