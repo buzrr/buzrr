@@ -360,7 +360,9 @@ function BuiltinSkinCard({
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold">{t(BUILTIN_SKINS[id].name)}</h2>
           <p className={clsx("text-xs", mutedText)}>
-            {t("Built in · synthesized in the browser")}
+            {id === "builtin:show"
+              ? t("Built in · recordings")
+              : t("Built in · synthesized in the browser")}
             {isSuperadmin &&
               ` · ${t("Playback options (superadmin, for all users)")}`}
           </p>

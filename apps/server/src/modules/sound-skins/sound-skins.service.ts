@@ -9,6 +9,8 @@ import {
 } from "@nestjs/common";
 import {
   BUILTIN_DEFAULT_OPTIONS,
+  BUILTIN_DEFAULT_PLAYER_SLOTS,
+  BUILTIN_DEFAULT_SLOTS,
   BUILTIN_SOUND_SKINS,
   CUE_SLOTS,
   soundSkinOptionsSchema,
@@ -245,12 +247,15 @@ export class SoundSkinsService implements OnApplicationBootstrap {
     for (const id of BUILTIN_SOUND_SKINS) {
       const r = byId.get(id);
       const defaults = BUILTIN_DEFAULT_OPTIONS[id] ?? {};
+      // The superadmin's files, else the recordings that come with the app.
+      const own = slotsOf(r?.slots);
+      const hasOwn = Object.keys(own).length > 0;
+      const slots = hasOwn ? own : (BUILTIN_DEFAULT_SLOTS[id] ?? {});
+      const small = hasOwn ? r?.playerSlots : BUILTIN_DEFAULT_PLAYER_SLOTS[id];
       out[id] = {
         options: r ? optionsOf(r.options) : defaults,
         defaults,
-        slots: forPlayer
-          ? playerView(slotsOf(r?.slots), r?.playerSlots)
-          : slotsOf(r?.slots),
+        slots: forPlayer ? playerView(slots, small) : slots,
       };
     }
     return out;
@@ -304,7 +309,17 @@ export class SoundSkinsService implements OnApplicationBootstrap {
     const row = await this.prisma.db.builtinSoundOptions.findUnique({
       where: { skinId },
     });
-    const files = slotsOf(row?.slots);
+    const own = slotsOf(row?.slots);
+    const fromApp = Object.keys(own).length === 0;
+    const files = fromApp
+      ? (BUILTIN_DEFAULT_SLOTS[skinId as keyof typeof BUILTIN_DEFAULT_SLOTS] ??
+        {})
+      : own;
+    const appSmall = slotsOf(
+      BUILTIN_DEFAULT_PLAYER_SLOTS[
+        skinId as keyof typeof BUILTIN_DEFAULT_PLAYER_SLOTS
+      ],
+    );
     const slots: SoundSkin["slots"] = {};
     const smallSlots: SoundSkin["slots"] = {};
     let finalClip: { url: string; key: string } | null = null;
@@ -314,7 +329,13 @@ export class SoundSkinsService implements OnApplicationBootstrap {
         string,
       ][]) {
         const buf = await this.storage.read(url);
-        if (!buf) continue;
+        if (!buf) {
+          // The app's own recordings (web files): linked, not copied — the
+          // storage never deletes what it didn't store.
+          slots[slot] = url;
+          if (appSmall[slot]) smallSlots[slot] = appSmall[slot];
+          continue;
+        }
         slots[slot] = (
           await this.storage.upload(buf, {
             contentType: "audio/mpeg",

@@ -44,61 +44,10 @@ interface Palette {
   };
 }
 
-export const BUILTIN_SKINS: Record<BuiltinSkinId, Palette> = {
-  "builtin:show": {
-    name: "TV Game Show",
-    bpm: 118,
-    lead: "sawtooth",
-    bass: "square",
-    pad: "sawtooth",
-    roots: [-9, -4, -2, -7], // C – F – G – Am (relative to A4)
-    scale: [0, 2, 4, 7, 9, 12],
-    cutoff: 2600,
-    drums: 0.9,
-    scores: {
-      roots: [-7, -2, -9, -4], // Am – G – C – F
-      riff: [
-        12,
-        null,
-        16,
-        19,
-        null,
-        16,
-        12,
-        null,
-        14,
-        null,
-        12,
-        7,
-        null,
-        9,
-        12,
-        null,
-      ],
-      lead: "triangle",
-    },
-    final: {
-      // Stadium anthem: C – G – Am – F, a melody that climbs and lands.
-      roots: [-9, -2, -12, -4],
-      melody: [
-        [7, 2],
-        [10, 2],
-        [15, 4],
-        [14, 3],
-        [12, 1],
-        [10, 4],
-        [12, 2],
-        [15, 2],
-        [19, 3],
-        [17, 1],
-        [15, 4],
-        [12, 2],
-        [10, 2],
-      ],
-      lead: "sawtooth",
-      halfTime: true,
-    },
-  },
+/** Arcade and Chill are synthesized; TV Game Show plays recordings. */
+export type SynthSkinId = "builtin:arcade" | "builtin:chill";
+
+const SYNTH_SKINS: Record<SynthSkinId, Palette> = {
   "builtin:arcade": {
     name: "Arcade",
     bpm: 138,
@@ -201,6 +150,13 @@ export const BUILTIN_SKINS: Record<BuiltinSkinId, Palette> = {
       halfTime: true,
     },
   },
+};
+
+/** The built-in skins' names (TV Game Show: recordings, no synth). */
+export const BUILTIN_SKINS: Record<BuiltinSkinId, { name: string }> = {
+  "builtin:show": { name: "TV Game Show" },
+  "builtin:arcade": { name: SYNTH_SKINS["builtin:arcade"].name },
+  "builtin:chill": { name: SYNTH_SKINS["builtin:chill"].name },
 };
 
 const LOOP_SLOTS: SoundSlot[] = [
@@ -364,7 +320,11 @@ export function playBuiltin(
 ): SoundHandle {
   const ctx = audioContext();
   if (!ctx) return { stop: () => undefined };
-  const p = BUILTIN_SKINS[skinId] ?? BUILTIN_SKINS["builtin:show"];
+  // TV Game Show has no synth music (its recordings play): only its cues.
+  if (skinId === "builtin:show" && !isCueSlot(slot)) {
+    return { stop: () => undefined };
+  }
+  const p = SYNTH_SKINS[skinId as SynthSkinId] ?? SYNTH_SKINS["builtin:arcade"];
   const bus = ctx.createGain();
   const level = opts.volume ?? 0.5;
   bus.connect(ctx.destination);
@@ -716,6 +676,7 @@ export async function renderBuiltin(
   slot: SoundSlot,
 ): Promise<AudioBuffer | null> {
   if (typeof OfflineAudioContext === "undefined") return null;
+  if (skinId === "builtin:show" && !isCueSlot(slot)) return null;
   const seconds = builtinRenderSec(slot);
   const rate = 22050;
   const ctx = new OfflineAudioContext(1, Math.ceil(rate * seconds), rate);

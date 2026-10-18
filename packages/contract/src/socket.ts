@@ -189,6 +189,38 @@ export type BuiltinSoundOptions = Partial<Record<string, BuiltinSkinData>>;
  * options" restores). TV Game Show's are tuned for its recordings; the
  * synth uses volume, fade-in and repeat of them where a slot has no file.
  */
+/**
+ * The built-in skins' recordings (web public files): TV Game Show plays
+ * these on every installation unless the superadmin set other files. The
+ * players' copies are small (mono, 64 kbit/s).
+ */
+const TV_SHOW_SLOTS = [
+  "lobby",
+  "countdown",
+  "lastCountdown",
+  "question",
+  "lastQuestion",
+  "end",
+  "reveal",
+  "scores",
+  "final",
+] as const;
+export const BUILTIN_DEFAULT_SLOTS: Partial<
+  Record<
+    (typeof BUILTIN_SOUND_SKINS)[number],
+    Partial<Record<SoundSlot, string>>
+  >
+> = {
+  "builtin:show": Object.fromEntries(
+    TV_SHOW_SLOTS.map((s) => [s, `/sounds/tv-game-show/${s}.mp3`]),
+  ),
+};
+export const BUILTIN_DEFAULT_PLAYER_SLOTS: typeof BUILTIN_DEFAULT_SLOTS = {
+  "builtin:show": Object.fromEntries(
+    TV_SHOW_SLOTS.map((s) => [s, `/sounds/tv-game-show/${s}.player.mp3`]),
+  ),
+};
+
 export const BUILTIN_DEFAULT_OPTIONS: Partial<
   Record<(typeof BUILTIN_SOUND_SKINS)[number], SoundSkinOptions>
 > = {

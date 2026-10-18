@@ -972,6 +972,7 @@ export const DE: Record<string, string> = {
   "The song plays on this long after the end, then fades out.":
     "So lange läuft der Song nach dem Ende weiter, dann wird er ausgeblendet.",
   "Test bench": "Testlauf",
+  "Built in · recordings": "Eingebaut · Aufnahmen",
   "{ready} / {n} ready": "{ready} / {n} bereit",
   "Waiting for downloads ({n} left · {s} s)":
     "Warte auf Downloads (noch {n} · {s} s)",
