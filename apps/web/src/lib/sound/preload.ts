@@ -1,4 +1,5 @@
 "use client";
+import type { DownloadKind } from "@buzrr/contract";
 
 /**
  * Downloads of question sound clips, started ahead of time (the server's
@@ -10,7 +11,8 @@ const progress = new Map<
   string,
   { loaded: number; total: number; done: boolean; failed?: boolean }
 >();
-const MAX_ENTRIES = 12;
+// Question clips plus a skin's files (up to 7 songs and the final clip).
+const MAX_ENTRIES = 32;
 
 const bare = (url: string) => url.split("?")[0]!;
 
@@ -151,14 +153,43 @@ const PRELOAD_SPREAD_MS = 3000;
 const QUEUED_REPORT_MS = 1500;
 
 /**
- * Waits for the server's download slot for question `qIndex` (a room hands
- * out MAX_PARALLEL_AUDIO_DOWNLOADS at a time). `limited` false: no
- * rationing, so the device spreads its own start. Set by the game socket.
+ * The server's download slots (a room hands out MAX_PARALLEL_AUDIO_DOWNLOADS
+ * at a time, per kind). `wait` resolves when it's this device's turn
+ * (`limited` false: no rationing, so the device spreads its own start);
+ * `keepAlive` says the slot is still in use; `done` frees it (questions free
+ * theirs with the "done" progress report). Set by the game socket.
  */
-type SlotGate = (qIndex: number) => Promise<{ limited: boolean }>;
-let slotGate: SlotGate | null = null;
-export function setSlotGate(gate: SlotGate | null) {
-  slotGate = gate;
+export interface SlotChannel {
+  wait: (kind: DownloadKind, qIndex: number) => Promise<{ limited: boolean }>;
+  keepAlive: (kind: DownloadKind, qIndex: number) => void;
+  done: (kind: DownloadKind, qIndex: number) => void;
+}
+let slots: SlotChannel | null = null;
+export function setSlotChannel(channel: SlotChannel | null) {
+  slots = channel;
+}
+const SKIN_KEEPALIVE_MS = 4000;
+
+/**
+ * The sound skin's files, fetched in one download slot (kind "skin"): a
+ * full room joining doesn't pull the lobby music and every other song at
+ * the same moment. Files already here are skipped; resolves when all are
+ * in (or given up).
+ */
+export async function fetchSkinFiles(urls: string[]): Promise<void> {
+  const missing = urls.filter((u) => !cache.has(bare(u)));
+  if (missing.length === 0) return;
+  const channel = slots;
+  if (channel) await channel.wait("skin", 0);
+  const alive = channel
+    ? setInterval(() => channel.keepAlive("skin", 0), SKIN_KEEPALIVE_MS)
+    : null;
+  try {
+    for (const u of missing) await fetchClip(u).catch(() => undefined);
+  } finally {
+    if (alive) clearInterval(alive);
+    channel?.done("skin", 0);
+  }
 }
 
 /**
@@ -186,7 +217,8 @@ export function preloadClips(urls: string[], qIndex?: number) {
     start(); // already here or on the way: nothing to queue for
     return;
   }
-  if (!slotGate) {
+  const channel = slots;
+  if (!channel) {
     spread();
     return;
   }
@@ -196,7 +228,7 @@ export function preloadClips(urls: string[], qIndex?: number) {
   const alive = setInterval(() => {
     if (tracked === mine) notify();
   }, QUEUED_REPORT_MS);
-  void slotGate(qIndex).then(({ limited }) => {
+  void channel.wait("question", qIndex).then(({ limited }) => {
     clearInterval(alive);
     if (limited) start();
     else spread();

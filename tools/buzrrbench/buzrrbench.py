@@ -88,6 +88,8 @@ DONE_GRACE = 30.0
 QUEUED_REPORT_EVERY = 1.5
 SLOT_ACK_TIMEOUT = 10.0
 SLOT_GIVE_UP = 90.0  # like the web client: start anyway after this long
+SKIN_KEEPALIVE_EVERY = 4.0  # holding the skin slot: ask again, refreshes it
+MUSIC_SLOTS = {"lobby", "question", "scores", "final"}
 # During the game, reactions are rare: this share of all players taps 1-3
 # times once a question has run QUESTION_REACT_AFTER s, and this share
 # right after the answer is shown. In the lobby they tap regularly.
@@ -269,7 +271,7 @@ class Bot:
     question_audio: dict | None = None
     seen_q: set = field(default_factory=set)
     wait_started: dict = field(default_factory=dict)  # qIndex -> first "waiting for downloads"
-    slot_go: dict = field(default_factory=dict)  # qIndex -> asyncio.Event (preload-go)
+    slot_go: dict = field(default_factory=dict)  # (kind, qIndex) -> asyncio.Event (preload-go)
     frozen_at: float = 0.0  # --timeout-*: when this player stopped sending (perf_counter)
 
     # -- helpers ------------------------------------------------------------------
@@ -364,6 +366,7 @@ class Bot:
         probe = asyncio.create_task(self.sync_probe() if self.probe else asyncio.sleep(0))
         reacts = asyncio.create_task(self.react())
         beats = asyncio.create_task(self.heartbeat())
+        self.prefetch_skin()
         await self.done.wait()
         bubbles.cancel()
         probe.cancel()
@@ -520,30 +523,84 @@ class Bot:
             self.download(u, "question sound (preload)")
         self.notify()
 
-    async def _preload_in_turn(self, q: int, urls: list) -> None:
-        """Like the web client: ask for a download slot, wait for `preload-go`
-        if queued (reporting "loaded 0" meanwhile), then download."""
+    async def wait_for_slot(self, kind: str, q: int, waiting=None) -> None:
+        """Like the web client: ask for a download slot (kind "question" /
+        "skin") and wait for `preload-go` if queued; `waiting` runs every
+        QUEUED_REPORT_EVERY s meanwhile."""
         t0 = time.perf_counter()
-        go = self.slot_go.setdefault(q, asyncio.Event())
+        go = self.slot_go.setdefault((kind, q), asyncio.Event())
+        go.clear()
         try:
-            ack = await self.sio.call("preload-slot", {"qIndex": q}, timeout=SLOT_ACK_TIMEOUT)
+            ack = await self.sio.call(
+                "preload-slot", {"qIndex": q, "kind": kind}, timeout=SLOT_ACK_TIMEOUT
+            )
         except Exception:  # noqa: BLE001 - no answer (older server): just go
             ack = {"go": True}
-        if not ack.get("go"):
-            M.counts["download slot: queued"] += 1
-            deadline = t0 + SLOT_GIVE_UP
-            while not go.is_set() and time.perf_counter() < deadline:
-                try:
-                    await asyncio.wait_for(go.wait(), QUEUED_REPORT_EVERY)
-                except asyncio.TimeoutError:
-                    self.last_report = 0.0  # a keepalive, not throttled away
-                    self.notify()
-            if not go.is_set():
-                M.counts["download slot: gave up waiting"] += 1
-            M.add("download slot wait", (time.perf_counter() - t0) * 1000)
-        else:
-            M.counts["download slot: at once"] += 1
+        if ack.get("go"):
+            M.counts[f"download slot ({kind}): at once"] += 1
+            return
+        M.counts[f"download slot ({kind}): queued"] += 1
+        deadline = t0 + SLOT_GIVE_UP
+        while not go.is_set() and time.perf_counter() < deadline:
+            try:
+                await asyncio.wait_for(go.wait(), QUEUED_REPORT_EVERY)
+            except asyncio.TimeoutError:
+                if waiting:
+                    waiting()
+        if not go.is_set():
+            M.counts[f"download slot ({kind}): gave up waiting"] += 1
+        M.add(f"download slot wait ({kind})", (time.perf_counter() - t0) * 1000)
+
+    async def _preload_in_turn(self, q: int, urls: list) -> None:
+        def keepalive():
+            self.last_report = 0.0  # "loaded 0" again, not throttled away
+            self.notify()
+        await self.wait_for_slot("question", q, keepalive)
         self.start_preload(urls)
+
+    def prefetch_skin(self) -> None:
+        """Like the web client: the skin's files once, in the lobby, through
+        the room's skin download slot (only what plays on this device)."""
+        if not self.assets or not self.skin or not self.sound_here("quiz"):
+            return
+        slots = self.skin.get("slots") or {}
+        music = self.sound.get("music", True) is not False
+        urls = [
+            u for slot, u in slots.items()
+            if u and (music or slot not in MUSIC_SLOTS)
+            and not (slot == "final" and self.skin.get("finalClipUrl"))
+        ]
+        if urls:
+            self.spawn(self.fetch_skin_files(urls, "skin sound (prefetch)"))
+
+    async def fetch_skin_files(self, urls: list, kind: str) -> None:
+        missing = [u for u in urls if u.split("?")[0] not in self.cache]
+        if not missing:
+            return
+        await self.wait_for_slot("skin", 0)
+
+        async def keepalive():
+            while True:
+                await asyncio.sleep(SKIN_KEEPALIVE_EVERY)
+                self.spawn(self._emit_ack("preload-slot", {"qIndex": 0, "kind": "skin"}))
+        alive = asyncio.create_task(keepalive())
+        try:
+            for u in missing:  # one after the other, like the browser
+                try:
+                    await self.fetch(u, kind)
+                except Exception:  # noqa: BLE001 - counted in the download
+                    pass
+        finally:
+            alive.cancel()
+            self.spawn(self._emit("slot-done", {"qIndex": 0, "kind": "skin"}))
+
+    async def _emit_ack(self, event: str, payload) -> None:
+        if self.frozen or not self.sio.connected:
+            return
+        try:
+            await self.sio.call(event, payload, timeout=SLOT_ACK_TIMEOUT)
+        except Exception:  # noqa: BLE001
+            pass
 
     def on_question(self, q_index: int, question: dict) -> None:
         """What the question screen loads as it opens: image, sound."""
@@ -584,14 +641,16 @@ class Bot:
         if new == "reveal":
             wanted.append("reveal")
         for slot in wanted:
-            self.download(slots.get(slot), f"skin sound ({slot})")
+            # Like the browser: through the skin slot unless already here.
+            if slots.get(slot):
+                self.spawn(self.fetch_skin_files([slots[slot]], f"skin sound ({slot})"))
         if final_url and old in ("idle", "lobby") and new not in ("idle", "lobby"):
             self.spawn(self._preload_final(final_url))
 
     async def _preload_final(self, url: str) -> None:
         # Each device at a random moment within a minute of the start.
         await asyncio.sleep(random.uniform(0, 60))
-        self.download(url, "final song (preload)")
+        await self.fetch_skin_files([url], "final song (preload)")
 
     def set_phase(self, phase: str) -> None:
         old, self.phase = self.phase, phase
@@ -638,7 +697,8 @@ class Bot:
 
         @s.on("preload-go")
         async def _preload_go(data):
-            self.slot_go.setdefault(data["qIndex"], asyncio.Event()).set()
+            key = (data.get("kind") or "question", data["qIndex"])
+            self.slot_go.setdefault(key, asyncio.Event()).set()
 
         @s.on("question-start")
         async def _qstart(data):

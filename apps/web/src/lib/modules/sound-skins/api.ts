@@ -1,4 +1,9 @@
-import type { SoundSkin, SoundSlot } from "@buzrr/contract";
+import type {
+  BuiltinSoundOptions,
+  SoundSkin,
+  SoundSkinOptions,
+  SoundSlot,
+} from "@buzrr/contract";
 import {
   createPlayerAuthedApiClient,
   getAuthApiClient,
@@ -17,7 +22,10 @@ export const soundSkinsApi = {
     ).data,
   create: async (name: string) =>
     (await getAuthApiClient().post<SoundSkin>("/sound-skins", { name })).data,
-  update: async (id: string, body: { name?: string; isGlobal?: boolean }) =>
+  update: async (
+    id: string,
+    body: { name?: string; isGlobal?: boolean; options?: SoundSkinOptions },
+  ) =>
     (await getAuthApiClient().patch<SoundSkin>(`/sound-skins/${id}`, body))
       .data,
   setSlot: async (id: string, slot: SoundSlot, file: File) => {
@@ -34,6 +42,21 @@ export const soundSkinsApi = {
     (
       await getAuthApiClient().delete<SoundSkin>(
         `/sound-skins/${id}/slots/${slot}`,
+      )
+    ).data,
+  /** The built-in skins' playback options (players with their token). */
+  builtinOptions: async (as: "account" | "player" = "account") =>
+    (
+      await (
+        as === "player" ? createPlayerAuthedApiClient() : getAuthApiClient()
+      ).get<BuiltinSoundOptions>("/sound-skins/builtin-options")
+    ).data,
+  /** Superadmin: one built-in skin's options, for everyone. */
+  setBuiltinOptions: async (skinId: string, options: SoundSkinOptions) =>
+    (
+      await getAuthApiClient().put<BuiltinSoundOptions>(
+        `/sound-skins/builtin-options/${encodeURIComponent(skinId)}`,
+        options,
       )
     ).data,
   remove: async (id: string) => {

@@ -458,10 +458,23 @@ model SoundSkin {
   /// The final song as devices load it ahead of time: encrypted
   /// ({ url, key }); the key goes out only with the final leaderboard.
   finalClip Json?    @map("final_clip")
+  /// slot -> playback options (`soundSlotOptionsSchema`)
+  options   Json     @default("{}")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("sound_skins")
+}
+
+/// Playback options of a built-in (synthesized) skin, for everyone; only the
+/// superadmin changes them.
+model BuiltinSoundOptions {
+  skinId    String   @id @map("skin_id")
+  /// slot -> playback options (`soundSlotOptionsSchema`)
+  options   Json     @default("{}")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("builtin_sound_options")
 }

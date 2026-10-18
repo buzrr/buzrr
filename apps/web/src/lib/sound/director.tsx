@@ -11,7 +11,10 @@ import {
 import { LuVolume2, LuVolumeX } from "react-icons/lu";
 import {
   BUILTIN_SOUND_SKINS,
+  isUnlimitedTime,
   quizSettingsSchema,
+  soundSlotSchema,
+  type BuiltinSoundOptions,
   type QuestionAudio,
   type SoundSettings,
   type SoundSkin,
@@ -20,12 +23,16 @@ import {
 import { useAppSelector } from "@/state/hooks";
 import type { GameSocket } from "@/types/socket";
 import { soundSkinsApi } from "@/lib/modules/sound-skins/api";
-import { decryptClip, preloadClips } from "./preload";
-import { fadeOutAndPause } from "./fade";
+import {
+  decryptClipBuffer,
+  fetchClip,
+  fetchSkinFiles,
+  preloadClips,
+} from "./preload";
+import { DEFAULT_SONG_VOLUME, playSong } from "./song";
 import { useT } from "@/lib/i18n/context";
 import {
   audioContext,
-  isLoopSlot,
   playBuiltin,
   playArcadeBlopp,
   playArcadeJoin,
@@ -144,53 +151,32 @@ function useSkin(id: string, role: Role): SoundSkin | null {
   return skin;
 }
 
-function playFile(url: string, loop: boolean, volume: number): SoundHandle {
-  const a = new Audio(url);
-  a.loop = loop;
-  a.volume = volume;
-  let stopped = false;
-  const retry = () => {
-    if (!stopped && a.paused) start();
-  };
-  const unhook = () => {
-    for (const g of GESTURES) window.removeEventListener(g, retry);
-  };
-  const start = () =>
-    void a
-      .play()
-      .then(unhook)
+/** The built-in skins' options (the superadmin's), loaded once per page. */
+function useBuiltinOptions(skinId: string, role: Role): BuiltinSoundOptions {
+  const [opts, setOpts] = useState<BuiltinSoundOptions>({});
+  const builtin = (BUILTIN_SOUND_SKINS as readonly string[]).includes(skinId);
+  useEffect(() => {
+    if (!builtin) return;
+    let alive = true;
+    soundSkinsApi
+      .builtinOptions(role === "player" ? "player" : "account")
+      .then((o) => alive && setOpts(o))
       .catch(() => undefined);
-  start();
-  // Autoplay may refuse until the first gesture; retry then.
-  for (const g of GESTURES) window.addEventListener(g, retry);
-  return {
-    stop: () => {
-      stopped = true;
-      unhook();
-      fadeOutAndPause(a);
-    },
-  };
+    return () => {
+      alive = false;
+    };
+  }, [builtin, role]);
+  return opts;
 }
 
-/** Decrypts a preloaded clip, then loops it like a file bed. */
-function playEncrypted(url: string, key: string, volume: number): SoundHandle {
-  let handle: SoundHandle | null = null;
-  let stopped = false;
-  let objectUrl: string | null = null;
-  decryptClip(url, key)
-    .then((u) => {
-      objectUrl = u;
-      if (!stopped) handle = playFile(u, true, volume);
-    })
-    .catch(() => undefined);
-  return {
-    stop: () => {
-      stopped = true;
-      handle?.stop();
-      if (objectUrl) setTimeout(() => URL.revokeObjectURL(objectUrl!), 1500);
-    },
-  };
-}
+const SKIN_SLOTS = soundSlotSchema.options;
+/** Background music (off with "no music"). */
+const MUSIC_SLOTS: readonly SoundSlot[] = [
+  "lobby",
+  "question",
+  "scores",
+  "final",
+];
 
 /** Which bed (loop) a phase plays; null = none. */
 function bedFor(phase: string): SoundSlot | null {
@@ -244,6 +230,7 @@ export function GameSounds({
   };
 
   const skin = useSkin(settings.skin, role);
+  const builtinOptions = useBuiltinOptions(settings.skin, role);
   const phase = useAppSelector((s) => s.game.phase);
   const qIndex = useAppSelector((s) => s.game.qIndex);
   const deadline = useAppSelector((s) => s.game.deadline);
@@ -265,22 +252,44 @@ export function GameSounds({
   ) => {
     const ctx = audioContext();
     if (ctx && ctx.state !== "running") void ctx.resume();
+    // End-aligned songs need the time left in the countdown / question.
+    const timing = { untilEndMs: extra?.remainingMs ?? null };
     if (slot === "final" && skin?.finalClipUrl) {
+      const url = skin.finalClipUrl;
       return finalSoundKey
-        ? playEncrypted(skin.finalClipUrl, finalSoundKey, 0.8)
+        ? playSong(
+            () => decryptClipBuffer(url, finalSoundKey),
+            slot,
+            skin.options?.final,
+            timing,
+          )
         : null;
     }
     const builtin = (BUILTIN_SOUND_SKINS as readonly string[]).includes(
       settings.skin,
     );
     if (builtin) {
+      const o = builtinOptions[settings.skin]?.[slot];
       return playBuiltin(settings.skin as BuiltinSkinId, slot, {
-        volume: 0.45,
+        // 80 (the default) = the usual synth level.
+        volume:
+          0.45 * ((o?.volume ?? DEFAULT_SONG_VOLUME) / DEFAULT_SONG_VOLUME),
+        fadeInSec: o?.fadeIn ? (o.fadeInSec ?? 2) : 0,
+        // Synth loops run until the phase ends unless repeat is set off.
+        repeat: o?.repeat === false ? false : undefined,
         ...extra,
       });
     }
     const url = skin?.slots[slot];
-    return url ? playFile(url, isLoopSlot(slot), 0.8) : null;
+    // Fetched through the room's skin download slot (normally done already
+    // in the lobby, see below).
+    const load = async () => {
+      await fetchSkinFiles([url!]);
+      return fetchClip(url!);
+    };
+    return url
+      ? playSong(load, slot, skin?.options?.[slot], timing, url)
+      : null;
   };
 
   // Bed for the phase. A question with its own sound here plays no bed.
@@ -301,16 +310,41 @@ export function GameSounds({
     bed.current = null;
     if (!bedSlot) return;
     const total = (question?.timeOut ?? 20) * 1000;
+    // A timed question: how long it still runs (end-aligned songs); "∞": none.
+    const timed = bedSlot === "question" && !isUnlimitedTime(question?.timeOut);
     bed.current = {
       key: bedKey,
       handle: play(bedSlot, {
         progress: () =>
           1 - Math.max(0, deadlineRef.current - Date.now()) / total,
+        ...(timed
+          ? { remainingMs: Math.max(0, deadlineRef.current - Date.now()) }
+          : {}),
       }),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bedKey]);
   useEffect(() => () => bed.current?.handle?.stop(), []);
+
+  // The skin's files, once, while waiting in the lobby: through the room's
+  // skin download slot, so a full room joining doesn't fetch them all at
+  // once. Only what plays here (no music: effects only; the final song comes
+  // encrypted, separately).
+  const skinFiles =
+    !on || !skin
+      ? []
+      : SKIN_SLOTS.filter(
+          (s) =>
+            (settings.music || !MUSIC_SLOTS.includes(s)) &&
+            !(s === "final" && skin.finalClipUrl),
+        )
+          .map((s) => skin.slots[s])
+          .filter((u): u is string => Boolean(u));
+  const skinFilesKey = skinFiles.join("|");
+  useEffect(() => {
+    if (skinFiles.length > 0) void fetchSkinFiles(skinFiles);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skinFilesKey]);
 
   // Fetch the next question's (encrypted) clips early — on devices that will
   // play them. They stay unplayable until the question hands out the key.
@@ -332,7 +366,7 @@ export function GameSounds({
   useEffect(() => {
     if (!on || !settings.music || !gameRunning || !finalUrl) return;
     const t = setTimeout(
-      () => preloadClips([finalUrl]),
+      () => void fetchSkinFiles([finalUrl]),
       Math.random() * 60_000,
     );
     return () => clearTimeout(t);

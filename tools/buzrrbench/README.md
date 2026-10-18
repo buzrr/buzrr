@@ -12,7 +12,8 @@ play context and the quiz's sound skin, question images, the question sound's
 encrypted clips when `preload` announces them (asking the server for a
 download slot first and waiting for `preload-go` when queued, reporting
 `preload-status`, so the countdown waits for slow devices), and — on devices
-where game sounds are on — the skin's sound files per phase and the preloaded
+where game sounds are on — the skin's sound files (all at once in the lobby,
+through the room's `skin` download slot, like the browser) and the preloaded
 final song. Like the web client, a failed download is retried up to 5 times
 after a random, growing pause (0.4–1.2 s, 0.8–2.4 s, …); a clip given up still
 reports `done` with `failed: true`. The summary counts `download slot:

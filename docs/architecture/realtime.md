@@ -297,6 +297,12 @@ masked until the reveal (`buildSnapshot`).
   never queues. While queued the device reports `loaded: 0` every 1.5 s, so
   the countdown keeps counting it. In memory per server process; unlimited
   when unset (the ack says `limited: false` and devices spread their own start).
+- Slots come in two kinds, each with its own limit: `question` (above) and
+  `skin` — a user sound skin's files. A device with sound on fetches them
+  once in the lobby (`fetchSkinFiles`: one slot, the files one after the
+  other, `preload-slot` again every 4 s as a keepalive, then `slot-done`);
+  the final song's encrypted clip and any file not yet here when its phase
+  plays go through the same slot.
 - A failed download is retried up to 5 times after a random, growing pause; a
   clip given up reports `done: true, failed: true` — the countdown never
   waits for it. Clips are mono, 64 kbit/s.
@@ -306,6 +312,27 @@ masked until the reveal (`buildSnapshot`).
   `downloadsDone`; the host answers with `downloads-decision { wait }`: go on
   now, or wait without the 30 s limit (`preloadWaitAll`, then `waitAll: true`).
   Questions with "∞" time have no countdown and no wait.
+
+## Sound skins: playback options
+
+Each slot of a skin has options (`soundSlotOptionsSchema`, stored per user
+skin in `sound_skins.options`, for the built-in skins in
+`builtin_sound_options` — only the superadmin changes those):
+
+- `volume` 0–100 (80 = the usual level), `fadeIn` + `fadeInSec`.
+- `repeat` (lobby, question, scores, reveal, final): default off, on for
+  the lobby. Built-in synth loops run until the phase ends unless repeat is
+  set off (then 8 bars).
+- Files only: `startMs`. Countdown / question: `align: "end"` plays the file
+  so its `endMs` lands on the end of the countdown (5 s) or the question,
+  starting later when there is less time left than song before that point;
+  `extendSec` (0–5) keeps it playing after the phase ends, then it fades out.
+  "∞" questions play from the start.
+
+Files play through Web Audio (`lib/sound/song.ts`: gain ramps work on iOS);
+an `<audio>` element is the fallback. The audio skins page has a test bench
+per skin: a round with countdown, question (chosen length), tusch and
+optionally reveal and scoreboard, timed like a game.
 
 ## Lobby extras: bubbles and reactions
 

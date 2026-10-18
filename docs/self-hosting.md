@@ -167,8 +167,9 @@ that don't make joins faster — the room's lock serializes them anyway (a few
 milliseconds each, so 1000 joins take a few seconds) — they only keep the rest
 of the server responsive meanwhile.
 
-`MAX_PARALLEL_AUDIO_DOWNLOADS` rations the question sound downloads: at most
-that many devices per room fetch the next question's clips at the same time,
+`MAX_PARALLEL_AUDIO_DOWNLOADS` rations the sound downloads: at most that many
+devices per room fetch the next question's clips at the same time (and, as a
+separate pool, the sound skin's music files when they join),
 the others queue and start as slots free up (a device finishes, leaves, or
 sends no progress for 8 s). Unset or `0` = no limit. Without it, 500 phones
 start the same download within three seconds, and on a modest uplink many of

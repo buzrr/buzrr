@@ -8,6 +8,7 @@ import {
   duelQueueSchema,
   preloadSlotSchema,
   preloadStatusSchema,
+  slotDoneSchema,
   reactionSchema,
   submitAnswerSchema,
   setAvatarSchema,
@@ -93,7 +94,10 @@ export class RealtimeGateway
   /** Queued devices whose download slot came free. */
   private grant(grants: Grant[]): void {
     for (const g of grants) {
-      this.server.to(g.socketId).emit("preload-go", { qIndex: g.qIndex });
+      this.server.to(g.socketId).emit("preload-go", {
+        qIndex: g.qIndex,
+        kind: g.kind === "skin" ? "skin" : "question",
+      });
     }
   }
 
@@ -516,12 +520,19 @@ export class RealtimeGateway
       if (!parsed.success || typeof ack !== "function") return;
       const go = this.slots.request(
         gameCode,
+        parsed.data.kind,
         parsed.data.qIndex,
         id,
         socket.id,
         Date.now(),
       );
       ack({ go, limited: this.slots.limited });
+    });
+    socket.on("slot-done", (payload) => {
+      const parsed = slotDoneSchema.safeParse(payload);
+      if (!parsed.success) return;
+      const { kind, qIndex } = parsed.data;
+      this.grant(this.slots.release(gameCode, kind, qIndex, id, Date.now()));
     });
     socket.once("disconnect", () =>
       this.grant(this.slots.leave(gameCode, id, socket.id, Date.now())),
@@ -531,8 +542,9 @@ export class RealtimeGateway
       if (!parsed.success) return;
       const now = Date.now();
       const { qIndex, loaded, total, done } = parsed.data;
-      if (done) this.grant(this.slots.release(gameCode, qIndex, id, now));
-      else this.slots.touch(gameCode, qIndex, id, now);
+      if (done) {
+        this.grant(this.slots.release(gameCode, "question", qIndex, id, now));
+      } else this.slots.touch(gameCode, "question", qIndex, id, now);
       // Progress at most every 300 ms; "done" always gets through.
       if (!done && now - last < 300) return;
       last = now;

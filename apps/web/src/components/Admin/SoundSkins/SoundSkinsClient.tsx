@@ -3,12 +3,21 @@
 import clsx from "clsx";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
-import { LuCheck, LuPlay, LuSquare, LuTrash2, LuUpload } from "react-icons/lu";
+import {
+  LuCheck,
+  LuFlaskConical,
+  LuPlay,
+  LuSettings2,
+  LuSquare,
+  LuTrash2,
+  LuUpload,
+} from "react-icons/lu";
 import {
   BUILTIN_SOUND_SKINS,
   soundSlotSchema,
   type SoundSkin,
   type SoundSlot,
+  type SoundSlotOptions,
 } from "@buzrr/contract";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { useCurrentRole } from "@/components/SessionProvider";
@@ -23,16 +32,21 @@ import {
 import {
   BUILTIN_SKINS,
   audioContext,
-  isLoopSlot,
   playBuiltin,
   type BuiltinSkinId,
   type SoundHandle,
 } from "@/lib/sound/synth";
+import { DEFAULT_SONG_VOLUME, playSong } from "@/lib/sound/song";
+import { fetchClip } from "@/lib/sound/preload";
+import { SlotOptionsEditor } from "./SlotOptionsEditor";
+import { SkinTestBench } from "./SkinTestBench";
 import { useT } from "@/lib/i18n/context";
 import {
   useClearSoundSlot,
   useCreateSoundSkin,
   useDeleteSoundSkin,
+  useBuiltinOptionsQuery,
+  useSetBuiltinOptions,
   useSetSoundSlot,
   useSoundSkinsQuery,
   useUpdateSoundSkin,
@@ -71,11 +85,75 @@ function usePreview() {
   return { playing, play, stop };
 }
 
-function fileHandle(url: string, loop: boolean): SoundHandle {
-  const a = new Audio(url);
-  a.loop = loop;
-  void a.play().catch(() => undefined);
-  return { stop: () => a.pause() };
+/** Preview of an uploaded song with its options (a 20 s question, the 5 s countdown). */
+function fileHandle(
+  url: string,
+  slot: SoundSlot,
+  options: SoundSlotOptions | undefined,
+): SoundHandle {
+  const untilEndMs =
+    slot === "countdown" ? 5000 : slot === "question" ? 20_000 : null;
+  return playSong(() => fetchClip(url), slot, options, { untilEndMs }, url);
+}
+
+/** Preview of a built-in slot with the superadmin's options. */
+function builtinHandle(
+  id: string,
+  slot: SoundSlot,
+  o: SoundSlotOptions | undefined,
+  extra: { remainingMs?: number; progress?: () => number } = {},
+): SoundHandle {
+  return playBuiltin(id as BuiltinSkinId, slot, {
+    progress: () => 0.85,
+    volume: 0.45 * ((o?.volume ?? DEFAULT_SONG_VOLUME) / DEFAULT_SONG_VOLUME),
+    fadeInSec: o?.fadeIn ? (o.fadeInSec ?? 2) : 0,
+    repeat: o?.repeat === false ? false : undefined,
+    ...extra,
+  });
+}
+
+/** "Test" toggle: a question round played like in a game. */
+function TestToggle({ open, onClick }: { open: boolean; onClick: () => void }) {
+  const t = useT();
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      onClick={onClick}
+      className={clsx(
+        "flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold cursor-pointer",
+        open ? "bg-dprimary/20" : "bg-lprimary/10 dark:bg-white/5",
+      )}
+    >
+      <LuFlaskConical size={11} />
+      {t("Test bench")}
+    </button>
+  );
+}
+
+/** The gear that opens a slot's options. */
+function OptionsToggle({
+  open,
+  onClick,
+}: {
+  open: boolean;
+  onClick: () => void;
+}) {
+  const t = useT();
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      onClick={onClick}
+      className={clsx(
+        "flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold cursor-pointer",
+        open ? "bg-dprimary/20" : "bg-lprimary/10 dark:bg-white/5",
+      )}
+    >
+      <LuSettings2 size={11} />
+      {t("Options")}
+    </button>
+  );
 }
 
 /**
@@ -86,6 +164,11 @@ export default function SoundSkinsClient() {
   const t = useT();
   const role = useCurrentRole();
   const isAdmin = role === "admin" || role === "superadmin";
+  const isSuperadmin = role === "superadmin";
+  const builtinOptions = useBuiltinOptionsQuery();
+  const setBuiltin = useSetBuiltinOptions();
+  const [openBuiltin, setOpenBuiltin] = useState<string | null>(null);
+  const [testing, setTesting] = useState<string | null>(null);
   const query = useSoundSkinsQuery();
   const create = useCreateSoundSkin();
   const [name, setName] = useState("");
@@ -132,9 +215,11 @@ export default function SoundSkinsClient() {
                   title={t(SLOT_LABELS[slot])}
                   onClick={() =>
                     preview.play(key, () =>
-                      playBuiltin(id as BuiltinSkinId, slot, {
-                        progress: () => 0.85,
-                      }),
+                      builtinHandle(
+                        id,
+                        slot,
+                        builtinOptions.data?.[id]?.[slot],
+                      ),
                     )
                   }
                   className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold bg-lprimary/10 dark:bg-white/5 cursor-pointer"
@@ -148,7 +233,79 @@ export default function SoundSkinsClient() {
                 </button>
               );
             })}
+            <TestToggle
+              open={testing === id}
+              onClick={() => {
+                preview.stop();
+                setTesting(testing === id ? null : id);
+              }}
+            />
           </div>
+          {testing === id && (
+            <SkinTestBench
+              play={(slot, extra) =>
+                builtinHandle(
+                  id,
+                  slot,
+                  builtinOptions.data?.[id]?.[slot],
+                  extra,
+                )
+              }
+            />
+          )}
+          {isSuperadmin && (
+            // Only the superadmin tunes the built-in skins, for everyone.
+            <div className="flex flex-col gap-1.5">
+              <p className={clsx("text-xs", mutedText)}>
+                {t("Playback options (superadmin, for all users)")}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {SLOTS.map((slot) => {
+                  const key = `${id}:${slot}`;
+                  return (
+                    <span key={slot} className="flex items-center gap-1">
+                      <span className="text-xs">{slot}</span>
+                      <OptionsToggle
+                        open={openBuiltin === key}
+                        onClick={() =>
+                          setOpenBuiltin(openBuiltin === key ? null : key)
+                        }
+                      />
+                    </span>
+                  );
+                })}
+              </div>
+              {SLOTS.filter((slot) => openBuiltin === `${id}:${slot}`).map(
+                (slot) => (
+                  <div key={slot} className="flex flex-col gap-1">
+                    <span className="text-xs font-bold">
+                      {t(SLOT_LABELS[slot])}
+                    </span>
+                    <SlotOptionsEditor
+                      slot={slot}
+                      builtin
+                      value={builtinOptions.data?.[id]?.[slot]}
+                      onSave={(next) =>
+                        setBuiltin.mutate(
+                          {
+                            skinId: id,
+                            options: {
+                              ...builtinOptions.data?.[id],
+                              [slot]: next,
+                            },
+                          },
+                          {
+                            onError: (err) =>
+                              toast.error(getApiErrorMessage(err)),
+                          },
+                        )
+                      }
+                    />
+                  </div>
+                ),
+              )}
+            </div>
+          )}
         </section>
       ))}
 
@@ -248,6 +405,8 @@ function SkinCard({
   const clearSlot = useClearSoundSlot();
   const del = useDeleteSoundSkin();
   const onError = (err: unknown) => toast.error(getApiErrorMessage(err));
+  const [openSlot, setOpenSlot] = useState<SoundSlot | null>(null);
+  const [testing, setTesting] = useState(false);
 
   return (
     <div
@@ -286,6 +445,13 @@ function SkinCard({
           )
         )}
         <DefaultSkinButton id={skin.id} />
+        <TestToggle
+          open={testing}
+          onClick={() => {
+            preview.stop();
+            setTesting(!testing);
+          }}
+        />
         <button
           type="button"
           aria-label={t("Delete audio skin")}
@@ -299,63 +465,105 @@ function SkinCard({
           <LuTrash2 size={17} />
         </button>
       </div>
+      {testing && (
+        <SkinTestBench
+          play={(slot, extra) => {
+            const url = skin.slots[slot];
+            return url
+              ? playSong(
+                  () => fetchClip(url),
+                  slot,
+                  skin.options?.[slot],
+                  { untilEndMs: extra.remainingMs ?? null },
+                  url,
+                )
+              : null;
+          }}
+        />
+      )}
       {SLOTS.map((slot) => {
         const url = skin.slots[slot];
         const key = `${skin.id}:${slot}`;
         return (
-          <div key={slot} className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="w-64 max-w-full">{t(SLOT_LABELS[slot])}</span>
-            {url ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() =>
-                    preview.play(key, () => fileHandle(url, isLoopSlot(slot)))
-                  }
-                  className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold bg-lprimary/10 dark:bg-white/5 cursor-pointer"
-                >
-                  {preview.playing === key ? (
-                    <LuSquare size={11} />
-                  ) : (
-                    <LuPlay size={11} />
-                  )}
-                  {t("Play")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    clearSlot.mutate({ id: skin.id, slot }, { onError })
-                  }
-                  className="text-xs underline cursor-pointer"
-                >
-                  {t("remove")}
-                </button>
-              </>
-            ) : (
-              <span className={clsx("text-xs", mutedText)}>{t("silent")}</span>
-            )}
-            <label className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold border border-dashed border-lprimary/30 cursor-pointer">
-              <LuUpload size={11} />
-              {url ? "Replace" : "Upload"}
-              <input
-                type="file"
-                accept="audio/*,.mp3,.wav,.ogg,.oga,.opus,.flac,.m4a,.aac,.webm"
-                className="sr-only"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = "";
-                  if (file) {
-                    setSlot.mutate(
-                      { id: skin.id, slot, file },
-                      {
-                        onSuccess: () => toast.success(t("Sound uploaded")),
-                        onError,
-                      },
-                    );
-                  }
-                }}
+          <div key={slot} className="flex flex-col gap-1.5">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="w-64 max-w-full">{t(SLOT_LABELS[slot])}</span>
+              {url ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      preview.play(key, () =>
+                        fileHandle(url, slot, skin.options?.[slot]),
+                      )
+                    }
+                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold bg-lprimary/10 dark:bg-white/5 cursor-pointer"
+                  >
+                    {preview.playing === key ? (
+                      <LuSquare size={11} />
+                    ) : (
+                      <LuPlay size={11} />
+                    )}
+                    {t("Play")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      clearSlot.mutate({ id: skin.id, slot }, { onError })
+                    }
+                    className="text-xs underline cursor-pointer"
+                  >
+                    {t("remove")}
+                  </button>
+                  <OptionsToggle
+                    open={openSlot === slot}
+                    onClick={() => setOpenSlot(openSlot === slot ? null : slot)}
+                  />
+                </>
+              ) : (
+                <span className={clsx("text-xs", mutedText)}>
+                  {t("silent")}
+                </span>
+              )}
+              <label className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold border border-dashed border-lprimary/30 cursor-pointer">
+                <LuUpload size={11} />
+                {url ? "Replace" : "Upload"}
+                <input
+                  type="file"
+                  accept="audio/*,.mp3,.wav,.ogg,.oga,.opus,.flac,.m4a,.aac,.webm"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) {
+                      setSlot.mutate(
+                        { id: skin.id, slot, file },
+                        {
+                          onSuccess: () => toast.success(t("Sound uploaded")),
+                          onError,
+                        },
+                      );
+                    }
+                  }}
+                />
+              </label>
+            </div>
+            {url && openSlot === slot && (
+              <SlotOptionsEditor
+                slot={slot}
+                builtin={false}
+                value={skin.options?.[slot]}
+                onSave={(next) =>
+                  update.mutate(
+                    {
+                      id: skin.id,
+                      options: { ...skin.options, [slot]: next },
+                    },
+                    { onError },
+                  )
+                }
               />
-            </label>
+            )}
           </div>
         );
       })}

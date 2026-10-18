@@ -6,8 +6,12 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import {
+  BUILTIN_SOUND_SKINS,
+  soundSkinOptionsSchema,
   soundSlotSchema,
+  type BuiltinSoundOptions,
   type SoundSkin,
+  type SoundSkinOptions,
   type SoundSlot,
 } from "@buzrr/contract";
 import { Prisma } from "@buzrr/prisma";
@@ -33,6 +37,7 @@ type SkinRow = {
   userId: string | null;
   isGlobal: boolean;
   slots: unknown;
+  options?: unknown;
   finalClip?: unknown;
 };
 
@@ -50,12 +55,25 @@ function slotsOf(raw: unknown): SoundSkin["slots"] {
   return out;
 }
 
+/** Stored options, cleaned (a bad entry is dropped, not fatal). */
+function optionsOf(raw: unknown): SoundSkinOptions {
+  const out: SoundSkinOptions = {};
+  if (raw && typeof raw === "object") {
+    for (const [k, v] of Object.entries(raw)) {
+      const parsed = soundSkinOptionsSchema.safeParse({ [k]: v });
+      if (parsed.success) Object.assign(out, parsed.data);
+    }
+  }
+  return out;
+}
+
 const toSkin = (row: SkinRow): SoundSkin => ({
   id: row.id,
   name: row.name,
   isGlobal: row.isGlobal,
   ownerId: row.userId,
   slots: slotsOf(row.slots),
+  options: optionsOf(row.options),
   // The URL only — the key never leaves with the skin.
   finalClipUrl: finalClipOf(row.finalClip)?.url ?? null,
 });
@@ -146,7 +164,7 @@ export class SoundSkinsService {
   async update(
     user: AuthUser,
     id: string,
-    patch: { name?: string; isGlobal?: boolean },
+    patch: { name?: string; isGlobal?: boolean; options?: SoundSkinOptions },
   ): Promise<SoundSkin> {
     await this.editable(user, id);
     if (patch.isGlobal !== undefined && !(await this.isAdmin(user.userId))) {
@@ -161,9 +179,47 @@ export class SoundSkinsService {
           ? { name: patch.name.trim().slice(0, 60) || "My sounds" }
           : {}),
         ...(patch.isGlobal !== undefined ? { isGlobal: patch.isGlobal } : {}),
+        ...(patch.options !== undefined
+          ? { options: patch.options as Prisma.InputJsonValue }
+          : {}),
       },
     });
     return toSkin(row);
+  }
+
+  /** Every built-in skin's options (anyone signed in or playing). */
+  async builtinOptions(): Promise<BuiltinSoundOptions> {
+    const rows = await this.prisma.db.builtinSoundOptions.findMany();
+    const out: BuiltinSoundOptions = {};
+    for (const r of rows) out[r.skinId] = optionsOf(r.options);
+    return out;
+  }
+
+  /** Superadmin only: one built-in skin's options, for everyone. */
+  async setBuiltinOptions(
+    user: AuthUser,
+    skinId: string,
+    options: SoundSkinOptions,
+  ): Promise<BuiltinSoundOptions> {
+    const u = await this.prisma.db.user.findUnique({
+      where: { id: user.userId },
+      select: { role: true },
+    });
+    if (u?.role !== "superadmin") {
+      throw new ForbiddenException(
+        "Only the superadmin can change the built-in skins",
+      );
+    }
+    if (!(BUILTIN_SOUND_SKINS as readonly string[]).includes(skinId)) {
+      throw new NotFoundException("Sound skin not found");
+    }
+    const json = options as Prisma.InputJsonValue;
+    await this.prisma.db.builtinSoundOptions.upsert({
+      where: { skinId },
+      create: { skinId, options: json },
+      update: { options: json },
+    });
+    return this.builtinOptions();
   }
 
   async setSlot(

@@ -26,7 +26,13 @@ interface RoomSlots {
 export interface Grant {
   socketId: string;
   qIndex: number;
+  kind: string;
 }
+
+/** Rooms are kept per game and kind ("question" / "skin"). */
+const SEP = "\u0000";
+const keyOf = (game: string, kind: string) => `${game}${SEP}${kind}`;
+const kindOf = (key: string) => key.slice(key.indexOf(SEP) + 1);
 
 export class AudioSlots {
   private rooms = new Map<string, RoomSlots>();
@@ -39,19 +45,20 @@ export class AudioSlots {
   }
 
   /**
-   * Device `id` wants to download question `qIndex`'s clips. True = go now;
-   * false = queued, a `Grant` for it comes from a later call. The host
+   * Device `id` wants to download (`kind`, question `qIndex`). True = go
+   * now; false = queued, a `Grant` for it comes from a later call. The host
    * ("host") never queues: its screen plays the sound for the whole room.
    */
   request(
     game: string,
+    kind: string,
     qIndex: number,
     id: string,
     socketId: string,
     now: number,
   ): boolean {
     if (!this.limited || id === "host") return true;
-    const room = this.room(game, qIndex);
+    const room = this.room(keyOf(game, kind), qIndex);
     const held = room.active.get(id);
     if (held) {
       held.socketId = socketId;
@@ -68,65 +75,80 @@ export class AudioSlots {
   }
 
   /** Download progress from `id`: its slot is still in use. */
-  touch(game: string, qIndex: number, id: string, now: number): void {
-    const room = this.rooms.get(game);
+  touch(
+    game: string,
+    kind: string,
+    qIndex: number,
+    id: string,
+    now: number,
+  ): void {
+    const room = this.rooms.get(keyOf(game, kind));
     const held = room?.qIndex === qIndex ? room.active.get(id) : undefined;
     if (held) held.at = now;
   }
 
-  /** `id` finished (or gave up) question `qIndex`'s download. */
-  release(game: string, qIndex: number, id: string, now: number): Grant[] {
-    const room = this.rooms.get(game);
+  /** `id` finished (or gave up) its download. */
+  release(
+    game: string,
+    kind: string,
+    qIndex: number,
+    id: string,
+    now: number,
+  ): Grant[] {
+    const key = keyOf(game, kind);
+    const room = this.rooms.get(key);
     if (!room || room.qIndex !== qIndex) return [];
     room.active.delete(id);
-    return this.fill(game, room, now);
+    return this.fill(key, room, now);
   }
 
-  /** `id`'s socket went away: its slot or queue place too. */
+  /** `id`'s socket went away: its slots and queue places, every kind. */
   leave(game: string, id: string, socketId: string, now: number): Grant[] {
-    const room = this.rooms.get(game);
-    if (!room) return [];
-    if (room.active.get(id)?.socketId === socketId) room.active.delete(id);
-    room.queue = room.queue.filter((q) => q.socketId !== socketId);
-    return this.fill(game, room, now);
+    const grants: Grant[] = [];
+    for (const [key, room] of this.rooms) {
+      if (!key.startsWith(game + SEP)) continue;
+      if (room.active.get(id)?.socketId === socketId) room.active.delete(id);
+      room.queue = room.queue.filter((q) => q.socketId !== socketId);
+      grants.push(...this.fill(key, room, now));
+    }
+    return grants;
   }
 
   /** Frees slots that stopped moving; returns who moves up (all rooms). */
   sweep(now: number): Grant[] {
     const grants: Grant[] = [];
-    for (const [game, room] of this.rooms) {
+    for (const [key, room] of this.rooms) {
       for (const [id, h] of room.active) {
         if (now - h.at >= SLOT_STALL_MS) room.active.delete(id);
       }
-      grants.push(...this.fill(game, room, now));
+      grants.push(...this.fill(key, room, now));
     }
     return grants;
   }
 
-  /** Drop a finished room. */
-  forget(game: string): void {
-    this.rooms.delete(game);
-  }
-
-  private room(game: string, qIndex: number): RoomSlots {
-    let room = this.rooms.get(game);
+  private room(key: string, qIndex: number): RoomSlots {
+    let room = this.rooms.get(key);
     // The next question's preload starts a fresh round.
     if (!room || room.qIndex !== qIndex) {
       room = { qIndex, active: new Map(), queue: [] };
-      this.rooms.set(game, room);
+      this.rooms.set(key, room);
     }
     return room;
   }
 
-  private fill(game: string, room: RoomSlots, now: number): Grant[] {
+  private fill(key: string, room: RoomSlots, now: number): Grant[] {
     const grants: Grant[] = [];
     while (room.active.size < this.limit && room.queue.length > 0) {
       const next = room.queue.shift()!;
       room.active.set(next.id, { socketId: next.socketId, at: now });
-      grants.push({ socketId: next.socketId, qIndex: room.qIndex });
+      grants.push({
+        socketId: next.socketId,
+        qIndex: room.qIndex,
+        kind: kindOf(key),
+      });
     }
     if (room.active.size === 0 && room.queue.length === 0) {
-      this.rooms.delete(game);
+      this.rooms.delete(key);
     }
     return grants;
   }

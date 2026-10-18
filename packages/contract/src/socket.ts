@@ -96,6 +96,42 @@ export const soundSettingsSchema = z.object({
   music: z.boolean().default(true),
 });
 
+/** Slots whose song can line up with the end of the countdown / question. */
+export const END_ALIGNABLE_SLOTS = ["countdown", "question"] as const;
+
+/**
+ * How one slot's song plays. Every field is optional: missing = the slot's
+ * usual behaviour (volume 80, no fade-in, loops repeat, from the start).
+ * Built-in skins use volume, fade-in and repeat only (they have no timeline).
+ */
+export const soundSlotOptionsSchema = z.object({
+  /** 0–100; 80 = the usual level. */
+  volume: z.number().int().min(0).max(100).optional(),
+  /** Fade in over `fadeInSec` seconds. */
+  fadeIn: z.boolean().optional(),
+  fadeInSec: z.number().min(0.1).max(30).optional(),
+  /** Play again from `startMs` when it ends (default: on for the loop slots). */
+  repeat: z.boolean().optional(),
+  /** Where in the file to start (ms). */
+  startMs: z.number().int().min(0).max(3_600_000).optional(),
+  /**
+   * Countdown / question only. "start": play from `startMs`. "end": time it
+   * so the file's `endMs` falls on the end of the countdown (5 s) or the
+   * question, then keep playing `extendSec` (0–5) and fade out.
+   */
+  align: z.enum(["start", "end"]).optional(),
+  endMs: z.number().int().min(0).max(3_600_000).optional(),
+  extendSec: z.number().min(0).max(5).optional(),
+});
+export type SoundSlotOptions = z.infer<typeof soundSlotOptionsSchema>;
+export const soundSkinOptionsSchema = z.partialRecord(
+  soundSlotSchema,
+  soundSlotOptionsSchema,
+);
+export type SoundSkinOptions = z.infer<typeof soundSkinOptionsSchema>;
+/** Built-in skin id -> its slot options (set by the superadmin, for everyone). */
+export type BuiltinSoundOptions = Partial<Record<string, SoundSkinOptions>>;
+
 /** A user's sound skin: an uploaded MP3 per slot (missing slots stay silent). */
 export const soundSkinSchema = z.object({
   id: z.string(),
@@ -104,6 +140,8 @@ export const soundSkinSchema = z.object({
   isGlobal: z.boolean(),
   ownerId: z.string().nullable(),
   slots: z.partialRecord(soundSlotSchema, z.string()),
+  /** How each slot's song plays. */
+  options: soundSkinOptionsSchema.optional(),
   /**
    * The final song, encrypted, for downloading ahead of time during a game;
    * the key comes with the final leaderboard (`finalSoundKey`).
@@ -216,10 +254,22 @@ export const phaseChangeSchema = z.object({
   waitAll: z.boolean().optional(),
 });
 
+/**
+ * What a download slot is for: a question's sound clips, or the sound skin's
+ * files (fetched once, in the lobby). Each kind has its own
+ * MAX_PARALLEL_AUDIO_DOWNLOADS per room.
+ */
+export const downloadKindSchema = z.enum(["question", "skin"]);
+export type DownloadKind = z.infer<typeof downloadKindSchema>;
+
 /** A device asks for one of the room's download slots (`preload-slot`). */
 export const preloadSlotSchema = z.object({
+  /** The question (kind "question"); 0 for the skin. */
   qIndex: z.number().int().nonnegative(),
+  kind: downloadKindSchema.default("question"),
 });
+/** The device is done with its slot (skin files; questions report `preload-status`). */
+export const slotDoneSchema = preloadSlotSchema;
 /**
  * `go`: start downloading now. Otherwise wait for `preload-go` — the server
  * hands out at most MAX_PARALLEL_AUDIO_DOWNLOADS slots per room at a time.
@@ -566,7 +616,7 @@ export interface ServerToClientEvents {
   /** Download the next question's (encrypted) sound clips now. */
   preload: (payload: PreloadPayload) => void;
   /** This device's download slot for question `qIndex` is free (see `preload-slot`). */
-  "preload-go": (payload: { qIndex: number }) => void;
+  "preload-go": (payload: { qIndex: number; kind?: DownloadKind }) => void;
   /**
    * Host only, moderated "closed" step: how the room answered, before the
    * answer is shown (the host screen keeps the correct one hidden).
@@ -637,9 +687,11 @@ export interface ClientToServerEvents {
   "preload-status": (payload: PreloadStatusPayload) => void;
   /** Ask for a download slot before fetching the question's sound. */
   "preload-slot": (
-    payload: z.infer<typeof preloadSlotSchema>,
+    payload: z.input<typeof preloadSlotSchema>,
     ack: (result: PreloadSlotAck) => void,
   ) => void;
+  /** Done with a download slot (the skin's files). */
+  "slot-done": (payload: z.infer<typeof slotDoneSchema>) => void;
   /** Host: keep waiting for downloads, or open the question now. */
   "downloads-decision": (payload: DownloadsDecisionPayload) => void;
   // -- host intents (the server decides what each one means) --

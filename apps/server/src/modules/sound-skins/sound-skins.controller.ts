@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -26,11 +27,13 @@ import type {
 import { RateLimitGuard } from "../../common/guards/rate-limit.guard";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { SoundSkinsService } from "./sound-skins.service";
+import { soundSkinOptionsSchema } from "@buzrr/contract";
 
 const createSchema = z.object({ name: z.string().max(60) });
 const updateSchema = z.object({
   name: z.string().max(60).optional(),
   isGlobal: z.boolean().optional(),
+  options: soundSkinOptionsSchema.optional(),
 });
 
 @Controller("sound-skins")
@@ -40,6 +43,24 @@ export class SoundSkinsController {
   @Get()
   list(@CurrentAccountUser() user: AuthUser) {
     return this.skins.list(user);
+  }
+
+  /** The built-in skins' playback options (signed-in users and players). */
+  @Get("builtin-options")
+  builtinOptions(@CurrentUser() _user: JwtRequestUser) {
+    void _user;
+    return this.skins.builtinOptions();
+  }
+
+  /** Superadmin: one built-in skin's options, for everyone. */
+  @Put("builtin-options/:skinId")
+  setBuiltinOptions(
+    @CurrentAccountUser() user: AuthUser,
+    @Param("skinId") skinId: string,
+    @Body(new ZodValidationPipe(soundSkinOptionsSchema))
+    body: z.infer<typeof soundSkinOptionsSchema>,
+  ) {
+    return this.skins.setBuiltinOptions(user, skinId, body);
   }
 
   /**

@@ -328,15 +328,29 @@ export interface SoundHandle {
 export function playBuiltin(
   skinId: BuiltinSkinId,
   slot: SoundSlot,
-  opts: { volume?: number; progress?: () => number; remainingMs?: number } = {},
+  opts: {
+    volume?: number;
+    progress?: () => number;
+    remainingMs?: number;
+    /** Fade in over this many seconds (superadmin's skin options). */
+    fadeInSec?: number;
+    /** Loops: false = one pass of BUILTIN_PASS_BARS bars, then fade out. */
+    repeat?: boolean;
+  } = {},
 ): SoundHandle {
   const ctx = audioContext();
   if (!ctx) return { stop: () => undefined };
   const p = BUILTIN_SKINS[skinId] ?? BUILTIN_SKINS["builtin:show"];
   const bus = ctx.createGain();
-  bus.gain.value = opts.volume ?? 0.5;
+  const level = opts.volume ?? 0.5;
   bus.connect(ctx.destination);
   const t0 = ctx.currentTime + 0.05;
+  if (opts.fadeInSec && opts.fadeInSec > 0) {
+    bus.gain.setValueAtTime(0.0001, ctx.currentTime);
+    bus.gain.linearRampToValueAtTime(level, t0 + opts.fadeInSec);
+  } else {
+    bus.gain.value = level;
+  }
   const beat = 60 / p.bpm;
   const d = p.drums;
   // Arcade: an 8-bit kick (a triangle sweep, like an old console's).
@@ -588,15 +602,32 @@ export function playBuiltin(
       step++;
     }
   };
-  tick();
-  const timer = setInterval(tick, 40);
+  // Repeat off: one pass (a synth loop has no end of its own), then out.
+  const passEnd = opts.repeat === false ? BUILTIN_PASS_BARS * 8 : Infinity;
+  let ended = false;
+  const run = () => {
+    if (ended) return;
+    if (step >= passEnd) {
+      ended = true;
+      clearInterval(timer);
+      setTimeout(fadeOut, Math.max(0, (next - ctx.currentTime) * 1000));
+      return;
+    }
+    tick();
+  };
+  const timer = setInterval(run, 40);
+  run();
   return {
     stop: () => {
       clearInterval(timer);
-      fadeOut();
+      if (!ended) fadeOut();
+      ended = true;
     },
   };
 }
+
+/** A built-in loop with "repeat" off plays this many bars. */
+export const BUILTIN_PASS_BARS = 8;
 
 /** A short, bright two-note "ping" (a player joined the waiting room). */
 export function playPing(volume = 0.35) {
