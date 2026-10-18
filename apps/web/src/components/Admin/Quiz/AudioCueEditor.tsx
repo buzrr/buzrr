@@ -9,8 +9,8 @@ import { useT } from "@/lib/i18n/context";
 import { mutedText, subtleCardClass } from "@/components/Game/GameUI";
 
 const REVEAL_PREVIEW_MS = 10_000;
-/** A moved reveal cue: this pause, then its part plays from the new spot. */
-const REVEAL_RESTART_PAUSE_MS = 500;
+/** A set or moved cue: this pause, then its part plays from the new spot. */
+const CUE_RESTART_PAUSE_MS = 500;
 
 function formatMs(ms: number) {
   const s = ms / 1000;
@@ -70,29 +70,38 @@ export default function AudioCueEditor({
 
   useEffect(() => () => stopRef.current?.(), []);
 
-  // The reveal cue moved while its part plays: stop, a short pause, then
-  // play from the new spot (after the last move while dragging).
+  // Setting or moving a cue by hand plays its part (even when stopped):
+  // stop, a short pause, then play from the new spot — after the last move
+  // while dragging. Only pointer actions do this, so a freshly uploaded
+  // sound stays silent.
   const playingRef = useRef(playing);
   useEffect(() => {
     playingRef.current = playing;
   });
   const restart = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastReveal = useRef(revealMs);
-  useEffect(() => {
-    if (lastReveal.current === revealMs) return;
-    lastReveal.current = revealMs;
-    if (playingRef.current !== "reveal" || revealMs === null) return;
+  const partEnds = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playCueSoon = (cue: "start" | "reveal", from: number) => {
+    const which = cue === "start" ? "question" : "reveal";
+    const length = cue === "start" ? questionMs : REVEAL_PREVIEW_MS;
     stopRef.current?.();
     stopRef.current = null;
     if (restart.current) clearTimeout(restart.current);
+    if (partEnds.current) clearTimeout(partEnds.current);
+    playingRef.current = which;
+    setPlaying(which);
     restart.current = setTimeout(() => {
-      if (playingRef.current !== "reveal") return;
-      stopRef.current = playSegment(src, revealMs, REVEAL_PREVIEW_MS);
-    }, REVEAL_RESTART_PAUSE_MS);
-  }, [revealMs, src]);
+      if (playingRef.current !== which) return;
+      stopRef.current = playSegment(src, from, length);
+      partEnds.current = setTimeout(
+        () => setPlaying((p) => (p === which ? null : p)),
+        length,
+      );
+    }, CUE_RESTART_PAUSE_MS);
+  };
   useEffect(
     () => () => {
       if (restart.current) clearTimeout(restart.current);
+      if (partEnds.current) clearTimeout(partEnds.current);
     },
     [],
   );
@@ -149,8 +158,9 @@ export default function AudioCueEditor({
       (wave?.durationMs ?? 0)
     );
   };
+  /** Puts a cue at `ms` (clamped); returns where it landed. */
   const place = (cue: "start" | "reveal", ms: number) => {
-    if (!wave) return;
+    if (!wave) return null;
     const max =
       cue === "start"
         ? Math.max(0, wave.durationMs - Math.min(questionMs, wave.durationMs))
@@ -158,6 +168,7 @@ export default function AudioCueEditor({
     const v = Math.round(Math.max(0, Math.min(max, ms)));
     if (cue === "start") onChange({ startMs: v, revealMs });
     else onChange({ startMs, revealMs: v });
+    return v;
   };
   const onPointerDown = (e: PointerEvent<HTMLCanvasElement>) => {
     if (!wave) return;
@@ -181,15 +192,18 @@ export default function AudioCueEditor({
         cue,
         offsetMs: ms - (cue === "start" ? startMs : revealMs!),
       };
+      playCueSoon(cue, cue === "start" ? startMs : revealMs!);
       return;
     }
     drag.current = { cue: mode, offsetMs: 0 };
-    place(mode, ms);
+    const at = place(mode, ms);
+    if (at !== null) playCueSoon(mode, at);
   };
   const onPointerMove = (e: PointerEvent<HTMLCanvasElement>) => {
     const d = drag.current;
     if (!d || !wave) return;
-    place(d.cue, msAt(e) - d.offsetMs);
+    const at = place(d.cue, msAt(e) - d.offsetMs);
+    if (at !== null) playCueSoon(d.cue, at);
   };
   const endDrag = () => {
     drag.current = null;
@@ -197,7 +211,11 @@ export default function AudioCueEditor({
 
   const preview = (which: "question" | "reveal") => {
     stopRef.current?.();
+    // A part about to play after a cue move doesn't start after this.
+    if (restart.current) clearTimeout(restart.current);
+    if (partEnds.current) clearTimeout(partEnds.current);
     if (playing === which) {
+      playingRef.current = null;
       setPlaying(null);
       return;
     }
