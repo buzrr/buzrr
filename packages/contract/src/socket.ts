@@ -165,8 +165,18 @@ export const soundSkinOptionsSchema = z.partialRecord(
   soundSlotOptionsSchema,
 );
 export type SoundSkinOptions = z.infer<typeof soundSkinOptionsSchema>;
-/** Built-in skin id -> its slot options (set by the superadmin, for everyone). */
-export type BuiltinSoundOptions = Partial<Record<string, SoundSkinOptions>>;
+/**
+ * A built-in skin as configured on this instance (the superadmin's): its
+ * slot options, the defaults "reset" restores, and files for slots that play
+ * a recording instead of the synth.
+ */
+export interface BuiltinSkinData {
+  options: SoundSkinOptions;
+  defaults: SoundSkinOptions;
+  slots: Partial<Record<SoundSlot, string>>;
+}
+/** Built-in skin id -> its configuration. */
+export type BuiltinSoundOptions = Partial<Record<string, BuiltinSkinData>>;
 
 /** A user's sound skin: an uploaded MP3 per slot (missing slots stay silent). */
 export const soundSkinSchema = z.object({

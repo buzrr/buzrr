@@ -320,6 +320,13 @@ export const DE: Record<string, string> = {
   "Game deleted": "Spiel gelöscht",
   "Game History": "Spielverlauf",
   "Game Show": "Game Show",
+  "TV Game Show": "TV Game Show",
+  "Clone to own": "Als eigenen Skin kopieren",
+  "Reset options": "Optionen zurücksetzen",
+  "Reset this skin's options to their defaults?":
+    "Optionen dieses Skins auf die Standardwerte zurücksetzen?",
+  "Copied to your audio skins": "In deine Audio-Skins kopiert",
+  "{name} (copy)": "{name} (Kopie)",
   "Games hosted": "Geleitete Spiele",
   "Games played": "Gespielte Spiele",
   "Get ready!": "Mach dich bereit!",

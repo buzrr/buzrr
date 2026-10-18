@@ -59,6 +59,21 @@ export const soundSkinsApi = {
         options,
       )
     ).data,
+  /** Superadmin: a built-in skin's options back to its defaults. */
+  resetBuiltinOptions: async (skinId: string) =>
+    (
+      await getAuthApiClient().post<BuiltinSoundOptions>(
+        `/sound-skins/builtin-options/${encodeURIComponent(skinId)}/reset`,
+      )
+    ).data,
+  /** A built-in skin copied into the user's own skins. */
+  cloneBuiltin: async (skinId: string, name: string) =>
+    (
+      await getAuthApiClient().post<SoundSkin>(
+        `/sound-skins/builtin/${encodeURIComponent(skinId)}/clone`,
+        { name },
+      )
+    ).data,
   remove: async (id: string) => {
     await getAuthApiClient().delete(`/sound-skins/${id}`);
   },

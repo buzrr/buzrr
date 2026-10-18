@@ -252,6 +252,14 @@ export function GameSounds({
   const builtinSkin = (BUILTIN_SOUND_SKINS as readonly string[]).includes(
     settings.skin,
   );
+  // The skin's recordings and their options: a user skin's, or a built-in
+  // skin's (the superadmin's; its slots without a file are synthesized).
+  const builtinData = builtinSkin ? builtinOptions[settings.skin] : undefined;
+  const files: Partial<Record<SoundSlot, string>> = builtinSkin
+    ? (builtinData?.slots ?? {})
+    : (skin?.slots ?? {});
+  const slotOpts = (slot: SoundSlot) =>
+    builtinSkin ? builtinData?.options[slot] : skin?.options?.[slot];
   const phase = useAppSelector((s) => s.game.phase);
   const qIndex = useAppSelector((s) => s.game.qIndex);
   const qCount = useAppSelector((s) => s.game.qCount);
@@ -271,7 +279,9 @@ export function GameSounds({
   // Lobby cues: a built-in skin plays its own; a user skin picks per cue
   // (default: its uploaded file, else Show's).
   const cueSource = (cue: CueSlot): CueSource => {
-    if (builtinSkin) return settings.skin as CueSource;
+    if (builtinSkin) {
+      return files[cue] ? "custom" : (settings.skin as CueSource);
+    }
     return (
       skin?.options?.[cue]?.source ??
       (skin?.slots[cue] ? "custom" : "builtin:show")
@@ -280,11 +290,9 @@ export function GameSounds({
   const playCueSound = (cue: CueSlot) => {
     const source = cueSource(cue);
     if (source === "off") return;
-    const o = builtinSkin
-      ? builtinOptions[settings.skin]?.[cue]
-      : skin?.options?.[cue];
+    const o = slotOpts(cue);
     if (source === "custom") {
-      const url = skin?.slots[cue];
+      const url = files[cue];
       if (!url) return;
       playSong(
         async () => {
@@ -333,7 +341,7 @@ export function GameSounds({
     if (ctx && ctx.state !== "running") void ctx.resume();
     // End-aligned songs need the time left in the countdown / question.
     const timing = { untilEndMs: extra?.remainingMs ?? null };
-    if (slot === "final" && skin?.finalClipUrl) {
+    if (slot === "final" && !builtinSkin && skin?.finalClipUrl) {
       const url = skin.finalClipUrl;
       return finalSoundKey
         ? playSong(
@@ -344,10 +352,7 @@ export function GameSounds({
           )
         : null;
     }
-    const builtin = (BUILTIN_SOUND_SKINS as readonly string[]).includes(
-      settings.skin,
-    );
-    if (builtin) {
+    if (builtinSkin && !files[slot]) {
       // Synth skins have one question music.
       const synthSlot =
         slot === "lastQuestion"
@@ -355,7 +360,7 @@ export function GameSounds({
           : slot === "lastCountdown"
             ? "countdown"
             : slot;
-      const o = builtinOptions[settings.skin]?.[synthSlot];
+      const o = builtinData?.options[synthSlot];
       return playBuiltin(settings.skin as BuiltinSkinId, synthSlot, {
         // 80 (the default) = the usual synth level.
         volume:
@@ -366,7 +371,7 @@ export function GameSounds({
         ...extra,
       });
     }
-    const url = skin?.slots[slot];
+    const url = files[slot];
     // Fetched through the room's skin download slot (normally done already
     // in the lobby, see below).
     const load = async () => {
@@ -378,8 +383,8 @@ export function GameSounds({
           load,
           slot,
           extra?.startMs !== undefined
-            ? { ...skin?.options?.[slot], startMs: extra.startMs }
-            : skin?.options?.[slot],
+            ? { ...slotOpts(slot), startMs: extra.startMs }
+            : slotOpts(slot),
           timing,
           url,
         )
@@ -400,10 +405,10 @@ export function GameSounds({
     phaseBed === "question" &&
     qCount > 0 &&
     qIndex === qCount - 1 &&
-    Boolean(skin?.slots.lastQuestion);
+    Boolean(files.lastQuestion);
   const bedSlot: SoundSlot | null = lastQuestion ? "lastQuestion" : phaseBed;
   const bedKey = bedSlot
-    ? `${bedSlot}:${settings.skin}:${skin?.id ?? ""}:${bedSlot && isQuestionSlot(bedSlot) ? qIndex : ""}:${bedSlot === "final" ? (finalSoundKey ?? "") : ""}`
+    ? `${bedSlot}:${settings.skin}:${skin?.id ?? ""}:${files[bedSlot] ?? ""}:${bedSlot && isQuestionSlot(bedSlot) ? qIndex : ""}:${bedSlot === "final" ? (finalSoundKey ?? "") : ""}`
     : "";
 
   // Leaving the lobby, the reveal or the scoreboard: their song fades out
@@ -418,10 +423,10 @@ export function GameSounds({
   useEffect(() => () => clearTimeout(tusch.current.timer), []);
   /** Where the tusch's hit is: the skin's zero point, or the synth's roll. */
   const tuschZeroMs = () =>
-    builtinSkin
-      ? builtinTuschZeroMs(settings.skin as BuiltinSkinId)
-      : skin?.slots.end
-        ? (skin.options?.end?.endMs ?? 0)
+    files.end
+      ? (slotOpts("end")?.endMs ?? 0)
+      : builtinSkin
+        ? builtinTuschZeroMs(settings.skin as BuiltinSkinId)
         : 0;
   const countdownSlot = useRef<"countdown" | "lastCountdown">("countdown");
   const left = useRef(phase);
@@ -451,9 +456,9 @@ export function GameSounds({
     if (from === "starting" && countdown.current) {
       countdown.current.stop();
       countdown.current = null;
-      const o = skin?.options?.[countdownSlot.current];
+      const o = slotOpts(countdownSlot.current);
       const tail =
-        !builtinSkin && skin?.slots[countdownSlot.current] && o?.align === "end"
+        files[countdownSlot.current] && o?.align === "end"
           ? (o.extendSec ?? 0) * 1000
           : 0;
       if (tail > 0) {
@@ -489,18 +494,17 @@ export function GameSounds({
   // skin download slot, so a full room joining doesn't fetch them all at
   // once. Only what plays here (no music: effects only; the final song comes
   // encrypted, separately).
-  const skinFiles =
-    !on || !skin
-      ? []
-      : SKIN_SLOTS.filter(
-          (s) =>
-            (settings.music || !MUSIC_SLOTS.includes(s)) &&
-            !(s === "final" && skin.finalClipUrl) &&
-            // Lobby cues play on the host only, and only its own files.
-            (!isCueSlot(s) || (role === "host" && cueSource(s) === "custom")),
-        )
-          .map((s) => skin.slots[s])
-          .filter((u): u is string => Boolean(u));
+  const skinFiles = !on
+    ? []
+    : SKIN_SLOTS.filter(
+        (s) =>
+          (settings.music || !MUSIC_SLOTS.includes(s)) &&
+          !(s === "final" && !builtinSkin && skin?.finalClipUrl) &&
+          // Lobby cues play on the host only, and only its own files.
+          (!isCueSlot(s) || (role === "host" && cueSource(s) === "custom")),
+      )
+        .map((s) => files[s])
+        .filter((u): u is string => Boolean(u));
   const skinFilesKey = skinFiles.join("|");
   useEffect(() => {
     if (skinFiles.length > 0) void fetchSkinFiles(skinFiles);
@@ -522,7 +526,7 @@ export function GameSounds({
   // device at a random moment within a minute of the start, so they don't
   // all download at once — and playable once the final leaderboard brings
   // the key.
-  const finalUrl = skin?.finalClipUrl ?? null;
+  const finalUrl = builtinSkin ? null : (skin?.finalClipUrl ?? null);
   const gameRunning = phase !== "idle" && phase !== "lobby";
   useEffect(() => {
     if (!on || !settings.music || !gameRunning || !finalUrl) return;
@@ -543,9 +547,7 @@ export function GameSounds({
       countdown.current?.stop();
       // The last question's countdown has its own song when the skin has one.
       const lastCd =
-        qCount > 0 &&
-        qIndex === qCount - 1 &&
-        Boolean(skin?.slots.lastCountdown);
+        qCount > 0 && qIndex === qCount - 1 && Boolean(files.lastCountdown);
       countdownSlot.current = lastCd ? "lastCountdown" : "countdown";
       countdown.current = play(countdownSlot.current, {
         remainingMs: countdownMs,
@@ -567,7 +569,7 @@ export function GameSounds({
         };
         if (left > zero) {
           tusch.current.timer = setTimeout(() => fire(), left - zero);
-        } else if (!builtinSkin) {
+        } else if (files.end) {
           fire(zero - left); // less time than lead-in: join it midway
         }
       }
@@ -579,7 +581,7 @@ export function GameSounds({
       clearTimeout(tusch.current.timer);
       if (!tusch.current.played) {
         const zero = tuschZeroMs();
-        play("end", zero > 0 && !builtinSkin ? { startMs: zero } : undefined);
+        play("end", zero > 0 && files.end ? { startMs: zero } : undefined);
       }
       tusch.current = { played: true };
     }

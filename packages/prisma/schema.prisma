@@ -474,6 +474,10 @@ model BuiltinSoundOptions {
   skinId    String   @id @map("skin_id")
   /// slot -> playback options (`soundSlotOptionsSchema`)
   options   Json     @default("{}")
+  /// slot -> file URL (public `builtin-*` uploads); slots without one are synthesized
+  slots     Json     @default("{}")
+  /// what "reset options" restores
+  defaults  Json     @default("{}")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("builtin_sound_options")

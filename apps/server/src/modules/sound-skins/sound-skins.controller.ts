@@ -63,6 +63,26 @@ export class SoundSkinsController {
     return this.skins.setBuiltinOptions(user, skinId, body);
   }
 
+  /** Superadmin: a built-in skin's options back to its defaults. */
+  @Post("builtin-options/:skinId/reset")
+  resetBuiltinOptions(
+    @CurrentAccountUser() user: AuthUser,
+    @Param("skinId") skinId: string,
+  ) {
+    return this.skins.resetBuiltinOptions(user, skinId);
+  }
+
+  /** A built-in skin copied into the user's own skins. */
+  @Post("builtin/:skinId/clone")
+  cloneBuiltin(
+    @CurrentAccountUser() user: AuthUser,
+    @Param("skinId") skinId: string,
+    @Body(new ZodValidationPipe(createSchema))
+    body: z.infer<typeof createSchema>,
+  ) {
+    return this.skins.cloneBuiltin(user, skinId, body.name);
+  }
+
   /**
    * A signed-in user (own, global or as admin) or a player whose current game
    * uses this skin; the files' links are signed for them.

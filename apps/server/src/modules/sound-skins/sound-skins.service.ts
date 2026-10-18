@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import {
   BUILTIN_SOUND_SKINS,
+  CUE_SLOTS,
   soundSkinOptionsSchema,
   soundSlotSchema,
   type BuiltinSoundOptions,
@@ -187,20 +188,21 @@ export class SoundSkinsService {
     return toSkin(row);
   }
 
-  /** Every built-in skin's options (anyone signed in or playing). */
+  /** Every built-in skin's options and files (anyone signed in or playing). */
   async builtinOptions(): Promise<BuiltinSoundOptions> {
     const rows = await this.prisma.db.builtinSoundOptions.findMany();
     const out: BuiltinSoundOptions = {};
-    for (const r of rows) out[r.skinId] = optionsOf(r.options);
+    for (const r of rows) {
+      out[r.skinId] = {
+        options: optionsOf(r.options),
+        defaults: optionsOf(r.defaults),
+        slots: slotsOf(r.slots),
+      };
+    }
     return out;
   }
 
-  /** Superadmin only: one built-in skin's options, for everyone. */
-  async setBuiltinOptions(
-    user: AuthUser,
-    skinId: string,
-    options: SoundSkinOptions,
-  ): Promise<BuiltinSoundOptions> {
+  private async assertSuperadmin(user: AuthUser, skinId: string) {
     const u = await this.prisma.db.user.findUnique({
       where: { id: user.userId },
       select: { role: true },
@@ -213,6 +215,104 @@ export class SoundSkinsService {
     if (!(BUILTIN_SOUND_SKINS as readonly string[]).includes(skinId)) {
       throw new NotFoundException("Sound skin not found");
     }
+  }
+
+  /** Superadmin: a built-in skin's options back to its defaults. */
+  async resetBuiltinOptions(
+    user: AuthUser,
+    skinId: string,
+  ): Promise<BuiltinSoundOptions> {
+    await this.assertSuperadmin(user, skinId);
+    const row = await this.prisma.db.builtinSoundOptions.findUnique({
+      where: { skinId },
+    });
+    if (row) {
+      await this.prisma.db.builtinSoundOptions.update({
+        where: { skinId },
+        data: { options: (row.defaults ?? {}) as Prisma.InputJsonValue },
+      });
+    }
+    return this.builtinOptions();
+  }
+
+  /**
+   * A copy of a built-in skin as the user's own: its files copied (so either
+   * can change or delete its own), its current options, `name`. Slots the
+   * built-in plays synthesized stay empty; cues keep the built-in's sound.
+   */
+  async cloneBuiltin(
+    user: AuthUser,
+    skinId: string,
+    name: string,
+  ): Promise<SoundSkin> {
+    if (!(BUILTIN_SOUND_SKINS as readonly string[]).includes(skinId)) {
+      throw new NotFoundException("Sound skin not found");
+    }
+    const row = await this.prisma.db.builtinSoundOptions.findUnique({
+      where: { skinId },
+    });
+    const files = slotsOf(row?.slots);
+    const slots: SoundSkin["slots"] = {};
+    let finalClip: { url: string; key: string } | null = null;
+    try {
+      for (const [slot, url] of Object.entries(files) as [
+        SoundSlot,
+        string,
+      ][]) {
+        const buf = await this.storage.read(url);
+        if (!buf) continue;
+        slots[slot] = (
+          await this.storage.upload(buf, {
+            contentType: "audio/mpeg",
+            kind: "audio",
+          })
+        ).url;
+        if (slot === "final") {
+          const { blob, key } = encryptClip(
+            await cutClip(buf, 0, FINAL_CLIP_MS),
+          );
+          const stored = await this.storage.upload(blob, {
+            contentType: "application/octet-stream",
+            kind: "encrypted",
+          });
+          finalClip = { url: stored.url, key };
+        }
+      }
+    } catch (err) {
+      if (err instanceof MediaUnavailableError) {
+        throw new ServiceUnavailableException(err.message);
+      }
+      throw err;
+    }
+    // The built-in's lobby cues, explicitly (a clone has no cue files).
+    const options: SoundSkinOptions = { ...optionsOf(row?.options) };
+    for (const cue of CUE_SLOTS) {
+      if (!slots[cue]) {
+        options[cue] = {
+          ...options[cue],
+          source: skinId as "builtin:show" | "builtin:arcade" | "builtin:chill",
+        };
+      }
+    }
+    const created = await this.prisma.db.soundSkin.create({
+      data: {
+        name: name.trim().slice(0, 60) || "My sounds",
+        userId: user.userId,
+        slots,
+        options: options as Prisma.InputJsonValue,
+        ...(finalClip ? { finalClip } : {}),
+      },
+    });
+    return toSkin(created);
+  }
+
+  /** Superadmin only: one built-in skin's options, for everyone. */
+  async setBuiltinOptions(
+    user: AuthUser,
+    skinId: string,
+    options: SoundSkinOptions,
+  ): Promise<BuiltinSoundOptions> {
+    await this.assertSuperadmin(user, skinId);
     const json = options as Prisma.InputJsonValue;
     await this.prisma.db.builtinSoundOptions.upsert({
       where: { skinId },

@@ -3,7 +3,14 @@
 import clsx from "clsx";
 import { useState } from "react";
 import { toast } from "react-toastify";
-import { LuCheck, LuFlaskConical, LuTrash2, LuUpload } from "react-icons/lu";
+import {
+  LuCheck,
+  LuCopy,
+  LuFlaskConical,
+  LuRotateCcw,
+  LuTrash2,
+  LuUpload,
+} from "react-icons/lu";
 import {
   BUILTIN_SOUND_SKINS,
   isCountdownSlot,
@@ -44,6 +51,8 @@ import {
   useCreateSoundSkin,
   useDeleteSoundSkin,
   useBuiltinOptionsQuery,
+  useCloneBuiltin,
+  useResetBuiltinOptions,
   useSetBuiltinOptions,
   useSetSoundSlot,
   useSoundSkinsQuery,
@@ -298,9 +307,33 @@ function BuiltinSkinCard({
   const t = useT();
   const builtinOptions = useBuiltinOptionsQuery();
   const setBuiltin = useSetBuiltinOptions();
+  const reset = useResetBuiltinOptions();
+  const clone = useCloneBuiltin();
   const playback = usePlayback();
   const [testing, setTesting] = useState(false);
-  const optionsOf = (slot: SoundSlot) => builtinOptions.data?.[id]?.[slot];
+  const data = builtinOptions.data?.[id];
+  const optionsOf = (slot: SoundSlot) => data?.options[slot];
+  // Recordings the superadmin gave this skin (others are synthesized).
+  const fileOf = (slot: SoundSlot) => data?.slots[slot];
+  const slots = SLOTS.filter(
+    (s) => (BUILTIN_SLOTS as readonly SoundSlot[]).includes(s) || fileOf(s),
+  );
+  const starterFor = (slot: SoundSlot, extra: PlayExtra = {}) => {
+    const url = fileOf(slot);
+    return url
+      ? fileStarter(
+          url,
+          slot,
+          optionsOf(slot),
+          extra.remainingMs ?? null,
+          extra.startMs,
+        )
+      : builtinStarter(id, slot, optionsOf(slot), extra);
+  };
+  const tail = (slot: "countdown" | "lastCountdown") => {
+    const o = optionsOf(slot);
+    return fileOf(slot) && o?.align === "end" ? (o.extendSec ?? 0) * 1000 : 0;
+  };
 
   return (
     <section
@@ -327,41 +360,100 @@ function BuiltinSkinCard({
             setTesting(!testing);
           }}
         />
+        <button
+          type="button"
+          disabled={clone.isPending}
+          onClick={() =>
+            clone.mutate(
+              {
+                skinId: id,
+                name: t("{name} (copy)", { name: t(BUILTIN_SKINS[id].name) }),
+              },
+              {
+                onSuccess: () => toast.success(t("Copied to your audio skins")),
+                onError: (err) => toast.error(getApiErrorMessage(err)),
+              },
+            )
+          }
+          className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold bg-lprimary/10 dark:bg-white/5 cursor-pointer disabled:opacity-50"
+        >
+          <LuCopy size={11} />
+          {t("Clone to own")}
+        </button>
+        {isSuperadmin && (
+          <button
+            type="button"
+            disabled={reset.isPending}
+            onClick={() => {
+              if (
+                window.confirm(
+                  t("Reset this skin's options to their defaults?"),
+                )
+              ) {
+                reset.mutate(id, {
+                  onError: (err) => toast.error(getApiErrorMessage(err)),
+                });
+              }
+            }}
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold bg-lprimary/10 dark:bg-white/5 cursor-pointer disabled:opacity-50"
+          >
+            <LuRotateCcw size={11} />
+            {t("Reset options")}
+          </button>
+        )}
       </div>
       {testing && (
         <SkinTestBench
-          tuschZeroMs={builtinTuschZeroMs(id)}
-          play={(slot, extra) =>
-            playback.start(
-              slot,
-              builtinStarter(id, slot, optionsOf(slot), extra),
-              false,
-            )
+          hasLastQuestion={Boolean(
+            fileOf("lastQuestion") || fileOf("lastCountdown"),
+          )}
+          countdownTailMs={tail("countdown")}
+          lastCountdownTailMs={
+            fileOf("lastCountdown") ? tail("lastCountdown") : undefined
           }
+          tuschZeroMs={
+            fileOf("end")
+              ? (optionsOf("end")?.endMs ?? 0)
+              : builtinTuschZeroMs(id)
+          }
+          play={(asked, extra) => {
+            const slot: SoundSlot =
+              fileOf(asked) || !LAST_FALLBACK[asked]
+                ? asked
+                : (LAST_FALLBACK[asked] ?? asked);
+            return playback.start(slot, starterFor(slot, extra), false);
+          }}
         />
       )}
-      {BUILTIN_SLOTS.map((slot) => (
-        <SlotRow
-          key={slot}
-          slot={slot}
-          label={t(SLOT_LABELS[slot])}
-          playback={playback}
-          starter={() => builtinStarter(id, slot, optionsOf(slot))}
-          wave={{ skinId: id }}
-          options={optionsOf(slot)}
-          editable={isSuperadmin}
-          builtin
-          onSave={(next) =>
-            setBuiltin.mutate(
-              {
-                skinId: id,
-                options: { ...builtinOptions.data?.[id], [slot]: next },
-              },
-              { onError: (err) => toast.error(getApiErrorMessage(err)) },
-            )
-          }
-        />
-      ))}
+      {slots.map((slot) => {
+        const url = fileOf(slot);
+        return (
+          <SlotRow
+            key={slot}
+            slot={slot}
+            label={t(SLOT_LABELS[slot])}
+            playback={playback}
+            starter={(questionMs) =>
+              starterFor(slot, {
+                remainingMs: previewUntilEnd(slot, questionMs) ?? undefined,
+              })
+            }
+            wave={url ? { url } : { skinId: id }}
+            options={optionsOf(slot)}
+            editable={isSuperadmin}
+            builtin={!url}
+            onSave={(next) =>
+              setBuiltin.mutate(
+                {
+                  skinId: id,
+                  options: { ...data?.options, [slot]: next },
+                },
+                { onError: (err) => toast.error(getApiErrorMessage(err)) },
+              )
+            }
+          />
+        );
+      })}
     </section>
   );
 }

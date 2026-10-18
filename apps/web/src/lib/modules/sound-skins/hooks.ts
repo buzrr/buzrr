@@ -44,6 +44,19 @@ export function useBuiltinOptionsQuery() {
   });
 }
 
+export function useResetBuiltinOptions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (skinId: string) => soundSkinsApi.resetBuiltinOptions(skinId),
+    onSuccess: (data) => qc.setQueryData(BUILTIN_KEY, data),
+  });
+}
+
+export const useCloneBuiltin = () =>
+  useSkinMutation((v: { skinId: string; name: string }) =>
+    soundSkinsApi.cloneBuiltin(v.skinId, v.name),
+  );
+
 export function useSetBuiltinOptions() {
   const qc = useQueryClient();
   return useMutation({

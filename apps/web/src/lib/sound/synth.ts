@@ -46,7 +46,7 @@ interface Palette {
 
 export const BUILTIN_SKINS: Record<BuiltinSkinId, Palette> = {
   "builtin:show": {
-    name: "Game Show",
+    name: "TV Game Show",
     bpm: 118,
     lead: "sawtooth",
     bass: "square",

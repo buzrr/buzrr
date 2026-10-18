@@ -397,6 +397,16 @@ class Bot:
                 "GET", f"/api/sound-skins/{skin_id}", "http sound-skin",
                 headers={"Authorization": f"Bearer {self.token}"},
             )
+        elif self.assets and self.sound_here("quiz"):
+            # A built-in skin can have recordings (the superadmin's): its
+            # files then load like a user skin's.
+            data = await self.http_json(
+                "GET", "/api/sound-skins/builtin-options", "http builtin-skins",
+                headers={"Authorization": f"Bearer {self.token}"},
+            )
+            files = ((data or {}).get(skin_id) or {}).get("slots") or {}
+            if files:
+                self.skin = {"slots": files}
 
     # -- downloads ------------------------------------------------------------------
 

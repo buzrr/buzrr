@@ -64,9 +64,12 @@ export function signAssetUrl(
   return `${bare}?sig=${expiry}.${mac(key, expiry, k)}`;
 }
 
-/** Avatar pictures are public (every roster shows them): `avatar-<id>.<ext>`. */
+/**
+ * Public without a signature: avatar pictures (every roster shows them),
+ * `avatar-<id>.<ext>`, and built-in skins' files, `builtin-<…>.<ext>`.
+ */
 export function isPublicAvatarKey(key: string): boolean {
-  return /^avatar-[\w-]+\.\w+$/.test(key);
+  return /^(avatar|builtin)-[\w-]+\.\w+$/.test(key);
 }
 
 /** Whether `sig` (from the query) admits `key` right now. */
