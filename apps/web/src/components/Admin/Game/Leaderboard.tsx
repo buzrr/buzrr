@@ -14,7 +14,7 @@ import {
   panelClass,
   subtleCardClass,
 } from "@/components/Game/GameUI";
-import type { LeaderboardEntry } from "@buzrr/contract";
+import { HOST_LEADERBOARD_TOP, type LeaderboardEntry } from "@buzrr/contract";
 import { useT, pl } from "@/lib/i18n/context";
 import { rankBadgeClass } from "./QuesResult";
 import { podiumEmoji } from "@/components/Game/Flyers";
@@ -164,13 +164,17 @@ export default function LeaderBoard({
   }, []);
 
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
+  // A big room: the host is sent the top HOST_LEADERBOARD_TOP and the count.
+  const playerCount =
+    useAppSelector((state) => state.game.leaderboardTotal) ??
+    leaderboard.length;
   const qCount = useAppSelector((state) => state.game.qCount);
   // Ranks are shared by equal scores, so a step can hold several players.
   const onPlace = (place: number) =>
     leaderboard.filter((entry) => entry.rank === place);
   // The full rankings list everyone, the podium's included (a shared step
   // names only some of its players, "Ana +2").
-  const rest = leaderboard;
+  const rest = leaderboard.slice(0, HOST_LEADERBOARD_TOP);
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
@@ -190,8 +194,8 @@ export default function LeaderBoard({
             <p className={clsx("mt-2 text-[15px]", mutedText)}>
               {quizTitle} ·{" "}
               {t(pl(qCount, "{n} question", "{n} questions"), { n: qCount })} ·{" "}
-              {t(pl(leaderboard.length, "{n} player", "{n} players"), {
-                n: leaderboard.length,
+              {t(pl(playerCount, "{n} player", "{n} players"), {
+                n: playerCount,
               })}
             </p>
           </div>
@@ -213,8 +217,8 @@ export default function LeaderBoard({
               {t("Full rankings")}
             </h3>
             <span className={clsx("text-[13.5px]", mutedText)}>
-              {t(pl(leaderboard.length, "{n} player", "{n} players"), {
-                n: leaderboard.length,
+              {t(pl(playerCount, "{n} player", "{n} players"), {
+                n: playerCount,
               })}
             </span>
           </div>

@@ -267,8 +267,11 @@ win for each player in `/users/me/stats`.
   during the reveal, and reveal-phase `state-sync`) carry `delta` — points earned on that question;
   final/ended leaderboards omit it.
   A room-wide `leaderboard` with more than `PLAYER_LEADERBOARD_TOP` (10)
-  entries is split in `GameEngineService.send`: the host room gets all of it,
-  the rest of the room (`.except(host:{code})`) the top 10 plus `total`.
+  entries is split in `GameEngineService.send`: the host room gets the top
+  `HOST_LEADERBOARD_TOP` (50) — with `delta`, also whoever was in the top 50
+  before the question (`hostOfLeaderboard`) — plus `total`, the rest of the
+  room (`.except(host:{code})`) the top 10 plus `total`. A host `state-sync`
+  is trimmed the same way.
   Sending the whole board to everyone grows with the room twice over
   (entries × recipients); at 109 players it delayed the `phase-change` behind
   it by about 300ms. A player's own standing comes with `answer-result`, and a

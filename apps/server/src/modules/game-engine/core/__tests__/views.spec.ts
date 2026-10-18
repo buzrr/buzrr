@@ -4,6 +4,7 @@ import {
   buildAnswerResult,
   buildLeaderboard,
   buildSnapshot,
+  hostOfLeaderboard,
   topOfLeaderboard,
 } from "../views";
 import { T0, answer, meta, player, questionOpen, state } from "./fixtures";
@@ -148,6 +149,43 @@ describe("buildSnapshot", () => {
     const snapshot = buildSnapshot(state({ meta: meta() }), null, T0);
     expect(snapshot.you).toBeUndefined();
     expect(snapshot.players).toHaveLength(2);
+  });
+});
+
+describe("hostOfLeaderboard", () => {
+  const roster = Array.from({ length: 80 }, (_, i) => player(`p${i + 1}`));
+  const scores = roster.map((p, i) => ({ playerId: p.id, score: 8000 - i }));
+
+  it("keeps the top 50 of a final board", () => {
+    const rows = hostOfLeaderboard(buildLeaderboard(scores, roster));
+    expect(rows).toHaveLength(50);
+    expect(rows.at(-1)).toMatchObject({ playerId: "p50", rank: 50 });
+  });
+
+  it("adds whoever was in the top 50 before the question", () => {
+    // p50 got nothing, p80 jumped to the top with this question.
+    const after = scores.map((s) =>
+      s.playerId === "p80" ? { ...s, score: 9000 } : s,
+    );
+    const answers = { p80: answer("o1", { score: 1079 }) };
+    const rows = hostOfLeaderboard(
+      buildLeaderboard(
+        [...after].sort((a, b) => b.score - a.score),
+        roster,
+        answers,
+      ),
+    );
+    expect(rows).toHaveLength(51);
+    expect(rows[0]).toMatchObject({ playerId: "p80", rank: 1 });
+    expect(rows.map((r) => r.playerId)).toContain("p50");
+  });
+
+  it("leaves a small board whole", () => {
+    expect(
+      hostOfLeaderboard(
+        buildLeaderboard(scores.slice(0, 20), roster.slice(0, 20)),
+      ),
+    ).toHaveLength(20);
   });
 });
 

@@ -28,7 +28,11 @@ import {
   primaryButtonClass,
 } from "@/components/Game/GameUI";
 import { AnimatedNumber, useFlipReorder } from "@/components/Game/motion";
-import { denseRanks, type LeaderboardEntry } from "@buzrr/contract";
+import {
+  HOST_LEADERBOARD_TOP,
+  denseRanks,
+  type LeaderboardEntry,
+} from "@buzrr/contract";
 import { useAudioSegment } from "@/lib/audio-cues";
 import { RevealDensity } from "@/components/QuestionTypes/MultipleChoice";
 import { useGameSound } from "@/lib/sound/director";
@@ -96,6 +100,9 @@ export default function QuesResult(props: QuesResultProps) {
   const closed = useAppSelector((state) => state.game.phase === "closed");
   const reveal = closed ? closedSummary : revealed;
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
+  const leaderboardTotal = useAppSelector(
+    (state) => state.game.leaderboardTotal,
+  );
   const players = useAppSelector((state) => state.game.players);
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const qCount = useAppSelector((state) => state.game.qCount);
@@ -109,6 +116,13 @@ export default function QuesResult(props: QuesResultProps) {
     scoredQ &&
     !closed &&
     (phase === "scores" || leaderboardWithReveal(moderation));
+  // "Show scores" after the answer was on screen: the standings slide in.
+  const [boardSlidesIn, setBoardSlidesIn] = useState(false);
+  const [boardWas, setBoardWas] = useState(showBoard);
+  if (boardWas !== showBoard) {
+    setBoardWas(showBoard);
+    setBoardSlidesIn(showBoard);
+  }
   const nextIsScores =
     phase === "reveal" && scoresStepPending(moderation) && scoredQ;
   // The reveal cue plays when the answer is shown, until the host moves on.
@@ -201,17 +215,21 @@ export default function QuesResult(props: QuesResultProps) {
       { duration: 800, easing: "cubic-bezier(.2,.8,.2,1)" },
     );
   }, [phase]);
+  // The server sends the host the top HOST_LEADERBOARD_TOP before and after
+  // the question: the old top shows first, then the new one.
   const rows = useMemo(
     () =>
-      settled
+      (settled
         ? leaderboard.map((e) => ({
             ...e,
             shownScore: e.score,
             shownRank: e.rank,
           }))
-        : previousStandings(leaderboard),
+        : previousStandings(leaderboard)
+      ).slice(0, HOST_LEADERBOARD_TOP),
     [leaderboard, settled],
   );
+  const playerCount = leaderboardTotal ?? leaderboard.length;
   const listRef = useRef<HTMLDivElement>(null);
   useFlipReorder(listRef, rows.map((r) => r.playerId).join());
   const connectedById = new Map(players.map((p) => [p.id, p.connected]));
@@ -253,11 +271,17 @@ export default function QuesResult(props: QuesResultProps) {
     <div className="flex-1 min-h-0 flex flex-col">
       <div
         className={clsx(
-          "flex-1 min-h-0 flex flex-col md:grid gap-3.5 md:gap-5",
-          // Results two thirds, leaderboard one third.
-          showAnswerPanel && showBoard
-            ? "md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"
-            : "md:grid-cols-1",
+          "flex-1 min-h-0 flex flex-col md:grid gap-3.5",
+          // Results two thirds, leaderboard one third. With the answer on
+          // screen first, the standings open beside it ("show scores"): the
+          // same two columns, the second growing from nothing.
+          !showAnswerPanel
+            ? "md:grid-cols-1 md:gap-5"
+            : showBoard
+              ? "md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] md:gap-x-5"
+              : "md:grid-cols-[minmax(0,1fr)_minmax(0,0fr)] md:gap-x-0",
+          showAnswerPanel &&
+            "md:transition-[grid-template-columns,column-gap] md:duration-700 md:ease-[cubic-bezier(.2,.8,.2,1)]",
         )}
       >
         {/* The results animation (with the skin's reveal sound). */}
@@ -355,6 +379,8 @@ export default function QuesResult(props: QuesResultProps) {
             className={clsx(
               panelClass,
               "flex flex-col md:min-h-0 md:overflow-hidden",
+              // Coming in after the answer: slides in beside it.
+              boardSlidesIn && "animate-board-in",
             )}
           >
             <div className="flex items-center justify-between px-5 md:px-[26px] pt-5 md:pt-6 pb-3.5">
@@ -362,8 +388,8 @@ export default function QuesResult(props: QuesResultProps) {
                 {t("Leaderboard")}
               </h3>
               <span className={clsx("text-[13.5px]", mutedText)}>
-                {t(pl(leaderboard.length, "{n} player", "{n} players"), {
-                  n: leaderboard.length,
+                {t(pl(playerCount, "{n} player", "{n} players"), {
+                  n: playerCount,
                 })}
               </span>
             </div>

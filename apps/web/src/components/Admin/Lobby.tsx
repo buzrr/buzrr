@@ -293,10 +293,14 @@ const Lobby = (params: {
     const r = lastReaction[id];
     return r && now - r.at < REACTION_SHOW_MS ? r : null;
   };
-  const sortedPlayers = players
-    .filter((p) =>
-      (p.name ?? "").toLowerCase().includes(query.trim().toLowerCase()),
-    )
+  // A big room lists only its newest LOBBY_LIST_LIMIT — or what the search
+  // finds.
+  const needle = query.trim().toLowerCase();
+  const listed = needle
+    ? players.filter((p) => (p.name ?? "").toLowerCase().includes(needle))
+    : players.slice(-LOBBY_LIST_LIMIT);
+  const hiddenCount = needle ? 0 : players.length - listed.length;
+  const sortedPlayers = listed
     .map((p, i) => ({ p, i }))
     .sort((a, b) => {
       const bumped = (id: string) => {
@@ -579,6 +583,14 @@ const Lobby = (params: {
                   onKick={onKick}
                 />
               ))}
+              {hiddenCount > 0 && (
+                <div className="col-span-full text-center text-[13px] py-2 text-[#8a8896] dark:text-muted-dark">
+                  {t(
+                    "Showing the newest {shown} of {total} players — search to find the others.",
+                    { shown: listed.length, total: players.length },
+                  )}
+                </div>
+              )}
               {visiblePlayers.length === 0 && (
                 <div className="col-span-full text-center text-sm py-10 text-[#8a8896] dark:text-muted-dark">
                   {query.trim()
@@ -656,6 +668,9 @@ const FLUSH_MS = 500;
 const FLYER_PLAYER_LIMIT = 60;
 /** Above this many players: no reorder animation, plain numbers. */
 const CROWD_LIMIT = 40;
+/** The host's waiting list shows at most this many (the newest), or the search's matches. */
+const LOBBY_LIST_LIMIT = 150;
+
 /** The waiting list re-sorts (bubble score, reactions) at most this often. */
 const REORDER_EVERY_MS = 5000;
 /** A player's reactions move them to the top of the list at most this often. */

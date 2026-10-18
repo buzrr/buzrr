@@ -194,9 +194,10 @@ const GameLobby = (params: {
             />
           ) : phase === "reveal" || phase === "scores" ? (
             // "Show answer" keeps the tally on screen (same key as "closed"),
-            // so only the right answer animates; "show scores" remounts it.
+            // so only the right answer animates; "show scores" keeps it too
+            // and slides the standings in beside it.
             <QuesResult
-              key={phase === "reveal" ? `answer-${qIndex}` : `scores-${qIndex}`}
+              key={`answer-${qIndex}`}
               socket={socket}
               roomId={params.roomId}
             />

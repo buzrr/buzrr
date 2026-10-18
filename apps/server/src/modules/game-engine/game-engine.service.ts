@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import {
   HEARTBEAT_TIMEOUT_MS,
+  HOST_LEADERBOARD_TOP,
   PLAYER_LEADERBOARD_TOP,
   quizSettingsSchema,
   type PreloadAllPayload,
@@ -36,7 +37,11 @@ import {
 
 /** How long a room's lobby download list is reused (joins come in waves). */
 const LOBBY_ASSETS_TTL_MS = 60_000;
-import { answerEntries, topOfLeaderboard } from "./core/views";
+import {
+  answerEntries,
+  hostOfLeaderboard,
+  topOfLeaderboard,
+} from "./core/views";
 import type {
   SocketData,
   StateSyncPayload,
@@ -323,13 +328,26 @@ export class GameEngineService
         break;
       case "leaderboard": {
         const { entries } = message.payload;
+        // The host shows its top (and who just dropped out of it).
+        const forHost =
+          entries.length > HOST_LEADERBOARD_TOP
+            ? {
+                ...message.payload,
+                entries: hostOfLeaderboard(entries),
+                total: entries.length,
+              }
+            : message.payload;
+        if ("host" in to) {
+          target.emit("leaderboard", forHost);
+          break;
+        }
         if (!("room" in to) || entries.length <= PLAYER_LEADERBOARD_TOP) {
           target.emit("leaderboard", message.payload);
           break;
         }
-        // The host shows the whole board; the players get its top (and
-        // their own standing from answer-result) — one small broadcast.
-        this.io.to(`host:${gameCode}`).emit("leaderboard", message.payload);
+        // The players get the top (and their own standing from
+        // answer-result) — one small broadcast.
+        this.io.to(`host:${gameCode}`).emit("leaderboard", forHost);
         this.io
           .to(gameCode)
           .except(`host:${gameCode}`)

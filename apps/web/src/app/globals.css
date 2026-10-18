@@ -40,6 +40,8 @@
   --animate-float: float 5s ease-in-out infinite;
   --animate-float-slow: float 7s ease-in-out infinite;
   --animate-fade-up: fade-up 0.7s ease-out both;
+  /* Host: the standings opening beside the revealed answer. */
+  --animate-board-in: board-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-pop: pop 0.25s ease-out;
   --animate-pop-in: pop-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   --animate-shake: shake 0.4s ease-in-out both;
@@ -106,6 +108,17 @@
     }
     50% {
       transform: translateY(-8px);
+    }
+  }
+
+  @keyframes board-in {
+    from {
+      opacity: 0;
+      transform: translateX(48px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
     }
   }
 

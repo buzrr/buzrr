@@ -15,7 +15,11 @@ import type {
   ScoreEntry,
   StoredAnswer,
 } from "../game-engine.types";
-import { PLAYER_LEADERBOARD_TOP, isScoredType } from "@buzrr/contract";
+import {
+  HOST_LEADERBOARD_TOP,
+  PLAYER_LEADERBOARD_TOP,
+  isScoredType,
+} from "@buzrr/contract";
 import { leaderboardWithReveal, moderationOf } from "./moderation";
 import type { GameState } from "./state";
 
@@ -44,6 +48,28 @@ export function topOfLeaderboard(
     ? entries.slice(PLAYER_LEADERBOARD_TOP).find((e) => e.playerId === playerId)
     : undefined;
   return own ? [...top, own] : top;
+}
+
+/**
+ * What the host is sent of the leaderboard: the top `HOST_LEADERBOARD_TOP`,
+ * plus — when the entries carry this question's `delta` — whoever was in
+ * the top before it. Order and ranks stay the full board's.
+ */
+export function hostOfLeaderboard(
+  entries: LeaderboardEntry[],
+): LeaderboardEntry[] {
+  if (entries.length <= HOST_LEADERBOARD_TOP) return entries;
+  const keep = new Set(
+    entries.slice(0, HOST_LEADERBOARD_TOP).map((e) => e.playerId),
+  );
+  if (entries.some((e) => e.delta !== undefined)) {
+    entries
+      .map((e, i) => ({ id: e.playerId, i, before: e.score - (e.delta ?? 0) }))
+      .sort((a, b) => b.before - a.before || a.i - b.i)
+      .slice(0, HOST_LEADERBOARD_TOP)
+      .forEach((e) => keep.add(e.id));
+  }
+  return entries.filter((e) => keep.has(e.playerId));
 }
 
 /**
@@ -259,6 +285,9 @@ export function buildSnapshot(
     );
     if (playerId && board.length > PLAYER_LEADERBOARD_TOP) {
       payload.leaderboard = topOfLeaderboard(board, playerId);
+      payload.leaderboardTotal = board.length;
+    } else if (!playerId && board.length > HOST_LEADERBOARD_TOP) {
+      payload.leaderboard = hostOfLeaderboard(board);
       payload.leaderboardTotal = board.length;
     } else {
       payload.leaderboard = board;

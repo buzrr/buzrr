@@ -581,6 +581,13 @@ export const answerResultSchema = z.object({
  */
 export const PLAYER_LEADERBOARD_TOP = 10;
 
+/**
+ * The host is sent the top this many — after a question also whoever was
+ * up there before it, so their move down can be shown. A room of hundreds
+ * renders no more rows than that.
+ */
+export const HOST_LEADERBOARD_TOP = 50;
+
 export const leaderboardSchema = z.object({
   entries: z.array(leaderboardEntrySchema),
   /** How many players there are, when `entries` is only the top. */
