@@ -212,14 +212,7 @@ export class BillingService {
     }
 
     for (const subscriptionId of subscriptionIds) {
-      await this.prisma.db.$transaction(
-        async (tx) => {
-          await this.sync.lock(tx, subscriptionId);
-          const subscription = await this.sync.fetch(subscriptionId);
-          if (subscription) await this.sync.apply(tx, subscription);
-        },
-        { maxWait: 5_000, timeout: 20_000 },
-      );
+      await this.sync.resync(subscriptionId);
     }
 
     return this.entitlements.getEntitlements(user.userId);

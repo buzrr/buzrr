@@ -6,7 +6,7 @@ import {
   EntitlementsService,
   isProSubscription,
 } from "../entitlements.service";
-import { PRO_AI_WINDOW_MS } from "../plans";
+import { PRO_AI_WINDOW_MS, RENEWAL_GRACE_MS } from "../plans";
 import {
   billingConfig,
   createSubscription,
@@ -24,12 +24,30 @@ describe("isProSubscription", () => {
   const past = new Date(now.getTime() - DAY);
 
   it("grants Pro while active", () => {
+    const sub = { status: "active" as const, cancelAtPeriodEnd: false };
+    expect(isProSubscription({ ...sub, currentPeriodEnd: future }, now)).toBe(
+      true,
+    );
+    expect(isProSubscription({ ...sub, currentPeriodEnd: null }, now)).toBe(
+      true,
+    );
+  });
+
+  it("keeps Pro through the renewal grace, then revokes an unconfirmed renewal", () => {
+    const sub = { status: "active" as const, cancelAtPeriodEnd: false };
+    const at = (ms: number) => new Date(now.getTime() - ms);
     expect(
       isProSubscription(
-        { status: "active", currentPeriodEnd: past, cancelAtPeriodEnd: false },
+        { ...sub, currentPeriodEnd: at(RENEWAL_GRACE_MS - 1) },
         now,
       ),
     ).toBe(true);
+    expect(
+      isProSubscription(
+        { ...sub, currentPeriodEnd: at(RENEWAL_GRACE_MS) },
+        now,
+      ),
+    ).toBe(false);
   });
 
   it("keeps Pro for a cancel-at-period-end subscription until the period ends", () => {

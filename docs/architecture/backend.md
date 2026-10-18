@@ -150,8 +150,9 @@ limits and billing routes return 503.
 - **`entitlements.service.ts`** — the single authority, exported to the
   quizzes and game-sessions modules:
   - `resolvePlan` reads `subscriptions` on every call, never the JWT. Pro
-    means `active`, or `cancelled` with `cancelAtPeriodEnd` inside the paid
-    period.
+    means `active` with `currentPeriodEnd` no more than `RENEWAL_GRACE_MS`
+    (48h, `plans.ts`) in the past, or `cancelled` with `cancelAtPeriodEnd`
+    inside the paid period.
   - `assertQuizCapacity(tx, userId)` locks the user row
     (`SELECT … FOR UPDATE`), then counts. Call it inside the transaction that
     creates the quiz.
@@ -187,6 +188,18 @@ max, resetsAt? }`; the web client's upgrade prompt keys on that body.
 
   If Dodo is unreachable it returns 503, so Dodo redelivers. Refunds and lost
   disputes are only logged for review; access follows the subscription status.
+
+- **`billing-reconcile.service.ts`** — the safety net for missed webhooks.
+  With `BILLING=ON`, each instance runs a pass ~60s after boot and then every
+  12h. A pass runs only if it claims `billing:reconcile:lock` (`SET NX PX 11h`).
+  It re-syncs (`SubscriptionSyncService.resync`: lock → fetch → apply), one at
+  a time and at most 200 per pass:
+  - `active` rows whose `currentPeriodEnd` has passed;
+  - `on_hold` / `past_due` rows not synced for 12h.
+
+  Dodo's state confirms the payment: a failed renewal leaves `active`, a paid
+  one moves `next_billing_date`. A row Dodo still calls `active` past the 48h
+  grace is already Free via `isProSubscription`; the job logs a warning.
 
 - **Tests:** `__tests__/` (vitest, real Postgres), run with
   `yarn workspace server test`.

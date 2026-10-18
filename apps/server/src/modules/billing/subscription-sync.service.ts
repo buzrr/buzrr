@@ -7,6 +7,7 @@ import {
 import DodoPayments, { NotFoundError } from "dodopayments";
 import type { Subscription as DodoSubscription } from "dodopayments/resources/subscriptions";
 import type { Prisma, SubscriptionStatus } from "@buzrr/prisma";
+import { PrismaService } from "../../prisma/prisma.service";
 import { BillingConfig } from "./billing.config";
 import { DODO_CLIENT } from "./dodo.provider";
 
@@ -38,7 +39,7 @@ function toDate(value: string | null | undefined): Date | null {
 /**
  * Copies Dodo's view of a subscription into the `subscriptions` table.
  *
- * Every write path (webhooks, the success-page sync) fetches the subscription
+ * Every write path (webhooks, the success-page sync, the reconcile job) fetches the subscription
  * from Dodo and applies *that*, never the event payload's copy. Events arrive
  * unordered; a fresh fetch taken under a per-subscription lock always writes
  * the newest state, so a late `renewed` can't overwrite a newer `cancelled`.
@@ -50,7 +51,24 @@ export class SubscriptionSyncService {
   constructor(
     @Inject(DODO_CLIENT) private readonly dodo: DodoPayments,
     private readonly billing: BillingConfig,
+    private readonly prisma: PrismaService,
   ) {}
+
+  /**
+   * Re-mirror one subscription from Dodo in its own transaction: lock, fresh
+   * fetch, apply. The non-webhook paths (success-page sync, reconcile job) use
+   * this; webhooks inline the same steps beside their idempotency claim.
+   */
+  async resync(dodoSubscriptionId: string): Promise<void> {
+    await this.prisma.db.$transaction(
+      async (tx) => {
+        await this.lock(tx, dodoSubscriptionId);
+        const subscription = await this.fetch(dodoSubscriptionId);
+        if (subscription) await this.apply(tx, subscription);
+      },
+      { maxWait: 5_000, timeout: 20_000 },
+    );
+  }
 
   /**
    * Serializes syncs of one subscription across requests and instances. Held
