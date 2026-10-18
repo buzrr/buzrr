@@ -6,6 +6,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import {
+  BUILTIN_DEFAULT_OPTIONS,
   BUILTIN_SOUND_SKINS,
   CUE_SLOTS,
   soundSkinOptionsSchema,
@@ -188,15 +189,21 @@ export class SoundSkinsService {
     return toSkin(row);
   }
 
-  /** Every built-in skin's options and files (anyone signed in or playing). */
+  /**
+   * Every built-in skin's options and files (anyone signed in or playing):
+   * the superadmin's, else the defaults from the code.
+   */
   async builtinOptions(): Promise<BuiltinSoundOptions> {
     const rows = await this.prisma.db.builtinSoundOptions.findMany();
+    const byId = new Map(rows.map((r) => [r.skinId, r]));
     const out: BuiltinSoundOptions = {};
-    for (const r of rows) {
-      out[r.skinId] = {
-        options: optionsOf(r.options),
-        defaults: optionsOf(r.defaults),
-        slots: slotsOf(r.slots),
+    for (const id of BUILTIN_SOUND_SKINS) {
+      const r = byId.get(id);
+      const defaults = BUILTIN_DEFAULT_OPTIONS[id] ?? {};
+      out[id] = {
+        options: r ? optionsOf(r.options) : defaults,
+        defaults,
+        slots: slotsOf(r?.slots),
       };
     }
     return out;
@@ -223,15 +230,14 @@ export class SoundSkinsService {
     skinId: string,
   ): Promise<BuiltinSoundOptions> {
     await this.assertSuperadmin(user, skinId);
-    const row = await this.prisma.db.builtinSoundOptions.findUnique({
+    const defaults = (BUILTIN_DEFAULT_OPTIONS[
+      skinId as keyof typeof BUILTIN_DEFAULT_OPTIONS
+    ] ?? {}) as Prisma.InputJsonValue;
+    await this.prisma.db.builtinSoundOptions.upsert({
       where: { skinId },
+      create: { skinId, options: defaults },
+      update: { options: defaults },
     });
-    if (row) {
-      await this.prisma.db.builtinSoundOptions.update({
-        where: { skinId },
-        data: { options: (row.defaults ?? {}) as Prisma.InputJsonValue },
-      });
-    }
     return this.builtinOptions();
   }
 
@@ -285,7 +291,13 @@ export class SoundSkinsService {
       throw err;
     }
     // The built-in's lobby cues, explicitly (a clone has no cue files).
-    const options: SoundSkinOptions = { ...optionsOf(row?.options) };
+    const options: SoundSkinOptions = {
+      ...(row
+        ? optionsOf(row.options)
+        : BUILTIN_DEFAULT_OPTIONS[
+            skinId as keyof typeof BUILTIN_DEFAULT_OPTIONS
+          ]),
+    };
     for (const cue of CUE_SLOTS) {
       if (!slots[cue]) {
         options[cue] = {

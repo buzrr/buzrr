@@ -476,7 +476,7 @@ model BuiltinSoundOptions {
   options   Json     @default("{}")
   /// slot -> file URL (public `builtin-*` uploads); slots without one are synthesized
   slots     Json     @default("{}")
-  /// what "reset options" restores
+  /// unused: the defaults live in the code (`BUILTIN_DEFAULT_OPTIONS`)
   defaults  Json     @default("{}")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 

@@ -353,13 +353,7 @@ export function GameSounds({
         : null;
     }
     if (builtinSkin && !files[slot]) {
-      // Synth skins have one question music.
-      const synthSlot =
-        slot === "lastQuestion"
-          ? "question"
-          : slot === "lastCountdown"
-            ? "countdown"
-            : slot;
+      const synthSlot = slot;
       const o = builtinData?.options[synthSlot];
       return playBuiltin(settings.skin as BuiltinSkinId, synthSlot, {
         // 80 (the default) = the usual synth level.
@@ -405,7 +399,7 @@ export function GameSounds({
     phaseBed === "question" &&
     qCount > 0 &&
     qIndex === qCount - 1 &&
-    Boolean(files.lastQuestion);
+    (builtinSkin || Boolean(files.lastQuestion));
   const bedSlot: SoundSlot | null = lastQuestion ? "lastQuestion" : phaseBed;
   const bedKey = bedSlot
     ? `${bedSlot}:${settings.skin}:${skin?.id ?? ""}:${files[bedSlot] ?? ""}:${bedSlot && isQuestionSlot(bedSlot) ? qIndex : ""}:${bedSlot === "final" ? (finalSoundKey ?? "") : ""}`
@@ -547,7 +541,9 @@ export function GameSounds({
       countdown.current?.stop();
       // The last question's countdown has its own song when the skin has one.
       const lastCd =
-        qCount > 0 && qIndex === qCount - 1 && Boolean(files.lastCountdown);
+        qCount > 0 &&
+        qIndex === qCount - 1 &&
+        (builtinSkin || Boolean(files.lastCountdown));
       countdownSlot.current = lastCd ? "lastCountdown" : "countdown";
       countdown.current = play(countdownSlot.current, {
         remainingMs: countdownMs,

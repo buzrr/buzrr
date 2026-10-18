@@ -390,13 +390,22 @@ export function playBuiltin(
     return { stop: () => undefined };
   }
 
+  // The last question's countdown and music: the same, stepped up (higher,
+  // a bigger hit; faster and building from the start).
+  const last = slot === "lastCountdown" || slot === "lastQuestion";
+  const up = last ? 5 : 0; // semitones
+
   // -- Arcade one-shots: 8-bit, square waves only ---------------------------
   if (skinId === "builtin:arcade") {
-    if (slot === "countdown") {
+    if (slot === "countdown" || slot === "lastCountdown") {
       // A race-start beep per second, the last one an octave up and long.
       const secs = Math.max(1, Math.round((opts.remainingMs ?? 5000) / 1000));
-      for (let i = 0; i < secs; i++) chip(ctx, bus, t0 + i, hz(12), 0.12, 0.35);
-      chip(ctx, bus, t0 + secs, hz(24), 0.5, 0.4);
+      for (let i = 0; i < secs; i++) {
+        chip(ctx, bus, t0 + i, hz(12 + up), 0.12, 0.35);
+        if (last) chip(ctx, bus, t0 + i + 0.5, hz(12 + up), 0.06, 0.2);
+      }
+      chip(ctx, bus, t0 + secs, hz(24 + up), last ? 0.9 : 0.5, 0.4);
+      if (last) chip(ctx, bus, t0 + secs, hz(31 + up), 0.9, 0.25);
       return { stop: fadeOut };
     }
     if (slot === "end") {
@@ -422,23 +431,35 @@ export function playBuiltin(
   }
 
   // -- one-shots ------------------------------------------------------------
-  if (slot === "countdown") {
+  if (slot === "countdown" || slot === "lastCountdown") {
     const secs = Math.max(1, Math.round((opts.remainingMs ?? 5000) / 1000));
     for (let i = 0; i < secs; i++) {
       tone(
         ctx,
         bus,
         t0 + i,
-        hz(p.scale[i % p.scale.length]! + 3),
+        hz(p.scale[i % p.scale.length]! + 3 + up),
         0.18,
         p.lead,
         0.3,
         p.cutoff,
       );
       K(ctx, bus, t0 + i, 0.5 * d);
+      // The last one: a heartbeat — a second kick on every half second.
+      if (last) K(ctx, bus, t0 + i + 0.5, 0.35 * d + 0.1);
     }
-    chord(ctx, bus, t0 + secs, p.roots[0]! + 12, 0.7, p.pad, 0.12, p.cutoff);
+    chord(
+      ctx,
+      bus,
+      t0 + secs,
+      p.roots[0]! + 12 + up,
+      last ? 1.4 : 0.7,
+      p.pad,
+      0.12,
+      p.cutoff,
+    );
     crash(ctx, bus, t0 + secs, d);
+    if (last) crash(ctx, bus, t0 + secs + 0.02, 1);
     return { stop: fadeOut };
   }
   if (slot === "end") {
@@ -555,8 +576,8 @@ export function playBuiltin(
     }
     while (slot !== "scores" && slot !== "final" && next < ahead) {
       // The question loop gets faster and denser towards the end.
-      const prog =
-        slot === "question"
+      const raw =
+        slot === "question" || slot === "lastQuestion"
           ? Math.min(
               1,
               offline
@@ -564,13 +585,15 @@ export function playBuiltin(
                 : (opts.progress?.() ?? 0),
             )
           : 0;
+      // The last question starts where a question ends up: driving.
+      const prog = slot === "lastQuestion" ? 0.5 + raw * 0.5 : raw;
       const eighth = beat / 2 / (tempo * (1 + prog * 0.35));
       const bar = Math.floor(step / 8) % p.roots.length;
       const root = p.roots[bar]!;
       const inBar = step % 8;
       const onBeat = inBar % 2 === 0;
 
-      if (party || slot === "question") {
+      if (party || slot === "question" || slot === "lastQuestion") {
         if (onBeat) K(ctx, bus, next, 0.7 * d);
         else hat(ctx, bus, next, d);
         if (inBar === 2 || inBar === 6) snare(ctx, bus, next, 0.6 * d);
@@ -621,7 +644,11 @@ export function playBuiltin(
         );
       }
       // last stretch of a question: a tick per beat, rising
-      if (slot === "question" && prog > 0.75 && onBeat) {
+      if (
+        (slot === "question" || slot === "lastQuestion") &&
+        prog > 0.75 &&
+        onBeat
+      ) {
         tone(
           ctx,
           bus,
@@ -687,13 +714,7 @@ export async function renderBuiltin(
   const ctx = new OfflineAudioContext(1, Math.ceil(rate * seconds), rate);
   rendering = { ctx, seconds };
   try {
-    const synthSlot =
-      slot === "lastQuestion"
-        ? "question"
-        : slot === "lastCountdown"
-          ? "countdown"
-          : slot;
-    playBuiltin(skinId, synthSlot, { volume: 0.45, remainingMs: 5000 });
+    playBuiltin(skinId, slot, { volume: 0.45, remainingMs: 5000 });
   } finally {
     rendering = null;
   }

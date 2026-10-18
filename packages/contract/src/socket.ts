@@ -178,6 +178,39 @@ export interface BuiltinSkinData {
 /** Built-in skin id -> its configuration. */
 export type BuiltinSoundOptions = Partial<Record<string, BuiltinSkinData>>;
 
+/**
+ * The built-in skins' default options (new installations, and what "reset
+ * options" restores). TV Game Show's are tuned for its recordings; the
+ * synth uses volume, fade-in and repeat of them where a slot has no file.
+ */
+export const BUILTIN_DEFAULT_OPTIONS: Partial<
+  Record<(typeof BUILTIN_SOUND_SKINS)[number], SoundSkinOptions>
+> = {
+  "builtin:show": {
+    end: { endMs: 52, volume: 51, startMs: 34 },
+    final: { volume: 95 },
+    lobby: { volume: 63, startMs: 0 },
+    scores: { volume: 83 },
+    question: { align: "end", endMs: 54816, volume: 70, extendSec: 3.8 },
+    countdown: {
+      align: "end",
+      endMs: 3885,
+      fadeIn: true,
+      extendSec: 1.9,
+      fadeInSec: 0.4,
+    },
+    lastQuestion: { align: "end", endMs: 60410, extendSec: 2.8 },
+    lastCountdown: {
+      align: "end",
+      endMs: 6382,
+      fadeIn: true,
+      startMs: 0,
+      extendSec: 1.6,
+      fadeInSec: 1.4,
+    },
+  },
+};
+
 /** A user's sound skin: an uploaded MP3 per slot (missing slots stay silent). */
 export const soundSkinSchema = z.object({
   id: z.string(),

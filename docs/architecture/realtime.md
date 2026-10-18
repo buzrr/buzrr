@@ -317,7 +317,13 @@ masked until the reveal (`buildSnapshot`).
 
 A user skin can have its own countdown and song for the last question
 (`lastCountdown`, `lastQuestion`; empty: the usual countdown / question music
-plays). Each slot of a skin has options (`soundSlotOptionsSchema`, stored per user
+plays). Built-in skins always have them: a recording (the superadmin's), or
+a stepped-up synth (higher countdown with a heartbeat and a bigger hit; the
+question loop starting halfway up its build).
+
+Built-in skins can have recordings (`builtin_sound_options.slots`, public
+`builtin-*` uploads) with default options to reset to; a slot without one is
+synthesized. "Clone to own" copies a built-in into a user skin (files copied). Each slot of a skin has options (`soundSlotOptionsSchema`, stored per user
 skin in `sound_skins.options`, for the built-in skins in
 `builtin_sound_options` — only the superadmin changes those):
 

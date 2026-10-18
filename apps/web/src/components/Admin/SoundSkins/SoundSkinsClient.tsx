@@ -75,10 +75,8 @@ export const SLOT_LABELS: Record<SoundSlot, string> = {
 };
 
 const SLOTS = soundSlotSchema.options;
-/** The built-in skins have one countdown and question music. */
-const BUILTIN_SLOTS = SLOTS.filter(
-  (s) => s !== "lastQuestion" && s !== "lastCountdown",
-);
+/** The built-in skins have every slot (the last question's: stepped-up synth). */
+const BUILTIN_SLOTS = SLOTS;
 
 /** The last question's slots and what plays when they are empty. */
 const LAST_FALLBACK: Partial<Record<SoundSlot, SoundSlot>> = {
@@ -404,9 +402,7 @@ function BuiltinSkinCard({
       </div>
       {testing && (
         <SkinTestBench
-          hasLastQuestion={Boolean(
-            fileOf("lastQuestion") || fileOf("lastCountdown"),
-          )}
+          hasLastQuestion
           countdownTailMs={tail("countdown")}
           lastCountdownTailMs={
             fileOf("lastCountdown") ? tail("lastCountdown") : undefined
@@ -417,11 +413,8 @@ function BuiltinSkinCard({
               : builtinTuschZeroMs(id)
           }
           play={(asked, extra) => {
-            const slot: SoundSlot =
-              fileOf(asked) || !LAST_FALLBACK[asked]
-                ? asked
-                : (LAST_FALLBACK[asked] ?? asked);
-            return playback.start(slot, starterFor(slot, extra), false);
+            // Every built-in slot plays: a file, or the synth.
+            return playback.start(asked, starterFor(asked, extra), false);
           }}
         />
       )}
