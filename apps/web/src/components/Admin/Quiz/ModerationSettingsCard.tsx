@@ -117,7 +117,7 @@ export default function ModerationSettingsCard({ quiz }: { quiz: QuizDetail }) {
             }
             className={selectClass}
           >
-            <option value="host">{t("Your screen")}</option>
+            <option value="host">{t("Host's screen")}</option>
             <option value="players">{t("Players' devices")}</option>
             <option value="both">{t("Both")}</option>
             <option value="off">{t("Off")}</option>

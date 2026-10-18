@@ -252,7 +252,10 @@ export default function QuesResult(props: QuesResultProps) {
       <div
         className={clsx(
           "flex-1 min-h-0 flex flex-col md:grid gap-3.5 md:gap-5",
-          showAnswerPanel && showBoard ? "md:grid-cols-2" : "md:grid-cols-1",
+          // Results two thirds, leaderboard one third.
+          showAnswerPanel && showBoard
+            ? "md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"
+            : "md:grid-cols-1",
         )}
       >
         {/* The results animation (with the skin's reveal sound). */}

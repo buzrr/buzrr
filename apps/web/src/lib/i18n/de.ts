@@ -505,7 +505,8 @@ export const DE: Record<string, string> = {
   "Opponent found — starting…": "Gegner gefunden – es geht los…",
   "Option {key}": "Option {key}",
   Optional: "Optional",
-  "Optional · plays on your screen": "Optional · spielt auf deinem Bildschirm",
+  "Optional · plays on the host's screen":
+    "Optional · spielt auf dem Moderator-Bildschirm",
   "Optional · PNG, JPG, SVG or WebP": "Optional · PNG, JPG, SVG oder WebP",
   Options: "Optionen",
   "Or pick a category": "Oder wähle eine Kategorie",
@@ -889,7 +890,7 @@ export const DE: Record<string, string> = {
     "Deine öffentliche Identität in Quizzen und Duellen.",
   "Your quizzes": "Deine Quizze",
   "Your rank": "Dein Platz",
-  "Your screen": "Dein Bildschirm",
+  "Host's screen": "Moderator-Bildschirm",
   "Your session expired. Create your player again.":
     "Deine Sitzung ist abgelaufen. Erstelle deinen Spieler erneut.",
   "Your session expired. Please try again.":
