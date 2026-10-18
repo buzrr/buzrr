@@ -68,6 +68,8 @@ export const soundSlotSchema = z.enum([
   "countdown",
   /** While a question is open, building up towards its end (loops). */
   "question",
+  /** The last question instead of "question" (empty: "question" plays). */
+  "lastQuestion",
   /** The "tusch" when a question ends (once). */
   "end",
   /** With the results animation when the answer is shown (once). */
@@ -97,7 +99,14 @@ export const soundSettingsSchema = z.object({
 });
 
 /** Slots whose song can line up with the end of the countdown / question. */
-export const END_ALIGNABLE_SLOTS = ["countdown", "question"] as const;
+export const END_ALIGNABLE_SLOTS = [
+  "countdown",
+  "question",
+  "lastQuestion",
+] as const;
+/** The music while a question runs: the usual one or the last question's. */
+export const isQuestionSlot = (slot: SoundSlot) =>
+  slot === "question" || slot === "lastQuestion";
 
 /**
  * How one slot's song plays. Every field is optional: missing = the slot's

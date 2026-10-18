@@ -315,12 +315,13 @@ masked until the reveal (`buildSnapshot`).
 
 ## Sound skins: playback options
 
-Each slot of a skin has options (`soundSlotOptionsSchema`, stored per user
+A user skin can have its own song for the last question (`lastQuestion`;
+empty: the usual question music plays). Each slot of a skin has options (`soundSlotOptionsSchema`, stored per user
 skin in `sound_skins.options`, for the built-in skins in
 `builtin_sound_options` — only the superadmin changes those):
 
 - `volume` 0–100 (80 = the usual level), `fadeIn` + `fadeInSec`.
-- `repeat` (lobby, question, scores, reveal, final): default off, on for
+- `repeat` (lobby, question, last question, scores, reveal, final): default off, on for
   the lobby. Built-in synth loops run until the phase ends unless repeat is
   set off (then 8 bars).
 - Files only: `startMs`. Countdown / question: `align: "end"` plays the file

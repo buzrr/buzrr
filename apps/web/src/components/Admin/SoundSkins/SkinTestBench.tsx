@@ -30,11 +30,19 @@ export type SlotPlayer = (
  * the question for the chosen time, the tusch, then optionally the reveal
  * and the scoreboard — with the time left on screen.
  */
-export function SkinTestBench({ play }: { play: SlotPlayer }) {
+export function SkinTestBench({
+  play,
+  hasLastQuestion = false,
+}: {
+  play: SlotPlayer;
+  /** The skin has a song for the last question: offer to test that one. */
+  hasLastQuestion?: boolean;
+}) {
   const t = useT();
   const [seconds, setSeconds] = useState(20);
   const [withReveal, setWithReveal] = useState(true);
   const [withScores, setWithScores] = useState(true);
+  const [lastQuestion, setLastQuestion] = useState(false);
   const [stage, setStage] = useState<Stage | null>(null);
   const [endsAt, setEndsAt] = useState(0);
   const [now, setNow] = useState(0);
@@ -77,7 +85,7 @@ export function SkinTestBench({ play }: { play: SlotPlayer }) {
       enter("question", questionMs);
       const t0 = Date.now();
       const bed = keep(
-        play("question", {
+        play(hasLastQuestion && lastQuestion ? "lastQuestion" : "question", {
           remainingMs: questionMs,
           progress: () => Math.min(1, (Date.now() - t0) / questionMs),
         }),
@@ -138,6 +146,16 @@ export function SkinTestBench({ play }: { play: SlotPlayer }) {
           />
           s
         </label>
+        {hasLastQuestion && (
+          <label className="flex items-center gap-2">
+            <Switch
+              aria-label={t("Last question")}
+              checked={lastQuestion}
+              onCheckedChange={setLastQuestion}
+            />
+            {t("Last question")}
+          </label>
+        )}
         <label className="flex items-center gap-2">
           <Switch
             aria-label={t("Reveal")}

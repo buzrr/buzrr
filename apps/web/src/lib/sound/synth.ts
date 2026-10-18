@@ -203,7 +203,13 @@ export const BUILTIN_SKINS: Record<BuiltinSkinId, Palette> = {
   },
 };
 
-const LOOP_SLOTS: SoundSlot[] = ["lobby", "question", "scores", "final"];
+const LOOP_SLOTS: SoundSlot[] = [
+  "lobby",
+  "question",
+  "lastQuestion",
+  "scores",
+  "final",
+];
 export const isLoopSlot = (slot: SoundSlot) => LOOP_SLOTS.includes(slot);
 
 let sharedCtx: AudioContext | null = null;

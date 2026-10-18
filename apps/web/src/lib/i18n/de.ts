@@ -961,6 +961,9 @@ export const DE: Record<string, string> = {
   "The song plays on this long after the end, then fades out.":
     "So lange läuft der Song nach dem Ende weiter, dann wird er ausgeblendet.",
   "Test bench": "Testlauf",
+  "Last question": "Letzte Frage",
+  "Music for the last question (empty: as above)":
+    "Musik bei der letzten Frage (leer: wie oben)",
   Countdown: "Countdown",
   Scores: "Punkte",
   Stop: "Stopp",

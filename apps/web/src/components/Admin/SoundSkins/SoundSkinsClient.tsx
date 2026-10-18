@@ -14,6 +14,7 @@ import {
 } from "react-icons/lu";
 import {
   BUILTIN_SOUND_SKINS,
+  isQuestionSlot,
   soundSlotSchema,
   type SoundSkin,
   type SoundSlot,
@@ -56,6 +57,7 @@ export const SLOT_LABELS: Record<SoundSlot, string> = {
   lobby: "Background music (lobby, get ready)",
   countdown: "Countdown before a question",
   question: "Music while a question runs",
+  lastQuestion: "Music for the last question (empty: as above)",
   end: "Tusch when a question ends",
   reveal: "Results animation",
   scores: "Party music on the scoreboard",
@@ -63,6 +65,8 @@ export const SLOT_LABELS: Record<SoundSlot, string> = {
 };
 
 const SLOTS = soundSlotSchema.options;
+/** The built-in skins have one question music (no separate last one). */
+const BUILTIN_SLOTS = SLOTS.filter((s) => s !== "lastQuestion");
 
 /** One preview at a time across the page. */
 function usePreview() {
@@ -92,7 +96,7 @@ function fileHandle(
   options: SoundSlotOptions | undefined,
 ): SoundHandle {
   const untilEndMs =
-    slot === "countdown" ? 5000 : slot === "question" ? 20_000 : null;
+    slot === "countdown" ? 5000 : isQuestionSlot(slot) ? 20_000 : null;
   return playSong(() => fetchClip(url), slot, options, { untilEndMs }, url);
 }
 
@@ -206,7 +210,7 @@ export default function SoundSkinsClient() {
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
-            {SLOTS.map((slot) => {
+            {BUILTIN_SLOTS.map((slot) => {
               const key = `${id}:${slot}`;
               return (
                 <button
@@ -260,7 +264,7 @@ export default function SoundSkinsClient() {
                 {t("Playback options (superadmin, for all users)")}
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {SLOTS.map((slot) => {
+                {BUILTIN_SLOTS.map((slot) => {
                   const key = `${id}:${slot}`;
                   return (
                     <span key={slot} className="flex items-center gap-1">
@@ -275,35 +279,35 @@ export default function SoundSkinsClient() {
                   );
                 })}
               </div>
-              {SLOTS.filter((slot) => openBuiltin === `${id}:${slot}`).map(
-                (slot) => (
-                  <div key={slot} className="flex flex-col gap-1">
-                    <span className="text-xs font-bold">
-                      {t(SLOT_LABELS[slot])}
-                    </span>
-                    <SlotOptionsEditor
-                      slot={slot}
-                      builtin
-                      value={builtinOptions.data?.[id]?.[slot]}
-                      onSave={(next) =>
-                        setBuiltin.mutate(
-                          {
-                            skinId: id,
-                            options: {
-                              ...builtinOptions.data?.[id],
-                              [slot]: next,
-                            },
+              {BUILTIN_SLOTS.filter(
+                (slot) => openBuiltin === `${id}:${slot}`,
+              ).map((slot) => (
+                <div key={slot} className="flex flex-col gap-1">
+                  <span className="text-xs font-bold">
+                    {t(SLOT_LABELS[slot])}
+                  </span>
+                  <SlotOptionsEditor
+                    slot={slot}
+                    builtin
+                    value={builtinOptions.data?.[id]?.[slot]}
+                    onSave={(next) =>
+                      setBuiltin.mutate(
+                        {
+                          skinId: id,
+                          options: {
+                            ...builtinOptions.data?.[id],
+                            [slot]: next,
                           },
-                          {
-                            onError: (err) =>
-                              toast.error(getApiErrorMessage(err)),
-                          },
-                        )
-                      }
-                    />
-                  </div>
-                ),
-              )}
+                        },
+                        {
+                          onError: (err) =>
+                            toast.error(getApiErrorMessage(err)),
+                        },
+                      )
+                    }
+                  />
+                </div>
+              ))}
             </div>
           )}
         </section>
@@ -467,6 +471,7 @@ function SkinCard({
       </div>
       {testing && (
         <SkinTestBench
+          hasLastQuestion={Boolean(skin.slots.lastQuestion)}
           play={(slot, extra) => {
             const url = skin.slots[slot];
             return url

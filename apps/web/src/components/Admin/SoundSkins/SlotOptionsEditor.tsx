@@ -2,7 +2,11 @@
 
 import clsx from "clsx";
 import { useEffect, useRef, useState } from "react";
-import type { SoundSlot, SoundSlotOptions } from "@buzrr/contract";
+import {
+  isQuestionSlot,
+  type SoundSlot,
+  type SoundSlotOptions,
+} from "@buzrr/contract";
 import { Switch } from "@/components/ui/Switch";
 import { mutedText } from "@/components/Game/GameUI";
 import { useT } from "@/lib/i18n/context";
@@ -53,7 +57,7 @@ export function SlotOptionsEditor({
     timer.current = setTimeout(() => saveRef.current(next), SAVE_AFTER_MS);
   };
 
-  const alignable = !builtin && (slot === "countdown" || slot === "question");
+  const alignable = !builtin && (slot === "countdown" || isQuestionSlot(slot));
   const endAligned = alignable && draft.align === "end";
   const volume = draft.volume ?? DEFAULT_SONG_VOLUME;
 

@@ -11,6 +11,7 @@ import {
 import { LuVolume2, LuVolumeX } from "react-icons/lu";
 import {
   BUILTIN_SOUND_SKINS,
+  isQuestionSlot,
   isUnlimitedTime,
   quizSettingsSchema,
   soundSlotSchema,
@@ -178,6 +179,7 @@ const clockMs = () => Date.now();
 const MUSIC_SLOTS: readonly SoundSlot[] = [
   "lobby",
   "question",
+  "lastQuestion",
   "scores",
   "final",
 ];
@@ -237,6 +239,7 @@ export function GameSounds({
   const builtinOptions = useBuiltinOptions(settings.skin, role);
   const phase = useAppSelector((s) => s.game.phase);
   const qIndex = useAppSelector((s) => s.game.qIndex);
+  const qCount = useAppSelector((s) => s.game.qCount);
   const deadline = useAppSelector((s) => s.game.deadline);
   const countdownMs = useAppSelector((s) => s.game.countdownMs);
   const question = useAppSelector((s) => s.game.question);
@@ -301,8 +304,10 @@ export function GameSounds({
       settings.skin,
     );
     if (builtin) {
-      const o = builtinOptions[settings.skin]?.[slot];
-      return playBuiltin(settings.skin as BuiltinSkinId, slot, {
+      // Synth skins have one question music.
+      const synthSlot = slot === "lastQuestion" ? "question" : slot;
+      const o = builtinOptions[settings.skin]?.[synthSlot];
+      return playBuiltin(settings.skin as BuiltinSkinId, synthSlot, {
         // 80 (the default) = the usual synth level.
         volume:
           0.45 * ((o?.volume ?? DEFAULT_SONG_VOLUME) / DEFAULT_SONG_VOLUME),
@@ -332,9 +337,16 @@ export function GameSounds({
   });
   const ownAudio = phase === "question" && questionAudioHere(question?.audio);
   // "No music": effects (countdown, tusch, reveal, pings) only.
-  const bedSlot = on && !ownAudio && settings.music ? bedFor(phase) : null;
+  const phaseBed = on && !ownAudio && settings.music ? bedFor(phase) : null;
+  // The last question has its own song when the skin has one.
+  const lastQuestion =
+    phaseBed === "question" &&
+    qCount > 0 &&
+    qIndex === qCount - 1 &&
+    Boolean(skin?.slots.lastQuestion);
+  const bedSlot: SoundSlot | null = lastQuestion ? "lastQuestion" : phaseBed;
   const bedKey = bedSlot
-    ? `${bedSlot}:${settings.skin}:${skin?.id ?? ""}:${bedSlot === "question" ? qIndex : ""}:${bedSlot === "final" ? (finalSoundKey ?? "") : ""}`
+    ? `${bedSlot}:${settings.skin}:${skin?.id ?? ""}:${bedSlot && isQuestionSlot(bedSlot) ? qIndex : ""}:${bedSlot === "final" ? (finalSoundKey ?? "") : ""}`
     : "";
 
   // Leaving the lobby, the reveal or the scoreboard: their song fades out
@@ -371,7 +383,8 @@ export function GameSounds({
     if (!bedSlot) return;
     const total = (question?.timeOut ?? 20) * 1000;
     // A timed question: how long it still runs (end-aligned songs); "∞": none.
-    const timed = bedSlot === "question" && !isUnlimitedTime(question?.timeOut);
+    const timed =
+      isQuestionSlot(bedSlot) && !isUnlimitedTime(question?.timeOut);
     bed.current = {
       key: bedKey,
       handle: play(bedSlot, {

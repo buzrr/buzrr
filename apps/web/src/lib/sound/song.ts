@@ -8,7 +8,11 @@
  * Web Audio (gain ramps work on iOS, where <audio>.volume is read-only); a
  * plain <audio> element is the fallback when the file can't be decoded here.
  */
-import type { SoundSlot, SoundSlotOptions } from "@buzrr/contract";
+import {
+  isQuestionSlot,
+  type SoundSlot,
+  type SoundSlotOptions,
+} from "@buzrr/contract";
 import { audioContext, type SoundHandle } from "./synth";
 import { fadeOutAndPause } from "./fade";
 
@@ -21,6 +25,7 @@ const STOP_FADE_SEC = 0.4;
 export const REPEATABLE_SLOTS: readonly SoundSlot[] = [
   "lobby",
   "question",
+  "lastQuestion",
   "scores",
   "reveal",
   "final",
@@ -103,7 +108,7 @@ export function playSong(
         const until = timing.untilEndMs;
         const endAligned =
           o.align === "end" &&
-          (slot === "countdown" || slot === "question") &&
+          (slot === "countdown" || isQuestionSlot(slot)) &&
           typeof until === "number" &&
           until > 0;
         const extend = endAligned ? (o.extendSec ?? 0) : 0;
