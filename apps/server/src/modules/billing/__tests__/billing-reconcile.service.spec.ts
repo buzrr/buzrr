@@ -153,6 +153,41 @@ describe("BillingReconcileService (Postgres, Dodo API + Redis mocked)", () => {
     expect(await entitlements.resolvePlan(userId)).toBe("pro");
   });
 
+  it("rotates checked rows to the back but keeps failed fetches first in line", async (ctx) => {
+    if (!dbUp) ctx.skip();
+    const userId = await user();
+    const longAgo = new Date(Date.now() - 400 * DAY);
+    const overdue = { currentPeriodEnd: new Date(Date.now() - 3 * DAY) };
+    // Unknown to Dodo (404): checked, but `apply` never touches it.
+    const unknown = await createSubscription(userId, overdue);
+    const flaky = await createSubscription(userId, overdue);
+    await prisma.subscription.updateMany({
+      where: { id: { in: [unknown.id, flaky.id] } },
+      data: { lastSyncedAt: longAgo },
+    });
+    const fetch = retrieveSubscription.getMockImplementation()!;
+    retrieveSubscription.mockImplementation(((id: string) =>
+      id === flaky.dodoSubscriptionId
+        ? Promise.reject(new Error("network down"))
+        : fetch(id)) as never);
+
+    const result = await service.reconcile();
+
+    expect(result).toMatchObject({ skipped: false });
+    expect(retrieveSubscription).toHaveBeenCalledWith(
+      unknown.dodoSubscriptionId,
+    );
+    const [unknownAfter, flakyAfter] = await Promise.all(
+      [unknown, flaky].map((row) =>
+        prisma.subscription.findUniqueOrThrow({ where: { id: row.id } }),
+      ),
+    );
+    expect(unknownAfter.lastSyncedAt.getTime()).toBeGreaterThan(
+      longAgo.getTime(),
+    );
+    expect(flakyAfter.lastSyncedAt.getTime()).toBe(longAgo.getTime());
+  });
+
   it("leaves a subscription that isn't due yet alone", async (ctx) => {
     if (!dbUp) ctx.skip();
     const userId = await user();

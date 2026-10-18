@@ -100,7 +100,10 @@ export class BillingReconcileService
           },
         ],
       },
-      orderBy: { currentPeriodEnd: "asc" },
+      // Least recently checked first: every checked row gets a fresh
+      // `lastSyncedAt` below, so rows past the cap get their turn next pass
+      // while rows whose fetch failed stay at the front for a retry.
+      orderBy: { lastSyncedAt: "asc" },
       take: MAX_PER_PASS,
       select: {
         dodoSubscriptionId: true,
@@ -123,6 +126,12 @@ export class BillingReconcileService
         );
         continue;
       }
+      // `apply` already stamps a mirrored row; this covers the ones it skips
+      // (unknown to Dodo, non-Pro, no matching user) so they rotate too.
+      await this.prisma.db.subscription.updateMany({
+        where: { dodoSubscriptionId: id },
+        data: { lastSyncedAt: new Date() },
+      });
       const after = await this.prisma.db.subscription.findUnique({
         where: { dodoSubscriptionId: id },
         select: {

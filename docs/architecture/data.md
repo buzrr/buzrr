@@ -124,11 +124,13 @@ it backfills `createdById` from quizzes and historical duel outcomes by score.
 ## Billing data (Buzrr Pro)
 
 - **A plan is never stored.** `EntitlementsService.resolvePlan` derives it on
-  every check from `subscriptions`: Pro means `status = active`, or a
-  cancel-at-period-end `cancelled` subscription whose paid period hasn't ended.
+  every check from `subscriptions`: Pro means `status = active` with the
+  billing date at most 48h past, or a cancel-at-period-end `cancelled`
+  subscription whose paid period hasn't ended.
   With `BILLING` off, everyone gets Pro limits.
 - **Who writes `subscriptions`.** Only `SubscriptionSyncService.apply`, fed by
-  verified webhooks or the success-page sync. It always writes the state
+  verified webhooks, the success-page sync or the 12h reconcile job (which
+  also stamps `last_synced_at` on rows it checked). It always writes the state
   fetched from Dodo, under a `pg_advisory_xact_lock` keyed on the Dodo
   subscription id.
 - **`billing_events`** is the webhook idempotency ledger, keyed by the Dodo
@@ -141,7 +143,8 @@ it backfills `createdById` from quizzes and historical duel outcomes by score.
   - Spending is one conditional `UPDATE`. Each spend adds an
     `ai_token_reservations` row whose hashed release token allows exactly one
     refund, into the same window only.
-- Billing uses **no Redis keys**.
+- Billing's only Redis key is `billing:reconcile:lock`, which lets one
+  instance run each 12h reconcile pass (see the keyspace map below).
 
 ## Redis keyspace (complete map)
 
