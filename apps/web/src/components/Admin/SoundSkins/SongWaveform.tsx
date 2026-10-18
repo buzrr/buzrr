@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { LuPlay, LuSquare } from "react-icons/lu";
 import {
+  isCountdownSlot,
   isQuestionSlot,
   type SoundSlot,
   type SoundSlotOptions,
@@ -73,12 +74,11 @@ export function SongWaveform({
   useEffect(() => () => preview.current?.stop(), []);
 
   const endAligned = options.align === "end";
-  const windowMs =
-    slot === "countdown"
-      ? COUNTDOWN_MS
-      : isQuestionSlot(slot)
-        ? questionSec * 1000
-        : null;
+  const windowMs = isCountdownSlot(slot)
+    ? COUNTDOWN_MS
+    : isQuestionSlot(slot)
+      ? questionSec * 1000
+      : null;
   const cueMs = endAligned
     ? (options.endMs ?? wave?.durationMs ?? 0)
     : (options.startMs ?? 0);

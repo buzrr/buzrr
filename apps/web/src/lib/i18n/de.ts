@@ -972,6 +972,8 @@ export const DE: Record<string, string> = {
   "Preview question time": "Fragezeit für die Vorschau",
   Preview: "Vorschau",
   "Last question": "Letzte Frage",
+  "Countdown before the last question (empty: as above)":
+    "Countdown vor der letzten Frage (leer: wie oben)",
   "Music for the last question (empty: as above)":
     "Musik bei der letzten Frage (leer: wie oben)",
   Countdown: "Countdown",

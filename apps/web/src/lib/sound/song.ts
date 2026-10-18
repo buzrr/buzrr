@@ -9,6 +9,7 @@
  * plain <audio> element is the fallback when the file can't be decoded here.
  */
 import {
+  isCountdownSlot,
   isQuestionSlot,
   type SoundSlot,
   type SoundSlotOptions,
@@ -121,7 +122,7 @@ export function playSong(
         const until = timing.untilEndMs;
         const endAligned =
           o.align === "end" &&
-          (slot === "countdown" || isQuestionSlot(slot)) &&
+          (isCountdownSlot(slot) || isQuestionSlot(slot)) &&
           typeof until === "number" &&
           until > 0;
         const extend = endAligned ? (o.extendSec ?? 0) : 0;

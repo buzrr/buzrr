@@ -14,6 +14,7 @@ import {
 } from "react-icons/lu";
 import {
   BUILTIN_SOUND_SKINS,
+  isCountdownSlot,
   isQuestionSlot,
   soundSlotSchema,
   type SoundSkin,
@@ -56,6 +57,7 @@ import {
 export const SLOT_LABELS: Record<SoundSlot, string> = {
   lobby: "Background music (lobby, get ready)",
   countdown: "Countdown before a question",
+  lastCountdown: "Countdown before the last question (empty: as above)",
   question: "Music while a question runs",
   lastQuestion: "Music for the last question (empty: as above)",
   end: "Tusch when a question ends",
@@ -66,7 +68,9 @@ export const SLOT_LABELS: Record<SoundSlot, string> = {
 
 const SLOTS = soundSlotSchema.options;
 /** The built-in skins have one question music (no separate last one). */
-const BUILTIN_SLOTS = SLOTS.filter((s) => s !== "lastQuestion");
+const BUILTIN_SLOTS = SLOTS.filter(
+  (s) => s !== "lastQuestion" && s !== "lastCountdown",
+);
 
 /** One preview at a time across the page. */
 function usePreview() {
@@ -95,8 +99,11 @@ function fileHandle(
   slot: SoundSlot,
   options: SoundSlotOptions | undefined,
 ): SoundHandle {
-  const untilEndMs =
-    slot === "countdown" ? 5000 : isQuestionSlot(slot) ? 20_000 : null;
+  const untilEndMs = isCountdownSlot(slot)
+    ? 5000
+    : isQuestionSlot(slot)
+      ? 20_000
+      : null;
   return playSong(() => fetchClip(url), slot, options, { untilEndMs }, url);
 }
 
@@ -133,6 +140,18 @@ function TestToggle({ open, onClick }: { open: boolean; onClick: () => void }) {
       {t("Test bench")}
     </button>
   );
+}
+
+/** The last question's slots and what plays when they are empty. */
+const LAST_FALLBACK: Partial<Record<SoundSlot, SoundSlot>> = {
+  lastCountdown: "countdown",
+  lastQuestion: "question",
+};
+
+/** How long a countdown song plays on after 0 (end-aligned only). */
+function countdownTail(skin: SoundSkin, slot: "countdown" | "lastCountdown") {
+  const o = skin.options?.[slot];
+  return skin.slots[slot] && o?.align === "end" ? (o.extendSec ?? 0) * 1000 : 0;
 }
 
 /** The gear that opens a slot's options. */
@@ -471,13 +490,20 @@ function SkinCard({
       </div>
       {testing && (
         <SkinTestBench
-          hasLastQuestion={Boolean(skin.slots.lastQuestion)}
-          countdownTailMs={
-            skin.slots.countdown && skin.options?.countdown?.align === "end"
-              ? (skin.options.countdown.extendSec ?? 0) * 1000
-              : 0
+          hasLastQuestion={Boolean(
+            skin.slots.lastQuestion || skin.slots.lastCountdown,
+          )}
+          countdownTailMs={countdownTail(skin, "countdown")}
+          lastCountdownTailMs={
+            skin.slots.lastCountdown
+              ? countdownTail(skin, "lastCountdown")
+              : undefined
           }
-          play={(slot, extra) => {
+          play={(asked, extra) => {
+            // No song for the last countdown / question: the usual one.
+            const slot: SoundSlot = skin.slots[asked]
+              ? asked
+              : (LAST_FALLBACK[asked] ?? asked);
             const url = skin.slots[slot];
             return url
               ? playSong(

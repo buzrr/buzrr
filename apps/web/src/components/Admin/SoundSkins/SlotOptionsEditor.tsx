@@ -3,6 +3,7 @@
 import clsx from "clsx";
 import { useEffect, useRef, useState } from "react";
 import {
+  isCountdownSlot,
   isQuestionSlot,
   type SoundSlot,
   type SoundSlotOptions,
@@ -62,7 +63,7 @@ export function SlotOptionsEditor({
     timer.current = setTimeout(() => saveRef.current(next), SAVE_AFTER_MS);
   };
 
-  const alignable = !builtin && (slot === "countdown" || isQuestionSlot(slot));
+  const alignable = !builtin && (isCountdownSlot(slot) || isQuestionSlot(slot));
   const endAligned = alignable && draft.align === "end";
   const volume = draft.volume ?? DEFAULT_SONG_VOLUME;
 
@@ -126,7 +127,7 @@ export function SlotOptionsEditor({
           >
             <option value="start">{t("At the beginning")}</option>
             <option value="end">
-              {slot === "countdown"
+              {isCountdownSlot(slot)
                 ? t("End − 5 s (the countdown)")
                 : t("End − the question's time")}
             </option>
@@ -150,18 +151,18 @@ export function SlotOptionsEditor({
         <>
           <TimeField
             label={
-              slot === "countdown" ? t("Zero point (0) at") : t("End point at")
+              isCountdownSlot(slot) ? t("Zero point (0) at") : t("End point at")
             }
             value={draft.endMs ?? 0}
             onChange={(endMs) => change({ endMs })}
           />
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-40">
-              {slot === "countdown" ? t("Plays on after 0") : t("Extend by")}
+              {isCountdownSlot(slot) ? t("Plays on after 0") : t("Extend by")}
             </span>
             <SecondsInput
               label={
-                slot === "countdown" ? t("Plays on after 0") : t("Extend by")
+                isCountdownSlot(slot) ? t("Plays on after 0") : t("Extend by")
               }
               value={draft.extendSec ?? 0}
               min={0}

@@ -308,7 +308,12 @@ export function GameSounds({
     );
     if (builtin) {
       // Synth skins have one question music.
-      const synthSlot = slot === "lastQuestion" ? "question" : slot;
+      const synthSlot =
+        slot === "lastQuestion"
+          ? "question"
+          : slot === "lastCountdown"
+            ? "countdown"
+            : slot;
       const o = builtinOptions[settings.skin]?.[synthSlot];
       return playBuiltin(settings.skin as BuiltinSkinId, synthSlot, {
         // 80 (the default) = the usual synth level.
@@ -357,6 +362,7 @@ export function GameSounds({
   // the bed and one-shot effects below (effects run in order).
   const reveal = useRef<SoundHandle | null>(null);
   const countdown = useRef<SoundHandle | null>(null);
+  const countdownSlot = useRef<"countdown" | "lastCountdown">("countdown");
   const left = useRef(phase);
   useEffect(() => {
     const from = left.current;
@@ -384,9 +390,9 @@ export function GameSounds({
     if (from === "starting" && countdown.current) {
       countdown.current.stop();
       countdown.current = null;
-      const o = skin?.options?.countdown;
+      const o = skin?.options?.[countdownSlot.current];
       const tail =
-        !builtinSkin && skin?.slots.countdown && o?.align === "end"
+        !builtinSkin && skin?.slots[countdownSlot.current] && o?.align === "end"
           ? (o.extendSec ?? 0) * 1000
           : 0;
       if (tail > 0) {
@@ -472,7 +478,15 @@ export function GameSounds({
     if (!on || from === phase) return;
     if (phase === "starting") {
       countdown.current?.stop();
-      countdown.current = play("countdown", { remainingMs: countdownMs });
+      // The last question's countdown has its own song when the skin has one.
+      const lastCd =
+        qCount > 0 &&
+        qIndex === qCount - 1 &&
+        Boolean(skin?.slots.lastCountdown);
+      countdownSlot.current = lastCd ? "lastCountdown" : "countdown";
+      countdown.current = play(countdownSlot.current, {
+        remainingMs: countdownMs,
+      });
     }
     if (
       from === "question" &&

@@ -315,8 +315,9 @@ masked until the reveal (`buildSnapshot`).
 
 ## Sound skins: playback options
 
-A user skin can have its own song for the last question (`lastQuestion`;
-empty: the usual question music plays). Each slot of a skin has options (`soundSlotOptionsSchema`, stored per user
+A user skin can have its own countdown and song for the last question
+(`lastCountdown`, `lastQuestion`; empty: the usual countdown / question music
+plays). Each slot of a skin has options (`soundSlotOptionsSchema`, stored per user
 skin in `sound_skins.options`, for the built-in skins in
 `builtin_sound_options` — only the superadmin changes those):
 
