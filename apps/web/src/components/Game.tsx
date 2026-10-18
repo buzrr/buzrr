@@ -66,7 +66,14 @@ export interface BubbleStats {
   misses: number;
 }
 
-const Game = ({ onStats }: { onStats?: (stats: BubbleStats) => void }) => {
+const Game = ({
+  onStats,
+  onPop,
+}: {
+  onStats?: (stats: BubbleStats) => void;
+  /** A bubble popped (e.g. to play its sound). */
+  onPop?: () => void;
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const bubblesRef = useRef<Bubble[]>([]);
@@ -80,8 +87,10 @@ const Game = ({ onStats }: { onStats?: (stats: BubbleStats) => void }) => {
   const [misses, setMisses] = useState(0);
   const missesRef = useRef(0);
   const onStatsRef = useRef(onStats);
+  const onPopRef = useRef(onPop);
   useEffect(() => {
     onStatsRef.current = onStats;
+    onPopRef.current = onPop;
   });
 
   // Report the running totals once a second (the host's lobby shows them).
@@ -302,6 +311,7 @@ const Game = ({ onStats }: { onStats?: (stats: BubbleStats) => void }) => {
           bubblesRef.current.splice(i, 1);
           scoreRef.current += 1;
           setScore(scoreRef.current);
+          onPopRef.current?.();
           return;
         }
       }

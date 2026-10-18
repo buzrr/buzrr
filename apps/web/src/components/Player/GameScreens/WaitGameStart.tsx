@@ -7,6 +7,7 @@ import BackNavButton from "@/components/BackNavButton";
 import { DEFAULT_AVATAR } from "@/constants";
 import type { GameSession } from "@/types/db";
 import { useT } from "@/lib/i18n/context";
+import { useGameSound } from "@/lib/sound/director";
 import Image from "next/image";
 
 interface PlayerWithProfile {
@@ -35,6 +36,7 @@ const WaitGameStart = (params: {
   onPickAvatar?: (profilePic: string) => void;
 }) => {
   const t = useT();
+  const sound = useGameSound();
   const game = params.game;
   const [pic, setPic] = useState(params.player.profilePic || DEFAULT_AVATAR);
   const [picking, setPicking] = useState(false);
@@ -148,7 +150,13 @@ const WaitGameStart = (params: {
             </h2>
             {chip("sm")}
             <div className="md:hidden">{picker}</div>
-            <Game onStats={params.onBubbleStats} />
+            <Game
+              onStats={params.onBubbleStats}
+              // Their own pops, when sound is on here.
+              onPop={() => {
+                if (sound?.on) sound.playCueSound("bubble");
+              }}
+            />
             {params.reactionBar}
             <div className="flex flex-col mt-2 md:hidden">
               <p className="text-xs dark:text-off-white">{t("Room Code")}</p>

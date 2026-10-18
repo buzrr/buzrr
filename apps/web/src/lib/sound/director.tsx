@@ -499,9 +499,13 @@ export function GameSounds({
       }
     }
     if (phase === "question") questionDeadline.current = deadline;
-    // Leaving the reveal, or the scoreboard song taking over on "Show answer".
+    // Leaving the reveal; or on "Show answer" the scoreboard song, or the
+    // question's own reveal part, taking over.
     if (
-      (from === "reveal" || (phase === "reveal" && bedSlot === "scores")) &&
+      (from === "reveal" ||
+        (phase === "reveal" &&
+          (bedSlot === "scores" ||
+            (from === "closed" && ownRevealHere.current)))) &&
       reveal.current
     ) {
       reveal.current.stop(FADE_OUT_SEC);
@@ -689,12 +693,12 @@ export function GameSounds({
       tusch.current = { played: true };
     }
     // The reveal sound: right as the question ends (with the tusch on top),
-    // and it plays on when the answer is shown. Not for a question with its
-    // own sound here: its reveal part plays instead, with nothing under it.
+    // and it plays on when the answer is shown. A question with its own
+    // sound here gets it only while "time's up" waits for the host: its
+    // reveal part plays at the answer instead, with nothing under it.
     if (
       from === "question" &&
-      (phase === "closed" || phase === "reveal") &&
-      !ownRevealHere.current
+      (phase === "closed" || (phase === "reveal" && !ownRevealHere.current))
     ) {
       reveal.current = play("reveal");
     }
@@ -719,11 +723,13 @@ export function GameSounds({
   );
 }
 
-/** Host waiting room: a ping for every player who joins (if sound is on here). */
+/** The host's lobby blopps for this many pops, then stays quiet. */
+const LOBBY_BLOPPS = 20;
+
 /**
  * The host's live cues: a ping when a player joins, a soft "blopp" for each
- * bubble a player pops (lobby) and a "pling" for each reaction. Rate-limited
- * so a full room doesn't turn into noise.
+ * bubble a player pops (lobby, the first LOBBY_BLOPPS only) and a "pling"
+ * for each reaction. Rate-limited so a full room doesn't turn into noise.
  */
 export function LiveSounds({ socket }: { socket: GameSocket | null }) {
   const s = useGameSound();
@@ -748,6 +754,13 @@ export function LiveSounds({ socket }: { socket: GameSocket | null }) {
     };
     const cue = (c: CueSlot) => sound.current?.playCueSound(c);
     const hits: Record<string, number> = {};
+    // Only the lobby's first pops blopp — then it goes quiet.
+    let blopps = 0;
+    const blopp = () => {
+      if (blopps >= LOBBY_BLOPPS) return;
+      blopps += 1;
+      cue("bubble");
+    };
     // A crowd joining at once: one ping per 150 ms is plenty.
     const ping = () => limited("join", 150, () => cue("join"));
     // Arcade's chip pling cuts through: at most one every 5 s.
@@ -772,10 +785,7 @@ export function LiveSounds({ socket }: { socket: GameSocket | null }) {
       }
       fresh = Math.min(12, fresh);
       for (let i = 0; i < fresh; i++) {
-        setTimeout(
-          () => limited("blopp", 70, () => cue("bubble")),
-          (i * 900) / fresh,
-        );
+        setTimeout(() => limited("blopp", 70, blopp), (i * 900) / fresh);
       }
     };
     socket.on("player-joined", ping);
