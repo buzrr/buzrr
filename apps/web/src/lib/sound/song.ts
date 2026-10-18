@@ -41,8 +41,15 @@ export function repeatOf(slot: SoundSlot, o: SoundSlotOptions | undefined) {
 /** The question music fades in over this long unless its slot says otherwise. */
 export const QUESTION_FADE_IN_SEC = 2;
 
-/** Fade-in seconds for a slot (0 = none): set, or the question music's default. */
+/** The reveal sound always fades in over this long. */
+export const REVEAL_FADE_IN_SEC = 0.5;
+
+/**
+ * Fade-in seconds for a slot (0 = none): set, or the question music's
+ * default; the reveal sound always REVEAL_FADE_IN_SEC.
+ */
 export function fadeInOf(slot: SoundSlot, o: SoundSlotOptions | undefined) {
+  if (slot === "reveal") return REVEAL_FADE_IN_SEC;
   const on = o?.fadeIn ?? isQuestionSlot(slot);
   if (!on) return 0;
   return (

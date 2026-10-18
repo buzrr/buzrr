@@ -19,7 +19,7 @@ import QuesResult from "./QuesResult";
 import LeaderBoard from "./Leaderboard";
 import { ClosedSlide, ReadySlide } from "@/components/Game/ModeratedSteps";
 import { closedNextLabel } from "@/lib/moderation";
-import { isScoredType } from "@buzrr/contract";
+import { isScoredType, revealHasPoint } from "@buzrr/contract";
 import { ReactionOverlay } from "@/components/Game/Flyers";
 import { useT } from "@/lib/i18n/context";
 import { GameSounds, LiveSounds, SoundToggle } from "@/lib/sound/director";
@@ -190,6 +190,7 @@ const GameLobby = (params: {
                 qIndex,
                 qCount,
                 question ? isScoredType(question.type) : true,
+                question ? revealHasPoint(question) : true,
               )}
             />
           ) : phase === "reveal" || phase === "scores" ? (

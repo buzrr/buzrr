@@ -1,6 +1,7 @@
 "use client";
 import clsx from "clsx";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import ConfettiBurst from "@/components/ConfettiBurst";
 import { clearFinalResult } from "@/lib/final-result";
 import { useT } from "@/lib/i18n/context";
@@ -20,6 +21,11 @@ interface Stats {
   quizTitle?: string;
   /** Players in the final standings. */
   players?: number;
+  /**
+   * Wait this long before showing the place: the host's board re-sorts and
+   * fills the podium first (moderated games).
+   */
+  holdMs?: number;
 }
 
 const PLACE_COLOR: Record<number, string> = {
@@ -30,9 +36,37 @@ const PLACE_COLOR: Record<number, string> = {
 
 const Leaderboard = (params: Stats) => {
   const t = useT();
+  const holdMs = params.holdMs ?? 0;
+  const [held, setHeld] = useState(holdMs > 0);
+  useEffect(() => {
+    if (holdMs <= 0) return;
+    const tm = setTimeout(() => setHeld(false), holdMs);
+    return () => clearTimeout(tm);
+  }, [holdMs]);
   const onPodium =
     params.position !== null && params.position >= 1 && params.position <= 3;
   const ringColor = onPodium ? PLACE_COLOR[params.position!] : undefined;
+
+  if (held) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[80dvh] px-4 text-dark dark:text-white">
+        <div
+          className={clsx(
+            panelClass,
+            "w-full max-w-md px-6 sm:px-10 py-12 text-center animate-fade-up",
+          )}
+        >
+          <span className={labelClass}>{t("Final results")}</span>
+          <p className="mt-5 text-2xl font-extrabold animate-pulse">
+            {t("Final results coming up")}
+          </p>
+          <p className={clsx("mt-3 text-sm", mutedText)}>
+            {t("Watch the big screen!")}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

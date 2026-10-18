@@ -206,6 +206,24 @@ interface PlayExtra {
 /** Songs that fade out over FADE_OUT_SEC when the next one takes over. */
 const FADING_BEDS: readonly SoundSlot[] = ["lobby", "reveal", "scores"];
 
+/**
+ * Every song and effect started on this page, across screens: a screen that
+ * goes (the host's lobby on "Start") can't be relied on to stop its own.
+ */
+const playing = new Set<SoundHandle>();
+/** After `fadeOutAllSounds`, the next song waits until this wall clock. */
+let fadeHoldUntil = 0;
+
+/**
+ * Fade out everything that plays (the host pressed "Start"); the next
+ * song — the "Be prepared!" reveal music, the countdown — starts after it.
+ */
+export function fadeOutAllSounds(fadeSec: number) {
+  for (const h of playing) h.stop(fadeSec, true);
+  playing.clear();
+  fadeHoldUntil = Date.now() + fadeSec * 1000;
+}
+
 /** Which bed (loop) a phase plays; null = none. */
 function bedFor(phase: string): SoundSlot | null {
   switch (phase) {
@@ -330,7 +348,9 @@ export function GameSounds({
     // The scoreboard and the final standings start at once (on the host's
     // click), over the reveal's fade-out.
     const wait =
-      slot === "scores" || slot === "final" ? 0 : holdUntil.current - clockMs();
+      slot === "scores" || slot === "final"
+        ? 0
+        : Math.max(holdUntil.current, fadeHoldUntil) - clockMs();
     if (wait <= 0) return playNow(slot, extra);
     // Starts after the fade; a countdown keeps its end where it was.
     let inner: SoundHandle | null = null;
@@ -353,6 +373,20 @@ export function GameSounds({
     };
   };
   const playNow = (slot: SoundSlot, extra?: PlayExtra): SoundHandle | null => {
+    const handle = startSound(slot, extra);
+    if (!handle) return null;
+    playing.add(handle);
+    return {
+      stop: (fadeSec?: number, now?: boolean) => {
+        playing.delete(handle);
+        handle.stop(fadeSec, now);
+      },
+    };
+  };
+  const startSound = (
+    slot: SoundSlot,
+    extra?: PlayExtra,
+  ): SoundHandle | null => {
     const ctx = audioContext();
     if (ctx && ctx.state !== "running") void ctx.resume();
     // End-aligned songs need the time left in the countdown / question.
@@ -445,10 +479,11 @@ export function GameSounds({
         ? "scores"
         : bedFor(phase)
       : null;
-  // The last question has its own song when the skin has one.
+  // The last question has its own song when the skin has one — not the
+  // only question of a one-question quiz (no finale to build up to).
   const lastQuestion =
     phaseBed === "question" &&
-    qCount > 0 &&
+    qCount > 1 &&
     qIndex === qCount - 1 &&
     (builtinSkin || Boolean(files.lastQuestion));
   const bedSlot: SoundSlot | null = lastQuestion ? "lastQuestion" : phaseBed;
@@ -504,6 +539,8 @@ export function GameSounds({
     // question's own reveal part, taking over.
     if (
       (from === "reveal" ||
+        // Straight on from "time's up" (nothing to reveal).
+        (from === "closed" && phase !== "reveal") ||
         (phase === "reveal" &&
           (bedSlot === "scores" ||
             (from === "closed" && ownRevealHere.current)))) &&
@@ -646,9 +683,10 @@ export function GameSounds({
     if (!on || from === phase) return;
     if (phase === "starting") {
       countdown.current?.stop();
-      // The last question's countdown has its own song when the skin has one.
+      // The last question's countdown has its own song when the skin has one
+      // (not in a one-question quiz).
       const lastCd =
-        qCount > 0 &&
+        qCount > 1 &&
         qIndex === qCount - 1 &&
         (builtinSkin || Boolean(files.lastCountdown));
       countdownSlot.current = lastCd ? "lastCountdown" : "countdown";

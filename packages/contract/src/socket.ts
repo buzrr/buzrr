@@ -351,6 +351,11 @@ export const reactionSchema = z.object({
     .max(16)
     .regex(/^[\p{Extended_Pictographic}\p{Emoji_Component}\u200d\ufe0f]+$/u)
     .refine((s) => /\p{Extended_Pictographic}/u.test(s), "Not an emoji"),
+  /**
+   * Meant for the player's row on the host's board (a right answer at the
+   * reveal, or the scores step's top players): shown there, not only flown.
+   */
+  board: z.boolean().optional(),
 });
 /**
  * Reactions: a player may send `reactionLimitFor(players in the room)`

@@ -30,8 +30,8 @@ import {
 import { AnimatedNumber, useFlipReorder } from "@/components/Game/motion";
 import {
   HOST_LEADERBOARD_TOP,
-  SCORES_EMOJI_TOP,
   denseRanks,
+  revealHasPoint,
   type LeaderboardEntry,
 } from "@buzrr/contract";
 import { useAudioSegment } from "@/lib/audio-cues";
@@ -46,16 +46,16 @@ import {
 } from "@/lib/moderation";
 import { useT, pl, currentLocale } from "@/lib/i18n/context";
 import type { GameSocket } from "@/types/socket";
+import { SETTLE_DELAY_MS } from "@/lib/podium";
 
 /** Hold the old standings until the answer bars have mostly filled. */
-const SETTLE_DELAY_MS = 1100;
 
 /**
  * The standings as they were before this question: each score minus its
  * `delta`, re-ranked the way the server ranks (ties share a rank). The
  * server only sends the new ones.
  */
-function previousStandings(entries: LeaderboardEntry[]) {
+export function previousStandings(entries: LeaderboardEntry[]) {
   const sorted = entries
     .map((entry, i) => ({ entry, i, prev: entry.score - (entry.delta ?? 0) }))
     .sort((a, b) => b.prev - a.prev || a.i - b.i);
@@ -124,8 +124,12 @@ export default function QuesResult(props: QuesResultProps) {
     setBoardWas(showBoard);
     setBoardSlidesIn(showBoard);
   }
+  // Not after the last question: the final standings come next.
   const nextIsScores =
-    phase === "reveal" && scoresStepPending(moderation) && scoredQ;
+    phase === "reveal" &&
+    scoresStepPending(moderation) &&
+    scoredQ &&
+    qIndex < qCount - 1;
   // The reveal cue plays when the answer is shown, until the host moves on.
   const sound = useGameSound();
   const audioHere = sound ? sound.questionAudioHere(question?.audio) : true;
@@ -232,19 +236,25 @@ export default function QuesResult(props: QuesResultProps) {
   );
   const playerCount = leaderboardTotal ?? leaderboard.length;
 
-  // The scores step: an emoji from one of the top SCORES_EMOJI_TOP stays on
-  // their row (this question's board only — it remounts with the next).
+  // An emoji meant for the board (a right answer at the reveal, the scores
+  // step's top SCORES_EMOJI_TOP) stays on the player's row — this question's
+  // board only: it remounts with the next.
   const [rowEmoji, setRowEmoji] = useState<Record<string, string>>({});
-  const onScores = phase === "scores";
+  const onBoard = phase === "reveal" || phase === "scores";
   useEffect(() => {
-    if (!socket || !onScores) return;
-    const onReaction = (r: { playerId: string; emoji: string }) =>
-      setRowEmoji((m) => ({ ...m, [r.playerId]: r.emoji }));
+    if (!socket || !onBoard) return;
+    const onReaction = (r: {
+      playerId: string;
+      emoji: string;
+      board?: boolean;
+    }) => {
+      if (r.board) setRowEmoji((m) => ({ ...m, [r.playerId]: r.emoji }));
+    };
     socket.on("reaction", onReaction);
     return () => {
       socket.off("reaction", onReaction);
     };
-  }, [socket, onScores]);
+  }, [socket, onBoard]);
   const listRef = useRef<HTMLDivElement>(null);
   useFlipReorder(listRef, rows.map((r) => r.playerId).join());
   const connectedById = new Map(players.map((p) => [p.id, p.connected]));
@@ -447,16 +457,15 @@ export default function QuesResult(props: QuesResultProps) {
                     <span className="flex-1 min-w-0 truncate text-[15px] font-semibold">
                       {lead.name}
                     </span>
-                    {lead.rank <= SCORES_EMOJI_TOP &&
-                      rowEmoji[lead.playerId] && (
-                        <span
-                          key={rowEmoji[lead.playerId]}
-                          aria-hidden
-                          className="shrink-0 text-2xl leading-none animate-pop-in"
-                        >
-                          {rowEmoji[lead.playerId]}
-                        </span>
-                      )}
+                    {rowEmoji[lead.playerId] && (
+                      <span
+                        key={rowEmoji[lead.playerId]}
+                        aria-hidden
+                        className="shrink-0 text-2xl leading-none animate-pop-in"
+                      >
+                        {rowEmoji[lead.playerId]}
+                      </span>
+                    )}
                     {lead.delta !== undefined && (
                       <span
                         className={clsx(
@@ -524,7 +533,13 @@ export default function QuesResult(props: QuesResultProps) {
           className={clsx(primaryButtonClass, "w-full md:w-auto md:min-w-80")}
         >
           {closed
-            ? closedNextLabel(moderation, qIndex, qCount, scoredQ)
+            ? closedNextLabel(
+                moderation,
+                qIndex,
+                qCount,
+                scoredQ,
+                question ? revealHasPoint(question) : true,
+              )
             : nextIsScores
               ? t("Show scores")
               : isLastQuestion

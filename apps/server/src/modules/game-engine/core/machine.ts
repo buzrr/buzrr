@@ -1,4 +1,4 @@
-import { isScoredType, isUnlimitedTime } from "@buzrr/contract";
+import { isScoredType, isUnlimitedTime, revealHasPoint } from "@buzrr/contract";
 import { ANSWER_GRACE_MS } from "../../../common/utils/answer-timing";
 import { planBotAnswer } from "../../../common/utils/duel-bot";
 import {
@@ -262,15 +262,25 @@ function hostNext(
       return openQuestion(state, state.meta.qIndex, now, ctx);
     case "question":
       return closeQuestion(state, now, pacing);
-    case "closed":
+    case "closed": {
+      // Nothing to reveal (a poll, a word cloud, … without a reveal cue):
+      // straight on — it scored nothing, so no answer-result is owed.
+      const q = state.questions[state.meta.qIndex];
+      if (q && !revealHasPoint(q)) return advance(state, now, pacing, ctx);
       // "Show answer": the answer is always revealed (no longer optional),
       // and the reveal sends every player their answer-result — so no path
       // reaches the scores or the final board without one.
       return reveal(state, now, pacing);
+    }
     case "reveal":
       // An unscored question (poll, word cloud, …) changes no score: no
-      // standings step after it.
-      if (scoresStepPending(mod) && currentScored(state)) {
+      // standings step after it. Nor after the last question: the final
+      // standings come next anyway (and show this question's points).
+      if (
+        scoresStepPending(mod) &&
+        currentScored(state) &&
+        state.meta.qIndex + 1 < state.meta.qCount
+      ) {
         return showScores(state, false);
       }
       return advance(state, now, pacing, ctx);
@@ -671,7 +681,9 @@ function enterFinal(state: GameState, pacing: PacingStrategy): Transition {
       message: {
         event: "leaderboard",
         payload: {
-          entries: buildLeaderboard(state.scores, state.roster),
+          // With the last question's points (`delta`): the host's board
+          // re-sorts once more and shows them.
+          entries: buildLeaderboard(state.scores, state.roster, state.answers),
           isFinal: true,
           // The preloaded final song becomes playable now.
           ...(state.meta.finalSoundKey

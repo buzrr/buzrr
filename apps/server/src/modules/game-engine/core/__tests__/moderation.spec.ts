@@ -168,6 +168,48 @@ describe("moderated question flow", () => {
     ]);
   });
 
+  it("a poll has nothing to reveal: 'time's up' goes straight on", () => {
+    const closed = questionOpen(
+      {},
+      { phase: "closed", moderation: moderated() },
+    );
+    const poll = {
+      ...closed,
+      questions: closed.questions.map((q, i) =>
+        i === 0 ? { ...q, type: "poll" as const } : q,
+      ),
+    };
+    expect(events(poll, { type: "host-next" })).not.toContain("question-end");
+    const { state: next } = step(poll, { type: "host-next" }, T0);
+    expect(next.meta).toMatchObject({ phase: "starting", qIndex: 1 });
+  });
+
+  it("…unless its own sound has a reveal part", () => {
+    const closed = questionOpen(
+      {},
+      { phase: "closed", moderation: moderated() },
+    );
+    const poll = {
+      ...closed,
+      questions: closed.questions.map((q, i) =>
+        i === 0
+          ? {
+              ...q,
+              type: "poll" as const,
+              audio: {
+                url: "https://x/song.mp3",
+                startMs: 0,
+                revealMs: 30_000,
+                playOn: "quiz" as const,
+              },
+            }
+          : q,
+      ),
+    };
+    const { state: next } = step(poll, { type: "host-next" }, T0);
+    expect(next.meta.phase).toBe("reveal");
+  });
+
   it("after the scores the next question counts down (get-ready only opens the round)", () => {
     const scores = questionOpen(
       {},
@@ -175,6 +217,28 @@ describe("moderated question flow", () => {
     );
     const { state: next } = step(scores, { type: "host-next" }, T0);
     expect(next.meta).toMatchObject({ phase: "starting", qIndex: 1 });
+  });
+
+  it("after the last question's answer the final standings come straight away, with its points", () => {
+    const last = questionOpen(
+      {
+        answers: { p1: answer("q2-a", { isCorrect: true, score: 900 }) },
+        scores: [{ playerId: "p1", score: 900 }],
+      },
+      { phase: "reveal", moderation: moderated() },
+      1,
+    );
+    const { state: next, effects } = step(last, { type: "host-next" }, T0);
+    expect(next.meta.phase).toBe("final");
+    const board = emitted(effects).find((e) => e.event === "leaderboard");
+    expect(board?.message).toMatchObject({
+      payload: {
+        isFinal: true,
+        entries: expect.arrayContaining([
+          expect.objectContaining({ playerId: "p1", delta: 900 }),
+        ]),
+      },
+    });
   });
 
   it("the last question's scores lead to the final leaderboard", () => {

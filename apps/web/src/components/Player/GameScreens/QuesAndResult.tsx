@@ -12,7 +12,12 @@ import {
   LuTrophy,
   LuX,
 } from "react-icons/lu";
-import type { PublicQuestion, QuestionAnswer } from "@buzrr/contract";
+import {
+  isScoredType,
+  type PublicQuestion,
+  type QuestionAnswer,
+} from "@buzrr/contract";
+import { scoresStepPending } from "@/lib/moderation";
 import { DEFAULT_AVATAR } from "@/constants";
 import { useAppSelector } from "@/state/hooks";
 import type { Standing } from "@/state/game/gameSlice";
@@ -251,6 +256,14 @@ const QuestionAndResult = (params: {
   const standing = useAppSelector((state) =>
     state.game.mode === "classic" ? state.game.standing : null,
   );
+  // Moderated: a player learns their new place with the host's scores step
+  // (or the final standings), not with the answer.
+  const moderation = useAppSelector((state) => state.game.moderation);
+  const liveQuestion = useAppSelector((state) => state.game.question);
+  const placeLater =
+    moderation !== null &&
+    (liveQuestion ? isScoredType(liveQuestion.type) : true) &&
+    (qIndex >= qCount - 1 || scoresStepPending(moderation));
   // Answers submitted while offline would be rejected anyway — lock the UI.
   const offline = connection !== "connected";
   // Display-only countdown against the server deadline; the reveal is pushed
@@ -373,7 +386,7 @@ const QuestionAndResult = (params: {
               </div>
             </div>
           )}
-          {!isQuestion && you && (
+          {!isQuestion && you && !placeLater && (
             <div className="hidden md:grid grid-cols-2 gap-3">
               <StatTile
                 value={you.rank ? ordinal(you.rank) : "—"}
@@ -508,7 +521,7 @@ const QuestionAndResult = (params: {
                   </AnswerRow>
                 ))}
             </div>
-            {standing && standing.qIndex === qIndex && (
+            {standing && standing.qIndex === qIndex && !placeLater && (
               <StandingCard standing={standing} playerCount={players.length} />
             )}
             <div className="mt-4 md:mt-[26px]">

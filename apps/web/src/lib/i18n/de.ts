@@ -714,6 +714,7 @@ export const DE: Record<string, string> = {
   Sounds: "Audio",
   "Quiz settings": "Quiz-Einstellungen",
   Tied: "Gleichstand",
+  "Watch the big screen!": "Schau auf die große Leinwand!",
   "Showing the newest {shown} of {total} players — search to find the others.":
     "Die neuesten {shown} von {total} Spielern — die anderen findest du über die Suche.",
   "Couldn't load sign-in options.":

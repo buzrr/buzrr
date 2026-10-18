@@ -477,6 +477,23 @@ export function isScoredType(type: QuestionType): boolean {
   return SCORED_TYPES.includes(type);
 }
 
+/**
+ * Whether a question's "show answer" step has anything to show: a right
+ * answer (the scored types), or the reveal part of its own sound. A poll, a
+ * word cloud, … without one skips it — moderated games go on from "time's
+ * up", where the host already sees how the room answered.
+ */
+export function revealHasPoint(question: {
+  type: QuestionType;
+  audio?: { revealMs?: number | null } | null;
+}): boolean {
+  return (
+    isScoredType(question.type) ||
+    (question.audio?.revealMs !== null &&
+      question.audio?.revealMs !== undefined)
+  );
+}
+
 /** Rows written before Question.type existed — and any unset type — mean this. */
 export const DEFAULT_QUESTION_TYPE: QuestionType = "multiple_choice";
 

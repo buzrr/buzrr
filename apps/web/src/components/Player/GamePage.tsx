@@ -19,6 +19,7 @@ import { usePlayerSocket } from "@/hooks/usePlayerSocket";
 import { ReactionBar } from "@/components/Game/Flyers";
 import { GameSounds, SoundToggle } from "@/lib/sound/director";
 import { SCORES_EMOJI_TOP, quizSettingsSchema } from "@buzrr/contract";
+import { podiumDoneMs } from "@/lib/podium";
 import { playersApi } from "@/lib/modules/players/api";
 import { useT } from "@/lib/i18n/context";
 import { saveFinalResult } from "@/lib/final-result";
@@ -67,6 +68,12 @@ const GamePage = (params: {
   const question = useAppSelector((state) => state.game.question);
   const you = useAppSelector((state) => state.game.you);
   const qIndex = useAppSelector((state) => state.game.qIndex);
+  const moderation = useAppSelector((state) => state.game.moderation);
+  // The question whose board got this player's emoji: the bar stays away
+  // while that board (reveal, scores) is on screen.
+  const [boardEmojiQ, setBoardEmojiQ] = useState<number | null>(null);
+  const sentToBoard =
+    (phase === "reveal" || phase === "scores") && boardEmojiQ === qIndex;
 
   const { socket } = usePlayerSocket({
     playerId: params.player.id,
@@ -148,13 +155,26 @@ const GamePage = (params: {
         phase !== "ended" &&
         phase !== "idle" &&
         phase !== "lobby" &&
-        (phase === "scores" ? (
+        (sentToBoard ? null : phase === "scores" ? (
           // The scores step: the top SCORES_EMOJI_TOP send one emoji each,
           // shown on their row of the host's board.
           you?.rank != null &&
           you.rank <= SCORES_EMOJI_TOP && (
-            <ReactionBar key={`scores-${qIndex}`} socket={socket} oneShot />
+            <ReactionBar
+              key={`scores-${qIndex}`}
+              socket={socket}
+              oneShot
+              onSent={() => setBoardEmojiQ(qIndex)}
+            />
           )
+        ) : phase === "reveal" && you?.isCorrect ? (
+          // "Right!": the first emoji goes onto their row of the board.
+          <ReactionBar
+            key={`reveal-${qIndex}`}
+            socket={socket}
+            oneShot
+            onSent={() => setBoardEmojiQ(qIndex)}
+          />
         ) : (
           <ReactionBar socket={socket} />
         ))}
@@ -220,6 +240,11 @@ const GamePage = (params: {
           score={mine?.score ?? you?.totalScore ?? 0}
           quizTitle={game.quiz.title ?? undefined}
           players={playerCount}
+          holdMs={
+            moderation && phase === "final"
+              ? podiumDoneMs(leaderboard.some((e) => (e.delta ?? 0) > 0))
+              : 0
+          }
         />
       ) : (
         // "starting" — the pre-question countdown

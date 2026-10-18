@@ -17,7 +17,7 @@ import { useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { AnimatedNumber } from "@/components/Game/motion";
 import { ReactionOverlay, useFlyers } from "@/components/Game/Flyers";
-import { GameSounds, LiveSounds } from "@/lib/sound/director";
+import { GameSounds, LiveSounds, fadeOutAllSounds } from "@/lib/sound/director";
 import HostHeader from "@/components/Admin/Game/HostHeader";
 import {
   LuBan,
@@ -272,6 +272,9 @@ const Lobby = (params: {
       return;
     }
     setLoad(true);
+    // The lobby music fades out over START_FADE_SEC; the game's next song
+    // waits for it.
+    fadeOutAllSounds(START_FADE_SEC);
     socket.emit("start-game", params.gameCode);
     // Move to the game screen right away instead of waiting for the
     // `game-started` round-trip — it syncs the countdown over the socket on
@@ -668,6 +671,9 @@ const FLUSH_MS = 500;
 const FLYER_PLAYER_LIMIT = 60;
 /** Above this many players: no reorder animation, plain numbers. */
 const CROWD_LIMIT = 40;
+/** "Start": the lobby music fades out this long before the game's sounds. */
+const START_FADE_SEC = 2;
+
 /** The host's waiting list shows at most this many (the newest), or the search's matches. */
 const LOBBY_LIST_LIMIT = 150;
 

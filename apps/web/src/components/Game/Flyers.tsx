@@ -279,11 +279,16 @@ export function ReactionBar({
   socket,
   inline = false,
   oneShot = false,
+  onSent,
 }: {
   socket: GameSocket | null;
   inline?: boolean;
-  /** One emoji, then the bar goes (the scores step's top players). */
+  /**
+   * One emoji for the player's row on the host's board (a right answer at
+   * the reveal, the scores step's top players), then the bar goes.
+   */
   oneShot?: boolean;
+  onSent?: () => void;
 }) {
   const t = useT();
   const [shot, setShot] = useState(false);
@@ -367,8 +372,13 @@ export function ReactionBar({
     if (taps.current.length >= limit.current) {
       setBlockedUntil(taps.current[0]! + windowMs.current);
     }
-    if (socket?.connected) socket.emit("reaction", { emoji });
-    if (oneShot) setShot(true);
+    if (socket?.connected) {
+      socket.emit("reaction", oneShot ? { emoji, board: true } : { emoji });
+    }
+    if (oneShot) {
+      setShot(true);
+      onSent?.();
+    }
     const r = el.getBoundingClientRect();
     spawn({
       emoji,

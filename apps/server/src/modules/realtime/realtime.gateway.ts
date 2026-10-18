@@ -816,9 +816,11 @@ export class RealtimeGateway
       if (!parsed.success) return;
       // The final top three: as many as they like.
       if (this.winners.get(gameCode)?.has(playerId)) {
-        this.server
-          .to(`host:${gameCode}`)
-          .emit("reaction", { playerId, emoji: parsed.data.emoji });
+        this.server.to(`host:${gameCode}`).emit("reaction", {
+          playerId,
+          emoji: parsed.data.emoji,
+          ...(parsed.data.board ? { board: true } : {}),
+        });
         return;
       }
       if (!this.roomAdmitsReaction(gameCode, playerId, now)) return;
@@ -832,9 +834,11 @@ export class RealtimeGateway
         socket.emit("reaction-limited", { retryInMs: budget.retryInMs });
         return;
       }
-      this.server
-        .to(`host:${gameCode}`)
-        .emit("reaction", { playerId, emoji: parsed.data.emoji });
+      this.server.to(`host:${gameCode}`).emit("reaction", {
+        playerId,
+        emoji: parsed.data.emoji,
+        ...(parsed.data.board ? { board: true } : {}),
+      });
     });
 
     socket.on("bubble-stats", (payload) => {

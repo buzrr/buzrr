@@ -28,8 +28,11 @@ export function closedNextLabel(
   qCount: number,
   /** Unscored questions skip the scores step. */
   scored = true,
+  /** Nothing to reveal (`revealHasPoint`): the host goes straight on. */
+  reveals = true,
 ): string {
-  if (mod?.showAnswer) return tx("Show answer");
+  if (mod?.showAnswer && reveals) return tx("Show answer");
+  if (!reveals) return nextQuestionLabel(qIndex, qCount);
   if (mod?.showScores && scored) return tx("Show scores");
   return nextQuestionLabel(qIndex, qCount);
 }
