@@ -39,6 +39,7 @@ function Slide({
   nextLabel?: string;
   waitingFor: string;
 }) {
+  const t = useT();
   const [advancing, setAdvancing] = useState(false);
   return (
     <div
@@ -90,6 +91,8 @@ function Slide({
         <div className="sticky bottom-0 z-10 flex justify-end py-3 bg-light-bg/90 dark:bg-dark-bg/90 backdrop-blur">
           <button
             type="button"
+            data-host-key="next"
+            title={t('You can also press "Space"')}
             disabled={advancing}
             onClick={() => {
               setAdvancing(true);

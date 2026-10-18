@@ -735,7 +735,7 @@ export const DE: Record<string, string> = {
   "Tap to mark it correct": "Tippen, um als richtig zu markieren",
   "Tap to retry": "Tippen zum Wiederholen",
   Template: "Vorlage",
-  "Thank you for joining!": "Danke fürs Mitmachen!",
+  "Thank you for joining!": "Danke fürs Mitspielen!",
   "Thank you for playing!": "Danke fürs Mitspielen!",
   "That's the most answers you can send": "Mehr Antworten gehen nicht",
   "That's the most words you can send": "Mehr Wörter gehen nicht",
@@ -971,6 +971,12 @@ export const DE: Record<string, string> = {
   "The song plays on this long after the end, then fades out.":
     "So lange läuft der Song nach dem Ende weiter, dann wird er ausgeblendet.",
   "Test bench": "Testlauf",
+  "Go to quiz": "Zum Quiz",
+  "Delete this game": "Dieses Spiel löschen",
+  "Delete this game and its results?":
+    "Dieses Spiel und seine Ergebnisse löschen?",
+  'You can also press "Space"': 'Du kannst auch die "Leertaste" drücken',
+  'You can also press "Esc"': 'Du kannst auch "Esc" drücken',
   "{what} is a Pro feature": "{what} ist eine Pro-Funktion",
   "Your own logo": "Eigenes Logo",
   "A quiz logo": "Ein Quiz-Logo",

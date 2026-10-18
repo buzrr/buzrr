@@ -259,6 +259,8 @@ export default function QuestionScreen(props: QuestionScreenProps) {
         {showSkip ? (
           <button
             type="button"
+            data-host-key="skip"
+            title={t('You can also press "Esc"')}
             onClick={() => socket.emit("host-next")}
             className={clsx(dangerButtonClass, "animate-fade-up")}
           >

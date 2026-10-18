@@ -1,4 +1,5 @@
 "use client";
+import { useHostHotkeys } from "@/hooks/useHostHotkeys";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
@@ -51,6 +52,8 @@ const GameLobby = (params: {
   quizQuestions: QuizQuestion;
 }) => {
   const t = useT();
+  // Space: the next button on screen; Escape: skip / go on.
+  useHostHotkeys();
   const dispatch = useAppDispatch();
   const phase = useAppSelector((state) => state.game.phase);
   const router = useRouter();

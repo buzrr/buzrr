@@ -138,7 +138,8 @@ export default function LeaderBoard({
 
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
   const qCount = useAppSelector((state) => state.game.qCount);
-  const rest = leaderboard.slice(3);
+  // The full rankings list everyone, the podium's three included.
+  const rest = leaderboard;
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
@@ -217,9 +218,7 @@ export default function LeaderBoard({
             ))}
             {rest.length === 0 && (
               <p className={clsx("text-center text-sm py-10", mutedText)}>
-                {leaderboard.length === 0
-                  ? t("No players finished this quiz.")
-                  : t("Everyone made the podium!")}
+                {t("No players finished this quiz.")}
               </p>
             )}
           </div>

@@ -124,6 +124,8 @@ export default function GetReady({
             <div className="flex flex-wrap justify-center gap-2.5">
               <button
                 type="button"
+                data-host-key="skip"
+                title={t('You can also press "Esc"')}
                 onClick={() => onDownloads(false)}
                 className={dangerButtonClass}
               >
@@ -145,7 +147,13 @@ export default function GetReady({
       {onSkip && phase === "starting" && (
         // Skip sits bottom left, like on the question screen.
         <div className="fixed bottom-4 left-4 md:left-8 z-20">
-          <button type="button" onClick={onSkip} className={dangerButtonClass}>
+          <button
+            type="button"
+            data-host-key="skip"
+            title={t('You can also press "Esc"')}
+            onClick={onSkip}
+            className={dangerButtonClass}
+          >
             <LuSkipForward size={17} />
             {t("Skip")}
           </button>
