@@ -7,7 +7,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { AiTokenSource, Prisma, Subscription } from "@buzrr/prisma";
 import { PrismaService } from "../../prisma/prisma.service";
 import { BillingConfig } from "./billing.config";
-import { PLAN_LIMITS, PRO_AI_WINDOW_MS } from "./plans";
+import { PLAN_LIMITS, PRO_AI_WINDOW_MS, RENEWAL_GRACE_MS } from "./plans";
 import type { PlanId, PlanLimits } from "./plans";
 
 /** Either the root client or an interactive-transaction client. */
@@ -36,8 +36,9 @@ export type Entitlements = {
 };
 
 /**
- * A subscription grants Pro while Dodo says it is `active`, or while a
- * cancel-at-period-end subscription is still inside the period it paid for.
+ * A subscription grants Pro while Dodo says it is `active` (and its billing
+ * date is at most `RENEWAL_GRACE_MS` behind), or while a cancel-at-period-end
+ * subscription is still inside the period it paid for.
  * `on_hold` (failed renewal), `failed`, `expired`, `pending` and an immediate
  * cancellation all resolve to Free.
  */
@@ -45,7 +46,14 @@ export function isProSubscription(
   sub: Pick<Subscription, "status" | "currentPeriodEnd" | "cancelAtPeriodEnd">,
   now: Date = new Date(),
 ): boolean {
-  if (sub.status === "active") return true;
+  if (sub.status === "active") {
+    // A renewal Dodo never confirmed (missed webhook, unpaid but not yet
+    // moved off `active`) stops granting Pro once the grace runs out.
+    return (
+      sub.currentPeriodEnd === null ||
+      sub.currentPeriodEnd.getTime() + RENEWAL_GRACE_MS > now.getTime()
+    );
+  }
   return (
     sub.status === "cancelled" &&
     sub.cancelAtPeriodEnd &&

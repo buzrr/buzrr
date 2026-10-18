@@ -45,7 +45,7 @@ describe("BillingWebhookService (Postgres, Dodo API mocked)", () => {
     dodo,
     prismaService,
     config,
-    new SubscriptionSyncService(dodo, config),
+    new SubscriptionSyncService(dodo, config, prismaService),
   );
   const entitlements = new EntitlementsService(prismaService, config);
 

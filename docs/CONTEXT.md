@@ -53,6 +53,9 @@ effects }` in `game-engine/core/`, unit-tested; `GameEngineService` is
   - **Webhooks** are verified in `apps/web`, then re-verified and applied by
     `apps/server/src/modules/billing` from Dodo-fetched state.
   - **`apps/ai`** reserves AI tokens through Nest.
+  - **Missed renewals:** an `active` row more than 48h past its billing date
+    resolves to Free; `BillingReconcileService` re-syncs overdue rows from
+    Dodo every 12h.
   - **Rollout:** off unless `BILLING=ON`; migration `20260914000001` needs
     `migrate:deploy`. See ADR-010.
 - **Server-authoritative rewrite** (PR #17): engine + Redis live state +
