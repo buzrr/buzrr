@@ -112,10 +112,13 @@ export default function Navbar() {
         </div>
         <div className="flex flex-col">
           <div className="p-2">
+            {/* prefetch off: every admin route renders per request, so
+                prefetching each visible link is a function call apiece. */}
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
+                prefetch={false}
                 className={clsx(
                   "my-1 py-2 px-4 rounded-lg flex items-center gap-3",
                   !isActive(link.href)
@@ -135,6 +138,7 @@ export default function Navbar() {
         <div className="mt-auto mb-2 pt-6 border-t border-t-gray">
           <Link
             href="/admin/profile"
+            prefetch={false}
             className={clsx(
               "flex items-center p-2 px-4 rounded-md",
               !isActive("/admin/profile")

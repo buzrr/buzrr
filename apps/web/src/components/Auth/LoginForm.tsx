@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/Button";
 import { authClient } from "@/lib/auth-client";
 import { useT } from "@/lib/i18n/context";
@@ -123,7 +124,47 @@ function EmailPasswordForm({
   );
 }
 
-const LoginForm = ({ methods }: { methods: AuthMethods }) => {
+async function fetchAuthMethods(): Promise<AuthMethods> {
+  const res = await fetch("/api/auth/methods");
+  if (!res.ok) throw new Error(`auth methods: ${res.status}`);
+  return (await res.json()) as AuthMethods;
+}
+
+/**
+ * Sign-in methods come from the server's runtime env via `/api/auth/methods`
+ * (CDN-cached), which lets the login page itself stay static.
+ */
+const LoginForm = () => {
+  const t = useT();
+  const {
+    data: methods,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: ["auth", "methods"] as const,
+    queryFn: fetchAuthMethods,
+    staleTime: Infinity,
+  });
+
+  if (isError) {
+    return (
+      <div className="py-4 flex flex-col gap-4">
+        <p className="text-sm text-red-light dark:text-red-dark my-2">
+          {t("Couldn't load sign-in options.")}
+        </p>
+        <Button variant="outline" fullWidth onClick={() => void refetch()}>
+          {t("Try again")}
+        </Button>
+      </div>
+    );
+  }
+  if (!methods) {
+    return <div className="py-4 h-28" aria-busy="true" />;
+  }
+  return <LoginMethods methods={methods} />;
+};
+
+function LoginMethods({ methods }: { methods: AuthMethods }) {
   const t = useT();
   const searchParams = useSearchParams();
   const oauthError = searchParams.get("error");
@@ -187,6 +228,6 @@ const LoginForm = ({ methods }: { methods: AuthMethods }) => {
       )}
     </div>
   );
-};
+}
 
 export default LoginForm;

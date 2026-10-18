@@ -119,6 +119,7 @@ const wordsAnswer = z
       .max(MAX_SUBMISSIONS),
   })
   .strict();
+const truthAnswer = z.object({ value: z.boolean() }).strict();
 const ratingAnswer = z
   .object({ value: z.number().int().min(1).max(10) })
   .strict();
@@ -183,20 +184,23 @@ export const multipleChoice = {
 } as const;
 
 // -- true_false ----------------------------------------------------------------
-// Two options ("True", "False"), exactly one correct.
+// A statement that is true or false. The answer key is `config.answer`; there
+// are no Option rows — "True" and "False" are fixed, so storing them per
+// question would be noise. Players send `{ value }`.
 
 export const trueFalse = {
   type: "true_false",
-  config: z.object({}),
-  answer: optionIdAnswer,
-  publicQuestion: publicBase.extend({
-    type: z.literal("true_false"),
-    options: z.array(publicOptionSchema),
-  }),
+  config: z.object({ answer: z.boolean() }),
+  answer: truthAnswer,
+  publicQuestion: publicBase.extend({ type: z.literal("true_false") }),
   summary: z.object({
     type: z.literal("true_false"),
-    ...optionTally,
-    correctOptionIds: z.array(z.string()),
+    /** How many picked true, and how many false. */
+    trueCount: z.number().int().nonnegative(),
+    falseCount: z.number().int().nonnegative(),
+    responses: z.number().int().nonnegative(),
+    /** The right answer. */
+    answer: z.boolean(),
     correct: z.number().int().nonnegative(),
   }),
 } as const;
@@ -500,6 +504,7 @@ export const revealSummarySchema = z.discriminatedUnion("type", [
 export const questionAnswerSchema = z.union([
   optionIdAnswer,
   optionIdsAnswer,
+  truthAnswer,
   wordsAnswer,
   ratingAnswer,
   textAnswer,

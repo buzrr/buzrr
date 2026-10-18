@@ -713,6 +713,10 @@ export const DE: Record<string, string> = {
   "Sound uploaded": "Audio hochgeladen",
   Sounds: "Audio",
   "Quiz settings": "Quiz-Einstellungen",
+  Tied: "Gleichstand",
+  "Couldn't load sign-in options.":
+    "Anmeldeoptionen konnten nicht geladen werden.",
+  "Try again": "Erneut versuchen",
   "Start 1v1": "1v1 starten",
   "Start a duel": "Duell starten",
   "Start Game": "Spiel starten",

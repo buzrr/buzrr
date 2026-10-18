@@ -209,8 +209,16 @@ Questions are sent to clients as `PublicQuestion` — **the answer key
 stripped** by the question type's handler (`toPublicQuestion` in
 `question-types/registry.ts`). Never leak correctness before the reveal —
 including the player's own: a question-phase `state-sync` tells a player
-_that_ (and what) they answered, but `you.isCorrect`/`score`/`rank` stay
-masked until the reveal (`buildSnapshot`).
+_that_ (and what) they answered, but `you.isCorrect`/`score` stay masked
+until the reveal, and `you.totalScore`/`rank` are the standings as of the
+last reveal (`buildSnapshot`).
+
+Ranks are **dense**: equal scores share a rank and the next score is one
+place below (900, 500, 500, 0 → 1, 2, 2, 3; `denseRanks` in the contract).
+Players who haven't scored rank with everyone else on zero. The same rule
+drives the host's re-ranked reveal list, the final podium (tied players
+share a step) and `GameResultEntry.rank`, so a tie for first counts as a
+win for each player in `/users/me/stats`.
 
 ## Client synchronization contract
 

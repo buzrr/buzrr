@@ -27,3 +27,11 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
 };
 
 export const PRO_AI_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * How long an `active` subscription keeps Pro after its billing date without
+ * Dodo confirming the renewal (a moved `next_billing_date`). Covers charge and
+ * webhook latency; past it the account resolves to Free even if the mirror
+ * still says `active` — see `isProSubscription` and BillingReconcileService.
+ */
+export const RENEWAL_GRACE_MS = 48 * 60 * 60 * 1000;

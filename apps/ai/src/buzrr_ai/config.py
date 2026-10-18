@@ -47,7 +47,7 @@ class Settings(BaseSettings):
 
     ai_embedding_model: str = "gemini-embedding-001"
     ai_embedding_dimensions: int = 768
-    ai_generation_model: str = "gemini-3.5-flash"
+    ai_generation_model: str = "gemini-flash-lite-latest"
 
     # Outbound pacing for the embeddings endpoint, in requests per minute. One
     # batch of up to `_EMBED_BATCH` chunks costs one request, so this bounds how

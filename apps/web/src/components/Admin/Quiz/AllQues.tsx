@@ -128,6 +128,35 @@ export default function AllQues(props: { quizId: string }) {
     );
   }
 
+  // Hidden means not rendered at all: blurring the real cards still let the
+  // correct option's highlight glow through on a shared screen. Neutral
+  // placeholders keep the shape of the list behind the reveal card.
+  if (visibility === HideQuestions.hide && questions.length > 0) {
+    return (
+      <div aria-hidden className="w-full min-w-0 blur-[2px]">
+        {questions.map((ques) => (
+          <div
+            key={ques.id}
+            className="w-full mb-4 rounded-[18px] border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 px-4 md:px-[22px] pt-4 md:pt-5 pb-5"
+          >
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div className="h-4 w-3/5 rounded-full bg-lprimary/15 dark:bg-white/10" />
+              <div className="h-7 w-16 rounded-[9px] bg-lprimary/10 dark:bg-white/5" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              {Array.from({ length: 4 }, (_, i) => (
+                <div
+                  key={i}
+                  className="h-11 rounded-xl bg-lprimary/8 dark:bg-white/5"
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <>
       <DragDropContext onDragEnd={onDragEnd}>
@@ -136,11 +165,7 @@ export default function AllQues(props: { quizId: string }) {
             <div
               {...provided.droppableProps}
               ref={provided.innerRef}
-              className={clsx(
-                "w-full min-w-0",
-                visibility === HideQuestions.hide &&
-                  "blur-lg pointer-events-none",
-              )}
+              className="w-full min-w-0"
             >
               {questions.length > 0 ? (
                 questions.map((ques, index) => (

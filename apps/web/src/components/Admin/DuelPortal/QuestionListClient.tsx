@@ -26,6 +26,7 @@ import type {
 import { Button } from "@/components/ui/Button";
 import {
   QuestionTypeTag,
+  cardOptions,
   cardType,
 } from "@/components/Admin/Quiz/QuestionCardBody";
 import Skeleton from "@/components/ui/Skeleton";
@@ -406,9 +407,9 @@ function QueueRow({
             {item.title}
           </p>
           <div className="mt-1 grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
-            {item.options.map((option) => (
+            {cardOptions(item).map((option, index) => (
               <p
-                key={option.id}
+                key={index}
                 className={`min-w-0 break-words ${
                   option.isCorrect
                     ? "font-bold text-[#20A97C]"

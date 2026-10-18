@@ -3,10 +3,19 @@ import QuestionPicture from "@/components/Game/QuestionPicture";
 import clsx from "clsx";
 import Image from "next/image";
 import type { ReactNode } from "react";
-import { LuCheck, LuClock, LuSend, LuX } from "react-icons/lu";
+import {
+  LuArrowDown,
+  LuArrowUp,
+  LuCheck,
+  LuClock,
+  LuSend,
+  LuTrophy,
+  LuX,
+} from "react-icons/lu";
 import type { PublicQuestion, QuestionAnswer } from "@buzrr/contract";
 import { DEFAULT_AVATAR } from "@/constants";
 import { useAppSelector } from "@/state/hooks";
+import type { Standing } from "@/state/game/gameSlice";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
 import { AnswerInput, QuestionTypePill } from "@/components/QuestionTypes";
 import { useT, useLocale } from "@/lib/i18n/context";
@@ -57,6 +66,125 @@ const STATUS = {
     answer: "border-[#e0a020] bg-[#e0a020]/8",
   },
 } as const;
+
+/** Places climbed (positive) or dropped since the reveal before. */
+function rankMove(standing: Standing): number {
+  return standing.previousRank === null
+    ? 0
+    : standing.previousRank - standing.rank;
+}
+
+/** "▲ 2" / "▼ 1" beside a rank; nothing when it didn't change. */
+function RankMove({ move }: { move: number }) {
+  if (move === 0) return null;
+  const up = move > 0;
+  return (
+    <span
+      className={clsx(
+        "inline-flex items-center gap-0.5 font-bold",
+        up ? "text-green-600 dark:text-green-500" : "text-[#e5544e]",
+      )}
+    >
+      {up ? (
+        <LuArrowUp size={14} strokeWidth={3} />
+      ) : (
+        <LuArrowDown size={14} strokeWidth={3} />
+      )}
+      <span className="sr-only">{up ? "up" : "down"}</span>
+      {Math.abs(move)}
+    </span>
+  );
+}
+
+/** The player's place from the last reveal, in the top bar while answering. */
+function StandingChip({ standing }: { standing: Standing }) {
+  return (
+    <span
+      title="Your rank after the last question"
+      className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-lprimary/15 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-1.5 text-[13px] font-semibold"
+    >
+      <LuTrophy
+        size={14}
+        className="text-lprimary dark:text-dprimary"
+        aria-hidden="true"
+      />
+      <span className="sr-only">Your rank</span>
+      {ordinal(standing.rank)}
+    </span>
+  );
+}
+
+/** Podium places in medal colours; everyone else in the brand colour. */
+const PLACE_TEXT: Record<number, string> = {
+  1: "text-[#c99a0e] dark:text-[#f4c542]",
+  2: "text-[#7d8494] dark:text-[#b9bfcc]",
+  3: "text-[#b8703c] dark:text-[#e0a173]",
+};
+
+/** A line of encouragement for where the player stands. */
+function standingMessage(rank: number, playerCount: number): string {
+  if (playerCount <= 1) return "Playing solo — every point counts!";
+  if (rank === 1) return "You're in the lead — keep it up!";
+  if (rank <= 3) return "Congrats, you're on the podium — keep it up!";
+  const below = rank - 3;
+  return below === 1
+    ? "Just 1 place below the podium — you've got this!"
+    : `${below} places below the podium — keep going!`;
+}
+
+/** The player's place after this question, under the answers. */
+function StandingCard({
+  standing,
+  playerCount,
+}: {
+  standing: Standing;
+  playerCount: number;
+}) {
+  const podium = standing.rank <= 3 && playerCount > 1;
+  return (
+    <div
+      className={clsx(
+        "mt-4 md:mt-6 w-full max-w-[420px] rounded-2xl px-5 py-4 md:py-5 flex flex-col items-center gap-1.5 animate-fade-up [animation-delay:250ms]",
+        subtleCardClass,
+      )}
+    >
+      <span
+        className={clsx(
+          "text-[12.5px] font-bold tracking-[0.06em] uppercase",
+          mutedText,
+        )}
+      >
+        Your standing
+      </span>
+      <p className="flex flex-wrap items-baseline justify-center gap-x-2 text-lg md:text-xl font-semibold">
+        <span>You&apos;re in</span>
+        <b
+          className={clsx(
+            "inline-flex items-center gap-1.5 text-[30px] md:text-[36px] font-extrabold tracking-[-0.02em] leading-none",
+            PLACE_TEXT[standing.rank] ?? "text-lprimary dark:text-dprimary",
+          )}
+        >
+          {podium && <LuTrophy size={24} aria-hidden="true" />}
+          {ordinal(standing.rank)}
+        </b>
+        <span>
+          place
+          {playerCount > 1 && ` out of ${playerCount}`}
+        </span>
+        <RankMove move={rankMove(standing)} />
+      </p>
+      <p className="text-[15px] font-semibold">
+        {standingMessage(standing.rank, playerCount)}
+      </p>
+      <p className={clsx("text-[13.5px]", mutedText)}>
+        <b className="text-dark dark:text-white tabular-nums">
+          {standing.totalScore.toLocaleString()}
+        </b>{" "}
+        points in total
+      </p>
+    </div>
+  );
+}
 
 /** One labelled answer; `children` is the answer as its type renders it. */
 function AnswerRow({
@@ -119,6 +247,10 @@ const QuestionAndResult = (params: {
   const qCount = useAppSelector((state) => state.game.qCount);
   const players = useAppSelector((state) => state.game.players);
   const you = useAppSelector((state) => state.game.you);
+  // Duels show both scores in their own header instead.
+  const standing = useAppSelector((state) =>
+    state.game.mode === "classic" ? state.game.standing : null,
+  );
   // Answers submitted while offline would be rejected anyway — lock the UI.
   const offline = connection !== "connected";
   // Display-only countdown against the server deadline; the reveal is pushed
@@ -143,7 +275,16 @@ const QuestionAndResult = (params: {
 
   return (
     <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 pb-16 md:pb-6 md:min-h-[calc(100dvh-7.5rem)] text-dark dark:text-white">
-      <GameTopBar title={params.quizTitle} qIndex={qIndex} qCount={qCount} />
+      <GameTopBar
+        title={params.quizTitle}
+        qIndex={qIndex}
+        qCount={qCount}
+        right={
+          isQuestion && standing ? (
+            <StandingChip standing={standing} />
+          ) : undefined
+        }
+      />
       {isQuestion && (
         <TimerBar
           key={params.question?.id ?? params.question?.title}
@@ -367,6 +508,9 @@ const QuestionAndResult = (params: {
                   </AnswerRow>
                 ))}
             </div>
+            {standing && standing.qIndex === qIndex && (
+              <StandingCard standing={standing} playerCount={players.length} />
+            )}
             <div className="mt-4 md:mt-[26px]">
               <WaitingDots>
                 {params.hideRoomCode

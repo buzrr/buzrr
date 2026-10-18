@@ -44,52 +44,79 @@ const PODIUM = {
   },
 } as const;
 
+/** Most avatars a shared podium step draws before "+N". */
+const MAX_PODIUM_AVATARS = 3;
+
+/** "Ana", "Ana & Ben", or "Ana +2". */
+function podiumNames(entries: LeaderboardEntry[]) {
+  if (entries.length === 1) return entries[0]!.name;
+  if (entries.length === 2) return `${entries[0]!.name} & ${entries[1]!.name}`;
+  return `${entries[0]!.name} +${entries.length - 1}`;
+}
+
+/** One podium step — everyone tied on that rank stands on it together. */
 function PodiumSpot({
-  entry,
+  entries,
   place,
 }: {
-  entry: LeaderboardEntry | undefined;
+  entries: LeaderboardEntry[];
   place: 1 | 2 | 3;
 }) {
   const t = useT();
   const p = PODIUM[place];
+  const shown = entries.slice(0, MAX_PODIUM_AVATARS);
+  const shared = entries.length > 1;
   // Once the podium stands: a heart rises from each winner, one by one.
-  const playerId = entry?.playerId;
+  const ids = shown.map((e) => e.playerId).join("|");
   useEffect(() => {
-    if (!playerId) return;
+    if (!ids) return;
     const tm = setTimeout(
-      () => podiumEmoji(playerId, "❤️"),
+      () => ids.split("|").forEach((id) => podiumEmoji(id, "❤️")),
       PODIUM_HEART_MS + (place - 1) * PODIUM_HEART_GAP_MS,
     );
     return () => clearTimeout(tm);
-  }, [playerId, place]);
-  if (!entry) return <div />;
+  }, [ids, place]);
+  if (entries.length === 0) return <div />;
   return (
     <div className="flex flex-col items-center gap-1.5 min-w-0">
-      {/* Their reactions fly from here (ReactionOverlay). */}
+      <div className="flex items-center">
+        {shown.map((entry, i) => (
+          // Their reactions fly from here (ReactionOverlay).
+          <span
+            key={entry.playerId}
+            className={clsx("rounded-full p-1", i > 0 && "-ml-4 md:-ml-6")}
+            style={{ background: p.color }}
+            data-podium-player={entry.playerId}
+          >
+            <Image
+              src={entry.profilePic || DEFAULT_AVATAR}
+              width={104}
+              height={104}
+              alt=""
+              className={clsx(
+                "rounded-full object-cover",
+                shared ? "size-11 md:size-16" : p.avatar,
+              )}
+            />
+          </span>
+        ))}
+      </div>
       <span
-        className="rounded-full p-1"
-        style={{ background: p.color }}
-        data-podium-player={entry.playerId}
-      >
-        <Image
-          src={entry.profilePic || DEFAULT_AVATAR}
-          width={104}
-          height={104}
-          alt=""
-          className={clsx("rounded-full object-cover", p.avatar)}
-        />
-      </span>
-      <span
+        title={shared ? entries.map((e) => e.name).join(", ") : undefined}
         className={clsx(
           "mt-1.5 max-w-full truncate font-bold",
           place === 1 ? "text-base md:text-xl" : "text-sm md:text-[17px]",
         )}
       >
-        {entry.name}
+        {podiumNames(entries)}
       </span>
+      {shared && (
+        <span className="sr-only">
+          {t("Tied")}: {entries.map((e) => e.name).join(", ")}
+        </span>
+      )}
       <span className={clsx("text-xs md:text-sm font-semibold", mutedText)}>
-        {entry.score.toLocaleString()} {t("pts")}
+        {entries[0]!.score.toLocaleString()} {t("pts")}
       </span>
       <div
         className={clsx(
@@ -138,7 +165,11 @@ export default function LeaderBoard({
 
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
   const qCount = useAppSelector((state) => state.game.qCount);
-  // The full rankings list everyone, the podium's three included.
+  // Ranks are shared by equal scores, so a step can hold several players.
+  const onPlace = (place: number) =>
+    leaderboard.filter((entry) => entry.rank === place);
+  // The full rankings list everyone, the podium's included (a shared step
+  // names only some of its players, "Ana +2").
   const rest = leaderboard;
 
   return (
@@ -165,9 +196,9 @@ export default function LeaderBoard({
             </p>
           </div>
           <div className="flex-1 grid grid-cols-[1fr_1.15fr_1fr] gap-3 items-end min-h-0">
-            <PodiumSpot entry={leaderboard[1]} place={2} />
-            <PodiumSpot entry={leaderboard[0]} place={1} />
-            <PodiumSpot entry={leaderboard[2]} place={3} />
+            <PodiumSpot entries={onPlace(2)} place={2} />
+            <PodiumSpot entries={onPlace(1)} place={1} />
+            <PodiumSpot entries={onPlace(3)} place={3} />
           </div>
         </section>
 

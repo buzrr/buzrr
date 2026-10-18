@@ -68,6 +68,13 @@ Constraints already in the architecture:
    - `status = cancelled`, with `cancel_at_period_end` set and the paid period
      not yet over.
 
+   An `active` subscription stops counting once its billing date
+   (`currentPeriodEnd`) is more than 48h past without Dodo moving it, so a
+   renewal that was never paid or never reported can't keep Pro forever.
+   `BillingReconcileService` re-syncs such rows from Dodo every 12h (one
+   instance per pass, via a Redis `SET NX` lock), restoring Pro when the
+   renewal did go through. This is billing's only background timer.
+
    Everything else is Free: `on_hold`, `past_due`, `paused`, `failed`,
    `expired`, `pending`, or an immediate cancellation. Plans never appear in a
    JWT.
