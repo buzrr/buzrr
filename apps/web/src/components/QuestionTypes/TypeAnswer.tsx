@@ -9,7 +9,7 @@ import {
   mutedText,
   subtleCardClass,
 } from "@/components/Game/GameUI";
-import { SubmitButton } from "./Inputs";
+import { SubmitButton, useAnswerFocus } from "./Inputs";
 import { CorrectGlow, ResultBar } from "./MultipleChoice";
 import { useT } from "@/lib/i18n/context";
 import type { QuestionRenderer } from "./types";
@@ -42,6 +42,7 @@ function BoxesInput({
   onEnter: () => void;
 }) {
   const t = useT();
+  const inputRef = useAnswerFocus<HTMLInputElement>(disabled);
   const total = pattern.reduce((a, b) => a + b, 0);
   const chars = Array.from(value.replace(/\s+/g, "")).slice(0, total);
   const words = fillPattern(chars, pattern);
@@ -79,6 +80,7 @@ function BoxesInput({
         ))}
       </div>
       <input
+        ref={inputRef}
         type="text"
         autoFocus
         autoComplete="off"
@@ -116,6 +118,9 @@ function AnswerForm({
 }: ComponentProps<QuestionRenderer<"type_answer">["AnswerInput"]>) {
   const t = useT();
   const [text, setText] = useState("");
+  const inputRef = useAnswerFocus<HTMLInputElement>(
+    disabled || Boolean(selected),
+  );
   if (selected) {
     return (
       <div
@@ -164,6 +169,7 @@ function AnswerForm({
   return (
     <>
       <input
+        ref={inputRef}
         type="text"
         autoFocus
         autoComplete="off"

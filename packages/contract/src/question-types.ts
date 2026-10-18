@@ -433,11 +433,12 @@ export function matchTypedAnswer(
   accepted: readonly string[],
   ignoreTypos: boolean,
 ): { correct: boolean; precision: number; matched: string | null } {
-  const g = normalizeTypedAnswer(guess);
+  // Spacing is no typo: "blackholesun" is "Black Hole Sun".
+  const g = normalizeTypedAnswer(guess).replace(/ /g, "");
   let best = { correct: false, precision: 0, matched: null as string | null };
   if (!g) return best;
   for (const answer of accepted) {
-    const a = normalizeTypedAnswer(answer);
+    const a = normalizeTypedAnswer(answer).replace(/ /g, "");
     if (!a) continue;
     if (a === g) return { correct: true, precision: 1, matched: answer };
     if (!ignoreTypos) continue;

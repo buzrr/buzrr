@@ -5,7 +5,7 @@ import { useState, type ComponentProps } from "react";
 import { LuPlus, LuX } from "react-icons/lu";
 import { MAX_SUBMISSIONS } from "@buzrr/contract";
 import { inputClass, mutedText } from "@/components/Game/GameUI";
-import { SubmitButton } from "./Inputs";
+import { SubmitButton, useAnswerFocus } from "./Inputs";
 import type { QuestionRenderer } from "./types";
 import { useT, tx } from "@/lib/i18n/context";
 import { WordCloudView } from "./Visuals";
@@ -39,6 +39,7 @@ function RepeatInput({
   const [text, setText] = useState("");
   const sent = selected?.words ?? [];
   const full = sent.length >= MAX_SUBMISSIONS;
+  const inputRef = useAnswerFocus<HTMLInputElement>(disabled || full);
   const word = text.trim();
   const send = () => {
     if (!word || disabled || full) return;
@@ -55,6 +56,7 @@ function RepeatInput({
         </div>
       )}
       <input
+        ref={inputRef}
         className={clsx(inputClass, sent.length > 0 ? "mt-3" : "mt-4 md:mt-7")}
         placeholder={
           sent.length ? t("Add another word") : t("Type a word or short phrase")
@@ -96,6 +98,9 @@ function BatchInput({
   const [words, setWords] = useState<string[]>([]);
   const [text, setText] = useState("");
   const { maxAnswers, maxLength } = question;
+  const inputRef = useAnswerFocus<HTMLInputElement>(
+    disabled || Boolean(selected),
+  );
 
   if (selected) {
     return (
@@ -129,6 +134,7 @@ function BatchInput({
     <>
       <div className="flex gap-2 mt-4 md:mt-7">
         <input
+          ref={inputRef}
           className={inputClass}
           placeholder={t("Type a word or short phrase")}
           value={text}
