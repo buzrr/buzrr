@@ -42,6 +42,10 @@
   --animate-fade-up: fade-up 0.7s ease-out both;
   /* Host: the standings opening beside the revealed answer. */
   --animate-board-in: board-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  /* Host standings: rows leaving the list, sliding in from below, fading in. */
+  --animate-row-out: row-out 0.9s ease-in both;
+  --animate-row-slide-in: row-slide-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-row-fade-in: fade-in 0.9s ease-out both;
   /* Final podium: a winner drops onto their step. */
   --animate-podium-in: podium-in 0.75s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   --animate-pop: pop 0.25s ease-out;
@@ -110,6 +114,28 @@
     }
     50% {
       transform: translateY(-8px);
+    }
+  }
+
+  @keyframes row-out {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+  }
+
+  @keyframes row-slide-in {
+    from {
+      opacity: 0;
+      transform: translateY(140px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
     }
   }
 

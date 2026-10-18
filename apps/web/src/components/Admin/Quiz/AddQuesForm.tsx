@@ -1584,7 +1584,7 @@ const AddQuesForm = (props: {
               onClick={() => (addNextRef.current = true)}
               className={clsx(primaryButtonClass, "px-[26px]")}
             >
-              {mutation.isPending ? "Saving..." : "Done + Next"}
+              {mutation.isPending ? t("Saving…") : t("Done + Next")}
             </button>
           </>
         )}

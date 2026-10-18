@@ -273,7 +273,7 @@ export function buildSnapshot(
   }
 
   if (
-    (inReveal && leaderboardWithReveal(mod)) ||
+    (inReveal && leaderboardWithReveal(mod, meta.qIndex + 1 >= meta.qCount)) ||
     inScores ||
     meta.phase === "final" ||
     meta.phase === "ended"

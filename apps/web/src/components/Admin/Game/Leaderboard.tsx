@@ -4,7 +4,7 @@ import clsx from "clsx";
 import Image from "next/image";
 import { DEFAULT_AVATAR } from "@/constants";
 import { useAppSelector } from "@/state/hooks";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import EndQuizButton from "@/components/Admin/EndQuizButton";
 import ConfettiBurst from "@/components/ConfettiBurst";
 import {
@@ -14,10 +14,15 @@ import {
   panelClass,
   subtleCardClass,
 } from "@/components/Game/GameUI";
-import { HOST_LEADERBOARD_TOP, type LeaderboardEntry } from "@buzrr/contract";
+import type { LeaderboardEntry } from "@buzrr/contract";
 import { useT, pl } from "@/lib/i18n/context";
-import { previousStandings, rankBadgeClass } from "./QuesResult";
-import { PODIUM_STEP_MS, SETTLE_DELAY_MS, podiumStartMs } from "@/lib/podium";
+import { rankBadgeClass } from "./QuesResult";
+import { PODIUM_STEP_MS, podiumStartMs } from "@/lib/podium";
+import {
+  RANK_STAGGER_MS,
+  rowMotionClass,
+  useRankingReveal,
+} from "@/lib/ranking";
 import { AnimatedNumber, useFlipReorder } from "@/components/Game/motion";
 import { podiumEmoji } from "@/components/Game/Flyers";
 
@@ -179,34 +184,23 @@ export default function LeaderBoard({
   // Ranks are shared by equal scores, so a step can hold several players.
   const onPlace = (place: number) =>
     leaderboard.filter((entry) => entry.rank === place);
-  // The full rankings list everyone, the podium's included (a shared step
-  // names only some of its players, "Ana +2"). Straight after the last
-  // question (entries carry its `delta`) it starts on the standings before
-  // it, re-sorts, and shows the new points in green for DELTA_SHOW_MS.
-  const withDelta = leaderboard.some((e) => (e.delta ?? 0) > 0);
-  const [settled, setSettled] = useState(!withDelta);
-  const [deltaShown, setDeltaShown] = useState(withDelta);
+  // The rankings (the podium's included — a shared step names only some of
+  // its players, "Ana +2"): straight after the last question (entries carry
+  // its `delta`) the old top first, its points count up, then the new
+  // order; the new points stay green for DELTA_SHOW_MS (lib/ranking.ts).
+  const {
+    rows: rest,
+    counted: settled,
+    ranked,
+    animating: withDelta,
+    countMs,
+  } = useRankingReveal(leaderboard);
+  const animating = withDelta;
+  const [deltaShown, setDeltaShown] = useState(true);
   useEffect(() => {
-    if (!withDelta) return;
-    const a = setTimeout(() => setSettled(true), SETTLE_DELAY_MS);
-    const b = setTimeout(() => setDeltaShown(false), DELTA_SHOW_MS);
-    return () => {
-      clearTimeout(a);
-      clearTimeout(b);
-    };
-  }, [withDelta]);
-  const rest = useMemo(
-    () =>
-      (settled
-        ? leaderboard.map((e) => ({
-            ...e,
-            shownScore: e.score,
-            shownRank: e.rank,
-          }))
-        : previousStandings(leaderboard)
-      ).slice(0, HOST_LEADERBOARD_TOP),
-    [leaderboard, settled],
-  );
+    const t = setTimeout(() => setDeltaShown(false), DELTA_SHOW_MS);
+    return () => clearTimeout(t);
+  }, []);
   const listRef = useRef<HTMLDivElement>(null);
   useFlipReorder(listRef, rest.map((r) => r.playerId).join());
 
@@ -215,12 +209,12 @@ export default function LeaderBoard({
   // seconds until the host ends the game (the final music loops on its own).
   const [podiumStage, setPodiumStage] = useState(0);
   useEffect(() => {
-    const start = podiumStartMs(withDelta);
+    const start = podiumStartMs(withDelta, countMs);
     const timers = [1, 2, 3, 4].map((stage, i) =>
       setTimeout(() => setPodiumStage(stage), start + i * PODIUM_STEP_MS),
     );
     return () => timers.forEach(clearTimeout);
-  }, [withDelta]);
+  }, [withDelta, countMs]);
   const fireworks = podiumStage >= 4;
   const [burst, setBurst] = useState(0);
   useEffect(() => {
@@ -291,19 +285,31 @@ export default function LeaderBoard({
             ref={listRef}
             className="md:flex-1 md:min-h-0 md:overflow-y-auto px-3 md:px-[18px] pb-4 flex flex-col gap-1.5"
           >
-            {rest.map((lead) => (
+            {rest.map((lead, i) => (
               <div
                 key={lead.playerId}
                 data-flip-id={lead.playerId}
-                className="flex items-center gap-3 md:gap-[13px] rounded-[14px] border border-transparent px-2.5 py-[9px] transition-colors hover:bg-light-bg dark:hover:bg-card-dark hover:border-lprimary/15 dark:hover:border-white/5"
+                className={clsx(
+                  "flex items-center gap-3 md:gap-[13px] rounded-[14px] border border-transparent px-2.5 py-[9px] transition-colors hover:bg-light-bg dark:hover:bg-card-dark hover:border-lprimary/15 dark:hover:border-white/5",
+                  rowMotionClass(lead),
+                )}
               >
                 <span
+                  key={ranked ? "ranked" : "unranked"}
                   className={clsx(
                     "size-[30px] shrink-0 rounded-[9px] flex items-center justify-center text-sm font-bold transition-colors duration-500",
-                    rankBadgeClass(lead.shownRank),
+                    // Numbers only once the rows stand in their new order,
+                    // popping in top to bottom.
+                    rankBadgeClass(ranked ? lead.shownRank : 0),
+                    ranked && animating && "animate-pop-in",
                   )}
+                  style={
+                    ranked && animating
+                      ? { animationDelay: `${i * RANK_STAGGER_MS}ms` }
+                      : undefined
+                  }
                 >
-                  {lead.shownRank}
+                  {ranked ? lead.shownRank : ""}
                 </span>
                 <Image
                   src={lead.profilePic || DEFAULT_AVATAR}
@@ -326,7 +332,10 @@ export default function LeaderBoard({
                   </span>
                 )}
                 <span className="min-w-16 text-right text-base font-bold tabular-nums">
-                  <AnimatedNumber value={lead.shownScore} />
+                  <AnimatedNumber
+                    value={lead.shownScore}
+                    duration={lead.countMs || 800}
+                  />
                 </span>
               </div>
             ))}

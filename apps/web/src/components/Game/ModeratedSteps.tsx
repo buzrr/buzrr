@@ -206,7 +206,7 @@ export function PlayerScores({ playerId }: { playerId: string }) {
     <div className="w-full max-w-xl mx-auto px-4 py-6 md:py-10 text-dark dark:text-white">
       <section className={clsx(panelClass, "flex flex-col gap-3 p-5 md:p-7")}>
         <span className={labelClass}>
-          {t("Scores after question {n}", { n: qIndex + 1 })}
+          {t("Standings after question {n}", { n: qIndex + 1 })}
         </span>
         <div className="flex flex-col gap-1.5">
           {leaderboard.map((e, i) => (

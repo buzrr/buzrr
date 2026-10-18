@@ -31,7 +31,16 @@ export function scoresStepPending(mod: ModerationSettings | null): boolean {
   return Boolean(mod?.showScores && mod.confirmShowScores);
 }
 
-/** Whether the running leaderboard goes out together with the reveal. */
-export function leaderboardWithReveal(mod: ModerationSettings | null): boolean {
-  return mod === null || (mod.showScores && !mod.confirmShowScores);
+/**
+ * Whether the running leaderboard goes out together with the reveal. Not
+ * after a moderated game's last question: the final standings come next and
+ * show it first.
+ */
+export function leaderboardWithReveal(
+  mod: ModerationSettings | null,
+  lastQuestion = false,
+): boolean {
+  return (
+    mod === null || (mod.showScores && !mod.confirmShowScores && !lastQuestion)
+  );
 }

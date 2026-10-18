@@ -29,10 +29,10 @@ const SUB_OPTIONS: { key: SubKey; label: string; parent?: SubKey }[] = [
     key: "confirmShowAnswer",
     label: "Show the answer on click (first how the room voted)",
   },
-  { key: "showScores", label: "Show scores after every question" },
+  { key: "showScores", label: "Show the standings after every question" },
   {
     key: "confirmShowScores",
-    label: "Show the scores on click",
+    label: "On its own page",
     parent: "showScores",
   },
 ];

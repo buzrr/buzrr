@@ -257,7 +257,13 @@ const gameSlice = createSlice({
         moderation?: ModerationSettings;
       }>,
     ) => {
-      state.phase = "starting";
+      // A moderated game with a get-ready slide opens on it (the server's
+      // `phase-change: ready` follows) — never a countdown in between, whose
+      // music would start for a moment.
+      const mod = action.payload.moderation;
+      state.phase =
+        mod?.enabled && mod.confirmNextQuestion ? "ready" : "starting";
+      state.qIndex = 0;
       // Display-only: the server opens question 1 on its own timer.
       state.deadline = Date.now() + action.payload.remainingMs;
       state.countdownMs = action.payload.remainingMs;

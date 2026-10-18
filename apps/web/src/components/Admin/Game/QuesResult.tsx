@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import Image from "next/image";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LuBan, LuPlay, LuX } from "react-icons/lu";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -28,12 +28,7 @@ import {
   primaryButtonClass,
 } from "@/components/Game/GameUI";
 import { AnimatedNumber, useFlipReorder } from "@/components/Game/motion";
-import {
-  HOST_LEADERBOARD_TOP,
-  denseRanks,
-  revealHasPoint,
-  type LeaderboardEntry,
-} from "@buzrr/contract";
+import { revealHasPoint } from "@buzrr/contract";
 import { useAudioSegment } from "@/lib/audio-cues";
 import { RevealDensity } from "@/components/QuestionTypes/MultipleChoice";
 import { useGameSound } from "@/lib/sound/director";
@@ -46,26 +41,13 @@ import {
 } from "@/lib/moderation";
 import { useT, pl, currentLocale } from "@/lib/i18n/context";
 import type { GameSocket } from "@/types/socket";
-import { SETTLE_DELAY_MS } from "@/lib/podium";
+import {
+  RANK_STAGGER_MS,
+  rowMotionClass,
+  useRankingReveal,
+} from "@/lib/ranking";
 
 /** Hold the old standings until the answer bars have mostly filled. */
-
-/**
- * The standings as they were before this question: each score minus its
- * `delta`, re-ranked the way the server ranks (ties share a rank). The
- * server only sends the new ones.
- */
-export function previousStandings(entries: LeaderboardEntry[]) {
-  const sorted = entries
-    .map((entry, i) => ({ entry, i, prev: entry.score - (entry.delta ?? 0) }))
-    .sort((a, b) => b.prev - a.prev || a.i - b.i);
-  const ranks = denseRanks(sorted.map((s) => s.prev));
-  return sorted.map(({ entry, prev }, i) => ({
-    ...entry,
-    shownScore: prev,
-    shownRank: ranks[i]!,
-  }));
-}
 
 interface QuesResultProps {
   socket: GameSocket;
@@ -116,8 +98,9 @@ export default function QuesResult(props: QuesResultProps) {
   const showBoard =
     scoredQ &&
     !closed &&
-    (phase === "scores" || leaderboardWithReveal(moderation));
-  // "Show scores" after the answer was on screen: the standings slide in.
+    (phase === "scores" ||
+      leaderboardWithReveal(moderation, qIndex >= qCount - 1));
+  // "Show standings" after the answer was on screen: the standings slide in.
   const [boardSlidesIn, setBoardSlidesIn] = useState(false);
   const [boardWas, setBoardWas] = useState(showBoard);
   if (boardWas !== showBoard) {
@@ -177,16 +160,6 @@ export default function QuesResult(props: QuesResultProps) {
     question.options.length >= 5;
   const scored = question ? isScoredType(question.type) : true;
 
-  // Start on the pre-question standings, then count scores up and let rows
-  // glide into their new ranks.
-  const [settled, setSettled] = useState(false);
-  useEffect(() => {
-    if (!showBoard) return;
-    setSettled(false);
-    const t = setTimeout(() => setSettled(true), SETTLE_DELAY_MS);
-    return () => clearTimeout(t);
-  }, [showBoard]);
-
   // "Show answer": the whole question grows once, briefly, as the right
   // answer turns green.
   const answerRef = useRef<HTMLElement>(null);
@@ -220,20 +193,14 @@ export default function QuesResult(props: QuesResultProps) {
       { duration: 800, easing: "cubic-bezier(.2,.8,.2,1)" },
     );
   }, [phase]);
-  // The server sends the host the top HOST_LEADERBOARD_TOP before and after
-  // the question: the old top shows first, then the new one.
-  const rows = useMemo(
-    () =>
-      (settled
-        ? leaderboard.map((e) => ({
-            ...e,
-            shownScore: e.score,
-            shownRank: e.rank,
-          }))
-        : previousStandings(leaderboard)
-      ).slice(0, HOST_LEADERBOARD_TOP),
-    [leaderboard, settled],
-  );
+  // The old top RANKING_ROWS, then the points count up, then the new order
+  // (lib/ranking.ts). The server sends the host enough for both.
+  const {
+    rows,
+    counted: settled,
+    ranked,
+    animating,
+  } = useRankingReveal(leaderboard, showBoard);
   const playerCount = leaderboardTotal ?? leaderboard.length;
 
   // An emoji meant for the board (a right answer at the reveal, the scores
@@ -422,21 +389,33 @@ export default function QuesResult(props: QuesResultProps) {
               ref={listRef}
               className="md:flex-1 md:min-h-0 md:overflow-y-auto px-3 md:px-[18px] pb-2.5 flex flex-col gap-1.5"
             >
-              {rows.map((lead) => {
+              {rows.map((lead, i) => {
                 const connected = connectedById.get(lead.playerId);
                 return (
                   <div
                     key={lead.playerId}
                     data-flip-id={lead.playerId}
-                    className="group relative bg-white dark:bg-dark flex items-center gap-3 md:gap-[13px] rounded-[14px] border border-transparent px-2.5 py-[9px] transition-colors hover:bg-light-bg dark:hover:bg-card-dark hover:border-lprimary/15 dark:hover:border-white/5"
+                    className={clsx(
+                      "group relative bg-white dark:bg-dark flex items-center gap-3 md:gap-[13px] rounded-[14px] border border-transparent px-2.5 py-[9px] transition-colors hover:bg-light-bg dark:hover:bg-card-dark hover:border-lprimary/15 dark:hover:border-white/5",
+                      rowMotionClass(lead),
+                    )}
                   >
                     <span
+                      key={ranked ? "ranked" : "unranked"}
                       className={clsx(
                         "size-[30px] shrink-0 rounded-[9px] flex items-center justify-center text-sm font-bold transition-colors duration-500",
-                        rankBadgeClass(lead.shownRank),
+                        // Numbers only once the rows stand in their new order,
+                        // popping in top to bottom.
+                        rankBadgeClass(ranked ? lead.shownRank : 0),
+                        ranked && animating && "animate-pop-in",
                       )}
+                      style={
+                        ranked && animating
+                          ? { animationDelay: `${i * RANK_STAGGER_MS}ms` }
+                          : undefined
+                      }
                     >
-                      {lead.shownRank}
+                      {ranked ? lead.shownRank : ""}
                     </span>
                     <span className="relative shrink-0">
                       <Image
@@ -480,7 +459,10 @@ export default function QuesResult(props: QuesResultProps) {
                       </span>
                     )}
                     <span className="min-w-[52px] text-right text-base font-bold tabular-nums">
-                      <AnimatedNumber value={lead.shownScore} />
+                      <AnimatedNumber
+                        value={lead.shownScore}
+                        duration={lead.countMs || 800}
+                      />
                     </span>
                     <span className="flex gap-0.5 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
                       <button
@@ -541,7 +523,7 @@ export default function QuesResult(props: QuesResultProps) {
                 question ? revealHasPoint(question) : true,
               )
             : nextIsScores
-              ? t("Show scores")
+              ? t("Show standings")
               : isLastQuestion
                 ? t("Final leaderboard")
                 : nextQuestionLabel(qIndex, qCount)}

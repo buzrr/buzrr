@@ -479,18 +479,25 @@ const QuestionAndResult = (params: {
             <h2 className="text-[26px] md:text-[40px] font-extrabold tracking-[-0.02em]">
               {t(status.heading)}
             </h2>
-            <span
-              className={clsx(
-                "text-lg md:text-[26px] font-bold animate-fade-up",
-                status.accent,
-              )}
-            >
-              {params.status === "timesout"
-                ? t("No answer this round")
-                : params.status === "received"
-                  ? t("Not scored — thanks for answering")
-                  : t("+{n} points", { n: params.points ?? 0 })}
-            </span>
+            {/* Moderated with standings to come: the points come with them
+                (the scores step's own row, or the final standings). */}
+            {!(
+              placeLater &&
+              (params.status === "correct" || params.status === "incorrect")
+            ) && (
+              <span
+                className={clsx(
+                  "text-lg md:text-[26px] font-bold animate-fade-up",
+                  status.accent,
+                )}
+              >
+                {params.status === "timesout"
+                  ? t("No answer this round")
+                  : params.status === "received"
+                    ? t("Not scored — thanks for answering")
+                    : t("+{n} points", { n: params.points ?? 0 })}
+              </span>
+            )}
             {params.status !== "timesout" && you?.timeTakenMs != null && (
               <span className={clsx("text-sm font-semibold", mutedText)}>
                 {t("You answered within {s} seconds", {

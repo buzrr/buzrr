@@ -215,13 +215,14 @@ const playing = new Set<SoundHandle>();
 let fadeHoldUntil = 0;
 
 /**
- * Fade out everything that plays (the host pressed "Start"); the next
- * song — the "Be prepared!" reveal music, the countdown — starts after it.
+ * Fade out everything that plays over `fadeSec` (the host pressed "Start");
+ * the next song — the "Be prepared!" reveal music, the countdown — starts
+ * after `nextAfterSec`, over the end of the fade.
  */
-export function fadeOutAllSounds(fadeSec: number) {
+export function fadeOutAllSounds(fadeSec: number, nextAfterSec = fadeSec) {
   for (const h of playing) h.stop(fadeSec, true);
   playing.clear();
-  fadeHoldUntil = Date.now() + fadeSec * 1000;
+  fadeHoldUntil = Date.now() + nextAfterSec * 1000;
 }
 
 /** Which bed (loop) a phase plays; null = none. */
@@ -763,6 +764,10 @@ export function GameSounds({
   );
 }
 
+/** Past this many players the join ping plays at most every JOIN_PING_CROWD_GAP_MS. */
+const JOIN_PING_CROWD = 25;
+const JOIN_PING_CROWD_GAP_MS = 10_000;
+
 /** The host's lobby blopps for this many pops, then stays quiet. */
 const LOBBY_BLOPPS = 20;
 
@@ -774,6 +779,12 @@ const LOBBY_BLOPPS = 20;
 export function LiveSounds({ socket }: { socket: GameSocket | null }) {
   const s = useGameSound();
   const on = Boolean(s?.on);
+  // Players in the host's lobby list (for the join ping's pace).
+  const players = useAppSelector((st) => st.player.players.length);
+  const roomSize = useRef(players);
+  useEffect(() => {
+    roomSize.current = players;
+  });
   // The latest sound state for the handlers (the skin may load later).
   const sound = useRef(s);
   useEffect(() => {
@@ -801,8 +812,14 @@ export function LiveSounds({ socket }: { socket: GameSocket | null }) {
       blopps += 1;
       cue("bubble");
     };
-    // A crowd joining at once: one ping per 150 ms is plenty.
-    const ping = () => limited("join", 150, () => cue("join"));
+    // A crowd joining at once: one ping per 150 ms is plenty — and once the
+    // room is past JOIN_PING_CROWD, one every JOIN_PING_CROWD_GAP_MS.
+    const ping = () =>
+      limited(
+        "join",
+        roomSize.current > JOIN_PING_CROWD ? JOIN_PING_CROWD_GAP_MS : 150,
+        () => cue("join"),
+      );
     // Arcade's chip pling cuts through: at most one every 5 s.
     const onReaction = () =>
       limited(

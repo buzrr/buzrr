@@ -246,6 +246,7 @@ export const DE: Record<string, string> = {
   "Display name": "Anzeigename",
   Docs: "Doku",
   Done: "Fertig",
+  "Done + Next": "Speichern + Neue Frage",
   Download: "Herunterladen",
   "Download {kind} template": "{kind}-Vorlage herunterladen",
   Duel: "Duell",
@@ -655,12 +656,13 @@ export const DE: Record<string, string> = {
   "s each · about": "s pro Frage · ca.",
   "Save changes": "Änderungen speichern",
   "Saving results…": "Speichere Ergebnisse…",
+  "Saving…": "Speichere…",
   Scale: "Skala",
   "Scan to join": "Zum Beitreten scannen",
   SCORED: "GEWERTET",
   Scored: "Gewertet",
   "Scores after question": "Punkte nach Frage",
-  "Scores after question {n}": "Punkte nach Frage {n}",
+  "Standings after question {n}": "Zwischenstand nach Frage {n}",
   "Search by name or email…": "Nach Name oder E-Mail suchen…",
   "Search categories": "Kategorien suchen",
   "Search players": "Spieler suchen",
@@ -686,8 +688,9 @@ export const DE: Record<string, string> = {
     "Kurze Antworten, nach Häufigkeit gruppiert",
   "Show all quizzes": "Alle Quizze anzeigen",
   "Show answer": "Auflösung zeigen",
-  "Show scores": "Punkte zeigen",
-  "Show scores after every question": "Punkte nach jeder Frage zeigen",
+  "Show standings": "Zwischenstand zeigen",
+  "Show the standings after every question":
+    "Zwischenstand nach jeder Frage zeigen",
   "Showing all users.": "Alle Nutzer.",
   "Showing search results across all users.":
     "Suchergebnisse über alle Nutzer.",
@@ -961,7 +964,7 @@ export const DE: Record<string, string> = {
     "„Mach dich bereit“-Folie vor der ersten Frage (du startest die Runde)",
   "Show the answer on click (first how the room voted)":
     "Auflösung nach Klick (erst die Abstimmung zeigen)",
-  "Show the scores on click": "Punkte nach Klick",
+  "On its own page": "Auf eigener Seite",
   "Reactions again in {s} s": "Reaktionen wieder in {s} s",
   "Limit reached — wait a little.": "Limit erreicht – warte ein bisschen.",
   "You're on the podium — send emojis!":

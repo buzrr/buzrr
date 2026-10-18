@@ -241,6 +241,28 @@ describe("moderated question flow", () => {
     });
   });
 
+  it("standings shown with the answer stay away from the last question's answer", () => {
+    const closedAt = (index: number) =>
+      questionOpen(
+        {
+          answers: {
+            p1: answer(`q${index + 1}-a`, { isCorrect: true, score: 900 }),
+          },
+        },
+        {
+          phase: "closed",
+          moderation: moderated({ confirmShowScores: false }),
+        },
+        index,
+      );
+    // The first question: the answer comes with the standings.
+    expect(events(closedAt(0), { type: "host-next" })).toContain("leaderboard");
+    // The last: the final standings come next and show them first.
+    expect(events(closedAt(1), { type: "host-next" })).not.toContain(
+      "leaderboard",
+    );
+  });
+
   it("the last question's scores lead to the final leaderboard", () => {
     const last = questionOpen(
       {},

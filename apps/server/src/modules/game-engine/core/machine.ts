@@ -645,7 +645,7 @@ function reveal(
   });
   // Running leaderboard so the host screen needs no REST round trip — unless
   // a moderated game shows the standings as a step of its own (or not at all).
-  if (leaderboardWithReveal(mod)) {
+  if (leaderboardWithReveal(mod, meta.qIndex + 1 >= meta.qCount)) {
     effects.push({
       kind: "emit",
       to: ROOM,
@@ -752,7 +752,10 @@ function onRosterChanged(state: GameState): Transition {
     meta.phase === "final"
   ) {
     const inReveal = meta.phase !== "final";
-    if (meta.phase === "reveal" && !leaderboardWithReveal(moderationOf(meta))) {
+    if (
+      meta.phase === "reveal" &&
+      !leaderboardWithReveal(moderationOf(meta), meta.qIndex + 1 >= meta.qCount)
+    ) {
       return noop(state);
     }
     return noop(state, {

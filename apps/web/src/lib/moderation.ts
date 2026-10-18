@@ -9,9 +9,17 @@ export function scoresStepPending(mod: ModerationSettings | null): boolean {
   return Boolean(mod?.showScores && mod.confirmShowScores);
 }
 
-/** The running leaderboard is shown together with the reveal. */
-export function leaderboardWithReveal(mod: ModerationSettings | null): boolean {
-  return mod === null || (mod.showScores && !mod.confirmShowScores);
+/**
+ * The running leaderboard is shown together with the reveal — not after a
+ * moderated game's last question (the final standings come next).
+ */
+export function leaderboardWithReveal(
+  mod: ModerationSettings | null,
+  lastQuestion = false,
+): boolean {
+  return (
+    mod === null || (mod.showScores && !mod.confirmShowScores && !lastQuestion)
+  );
 }
 
 /** Label for the host's button that leaves the current question for good. */
@@ -33,6 +41,6 @@ export function closedNextLabel(
 ): string {
   if (mod?.showAnswer && reveals) return tx("Show answer");
   if (!reveals) return nextQuestionLabel(qIndex, qCount);
-  if (mod?.showScores && scored) return tx("Show scores");
+  if (mod?.showScores && scored) return tx("Show standings");
   return nextQuestionLabel(qIndex, qCount);
 }
