@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { denseRanks, type LeaderboardEntry } from "@buzrr/contract";
+import {
+  RANKING_ROWS,
+  denseRanks,
+  type LeaderboardEntry,
+} from "@buzrr/contract";
 import {
   RESORT_MS,
   SETTLE_DELAY_MS,
@@ -9,8 +13,7 @@ import {
   resortStartMs,
 } from "@/lib/podium";
 
-/** The host's standings show this many rows. */
-export const RANKING_ROWS = 20;
+export { RANKING_ROWS };
 /** After the re-sort the place numbers pop in top to bottom, this far apart. */
 export const RANK_STAGGER_MS = 90;
 

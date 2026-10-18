@@ -603,6 +603,11 @@ export const leaderboardSchema = z.object({
   isFinal: z.boolean(),
   /** Final leaderboard: decrypts the skin's preloaded final song. */
   finalSoundKey: z.string().optional(),
+  /**
+   * Final leaderboard: ms until the host's board has re-sorted and filled
+   * the podium (`finalRevealMs`) — players see their place then.
+   */
+  revealInMs: z.number().int().nonnegative().optional(),
 });
 
 const eloChangesSchema = z.record(

@@ -19,7 +19,6 @@ import { usePlayerSocket } from "@/hooks/usePlayerSocket";
 import { ReactionBar } from "@/components/Game/Flyers";
 import { GameSounds, SoundToggle } from "@/lib/sound/director";
 import { SCORES_EMOJI_TOP, quizSettingsSchema } from "@buzrr/contract";
-import { podiumDoneMs } from "@/lib/podium";
 import { playersApi } from "@/lib/modules/players/api";
 import { useT } from "@/lib/i18n/context";
 import { saveFinalResult } from "@/lib/final-result";
@@ -42,6 +41,9 @@ interface GameSessionWithQuiz extends GameSession {
  * arrives over the socket (`question-start` / `state-sync`), so no quiz
  * pre-fetch is needed for gameplay.
  */
+/** On the final standings the top this many get a blinking emoji bar. */
+const FINAL_BLINK_TOP = 15;
+
 const GamePage = (params: {
   player: { id: string };
   game: GameSessionWithQuiz;
@@ -69,6 +71,20 @@ const GamePage = (params: {
   const you = useAppSelector((state) => state.game.you);
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const moderation = useAppSelector((state) => state.game.moderation);
+  const finalRevealInMs = useAppSelector((state) => state.game.finalRevealInMs);
+  // The final standings: moderated, the place (and the podium's emoji call)
+  // waits until the host's board has re-sorted and filled the podium — the
+  // server says when (nothing to wait for after a reconnect).
+  const [finalRevealed, setFinalRevealed] = useState(false);
+  const atFinal = phase === "final" || phase === "ended";
+  useEffect(() => {
+    if (!atFinal) return;
+    const wait = moderation && phase === "final" ? (finalRevealInMs ?? 0) : 0;
+    const t = setTimeout(() => setFinalRevealed(true), wait);
+    return () => clearTimeout(t);
+  }, [atFinal, phase, moderation, finalRevealInMs]);
+  const finalRank =
+    finalRevealed && atFinal ? (mine?.rank ?? you?.rank ?? null) : null;
   // The question whose board got this player's emoji: the bar stays away
   // while that board (reveal, scores) is on screen.
   const [boardEmojiQ, setBoardEmojiQ] = useState<number | null>(null);
@@ -176,7 +192,17 @@ const GamePage = (params: {
             onSent={() => setBoardEmojiQ(qIndex)}
           />
         ) : (
-          <ReactionBar socket={socket} />
+          <ReactionBar
+            socket={socket}
+            // The final standings' top: an eye-catching bar — the podium is
+            // asked to share.
+            blink={finalRank !== null && finalRank <= FINAL_BLINK_TOP}
+            hint={
+              finalRank !== null && finalRank <= 3
+                ? t("Share your emojis now!")
+                : undefined
+            }
+          />
         ))}
       {phase !== "question" && phase !== "reveal" && phase !== "closed" && (
         <ConnectionStatusPill className="fixed left-3 bottom-3 z-40" />
@@ -240,11 +266,7 @@ const GamePage = (params: {
           score={mine?.score ?? you?.totalScore ?? 0}
           quizTitle={game.quiz.title ?? undefined}
           players={playerCount}
-          holdMs={
-            moderation && phase === "final"
-              ? podiumDoneMs(leaderboard.some((e) => (e.delta ?? 0) > 0))
-              : 0
-          }
+          held={!finalRevealed}
         />
       ) : (
         // "starting" — the pre-question countdown

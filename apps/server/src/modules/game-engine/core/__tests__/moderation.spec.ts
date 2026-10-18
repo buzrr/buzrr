@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { ModerationSettings } from "@buzrr/contract";
+import {
+  COUNT_PAUSE_MS,
+  PODIUM_STEP_MS,
+  RESORT_MS,
+  SETTLE_DELAY_MS,
+  countUpMs,
+  finalRevealMs,
+  type ModerationSettings,
+} from "@buzrr/contract";
 import { ANSWER_GRACE_MS } from "../../../../common/utils/answer-timing";
 import { START_COUNTDOWN_MS, step } from "../machine";
 import type { GameState } from "../state";
@@ -237,8 +245,17 @@ describe("moderated question flow", () => {
         entries: expect.arrayContaining([
           expect.objectContaining({ playerId: "p1", delta: 900 }),
         ]),
+        // When the host's podium stands: re-sort after a 900-point count-up.
+        revealInMs: finalRevealMs([{ score: 900, delta: 900 }]),
       },
     });
+    expect(finalRevealMs([{ score: 900, delta: 900 }])).toBe(
+      SETTLE_DELAY_MS +
+        countUpMs(900) +
+        COUNT_PAUSE_MS +
+        RESORT_MS +
+        3 * PODIUM_STEP_MS,
+    );
   });
 
   it("standings shown with the answer stay away from the last question's answer", () => {

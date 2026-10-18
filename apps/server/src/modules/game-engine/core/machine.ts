@@ -1,4 +1,9 @@
-import { isScoredType, isUnlimitedTime, revealHasPoint } from "@buzrr/contract";
+import {
+  finalRevealMs,
+  isScoredType,
+  isUnlimitedTime,
+  revealHasPoint,
+} from "@buzrr/contract";
 import { ANSWER_GRACE_MS } from "../../../common/utils/answer-timing";
 import { planBotAnswer } from "../../../common/utils/duel-bot";
 import {
@@ -669,6 +674,11 @@ function enterFinal(state: GameState, pacing: PacingStrategy): Transition {
     return noop(state);
   }
   const patch = { phase: "final" as const, qDeadline: 0 };
+  const finalEntries = buildLeaderboard(
+    state.scores,
+    state.roster,
+    state.answers,
+  );
   const effects: Effect[] = [
     { kind: "clear-timer" },
     // Waits on the host until the game ends; parked so the abandon sweep
@@ -683,8 +693,9 @@ function enterFinal(state: GameState, pacing: PacingStrategy): Transition {
         payload: {
           // With the last question's points (`delta`): the host's board
           // re-sorts once more and shows them.
-          entries: buildLeaderboard(state.scores, state.roster, state.answers),
+          entries: finalEntries,
           isFinal: true,
+          revealInMs: finalRevealMs(finalEntries),
           // The preloaded final song becomes playable now.
           ...(state.meta.finalSoundKey
             ? { finalSoundKey: state.meta.finalSoundKey }

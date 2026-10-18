@@ -1,7 +1,6 @@
 "use client";
 import clsx from "clsx";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import ConfettiBurst from "@/components/ConfettiBurst";
 import { clearFinalResult } from "@/lib/final-result";
 import { useT } from "@/lib/i18n/context";
@@ -22,10 +21,10 @@ interface Stats {
   /** Players in the final standings. */
   players?: number;
   /**
-   * Wait this long before showing the place: the host's board re-sorts and
-   * fills the podium first (moderated games).
+   * Not yet: the host's board re-sorts and fills the podium first
+   * (moderated games) — the place shows after.
    */
-  holdMs?: number;
+  held?: boolean;
 }
 
 const PLACE_COLOR: Record<number, string> = {
@@ -36,13 +35,7 @@ const PLACE_COLOR: Record<number, string> = {
 
 const Leaderboard = (params: Stats) => {
   const t = useT();
-  const holdMs = params.holdMs ?? 0;
-  const [held, setHeld] = useState(holdMs > 0);
-  useEffect(() => {
-    if (holdMs <= 0) return;
-    const tm = setTimeout(() => setHeld(false), holdMs);
-    return () => clearTimeout(tm);
-  }, [holdMs]);
+  const held = params.held ?? false;
   const onPodium =
     params.position !== null && params.position >= 1 && params.position <= 3;
   const ringColor = onPodium ? PLACE_COLOR[params.position!] : undefined;

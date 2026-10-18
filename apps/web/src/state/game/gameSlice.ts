@@ -47,6 +47,8 @@ export interface GameLiveState {
   leaderboard: LeaderboardEntry[];
   /** Players: how many are on the board when `leaderboard` is only its top. */
   leaderboardTotal: number | null;
+  /** Final leaderboard: when (ms after it came) the host's podium stands. */
+  finalRevealInMs: number | null;
   isFinalLeaderboard: boolean;
   players: {
     id: string;
@@ -128,6 +130,7 @@ const initialState: GameLiveState = {
   reveal: null,
   leaderboard: [],
   leaderboardTotal: null,
+  finalRevealInMs: null,
   isFinalLeaderboard: false,
   players: [],
   you: null,
@@ -365,10 +368,12 @@ const gameSlice = createSlice({
         total?: number;
         isFinal: boolean;
         finalSoundKey?: string;
+        revealInMs?: number;
       }>,
     ) => {
       state.leaderboard = action.payload.entries;
       state.leaderboardTotal = action.payload.total ?? null;
+      state.finalRevealInMs = action.payload.revealInMs ?? null;
       state.isFinalLeaderboard = action.payload.isFinal;
       if (action.payload.finalSoundKey) {
         state.finalSoundKey = action.payload.finalSoundKey;

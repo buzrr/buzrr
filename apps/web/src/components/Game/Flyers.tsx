@@ -280,6 +280,8 @@ export function ReactionBar({
   inline = false,
   oneShot = false,
   onSent,
+  blink = false,
+  hint,
 }: {
   socket: GameSocket | null;
   inline?: boolean;
@@ -289,6 +291,10 @@ export function ReactionBar({
    */
   oneShot?: boolean;
   onSent?: () => void;
+  /** Catch the eye (the final standings' top). */
+  blink?: boolean;
+  /** A call to send, shown beside the bar (the podium). */
+  hint?: string;
 }) {
   const t = useT();
   const [shot, setShot] = useState(false);
@@ -326,12 +332,8 @@ export function ReactionBar({
         taps.current = [];
         setBlockedUntil(0);
       }
-      if (p.winner) {
-        toast.success(t("You're on the podium — send emojis!"), {
-          toastId: "podium-emojis",
-          autoClose: 6000,
-        });
-      }
+      // A winner (no limit from now on) is told once the host's podium
+      // stands — the bar's "share your emojis" hint — not here, early.
     };
     const onLimited = ({ retryInMs }: { retryInMs: number }) => {
       setBlockedUntil(Date.now() + retryInMs);
@@ -400,6 +402,11 @@ export function ReactionBar({
 
   return (
     <>
+      {hint && !inline && (
+        <div className="fixed z-40 bottom-[7.25rem] left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-16 md:bottom-16 rounded-full bg-lprimary dark:bg-dprimary px-3.5 py-1.5 text-sm font-bold text-white dark:text-dark shadow-lg animate-bounce whitespace-nowrap pointer-events-none">
+          {hint}
+        </div>
+      )}
       <div
         className={clsx(
           "flex gap-1 rounded-full bg-white/85 dark:bg-dark/85 p-1.5 border border-lprimary/15 dark:border-white/10",
@@ -408,6 +415,7 @@ export function ReactionBar({
             : "fixed z-40 shadow-lg backdrop-blur flex-row bottom-14 left-1/2 -translate-x-1/2 md:flex-col md:left-auto md:translate-x-0 md:right-2 md:bottom-14",
           // Faded, but a tap still says why nothing happens.
           blockedFor > 0 && "opacity-45",
+          blink && blockedFor === 0 && "animate-bar-blink",
         )}
       >
         {BASE_REACTION_EMOJIS.map((emoji) => (
