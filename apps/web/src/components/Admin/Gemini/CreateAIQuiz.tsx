@@ -22,7 +22,7 @@ import {
 import ActionCard from "@/components/Admin/Home/ActionCard";
 import AiMagicLoader from "@/components/Admin/Gemini/AiMagicLoader";
 import RangeSlider from "@/components/ui/RangeSlider";
-import { useT, pl, useLocale } from "@/lib/i18n/context";
+import { useT, tx, pl, useLocale } from "@/lib/i18n/context";
 import { LANGUAGE_NAMES } from "@/lib/i18n/locale";
 import {
   fieldLabelClass,
@@ -40,7 +40,16 @@ const DEFAULTS: FormValues = {
   description: "",
   questions: 10,
   time: 20,
+  difficulty: 3,
 };
+/** Difficulty 1–5, by name. */
+const DIFFICULTY_NAMES = [
+  "Easy",
+  "Fairly easy",
+  "Medium",
+  "Fairly hard",
+  "Hard",
+] as const;
 
 export default function CreateAIQuiz({ className }: { className?: string }) {
   const t = useT();
@@ -82,6 +91,7 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
         description: data.description,
         questions: data.questions,
         time: data.time,
+        difficulty: data.difficulty,
         language: LANGUAGE_NAMES[locale],
       },
       {
@@ -348,6 +358,68 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                     )}
                   />
                 </div>
+                <Controller
+                  name="difficulty"
+                  control={control}
+                  render={({ field }) => {
+                    const level = Number(field.value) || 3;
+                    return (
+                      <div
+                        className={clsx(
+                          "flex flex-col gap-3 rounded-2xl p-4",
+                          subtleCardClass,
+                        )}
+                      >
+                        <div className={fieldLabelClass}>
+                          {t("Difficulty")}
+                          <span className="text-[15px] font-extrabold text-lprimary dark:text-dprimary">
+                            {tx(DIFFICULTY_NAMES[level - 1]!)}
+                          </span>
+                        </div>
+                        <div
+                          role="radiogroup"
+                          aria-label={t("Difficulty")}
+                          className="grid grid-cols-5 gap-1 rounded-xl p-[3px] bg-lprimary/8 dark:bg-white/5"
+                        >
+                          {DIFFICULTY_NAMES.map((name, i) => {
+                            const on = level === i + 1;
+                            return (
+                              <button
+                                key={name}
+                                type="button"
+                                role="radio"
+                                aria-checked={on}
+                                aria-label={tx(name)}
+                                title={tx(name)}
+                                onClick={() => field.onChange(i + 1)}
+                                className={clsx(
+                                  "rounded-[9px] py-2 text-sm font-bold tabular-nums cursor-pointer transition-colors",
+                                  on
+                                    ? "bg-white dark:bg-dark text-lprimary dark:text-dprimary shadow-[0_1px_3px_rgba(0,0,0,0.12)]"
+                                    : clsx(
+                                        mutedText,
+                                        "hover:text-dark dark:hover:text-white",
+                                      ),
+                                )}
+                              >
+                                {i + 1}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div
+                          className={clsx(
+                            "flex justify-between text-xs -mt-1",
+                            mutedText,
+                          )}
+                        >
+                          <span>{t("Easy")}</span>
+                          <span>{t("Hard")}</span>
+                        </div>
+                      </div>
+                    );
+                  }}
+                />
               </div>
 
               <div className="mt-[22px] flex flex-col md:flex-row items-stretch md:items-center gap-3.5 border-t border-lprimary/15 dark:border-white/10 px-5 pt-[18px] pb-6 md:px-7 md:pt-[22px] md:pb-[26px]">

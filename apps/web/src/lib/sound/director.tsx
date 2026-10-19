@@ -175,6 +175,12 @@ function useBuiltinOptions(skinId: string, role: Role): BuiltinSoundOptions {
 }
 
 const SKIN_SLOTS = soundSlotSchema.options;
+/**
+ * Synthesized skins on players' devices: +12 dB (limited). Measured through
+ * a phone-speaker high-pass, Arcade's lobby loop sat ~17 dB under the TV Game
+ * Show recording — most of its energy is bass a phone can't play.
+ */
+const PHONE_SYNTH_BOOST = 4;
 /** Lobby, reveal and scoreboard songs fade out this long before the next starts. */
 const FADE_OUT_SEC = 1;
 /** Closed this long before its deadline: an early close (music fades at once). */
@@ -416,6 +422,7 @@ export function GameSounds({
         fadeInSec: fadeInOf(synthSlot, o),
         // Synth loops run until the phase ends unless repeat is set off.
         repeat: o?.repeat === false ? false : undefined,
+        boost: role === "player" ? PHONE_SYNTH_BOOST : undefined,
         ...extra,
       });
     }

@@ -26,7 +26,8 @@ import { TextInput } from "@/components/ui/TextInput";
 import { useT, tx } from "@/lib/i18n/context";
 import { Button } from "@/components/ui/Button";
 
-const ROW_HEIGHT = 88;
+/** A first guess; rows are measured (taller on phones, actions wrap). */
+const ROW_HEIGHT = 76;
 const DEBOUNCE_MS = 300;
 
 export default function AdminsListClient() {
@@ -124,15 +125,16 @@ export default function AdminsListClient() {
               return (
                 <div
                   key={item.id}
+                  data-index={virtualRow.index}
+                  ref={virtualizer.measureElement}
                   style={{
                     position: "absolute",
                     top: 0,
                     left: 0,
                     width: "100%",
-                    height: `${virtualRow.size}px`,
                     transform: `translateY(${virtualRow.start}px)`,
                   }}
-                  className="flex items-center justify-between gap-4 border-b border-gray px-4"
+                  className="border-b border-gray px-3 md:px-4 py-3"
                 >
                   <AdminRow
                     item={item}
@@ -169,49 +171,68 @@ function AdminRow({
   onDemote: () => void;
   onResetPassword: () => void;
 }) {
+  const t = useT();
+  // One grid for every row, so avatar, name, role and actions line up
+  // down the list. Phones: the actions go under the name.
   return (
-    <>
-      <div className="flex items-center gap-3">
-        <Image
-          src={item.image || DEFAULT_AVATAR}
-          width={40}
-          height={40}
-          alt={item.name ?? item.email}
-          className="rounded-full"
-        />
-        <div>
-          <p className="font-bold text-dark dark:text-white">
-            {item.name ?? "Unnamed"}
-          </p>
-          <p className="text-sm text-off-dark dark:text-off-white">
-            {item.email}
-          </p>
-        </div>
-        <span className="ml-2 rounded-full bg-lprimary/20 dark:bg-dprimary/20 px-2 py-0.5 text-xs font-bold capitalize text-lprimary dark:text-dprimary">
-          {item.role}
+    <div className="grid grid-cols-[40px_minmax(0,1fr)_auto] md:grid-cols-[40px_minmax(0,1fr)_88px_auto] items-center gap-x-3 gap-y-2">
+      <Image
+        src={item.image || DEFAULT_AVATAR}
+        width={40}
+        height={40}
+        alt=""
+        className="size-10 rounded-full object-cover"
+      />
+      <div className="min-w-0">
+        <p className="truncate font-bold text-dark dark:text-white">
+          {item.name ?? t("Unnamed")}
+        </p>
+        <p
+          className="truncate text-sm text-off-dark dark:text-off-white"
+          title={item.email}
+        >
+          {item.email}
+        </p>
+      </div>
+      <span className="justify-self-end md:justify-self-start rounded-full bg-lprimary/20 dark:bg-dprimary/20 px-2 py-0.5 text-xs font-bold capitalize text-lprimary dark:text-dprimary">
+        {item.role}
+      </span>
+      <div className="col-start-2 col-span-2 md:col-start-auto md:col-span-1 flex items-center gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          className="flex-1 md:flex-none whitespace-nowrap !border !py-1.5"
+          onClick={onResetPassword}
+        >
+          {t("Reset password")}
+        </Button>
+        {/* Same width whether it promotes, demotes or (superadmin) is
+            empty, so "Reset password" stays in one column. */}
+        <span className="flex-1 md:flex-none md:w-40 flex">
+          {item.role === "user" && (
+            <Button
+              size="sm"
+              disabled={pending}
+              className="w-full whitespace-nowrap !py-1.5"
+              onClick={onPromote}
+            >
+              {t("Promote to admin")}
+            </Button>
+          )}
+          {item.role === "admin" && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={pending}
+              className="w-full whitespace-nowrap !border !py-1.5"
+              onClick={onDemote}
+            >
+              {t("Demote to user")}
+            </Button>
+          )}
         </span>
       </div>
-      <div className="flex items-center gap-2">
-        <Button size="sm" variant="ghost" onClick={onResetPassword}>
-          Reset password
-        </Button>
-        {item.role === "user" && (
-          <Button size="sm" disabled={pending} onClick={onPromote}>
-            Promote to admin
-          </Button>
-        )}
-        {item.role === "admin" && (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={pending}
-            onClick={onDemote}
-          >
-            Demote to user
-          </Button>
-        )}
-      </div>
-    </>
+    </div>
   );
 }
 

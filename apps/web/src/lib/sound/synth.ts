@@ -197,6 +197,18 @@ export function audioContext(): AudioContext | null {
 
 const hz = (semisFromA4: number) => 440 * Math.pow(2, semisFromA4 / 12);
 
+/** A brick-wall-ish limiter into the speakers (for boosted sound). */
+function limiter(ctx: BaseAudioContext): DynamicsCompressorNode {
+  const c = ctx.createDynamicsCompressor();
+  c.threshold.value = -6;
+  c.knee.value = 0;
+  c.ratio.value = 20;
+  c.attack.value = 0.003;
+  c.release.value = 0.15;
+  c.connect(ctx.destination);
+  return c;
+}
+
 let noiseBuffer: AudioBuffer | null = null;
 function noise(ctx: AudioContext) {
   if (!noiseBuffer) {
@@ -316,6 +328,11 @@ export function playBuiltin(
     fadeInSec?: number;
     /** Loops: false = one pass of BUILTIN_PASS_BARS bars, then fade out. */
     repeat?: boolean;
+    /**
+     * Make-up gain (through a limiter) for small speakers: a phone barely
+     * plays the synth's bass and kick, so its music was near silent there.
+     */
+    boost?: number;
   } = {},
 ): SoundHandle {
   const ctx = audioContext();
@@ -326,8 +343,14 @@ export function playBuiltin(
   }
   const p = SYNTH_SKINS[skinId as SynthSkinId] ?? SYNTH_SKINS["builtin:arcade"];
   const bus = ctx.createGain();
-  const level = opts.volume ?? 0.5;
-  bus.connect(ctx.destination);
+  const boost = opts.boost ?? 1;
+  const level = (opts.volume ?? 0.5) * boost;
+  const limit = boost > 1 ? limiter(ctx) : null;
+  bus.connect(limit ?? ctx.destination);
+  const unplug = () => {
+    bus.disconnect();
+    limit?.disconnect();
+  };
   const t0 = ctx.currentTime + 0.05;
   if (opts.fadeInSec && opts.fadeInSec > 0) {
     bus.gain.setValueAtTime(0.0001, ctx.currentTime);
@@ -345,12 +368,12 @@ export function playBuiltin(
     bus.gain.cancelScheduledValues(now);
     bus.gain.setValueAtTime(bus.gain.value, now);
     bus.gain.linearRampToValueAtTime(0.0001, now + fadeSec);
-    later(() => bus.disconnect(), fadeSec * 1000 + 200);
+    later(unplug, fadeSec * 1000 + 200);
   };
 
   // -- lobby cues (join / bubble / reaction): the skin's own variant ---------
   if (isCueSlot(slot)) {
-    bus.disconnect();
+    unplug();
     playCue(skinId, slot, (opts.volume ?? 0.45) / 0.45);
     return { stop: () => undefined };
   }

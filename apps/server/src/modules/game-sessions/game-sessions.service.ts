@@ -18,6 +18,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
 import { CreateRoomDto } from "./dto/create-room.dto";
 import { JoinRoomDto } from "./dto/join-room.dto";
+import { OPTION_ORDER } from "../../common/utils/option-order";
 
 const generateGameCode = customAlphabet("ABCDEFGHJKMNPQRSTUVWXYZ23456789", 6);
 
@@ -385,7 +386,7 @@ export class GameSessionsService {
         include: {
           questions: {
             where: { disabled: false },
-            include: { options: true },
+            include: { options: { orderBy: OPTION_ORDER } },
           },
           user: { select: { preferences: true } },
         },

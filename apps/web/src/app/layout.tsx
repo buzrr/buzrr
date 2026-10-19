@@ -18,6 +18,7 @@ import { getInstanceConfig } from "@/lib/instance";
 import { InstanceProvider } from "@/lib/instance-context";
 import { I18nProvider } from "@/lib/i18n/context";
 import { getLocale } from "@/lib/i18n/server";
+import { THEME_INIT_SCRIPT } from "@/lib/theme-init";
 
 // Instance options (TITLE, PRIVATE_BUZZ, …) come from the environment at
 // request time, so nothing is frozen at build.
@@ -95,7 +96,11 @@ export default async function RootLayout({
 }>) {
   const locale = await getLocale();
   return (
-    <html lang={locale}>
+    // The theme script sets `dark` on <html> before React hydrates.
+    <html lang={locale} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body
         className={clsx(
           sans.className,

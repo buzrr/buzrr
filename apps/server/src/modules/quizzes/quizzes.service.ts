@@ -36,6 +36,7 @@ import {
   imageType,
   shrinkImage,
 } from "../../common/storage/image-resize";
+import { inAuthoredOrder, OPTION_ORDER } from "../../common/utils/option-order";
 
 /**
  * Shape the model must return (sent to the provider as a JSON Schema for
@@ -69,6 +70,15 @@ const AI_QUIZ_JSON_SCHEMA = {
 };
 
 type AiQuestion = z.infer<typeof aiQuizOutputSchema>["questions"][number];
+
+/** What each difficulty (1–5) asks the model for. */
+const AI_DIFFICULTY: Record<number, string> = {
+  1: "Easy: common knowledge that most people know, in plain wording. Wrong options are clearly wrong to anyone who knows the topic a little.",
+  2: "Fairly easy: well-known facts about the topic, for casual players.",
+  3: "Medium: a mix of well-known facts and ones that need real knowledge of the topic.",
+  4: "Fairly hard: for players who know the topic well. Less obvious facts, and wrong options close to the correct one.",
+  5: "Hard: for experts. Specific details and lesser-known facts, with wrong options that are close and plausible.",
+};
 
 function shuffleArray<T>(array: T[]): void {
   for (let i = array.length - 1; i > 0; i--) {
@@ -174,7 +184,10 @@ export class QuizzesService {
     const source = await this.prisma.db.quiz.findFirst({
       where: { id: quizId, userId: user.userId },
       include: {
-        questions: { include: { options: true }, orderBy: { order: "asc" } },
+        questions: {
+          include: { options: { orderBy: OPTION_ORDER } },
+          orderBy: { order: "asc" },
+        },
       },
     });
     if (!source) {
@@ -212,10 +225,12 @@ export class QuizzesService {
               order: q.order,
               disabled: q.disabled,
               options: {
-                create: q.options.map((o) => ({
-                  title: o.title,
-                  isCorrect: o.isCorrect,
-                })),
+                create: inAuthoredOrder(
+                  q.options.map((o) => ({
+                    title: o.title,
+                    isCorrect: o.isCorrect,
+                  })),
+                ),
               },
             })),
           },
@@ -462,10 +477,12 @@ export class QuizzesService {
               config: question.config,
               createdById: user.userId,
               options: {
-                create: question.options.map((option) => ({
-                  title: option.title,
-                  isCorrect: option.isCorrect,
-                })),
+                create: inAuthoredOrder(
+                  question.options.map((option) => ({
+                    title: option.title,
+                    isCorrect: option.isCorrect,
+                  })),
+                ),
               },
             })),
           },
@@ -529,6 +546,8 @@ ${dto.description}
 
 Write exactly ${dto.questions} questions on that topic, in ${dto.language ?? "English"} (questions and all options).
 
+Difficulty: ${AI_DIFFICULTY[dto.difficulty ?? 3]}
+
 Rules:
 - Each question has exactly one correct answer and three plausible but clearly wrong answers.
 - Keep answer options SHORT so players can read all four within a few seconds: ideally 1-5 words, never more than about 60 characters. Put any needed context in the question, not in the options.
@@ -585,7 +604,7 @@ Rules:
           questions: {
             create: questionsArray.slice(0, dto.questions).map((q, index) => ({
               title: q.question,
-              options: { create: q.options },
+              options: { create: inAuthoredOrder(q.options) },
               timeOut: dto.time,
               order: index + 1,
               createdById: user.userId,

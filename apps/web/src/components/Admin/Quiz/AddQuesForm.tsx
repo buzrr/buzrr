@@ -10,12 +10,15 @@ import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
   LuCheck,
+  LuGripVertical,
   LuImagePlus,
   LuMusic,
   LuPlus,
+  LuShuffle,
   LuTrash2,
   LuX,
 } from "react-icons/lu";
+import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
 import AudioCueEditor from "@/components/Admin/Quiz/AudioCueEditor";
 import Image from "next/image";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -152,6 +155,19 @@ function singleCorrect(options: AuthoredOption[]): AuthoredOption[] {
     options.findIndex((o) => o.isCorrect),
   );
   return options.map((o, i) => ({ ...o, isCorrect: i === first }));
+}
+
+/** The options in a new random order — never the one they are in. */
+function shuffled(options: AuthoredOption[]): AuthoredOption[] {
+  if (options.length < 2) return options;
+  for (;;) {
+    const next = [...options];
+    for (let i = next.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [next[i], next[j]] = [next[j]!, next[i]!];
+    }
+    if (next.some((o, i) => o !== options[i])) return next;
+  }
 }
 
 /** The options a type starts with, carrying over what fits from `from`. */
@@ -1015,135 +1031,214 @@ const AddQuesForm = (props: {
                   const minOpts = isPoll ? MIN_POLL_OPTIONS : MIN_OPTIONS;
                   const maxOpts = isPoll ? MAX_POLL_OPTIONS : MAX_OPTIONS;
                   const multi = values.mcqMulti;
+                  // Drag a row by its grip to move it; the letters follow
+                  // the order, so the correct mark moves with its text.
+                  const move = (from: number, to: number) => {
+                    if (from === to) return;
+                    const next = [...opts];
+                    const [moved] = next.splice(from, 1);
+                    next.splice(to, 0, moved!);
+                    field.onChange(next);
+                  };
                   return (
                     <div className="flex flex-col gap-2">
                       <span className={fieldLabelClass}>
                         {t("Options")}
-                        <span className={counterClass}>
-                          {isPoll
-                            ? t("No correct answer")
-                            : multi
-                              ? t("Tap letters to mark the correct ones")
-                              : t("Tap a letter to mark it correct")}
-                        </span>
-                      </span>
-                      <div
-                        role={
-                          isPoll ? undefined : multi ? "group" : "radiogroup"
-                        }
-                        aria-label={isPoll ? undefined : t("Correct answers")}
-                        className="grid grid-cols-1 gap-2"
-                      >
-                        {opts.map((o, i) => {
-                          const isCorrect = !isPoll && o.isCorrect;
-                          return (
-                            <div
-                              key={i}
-                              className={clsx(
-                                "flex items-center gap-2.5 rounded-[14px] border-[1.5px] p-1.5 pr-3 transition-colors",
-                                isCorrect
-                                  ? "border-green-500 bg-green-500/8"
-                                  : titleError(i)
-                                    ? "border-red-light dark:border-red-dark bg-light-bg dark:bg-card-dark"
-                                    : "border-lprimary/15 dark:border-white/10 bg-light-bg dark:bg-card-dark focus-within:border-dprimary",
-                              )}
-                            >
-                              {isPoll ? (
-                                <OptionKey
-                                  index={i}
-                                  className="size-8 text-[15px]"
-                                />
-                              ) : (
-                                <button
-                                  type="button"
-                                  role={multi ? "checkbox" : "radio"}
-                                  aria-checked={isCorrect}
-                                  aria-label={t("Mark option {key} correct", {
-                                    key: OPTION_KEYS[i]!,
-                                  })}
-                                  onClick={() =>
-                                    multi
-                                      ? update(i, { isCorrect: !o.isCorrect })
-                                      : field.onChange(
-                                          opts.map((x, j) => ({
-                                            ...x,
-                                            isCorrect: j === i,
-                                          })),
-                                        )
-                                  }
-                                  className="relative shrink-0 cursor-pointer"
-                                >
-                                  <OptionKey
-                                    index={i}
-                                    className={clsx(
-                                      "size-8 text-[15px] transition-opacity",
-                                      !isCorrect &&
-                                        "opacity-80 hover:opacity-100",
-                                    )}
-                                  />
-                                  {isCorrect && (
-                                    <span className="absolute -right-1.5 -bottom-1.5 size-[18px] rounded-full bg-green-500 text-white flex items-center justify-center border-2 border-white dark:border-dark">
-                                      <LuCheck size={10} strokeWidth={3.5} />
-                                    </span>
-                                  )}
-                                </button>
-                              )}
-                              <input
-                                type="text"
-                                value={o.title}
-                                onChange={(e) =>
-                                  update(i, { title: e.target.value })
-                                }
-                                required
-                                maxLength={500}
-                                autoComplete="off"
-                                placeholder={t("Option {key}", {
-                                  key: OPTION_KEYS[i]!,
-                                })}
-                                aria-label={t("Option {key}", {
-                                  key: OPTION_KEYS[i]!,
-                                })}
-                                className="flex-1 min-w-0 bg-transparent outline-none py-1.5 text-[15px] font-medium placeholder:text-[#8a8896] dark:placeholder:text-muted-dark"
-                              />
-                              {resizable && opts.length > minOpts && (
-                                <button
-                                  type="button"
-                                  aria-label={t("Remove option {key}", {
-                                    key: OPTION_KEYS[i]!,
-                                  })}
-                                  onClick={() => {
-                                    const rest = opts.filter((_, j) => j !== i);
-                                    // Single choice must keep one correct option.
-                                    field.onChange(
-                                      !isPoll && !multi
-                                        ? singleCorrect(rest)
-                                        : rest,
-                                    );
-                                  }}
-                                  className="shrink-0 text-[#8a8896] dark:text-muted-dark hover:text-[#e5544e] cursor-pointer"
-                                >
-                                  <LuX size={16} />
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                        {resizable && opts.length < maxOpts && (
+                        <span className="flex items-center gap-2">
+                          <span className={counterClass}>
+                            {isPoll
+                              ? t("No correct answer")
+                              : multi
+                                ? t("Tap letters to mark the correct ones")
+                                : t("Tap a letter to mark it correct")}
+                          </span>
                           <button
                             type="button"
-                            onClick={() =>
-                              field.onChange([
-                                ...opts,
-                                { title: "", isCorrect: false },
-                              ])
-                            }
-                            className="flex items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-lprimary/25 dark:border-white/15 p-2.5 text-sm font-bold text-lprimary dark:text-dprimary cursor-pointer hover:border-dprimary"
+                            onClick={() => field.onChange(shuffled(opts))}
+                            title={t("Put the options in a random order")}
+                            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-bold text-lprimary dark:text-dprimary hover:bg-lprimary/10 dark:hover:bg-dprimary/10 cursor-pointer"
                           >
-                            <LuPlus size={16} />
-                            {t("Add option")}
+                            <LuShuffle size={14} />
+                            {t("Shuffle")}
                           </button>
-                        )}
-                      </div>
+                        </span>
+                      </span>
+                      <DragDropContext
+                        onDragEnd={(r) => {
+                          if (r.destination) {
+                            move(r.source.index, r.destination.index);
+                          }
+                        }}
+                      >
+                        <Droppable droppableId="options">
+                          {(drop) => (
+                            <div
+                              ref={drop.innerRef}
+                              {...drop.droppableProps}
+                              role={
+                                isPoll
+                                  ? undefined
+                                  : multi
+                                    ? "group"
+                                    : "radiogroup"
+                              }
+                              aria-label={
+                                isPoll ? undefined : t("Correct answers")
+                              }
+                              // Rows carry their gap as a margin (the drag
+                              // measures it); the last one's is taken back.
+                              className="flex flex-col -mb-2"
+                            >
+                              {opts.map((o, i) => {
+                                const isCorrect = !isPoll && o.isCorrect;
+                                return (
+                                  <Draggable
+                                    key={i}
+                                    draggableId={`option-${i}`}
+                                    index={i}
+                                  >
+                                    {(drag, snapshot) => (
+                                      <div
+                                        ref={drag.innerRef}
+                                        {...drag.draggableProps}
+                                        className={clsx(
+                                          "mb-2 flex items-center gap-2.5 rounded-[14px] border-[1.5px] p-1.5 pl-1 pr-3 transition-colors",
+                                          snapshot.isDragging &&
+                                            "shadow-[0_12px_28px_-16px_rgba(0,0,0,0.5)]",
+                                          isCorrect
+                                            ? "border-green-500 bg-green-500/8"
+                                            : titleError(i)
+                                              ? "border-red-light dark:border-red-dark bg-light-bg dark:bg-card-dark"
+                                              : "border-lprimary/15 dark:border-white/10 bg-light-bg dark:bg-card-dark focus-within:border-dprimary",
+                                          snapshot.isDragging &&
+                                            !isCorrect &&
+                                            "border-lprimary dark:border-dprimary",
+                                        )}
+                                      >
+                                        <span
+                                          {...drag.dragHandleProps}
+                                          aria-label={t("Move option {key}", {
+                                            key: OPTION_KEYS[i]!,
+                                          })}
+                                          className="shrink-0 -mr-1 cursor-grab text-[#8a8896] dark:text-muted-dark"
+                                        >
+                                          <LuGripVertical size={18} />
+                                        </span>
+                                        {isPoll ? (
+                                          <OptionKey
+                                            index={i}
+                                            className="size-8 text-[15px]"
+                                          />
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            role={multi ? "checkbox" : "radio"}
+                                            aria-checked={isCorrect}
+                                            aria-label={t(
+                                              "Mark option {key} correct",
+                                              {
+                                                key: OPTION_KEYS[i]!,
+                                              },
+                                            )}
+                                            onClick={() =>
+                                              multi
+                                                ? update(i, {
+                                                    isCorrect: !o.isCorrect,
+                                                  })
+                                                : field.onChange(
+                                                    opts.map((x, j) => ({
+                                                      ...x,
+                                                      isCorrect: j === i,
+                                                    })),
+                                                  )
+                                            }
+                                            className="relative shrink-0 cursor-pointer"
+                                          >
+                                            <OptionKey
+                                              index={i}
+                                              className={clsx(
+                                                "size-8 text-[15px] transition-opacity",
+                                                !isCorrect &&
+                                                  "opacity-80 hover:opacity-100",
+                                              )}
+                                            />
+                                            {isCorrect && (
+                                              <span className="absolute -right-1.5 -bottom-1.5 size-[18px] rounded-full bg-green-500 text-white flex items-center justify-center border-2 border-white dark:border-dark">
+                                                <LuCheck
+                                                  size={10}
+                                                  strokeWidth={3.5}
+                                                />
+                                              </span>
+                                            )}
+                                          </button>
+                                        )}
+                                        <input
+                                          type="text"
+                                          value={o.title}
+                                          onChange={(e) =>
+                                            update(i, { title: e.target.value })
+                                          }
+                                          required
+                                          maxLength={500}
+                                          autoComplete="off"
+                                          placeholder={t("Option {key}", {
+                                            key: OPTION_KEYS[i]!,
+                                          })}
+                                          aria-label={t("Option {key}", {
+                                            key: OPTION_KEYS[i]!,
+                                          })}
+                                          className="flex-1 min-w-0 bg-transparent outline-none py-1.5 text-[15px] font-medium placeholder:text-[#8a8896] dark:placeholder:text-muted-dark"
+                                        />
+                                        {resizable && opts.length > minOpts && (
+                                          <button
+                                            type="button"
+                                            aria-label={t(
+                                              "Remove option {key}",
+                                              {
+                                                key: OPTION_KEYS[i]!,
+                                              },
+                                            )}
+                                            onClick={() => {
+                                              const rest = opts.filter(
+                                                (_, j) => j !== i,
+                                              );
+                                              // Single choice must keep one correct option.
+                                              field.onChange(
+                                                !isPoll && !multi
+                                                  ? singleCorrect(rest)
+                                                  : rest,
+                                              );
+                                            }}
+                                            className="shrink-0 text-[#8a8896] dark:text-muted-dark hover:text-[#e5544e] cursor-pointer"
+                                          >
+                                            <LuX size={16} />
+                                          </button>
+                                        )}
+                                      </div>
+                                    )}
+                                  </Draggable>
+                                );
+                              })}
+                              {drop.placeholder}
+                            </div>
+                          )}
+                        </Droppable>
+                      </DragDropContext>
+                      {resizable && opts.length < maxOpts && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            field.onChange([
+                              ...opts,
+                              { title: "", isCorrect: false },
+                            ])
+                          }
+                          className="flex items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-lprimary/25 dark:border-white/15 p-2.5 text-sm font-bold text-lprimary dark:text-dprimary cursor-pointer hover:border-dprimary"
+                        >
+                          <LuPlus size={16} />
+                          {t("Add option")}
+                        </button>
+                      )}
                       {optionsError && (
                         <span className="text-xs text-red-light dark:text-red-dark">
                           {optionsError}

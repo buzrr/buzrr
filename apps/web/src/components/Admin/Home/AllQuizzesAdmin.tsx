@@ -47,7 +47,12 @@ export default function AllQuizzesAdmin({
     return <p className="text-red-light">{t("Could not load quizzes.")}</p>;
 
   return (
-    <div className={clsx(panelClass, "p-3 md:p-4 flex flex-col gap-1.5")}>
+    <div
+      className={clsx(
+        panelClass,
+        "p-3 md:p-4 flex flex-col gap-1.5 text-dark dark:text-white",
+      )}
+    >
       {(all.data ?? []).map((q) => {
         const mine = q.user.id === myUserId;
         return (
@@ -95,7 +100,7 @@ export default function AllQuizzesAdmin({
                   placeholder={t("new owner's email")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-56 rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent px-2 py-1 text-sm"
+                  className="w-56 rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent px-2 py-1 text-sm placeholder:text-[#8a8896] dark:placeholder:text-muted-dark"
                 />
                 <button
                   type="submit"

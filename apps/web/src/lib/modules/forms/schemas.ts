@@ -19,6 +19,7 @@ export const createAiQuizSchema = z.object({
     .int("Use whole seconds")
     .min(5, "At least 5 seconds")
     .max(600, "At most 600 seconds"),
+  difficulty: z.coerce.number().int().min(1).max(5),
 });
 
 export const createPlayerSchema = z.object({
