@@ -1,24 +1,52 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { GameSocket } from "@/types/socket";
 import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import { answerTimed } from "@/state/game/gameSlice";
 import { toast } from "react-toastify";
 import QuestionAndResult from "./QuesAndResult";
-import type { PublicQuestion, QuestionAnswer } from "@buzrr/contract";
-import type { GameSocket } from "@/types/socket";
+import type {
+  PublicQuestion,
+  QuestionAnswer,
+  SubmitAnswerAck,
+  SubmitAnswerPayload,
+} from "@buzrr/contract";
 import { acceptsMoreAnswers } from "@/components/QuestionTypes";
 import { useAudioSegment } from "@/lib/audio-cues";
 import { useT } from "@/lib/i18n/context";
 import { useGameSound } from "@/lib/sound/director";
 
+/** Sends an answer; the server's ack says whether (and what) it stored. */
+export type AnswerSender = (
+  payload: SubmitAnswerPayload,
+  ack: (result: SubmitAnswerAck) => void,
+) => void;
+
+/** A live game's sender: the socket's `submit-answer` and `request-sync`. */
+export function useSocketSender(socket: GameSocket | null | undefined) {
+  return useMemo(
+    () => ({
+      send: ((payload, ack) =>
+        socket?.emit("submit-answer", payload, ack)) as AnswerSender,
+      resync: () => {
+        socket?.emit("request-sync");
+      },
+    }),
+    [socket],
+  );
+}
+
 /**
- * Answers go over the socket and the server measures the time taken; the
- * client no longer reports its own clock. The screen stays on the question
- * until the server pushes the reveal.
+ * Answers go to the server (the socket's `submit-answer`, or REST when
+ * playing alone) and the server measures the time taken; the client never
+ * reports its own clock. The screen stays on the question until the server
+ * sends the reveal.
  */
 const Question = (params: {
   question: PublicQuestion;
-  socket: GameSocket;
+  send: AnswerSender;
+  /** Asks the server for the current state (after a refused answer). */
+  resync: () => void;
   quizTitle: string;
   gameCode: string;
   hideRoomCode?: boolean;
@@ -63,6 +91,7 @@ const Question = (params: {
   }, [params.question.id]);
 
   const dispatch = useAppDispatch();
+  const { send: sendAnswer, resync } = params;
   const send = useCallback(
     (picked: QuestionAnswer, opts?: { silent?: boolean }) => {
       const sentFor = liveQuestionId.current;
@@ -72,41 +101,37 @@ const Question = (params: {
       if (!more) setAnswer(picked);
       setSubmitted(true);
       setPending(true);
-      params.socket.emit(
-        "submit-answer",
-        { qIndex, answer: picked },
-        (result) => {
-          // An ack that arrives after the question moved on describes a
-          // question this screen has left. Acting on it would clobber the new
-          // question's state — unlocking an answer already sent for it, or
-          // dropping its pending pick — so ignore it entirely.
-          if (sentFor !== liveQuestionId.current) return;
-          setPending(false);
-          if (result.accepted) {
-            unacked.current = null;
-            if (result.timeTakenMs !== undefined) {
-              dispatch(answerTimed(result.timeTakenMs));
-            }
-            // The server sends back everything this player has sent so far.
-            if (result.answer) setAnswer(result.answer);
-            return;
-          }
-          // The server is the authority on what it stored, so unlock and ask
-          // for a snapshot rather than assuming: an answer sent just before a
-          // drop may have landed after all, and the sync will re-lock if so.
+      sendAnswer({ qIndex, answer: picked }, (result) => {
+        // An ack that arrives after the question moved on describes a
+        // question this screen has left. Acting on it would clobber the new
+        // question's state — unlocking an answer already sent for it, or
+        // dropping its pending pick — so ignore it entirely.
+        if (sentFor !== liveQuestionId.current) return;
+        setPending(false);
+        if (result.accepted) {
           unacked.current = null;
-          if (!more) {
-            setSubmitted(false);
-            setAnswer(null);
+          if (result.timeTakenMs !== undefined) {
+            dispatch(answerTimed(result.timeTakenMs));
           }
-          if (!opts?.silent) {
-            toast.error(result.reason ?? t("Answer was not accepted"));
-          }
-          params.socket.emit("request-sync");
-        },
-      );
+          // The server sends back everything this player has sent so far.
+          if (result.answer) setAnswer(result.answer);
+          return;
+        }
+        // The server is the authority on what it stored, so unlock and ask
+        // for a snapshot rather than assuming: an answer sent just before a
+        // drop may have landed after all, and the sync will re-lock if so.
+        unacked.current = null;
+        if (!more) {
+          setSubmitted(false);
+          setAnswer(null);
+        }
+        if (!opts?.silent) {
+          toast.error(result.reason ?? t("Answer was not accepted"));
+        }
+        params.resync();
+      });
     },
-    [params.socket, qIndex, more, dispatch],
+    [sendAnswer, resync, qIndex, more, dispatch],
   );
 
   /**

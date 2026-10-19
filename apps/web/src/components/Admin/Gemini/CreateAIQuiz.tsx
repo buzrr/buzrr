@@ -22,6 +22,11 @@ import {
 import ActionCard from "@/components/Admin/Home/ActionCard";
 import AiMagicLoader from "@/components/Admin/Gemini/AiMagicLoader";
 import RangeSlider from "@/components/ui/RangeSlider";
+import Segmented from "@/components/ui/Segmented";
+import {
+  QUESTION_TYPE_META,
+  QuestionTypeIcon,
+} from "@/components/QuestionTypes/meta";
 import { useT, tx, pl, useLocale } from "@/lib/i18n/context";
 import { LANGUAGE_NAMES } from "@/lib/i18n/locale";
 import {
@@ -41,7 +46,17 @@ const DEFAULTS: FormValues = {
   questions: 10,
   time: 20,
   difficulty: 3,
+  multipleChoice: 3,
+  trueFalse: 1,
+  typeAnswer: 1,
 };
+/** The scored types the AI writes, each none / few / medium / many. */
+const AI_TYPES = [
+  { field: "multipleChoice", type: "multiple_choice" },
+  { field: "trueFalse", type: "true_false" },
+  { field: "typeAnswer", type: "type_answer" },
+] as const;
+const AMOUNT_NAMES = ["None", "Few", "Medium", "Many"] as const;
 /** Difficulty 1–5, by name. */
 const DIFFICULTY_NAMES = [
   "Easy",
@@ -66,17 +81,21 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
       defaultValues: DEFAULTS,
     });
 
-  const [title, description, questions, time] = watch([
+  const [title, description, questions, time, mc, tf, ta] = watch([
     "title",
     "description",
     "questions",
     "time",
+    "multipleChoice",
+    "trueFalse",
+    "typeAnswer",
   ]);
   const n = Number(questions) || 0;
   const secs = Number(time) || 0;
   const canGenerate =
     title.trim().length > 0 &&
     description.trim().length > 0 &&
+    mc + tf + ta > 0 &&
     !mutation.isPending;
 
   const close = () => {
@@ -92,6 +111,9 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
         questions: data.questions,
         time: data.time,
         difficulty: data.difficulty,
+        multipleChoice: data.multipleChoice,
+        trueFalse: data.trueFalse,
+        typeAnswer: data.typeAnswer,
         language: LANGUAGE_NAMES[locale],
       },
       {
@@ -420,6 +442,43 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                     );
                   }}
                 />
+                <div
+                  className={clsx(
+                    "flex flex-col gap-3 rounded-2xl p-4",
+                    subtleCardClass,
+                  )}
+                >
+                  <div className={fieldLabelClass}>{t("Question types")}</div>
+                  {AI_TYPES.map(({ field: name, type }) => (
+                    <Controller
+                      key={name}
+                      name={name}
+                      control={control}
+                      render={({ field }) => (
+                        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+                          <span className="inline-flex items-center gap-2 text-sm font-semibold">
+                            <QuestionTypeIcon type={type} size={16} />
+                            {tx(QUESTION_TYPE_META[type].name)}
+                          </span>
+                          <Segmented<number>
+                            label={tx(QUESTION_TYPE_META[type].name)}
+                            value={field.value}
+                            onChange={field.onChange}
+                            options={AMOUNT_NAMES.map((amount, i) => ({
+                              value: i,
+                              label: tx(amount),
+                            }))}
+                          />
+                        </div>
+                      )}
+                    />
+                  ))}
+                  {mc + tf + ta === 0 && (
+                    <span className="text-xs text-red-light dark:text-red-dark">
+                      {t("Pick at least one question type.")}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="mt-[22px] flex flex-col md:flex-row items-stretch md:items-center gap-3.5 border-t border-lprimary/15 dark:border-white/10 px-5 pt-[18px] pb-6 md:px-7 md:pt-[22px] md:pb-[26px]">

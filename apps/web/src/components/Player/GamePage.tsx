@@ -6,6 +6,7 @@ import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import type { GameSession } from "@/types/db";
 import { WaitGameStart, Question, Result, LeaderBoard } from "./GameScreens";
+import { useSocketSender } from "./GameScreens/Question";
 import ConnectionBanner from "@/components/ConnectionBanner";
 import GetReady from "@/components/Game/GetReady";
 import {
@@ -160,6 +161,8 @@ const GamePage = (params: {
     router.replace(`/player/joinRoom/${params.player.id}`);
   };
 
+  const sender = useSocketSender(socket);
+
   const settings = quizSettingsSchema.safeParse(game.quiz.settings ?? {});
   const reactionsOn = settings.success ? settings.data.reactions : true;
 
@@ -236,7 +239,8 @@ const GamePage = (params: {
         question && socket ? (
           <Question
             question={question}
-            socket={socket}
+            send={sender.send}
+            resync={sender.resync}
             quizTitle={game.quiz.title ?? ""}
             gameCode={game.gameCode}
             hostName={game.creator?.name}

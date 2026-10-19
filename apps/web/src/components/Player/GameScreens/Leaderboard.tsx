@@ -73,7 +73,7 @@ const Leaderboard = (params: Stats) => {
         >
           <span className={labelClass}>
             {params.quizTitle
-              ? `${params.quizTitle} · final results`
+              ? t("{title} · final results", { title: params.quizTitle })
               : t("Final results")}
           </span>
           <div

@@ -42,6 +42,10 @@ export async function createAiQuiz(
     time: number;
     /** 1 (easy) to 5 (hard). */
     difficulty?: number;
+    /** How many of each type: 0 none, 1 few, 2 medium, 3 many. */
+    multipleChoice?: number;
+    trueFalse?: number;
+    typeAnswer?: number;
     /** Language to write the quiz in (the UI language). */
     language?: string;
   },

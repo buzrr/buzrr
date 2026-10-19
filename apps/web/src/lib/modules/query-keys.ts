@@ -17,6 +17,11 @@ export const queryKeys = {
     playerPlay: (playerId: string) =>
       ["gameSessions", "playerPlay", playerId] as const,
   },
+  solo: {
+    all: ["solo"] as const,
+    tests: (quizId: string) => ["solo", "tests", quizId] as const,
+    report: (id: string) => ["solo", "report", id] as const,
+  },
   users: {
     myStats: ["users", "me", "stats"] as const,
   },

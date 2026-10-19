@@ -15,6 +15,7 @@ import ConfettiBurst from "@/components/ConfettiBurst";
 import ConnectionBanner from "@/components/ConnectionBanner";
 import { Button } from "@/components/ui/Button";
 import { Question, Result } from "@/components/Player/GameScreens";
+import { useSocketSender } from "@/components/Player/GameScreens/Question";
 import GetReady from "@/components/Game/GetReady";
 import ReportQuestionButton from "./ReportQuestionButton";
 import DuelAudio, { type DuelOutcome } from "./DuelAudio";
@@ -46,6 +47,7 @@ export default function DuelGameClient({ gameCode }: { gameCode: string }) {
     token: token ?? undefined,
   });
 
+  const sender = useSocketSender(socket);
   const phase = useAppSelector((state) => state.game.phase);
   const question = useAppSelector((state) => state.game.question);
   const you = useAppSelector((state) => state.game.you);
@@ -102,7 +104,8 @@ export default function DuelGameClient({ gameCode }: { gameCode: string }) {
             </div>
             <Question
               question={question}
-              socket={socket}
+              send={sender.send}
+              resync={sender.resync}
               quizTitle={title}
               gameCode={gameCode}
               hideRoomCode

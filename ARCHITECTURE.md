@@ -67,8 +67,9 @@ Both game modes run this same machine. Classic rooms are **host-paced**
 (`reveal` waits for the host to advance) and are backed by a `GameSession` lobby
 row; duels are **hostless**, exist only in Redis, and auto-advance after a 4s
 reveal. "How the game moves forward" is a **pacing strategy** the machine
-consults, so a third mode (self-paced, planned) is a new strategy rather than
-branches through the engine.
+consults, rather than branches through the engine. Self-paced play ("Play
+alone" tests, ADR-016) runs outside this machine over REST, reusing its pure
+answer, timing and scoring rules.
 
 The machine is a **pure function** — `step(state, event, now) → (newState,
 effects)` in `game-engine/core/` — with no Redis, sockets or timers in it.

@@ -243,6 +243,8 @@ const QuestionAndResult = (params: {
   /** Host of the quiz — shown as "Quiz by". Omitted for duels (no host). */
   hostName?: string | null;
   hostImage?: string | null;
+  /** Result screen: what moves on (playing alone), instead of waiting. */
+  next?: ReactNode;
 }) => {
   const t = useT();
   const locale = useLocale();
@@ -532,17 +534,19 @@ const QuestionAndResult = (params: {
               <StandingCard standing={standing} playerCount={players.length} />
             )}
             <div className="mt-4 md:mt-[26px]">
-              <WaitingDots>
-                {params.hideRoomCode
-                  ? isLast
-                    ? t("Final results coming up")
-                    : t("Next question coming up")
-                  : isLast
-                    ? t("Waiting for the final results")
-                    : t("Waiting for the host to start question {n}", {
-                        n: qIndex + 2,
-                      })}
-              </WaitingDots>
+              {params.next ?? (
+                <WaitingDots>
+                  {params.hideRoomCode
+                    ? isLast
+                      ? t("Final results coming up")
+                      : t("Next question coming up")
+                    : isLast
+                      ? t("Waiting for the final results")
+                      : t("Waiting for the host to start question {n}", {
+                          n: qIndex + 2,
+                        })}
+                </WaitingDots>
+              )}
             </div>
           </section>
         )}

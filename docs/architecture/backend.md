@@ -32,6 +32,7 @@ Global modules: `ConfigModule`, `RedisModule` (3 ioredis clients),
 | `moderation`     | `GET /moderation/questions?status=pending\|approved\|unapproved`, `GET .../counts`, `PATCH .../approve` · `.../unapprove` · `.../pending` · `.../categories` (bulk, `{ ids }` ≤100; skipped ids reported back), `PATCH .../:id/approve`, `PATCH .../:id/unapprove`, `PATCH .../:id/pending` (back to review), `PATCH .../:id/categories` (retag; no re-moderation) — `@Roles("admin","superadmin")`              | Categories                               |
 | `categories`     | `GET /categories` (any account — the list with question counts), `POST`/`PATCH`/`DELETE /categories[/:id]` (`@Roles("admin","superadmin")`; delete cascades tags + per-category ratings); `CategoriesService.assertExist` validates `categoryIds` on admin writes. **Only admins tag questions** (standalone create + moderation endpoints); quiz question saves and `POST /quizzes/import` ignore `categoryIds` | —                                        |
 | `admin-users`    | `GET /superadmin/users`, `PATCH /superadmin/users/:id/role` — `@Roles("superadmin")`                                                                                                                                                                                                                                                                                                                             | —                                        |
+| `solo`           | "Play alone" (ADR-016). Host: `POST/GET /solo-tests`, `GET /solo-tests/:id/report`, `PATCH/DELETE /solo-tests/:id`. Player (guest JWT): `GET /solo/:code` (public, IP rate limit), `POST /solo/:code/attempt`, `POST /solo/attempts/:id/next`, `POST /solo/attempts/:id/answer`                                                                                                                                  | question types                           |
 | `users`          | `GET /users/me/stats` (aggregates over GameResultEntry)                                                                                                                                                                                                                                                                                                                                                          | —                                        |
 | `billing`        | `GET /billing/me`, `POST /billing/checkout`, `POST /billing/portal`, `POST /billing/sync` (`report` rate profile), `POST /billing/ai-tokens/reserve` + `/release` (called by Buzrr-AI with the caller's JWT), `POST /billing/webhooks/dodo` (`@Public()`, Dodo signature) — see [Billing](#billing--entitlements-srcmodulesbilling)                                                                              | Dodo SDK                                 |
 | `duel`           | see [duels.md](duels.md)                                                                                                                                                                                                                                                                                                                                                                                         | GameEngine                               |
@@ -71,16 +72,30 @@ services.
 - `POST /quizzes/import` (`importQuestions`): the contract's `importQuizSchema`
   fixes the envelope; each question (no `type` → multiple choice) is checked
   by its type's handler, and a failure names the question (`Question 3: …`).
-- `POST /quizzes/ai` (`createWithAi`): prompt → the configured
-  `TextGenerator.generateJson` (Gemini `responseSchema`, or OpenAI-compatible
-  `response_format: json_schema`) with a JSON Schema derived from the zod
-  `aiQuizOutputSchema` (`question`, `correctAnswer`, three `wrongAnswers`);
-  the reply is re-validated with the same schema, blank/duplicate-option
-  questions are dropped, options shuffled. The prompt asks for short options
-  (≈1–5 words, ≤60 chars) so players can read them in time. Timeouts → 503,
-  other failures or off-schema output → 502, under-generation → 400,
-  no model configured → 400. Whole quiz insert is one transaction. Reserves
-  one AI token before generating; any failure refunds it.
+- `POST /quizzes/ai` (`createWithAi`, `ai-quiz.ts`, `ai-mix.ts`,
+  `ai-leak.ts`): the host picks a difficulty (1–5) and how much multiple
+  choice, true / false and type-answer (none / few / medium / many,
+  `allocateTypes`). The prompt carries the quiz title and topic; the
+  configured `TextGenerator.generateJson` (Gemini `responseSchema`, or
+  OpenAI-compatible `response_format: json_schema`) returns one list per type
+  (`aiQuizOutputSchema`), re-validated with the same schema.
+  - **Write:** about 25% spare questions are asked for. Blank / duplicate
+    ones and questions that **give their answer away** (the answer, or a
+    telling word of it that no wrong option shares, in the question; the
+    answer in the quiz title — `choiceLeaks` / `typedLeaks`) are dropped.
+  - **Review (agentic):** a second call reviews every picked question against
+    the rules (leaks, facts, a single right answer, ambiguity, weak
+    distractors, difficulty) and rewrites the weak ones
+    (`aiReviewOutputSchema`); rewrites pass the same checks or are dropped
+    (`applyReview`), and the rewrites are reviewed once more
+    (`AI_REVIEW_ROUNDS` = 2). A failed review keeps the questions.
+  - **Fill:** if too few remain, one more write + review for the rest
+    (avoiding the questions already taken); then each question is checked by
+    its type's handler, as on import, and the order mixed.
+  - Timeouts → 503, other failures or off-schema output → 502,
+    under-generation → 400, no model configured → 400. Whole quiz insert is
+    one transaction. Reserves one AI token before generating; any failure
+    refunds it.
 
 ## Moderation
 

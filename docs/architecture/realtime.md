@@ -64,9 +64,9 @@ in meta as `pacing` (games from before the field fall back by mode):
   close once every **connected** rostered player has answered.
 - A host-paced reveal whose parked deadline comes due is re-parked, not
   advanced.
-- Self-paced play (each player on their own clock) is planned; the strategy
-  is where its advance rules belong, but it also needs per-player question
-  state that `GameState` doesn't model yet (ADR-012).
+- Self-paced play (each player on their own clock) is not a strategy: it is
+  "Play alone" (tests), a REST mode outside the room engine that reuses its
+  pure rules (ADR-016).
 
 ## Timing & timer ownership (multi-instance model)
 

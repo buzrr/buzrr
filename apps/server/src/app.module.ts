@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { SignAssetsInterceptor } from "./common/interceptors/sign-assets.interceptor";
+import { SoloModule } from "./modules/solo/solo.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { CommonModule } from "./common/common.module";
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
@@ -40,6 +41,7 @@ import { SoundSkinsModule } from "./modules/sound-skins/sound-skins.module";
     BillingModule,
     DuelModule,
     UsersModule,
+    SoloModule,
     RealtimeModule,
   ],
   providers: [

@@ -31,6 +31,7 @@ import {
   mergeAnswers,
   preloadImageUrls,
   preloadUrls,
+  questionStats,
   summarizeAnswers,
   toLiveQuestion,
 } from "../question-types";
@@ -1303,12 +1304,35 @@ export class GameEngineService
     const roster = await this.store.roster(gameCode);
     const rosterById = new Map(roster.map((p) => [p.id, p]));
     const correctCounts = new Map<string, number>();
+    // Classic games keep how each question went (the host's report) —
+    // the questions that were reached, as they were played.
+    const questions =
+      meta.mode === "classic"
+        ? ((await this.store.loadState(gameCode, ["questions"]))?.questions ??
+          [])
+        : [];
+    const questionRows: Prisma.GameResultQuestionCreateWithoutResultInput[] =
+      [];
     for (let i = 0; i < meta.qCount; i++) {
       const answers = await this.store.getAnswers(gameCode, i);
       for (const [playerId, a] of Object.entries(answers)) {
         if (a.isCorrect) {
           correctCounts.set(playerId, (correctCounts.get(playerId) ?? 0) + 1);
         }
+      }
+      const question = questions[i];
+      if (question && i <= meta.qIndex) {
+        const stats = questionStats(
+          question,
+          i,
+          answerEntries(answers, roster),
+          Object.values(answers).map((a) => a.timeTakenMs),
+        );
+        questionRows.push({
+          ...stats,
+          options: stats.options as unknown as Prisma.InputJsonValue,
+          summary: stats.summary as unknown as Prisma.InputJsonValue,
+        });
       }
     }
 
@@ -1372,6 +1396,9 @@ export class GameEngineService
           outcome: outcomes.get(e.playerId) ?? null,
         })),
       },
+      ...(questionRows.length > 0
+        ? { questions: { create: questionRows } }
+        : {}),
     });
 
     try {

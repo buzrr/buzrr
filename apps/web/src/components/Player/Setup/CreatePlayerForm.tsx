@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import clsx from "clsx";
 import SelectProfile from "@/components/Player/SelectProfile";
 import { toast } from "react-toastify";
@@ -44,6 +44,10 @@ const CreatePlayerForm = (props: {
    * room after being created — skipping the manual "enter room code" step.
    */
   joinGameCode?: string;
+  /** Called with the new player instead of going to the room-code step. */
+  onCreated?: (playerId: string) => void;
+  /** Replaces "Joining a private quiz" under the heading. */
+  subtitle?: ReactNode;
 }) => {
   const t = useT();
   const router = useRouter();
@@ -128,6 +132,11 @@ const CreatePlayerForm = (props: {
             autoJoin(props.joinGameCode);
             return;
           }
+          if (props.onCreated) {
+            window.localStorage.setItem("playerId", res.playerId);
+            props.onCreated(res.playerId);
+            return;
+          }
           router.push(`/player/joinRoom/${res.playerId}`);
         },
         onError: (err) => {
@@ -144,14 +153,16 @@ const CreatePlayerForm = (props: {
     >
       <div className="flex items-center justify-between">
         <BackSquare href="/" />
-        {!props.joinGameCode && <Steps step={1} />}
+        {!props.joinGameCode && !props.onCreated && <Steps step={1} />}
       </div>
       <div>
         <h1 className="text-[32px] md:text-[44px] font-extrabold tracking-[-0.03em] leading-[1.06]">
           {t("Create a custom profile")}
         </h1>
         <p className={clsx("mt-2.5 text-base", mutedText)}>
-          {props.joinGameCode ? (
+          {props.subtitle ? (
+            props.subtitle
+          ) : props.joinGameCode ? (
             <>
               {t("Joining room")}{" "}
               <b className="font-bold tracking-[0.1em] text-lprimary dark:text-dprimary">
