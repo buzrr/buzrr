@@ -12,7 +12,7 @@ import type { PlayerPayload } from "@buzrr/contract";
 import { useAdminSocket } from "@/hooks/useAdminSocket";
 import ConnectionBanner from "@/components/ConnectionBanner";
 import { Progress } from "@/components/Game/GameUI";
-import HostHeader, { headerPillClass } from "./HostHeader";
+import HostHeader, { HostControls, headerPillClass } from "./HostHeader";
 import GetReady from "@/components/Game/GetReady";
 import QuestionScreen from "./QuestionScreen";
 import QuesResult from "./QuesResult";
@@ -99,6 +99,20 @@ const GameLobby = (params: {
 
   if (!socket) return null;
 
+  // Fewer than two players: a try-out — "End" goes back to editing the quiz.
+  const endRedirect =
+    roster.length < 2 && params.quizQuestions?.id
+      ? `/admin/quiz/${params.quizQuestions.id}`
+      : undefined;
+  const codePill = (
+    <span title={t("Game code")} className={`shrink-0 ${headerPillClass}`}>
+      <span className="font-medium opacity-60">{t("Code")}</span>
+      <b className="font-extrabold tracking-[0.1em] text-lprimary dark:text-dprimary">
+        {params.gameCode}
+      </b>
+    </span>
+  );
+
   // One sound provider for every phase: remounting it between the countdown
   // and the question screens restarted (or lost) the music.
   return (
@@ -137,24 +151,14 @@ const GameLobby = (params: {
             logo={params.quizQuestions?.logo}
             roomId={params.roomId}
             alreadyEnded={alreadyEnded}
-            // Fewer than two players: a try-out — back to editing the quiz.
-            {...(roster.length < 2 && params.quizQuestions?.id
-              ? { endRedirect: `/admin/quiz/${params.quizQuestions.id}` }
-              : {})}
+            endRedirect={endRedirect}
+            controlsBelowOnPhone
             middle={
               <>
                 {(phase === "reveal" ||
                   phase === "scores" ||
                   phase === "ready") && (
-                  <span
-                    title={t("Game code")}
-                    className={`hidden sm:inline-flex shrink-0 ${headerPillClass}`}
-                  >
-                    <span className="font-medium opacity-60">{t("Code")}</span>
-                    <b className="font-extrabold tracking-[0.1em] text-lprimary dark:text-dprimary">
-                      {params.gameCode}
-                    </b>
-                  </span>
+                  <span className="hidden md:inline-flex">{codePill}</span>
                 )}
                 {qCount > 0 && (
                   <Progress
@@ -210,6 +214,16 @@ const GameLobby = (params: {
               quizId={params.quizQuestions?.id}
             />
           )}
+          {/* Phones: the room goes to the game; code, Live and "End" wait
+              at the very end of the page. */}
+          <div className="md:hidden flex flex-wrap items-center justify-center gap-2 pt-4 pb-5">
+            {codePill}
+            <HostControls
+              roomId={params.roomId}
+              endRedirect={endRedirect}
+              alreadyEnded={alreadyEnded}
+            />
+          </div>
         </div>
       )}
     </GameSounds>

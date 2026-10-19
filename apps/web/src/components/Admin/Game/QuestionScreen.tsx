@@ -145,7 +145,8 @@ export default function QuestionScreen(props: QuestionScreenProps) {
             </div>
           </div>
 
-          <div className="flex flex-col gap-2.5">
+          {/* Phones: no room for it — the code is at the page's end. */}
+          <div className="hidden md:flex flex-col gap-2.5">
             <span className={labelClass}>{t("Late joiners")}</span>
             <div
               className={clsx(
