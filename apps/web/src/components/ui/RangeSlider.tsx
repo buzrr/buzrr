@@ -15,8 +15,8 @@ export default function RangeSlider({
   onChange: (v: number) => void;
   ticks: string[];
   label: string;
-  /** The value each tick stands for (clicking a tick sets it); evenly spaced
-   *  over min..max when omitted. */
+  /** The value each tick stands for (clicking a tick sets it); when omitted,
+   *  a numeric label's own number, else evenly spaced over min..max. */
   tickValues?: number[];
 }) {
   const pct = ((value - min) / (max - min)) * 100;
@@ -39,9 +39,14 @@ export default function RangeSlider({
         aria-hidden="true"
       >
         {ticks.map((t, i) => {
+          // A label that is a number ("5", "15s") stands for that value.
           const v =
             tickValues?.[i] ??
-            Math.round(min + ((max - min) * i) / Math.max(1, ticks.length - 1));
+            (/^\d+/.test(t)
+              ? parseInt(t, 10)
+              : Math.round(
+                  min + ((max - min) * i) / Math.max(1, ticks.length - 1),
+                ));
           return (
             <button
               key={t}
