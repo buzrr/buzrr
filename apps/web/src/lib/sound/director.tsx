@@ -55,20 +55,22 @@ import {
 
 type Role = "host" | "player";
 
-const MUTE_KEY = (role: Role) => `buzrr:sound-${role}`;
+/** The device's switch is kept per role; "Play alone" has its own. */
+type PrefKey = Role | "solo";
+const MUTE_KEY = (key: PrefKey) => `buzrr:sound-${key}`;
 
-function readPref(role: Role): boolean | null {
+function readPref(key: PrefKey): boolean | null {
   try {
-    const v = window.localStorage.getItem(MUTE_KEY(role));
+    const v = window.localStorage.getItem(MUTE_KEY(key));
     return v === null ? null : v === "on";
   } catch {
     return null;
   }
 }
 
-function writePref(role: Role, on: boolean) {
+function writePref(key: PrefKey, on: boolean) {
   try {
-    window.localStorage.setItem(MUTE_KEY(role), on ? "on" : "off");
+    window.localStorage.setItem(MUTE_KEY(key), on ? "on" : "off");
   } catch {
     // ignore
   }
@@ -86,7 +88,10 @@ function placement(
   playOn: SoundSettings["playOn"],
   role: Role,
   playerOptIn: boolean,
+  solo = false,
 ): { allowed: boolean; defaultOn: boolean } {
+  // Playing alone, the player's device is the only one: on unless "off".
+  if (solo) return { allowed: playOn !== "off", defaultOn: playOn !== "off" };
   const here =
     playOn === "both" || playOn === (role === "host" ? "host" : "players");
   if (here) return { allowed: true, defaultOn: true };
@@ -260,10 +265,13 @@ function bedFor(phase: string): SoundSlot | null {
 export function GameSounds({
   role,
   quizSettings,
+  solo = false,
   children,
 }: {
   role: Role;
   quizSettings: unknown;
+  /** "Play alone": sounds play here unless the quiz has them off. */
+  solo?: boolean;
   children?: ReactNode;
 }) {
   useUnlockAudio();
@@ -275,13 +283,15 @@ export function GameSounds({
     settings.playOn,
     role,
     settings.playerOptIn,
+    solo,
   );
+  const prefKey: PrefKey = solo ? "solo" : role;
   const [pref, setPref] = useState<boolean | null>(null);
-  useEffect(() => setPref(readPref(role)), [role]);
+  useEffect(() => setPref(readPref(prefKey)), [prefKey]);
   const on = allowed && (pref ?? defaultOn);
   const setOn = (v: boolean) => {
     setPref(v);
-    writePref(role, v);
+    writePref(prefKey, v);
     if (v) void audioContext()?.resume();
   };
 
@@ -310,7 +320,7 @@ export function GameSounds({
   const questionAudioHere = (audio: QuestionAudio | null | undefined) => {
     if (!audio) return false;
     const playOn = audio.playOn === "quiz" ? settings.playOn : audio.playOn;
-    const p = placement(playOn, role, settings.playerOptIn);
+    const p = placement(playOn, role, settings.playerOptIn, solo);
     return p.allowed && (pref ?? p.defaultOn);
   };
 

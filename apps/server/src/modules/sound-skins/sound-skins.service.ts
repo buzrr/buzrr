@@ -181,7 +181,20 @@ export class SoundSkinsService implements OnApplicationBootstrap {
       const settings = quizSettingsSchema.safeParse(
         player?.game?.quiz.settings ?? {},
       );
-      if (!settings.success || settings.data.sound.skin !== id) {
+      const inGame = settings.success && settings.data.sound.skin === id;
+      // Or a test they play ("Play alone"): the host's own or a global skin.
+      const owner = row.isGlobal
+        ? {}
+        : row.userId
+          ? { hostId: row.userId }
+          : null;
+      const inTest =
+        !inGame &&
+        owner !== null &&
+        (await this.prisma.db.soloAttempt.count({
+          where: { playerId: user.playerId, test: owner },
+        })) > 0;
+      if (!inGame && !inTest) {
         throw new NotFoundException("Sound skin not found");
       }
     } else if (

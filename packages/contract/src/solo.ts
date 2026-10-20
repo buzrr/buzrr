@@ -1,6 +1,10 @@
 import type { PublicQuestion } from "./question-types";
 import type { QuestionStats } from "./report";
-import type { AnswerResultPayload, QuestionEndPayload } from "./socket";
+import type {
+  AnswerResultPayload,
+  QuestionEndPayload,
+  SoundSettings,
+} from "./socket";
 
 // ---------------------------------------------------------------------------
 // "Play alone" (tests): a quiz played by each player on their own, at their
@@ -18,6 +22,11 @@ export interface SoloTestInfo {
   /** ISO time; null = open until the host closes it. */
   closesAt: string | null;
   closed: boolean;
+  /**
+   * The quiz's sounds (skin resolved). Played on the player's device unless
+   * they are off altogether ("host" / "players" mean nothing here).
+   */
+  sound: SoundSettings;
 }
 
 /** One player's run through a test, as their screen shows it. */

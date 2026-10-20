@@ -16,8 +16,10 @@ import type {
 import { Prisma } from "@buzrr/prisma";
 import { customAlphabet } from "nanoid";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
+import { resolveGameLook } from "../../common/game-look/game-look";
 import { OPTION_ORDER } from "../../common/utils/option-order";
 import { PrismaService } from "../../prisma/prisma.service";
+import { EntitlementsService } from "../billing/entitlements.service";
 import {
   questionStats,
   toLiveQuestion,
@@ -64,7 +66,10 @@ const rowOf = (a: AttemptRow["answers"][number]): SoloAnswerRow => ({
  */
 @Injectable()
 export class SoloService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly entitlements: EntitlementsService,
+  ) {}
 
   // -- host ---------------------------------------------------------------------
 
@@ -226,6 +231,26 @@ export class SoloService {
 
   async info(code: string): Promise<SoloTestInfo> {
     const test = await this.testByCode(code);
+    // The quiz's sounds as they are now, with the host's defaults filled in
+    // (a deleted quiz: the defaults).
+    const [quiz, host, plan] = await Promise.all([
+      test.quizId
+        ? this.prisma.db.quiz.findUnique({
+            where: { id: test.quizId },
+            select: { settings: true },
+          })
+        : null,
+      this.prisma.db.user.findUnique({
+        where: { id: test.hostId },
+        select: { preferences: true },
+      }),
+      this.entitlements.resolvePlan(test.hostId),
+    ]);
+    const look = resolveGameLook(
+      { settings: quiz?.settings ?? {}, logo: null },
+      host?.preferences,
+      plan === "pro",
+    );
     return {
       code: test.code,
       title: test.title,
@@ -234,6 +259,7 @@ export class SoloService {
       hostImage: test.host.image,
       closesAt: test.closesAt?.toISOString() ?? null,
       closed: isClosed(test),
+      sound: look.settings.sound,
     };
   }
 

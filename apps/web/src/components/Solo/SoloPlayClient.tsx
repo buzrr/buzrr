@@ -14,6 +14,8 @@ import { applySync, resetGame, setConnection } from "@/state/game/gameSlice";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { clearPlayerLocalSession } from "@/lib/player-session";
 import { soloApi } from "@/lib/modules/solo/api";
+import { GameSounds, SoundToggle } from "@/lib/sound/director";
+import { audioContext } from "@/lib/sound/synth";
 import { pl, tx, useLocale, useT } from "@/lib/i18n/context";
 import { LeaderBoard, Question, Result } from "@/components/Player/GameScreens";
 import type { AnswerSender } from "@/components/Player/GameScreens/Question";
@@ -73,9 +75,10 @@ export default function SoloPlayClient({ code: rawCode }: { code: string }) {
   const apply = useCallback(
     (v: SoloView) => {
       setView(v);
-      if (v.phase !== "question" && v.phase !== "reveal") return;
+      if (v.phase === "intro") return;
       const sync: StateSyncPayload = {
-        phase: v.phase,
+        // Done: the final standings' music.
+        phase: v.phase === "done" ? "final" : v.phase,
         mode: "classic",
         qIndex: v.qIndex,
         qCount: v.qCount,
@@ -212,70 +215,88 @@ export default function SoloPlayClient({ code: rawCode }: { code: string }) {
     );
   }
 
-  if (view?.phase === "done") {
-    return (
-      <LeaderBoard
-        playerId={window.localStorage.getItem("playerId") ?? ""}
-        position={view.final?.rank ?? null}
-        score={view.totalScore}
-        quizTitle={test.title}
-        players={view.final?.of}
-      />
-    );
-  }
-
-  if (view && phase === "question" && question) {
-    return (
-      <Question
-        question={question}
-        send={send}
-        resync={() => void refresh()}
-        quizTitle={test.title}
-        gameCode={test.code}
-        hideRoomCode
-        hostName={test.hostName}
-        hostImage={test.hostImage}
-      />
-    );
-  }
-
-  if (view && phase === "reveal") {
-    const last = view.qIndex >= view.qCount - 1;
-    return (
-      <Result
-        you={you}
-        gameCode={test.code}
-        quizTitle={test.title}
-        hideRoomCode
-        hostName={test.hostName}
-        hostImage={test.hostImage}
-        next={
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void run(() => soloApi.next(view.attemptId))}
-            className={clsx(primaryButtonClass, "px-6")}
-          >
-            {last ? t("See my result") : t("Next question")}
-            <LuArrowRight size={18} />
-          </button>
-        }
-      />
-    );
-  }
-
-  return (
-    <Intro
-      title={test.title}
-      hostName={test.hostName}
-      hostImage={test.hostImage}
-      questionCount={test.questionCount}
-      closesAt={test.closesAt}
-      closed={test.closed}
-      busy={busy}
-      onStart={() => void start()}
-    />
+  const screen = soloScreen();
+  // Sounds once the run has started (the host's own skin loads for a
+  // player with an attempt only).
+  return view ? (
+    <GameSounds role="player" solo quizSettings={{ sound: test.sound }}>
+      <SoundToggle />
+      {screen}
+    </GameSounds>
+  ) : (
+    screen
   );
+
+  function soloScreen() {
+    if (view?.phase === "done") {
+      return (
+        <LeaderBoard
+          playerId={window.localStorage.getItem("playerId") ?? ""}
+          position={view.final?.rank ?? null}
+          score={view.totalScore}
+          quizTitle={test.title}
+          players={view.final?.of}
+        />
+      );
+    }
+
+    if (view && phase === "question" && question) {
+      return (
+        <Question
+          question={question}
+          send={send}
+          resync={() => void refresh()}
+          quizTitle={test.title}
+          gameCode={test.code}
+          hideRoomCode
+          hostName={test.hostName}
+          hostImage={test.hostImage}
+        />
+      );
+    }
+
+    if (view && phase === "reveal") {
+      const last = view.qIndex >= view.qCount - 1;
+      return (
+        <Result
+          you={you}
+          gameCode={test.code}
+          quizTitle={test.title}
+          hideRoomCode
+          hostName={test.hostName}
+          hostImage={test.hostImage}
+          next={
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void run(() => soloApi.next(view.attemptId))}
+              className={clsx(primaryButtonClass, "px-6")}
+            >
+              {last ? t("See my result") : t("Next question")}
+              <LuArrowRight size={18} />
+            </button>
+          }
+        />
+      );
+    }
+
+    return (
+      <Intro
+        title={test.title}
+        hostName={test.hostName}
+        hostImage={test.hostImage}
+        questionCount={test.questionCount}
+        closesAt={test.closesAt}
+        closed={test.closed}
+        busy={busy}
+        onStart={() => {
+          // Unlocked by this tap, so the first question's music can play.
+          void audioContext()?.resume();
+          void start();
+        }}
+      />
+    );
+  }
 }
 
 function Intro(props: {
