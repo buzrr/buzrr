@@ -1,0 +1,133 @@
+name: Deploy server
+
+# Builds the Nest API image (apps/server/Dockerfile), pushes it to GHCR, then
+# rolls it out on the EC2 host over SSH. Runs only after CI has passed on main,
+# so a red build never reaches production. Manual runs (workflow_dispatch)
+# deploy the selected ref without waiting for CI.
+#
+# Setup (repo → Settings → Secrets and variables → Actions):
+#   variables  EC2_HOST      public IP / DNS of the instance (deploy is skipped while unset)
+#              EC2_USER      SSH user, default "ubuntu"
+#              EC2_PATH      directory holding the compose stack, default "/home/ubuntu/buzrr"
+#   secrets    EC2_SSH_KEY   private key whose public half is in the host's authorized_keys
+#              EC2_KNOWN_HOSTS  optional `ssh-keyscan` output; pinned instead of scanning each run
+#
+# The host keeps its own `.env` (never in git); deploy/ec2/* is copied over it.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+# Never run two rollouts against the host at once; let the running one finish.
+concurrency:
+  group: deploy-server
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/buzrr-server
+
+jobs:
+  image:
+    name: Build & push image
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.ref.outputs.sha }}
+    steps:
+      - id: ref
+        run: echo "sha=${{ github.event.workflow_run.head_sha || github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.ref.outputs.sha }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/server/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ steps.ref.outputs.sha }}
+          cache-from: type=gha,scope=server
+          cache-to: type=gha,scope=server,mode=max
+
+  deploy:
+    name: Roll out on EC2
+    needs: image
+    if: vars.EC2_HOST != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    env:
+      HOST: ${{ vars.EC2_HOST }}
+      SSH_USER: ${{ vars.EC2_USER || 'ubuntu' }}
+      DEPLOY_PATH: ${{ vars.EC2_PATH || '/home/ubuntu/buzrr' }}
+      SERVER_TAG: ${{ needs.image.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.image.outputs.sha }}
+          sparse-checkout: deploy/ec2
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          if [ -n "$KNOWN_HOSTS" ]; then
+            printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -H "$HOST" > ~/.ssh/known_hosts
+          fi
+          printf 'Host target\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/id_deploy\n' "$HOST" "$SSH_USER" > ~/.ssh/config
+
+      - name: Copy stack files
+        run: |
+          ssh target "mkdir -p '$DEPLOY_PATH'"
+          scp deploy/ec2/docker-compose.yml deploy/ec2/Caddyfile "target:$DEPLOY_PATH/"
+
+      - name: Pull and restart
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            printf 'export SERVER_TAG=%q GHCR_USER=%q GHCR_TOKEN=%q\n' \
+              "$SERVER_TAG" "$GITHUB_ACTOR" "$GHCR_TOKEN"
+            cat <<'EOF'
+          set -euo pipefail
+          test -f .env || { echo ".env is missing in $PWD — create it from deploy/ec2/.env.example"; exit 1; }
+          # The job token expires with the run, so log out once the pull is done.
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+          trap 'docker logout ghcr.io >/dev/null' EXIT
+          docker compose pull
+          # `migrate` runs first (server depends on it completing).
+          docker compose up -d --remove-orphans
+          for _ in $(seq 60); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q server)")
+            [ "$status" = healthy ] && { echo "server healthy on $SERVER_TAG"; docker image prune -f >/dev/null; exit 0; }
+            sleep 3
+          done
+          docker compose logs --tail 150 migrate server
+          exit 1
+          EOF
+          } | ssh target "cd '$DEPLOY_PATH' && bash -s"
