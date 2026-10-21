@@ -1,0 +1,51 @@
+# Production stack for a single EC2 host: the Nest API behind Caddy (HTTPS +
+# WebSocket upgrades). Postgres and Redis are external — their URLs live in
+# `.env` next to this file (template: .env.example). Images are built by
+# .github/workflows/deploy-server.yml; nothing is built on the host.
+#
+#   docker compose pull && docker compose up -d
+#
+# SERVER_TAG pins a commit SHA (the deploy workflow sets it); unset = latest.
+# Roll back with: SERVER_TAG=<older sha> docker compose up -d
+
+services:
+  # One-shot: applies committed migrations (plain `migrate deploy` once the
+  # database has a migration history — see packages/prisma/scripts/deploy.mjs).
+  migrate:
+    image: ghcr.io/buzrr/buzrr-server:${SERVER_TAG:-latest}
+    restart: "no"
+    working_dir: /app/packages/prisma
+    command: ["node", "scripts/deploy.mjs"]
+    env_file: .env
+
+  server:
+    image: ghcr.io/buzrr/buzrr-server:${SERVER_TAG:-latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: "3001"
+      TRUST_PROXY: "1"
+    expose: ["3001"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    logging: &logging
+      driver: json-file
+      options: { max-size: 10m, max-file: "3" }
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [server]
+    logging: *logging
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,6 @@
+# Automatic Let's Encrypt certificate for API_DOMAIN (set in .env). Caddy
+# proxies WebSocket upgrades by default, so Socket.IO needs no extra config.
+{$API_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy server:3001
+}
