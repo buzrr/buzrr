@@ -167,7 +167,9 @@ jobs:
       - name: Smoke test
         run: |
           curl -fsS http://localhost:3001/health
-          curl -fsS http://localhost:3000/auth/login | grep -q 'emailPassword'
+          curl -fsS http://localhost:3000/auth/login > /dev/null
+          # The login page is static; it reads sign-in methods from here.
+          curl -fsS http://localhost:3000/api/auth/methods | grep -q '"emailPassword":true'
           # A local account can sign up and mint an API token.
           curl -fsS -c jar -H 'content-type: application/json' \
             -H 'origin: http://localhost:3000' \
