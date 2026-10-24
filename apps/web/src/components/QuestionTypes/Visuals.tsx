@@ -11,6 +11,7 @@ import {
   subtleCardClass,
 } from "@/components/Game/GameUI";
 import { AnimatedNumber, useEntered } from "@/components/Game/motion";
+import { useT, pl } from "@/lib/i18n/context";
 import { Tooltip } from "@/components/ui/Tooltip";
 
 // The results views of the unscored types. The host sees them filling in
@@ -20,9 +21,10 @@ const pct = (n: number, of: number) =>
   of > 0 ? Math.round((n / of) * 100) : 0;
 
 export function NoResponsesYet() {
+  const t = useT();
   return (
     <div className="flex-1 flex items-center justify-center py-10">
-      <WaitingDots>Waiting for the first responses</WaitingDots>
+      <WaitingDots>{t("Waiting for the first responses")}</WaitingDots>
     </div>
   );
 }
@@ -162,6 +164,7 @@ export function RatingView({
   counts: number[];
   responses: number;
 }) {
+  const t = useT();
   const entered = useEntered();
   if (responses === 0) return <NoResponsesYet />;
   const total = counts.reduce((sum, c, i) => sum + c * (i + 1), 0);
@@ -185,8 +188,10 @@ export function RatingView({
           ))}
         </div>
         <span className={clsx("text-sm", mutedText)}>
-          average of {responses} {responses === 1 ? "rating" : "ratings"}
-          {scaleMax === 10 ? " · out of 10" : ""}
+          {t(pl(responses, "average of {n} rating", "average of {n} ratings"), {
+            n: responses,
+          })}
+          {scaleMax === 10 ? ` · ${t("out of 10")}` : ""}
         </span>
       </div>
       <div className="flex items-end gap-2.5 md:gap-4 h-40 md:h-60">

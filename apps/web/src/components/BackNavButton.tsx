@@ -3,6 +3,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { PageTheme } from "@/state/pageThemeSlice";
 import { useRenderedTheme } from "@/hooks/useRenderedTheme";
+import { useT } from "@/lib/i18n/context";
 import { IconButton } from "@/components/ui/IconButton";
 
 /**
@@ -16,12 +17,13 @@ const BackNavButton = ({
   href?: string;
   onBack?: () => void;
 }) => {
+  const t = useT();
   const theme = useRenderedTheme();
   const router = useRouter();
 
   return (
     <IconButton
-      aria-label="Go back"
+      aria-label={t("Go back")}
       className="cursor-pointer"
       onClick={() => {
         if (onBack) {

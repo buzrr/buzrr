@@ -1,12 +1,15 @@
 "use client";
-import React from "react";
+import React, { type ReactNode } from "react";
 import QuestionAndResult from "./QuesAndResult";
 import { useAppSelector } from "@/state/hooks";
+import { useAudioSegment } from "@/lib/audio-cues";
+import { useGameSound } from "@/lib/sound/director";
 import {
   correctAnswers,
   describeAnswer,
   isScoredType,
 } from "@/components/QuestionTypes";
+import { useT } from "@/lib/i18n/context";
 import type { AnswerResultPayload } from "@buzrr/contract";
 
 /**
@@ -22,8 +25,26 @@ const Result = (params: {
   hideRoomCode?: boolean;
   hostName?: string | null;
   hostImage?: string | null;
+  /** What moves on (playing alone), instead of waiting for the host. */
+  next?: ReactNode;
 }) => {
+  const t = useT();
   const you = params.you;
+  const sound = useGameSound();
+  const revealAudio = useAppSelector((state) => state.game.question?.audio);
+  const revealKey = useAppSelector(
+    (state) => state.game.reveal?.audioRevealKey,
+  );
+  useAudioSegment(
+    sound?.questionAudioHere(revealAudio)
+      ? (revealAudio?.revealUrl ??
+          (revealAudio?.encrypted ? null : revealAudio?.url))
+      : null,
+    revealAudio?.revealMs,
+    null,
+    revealAudio?.url,
+    revealAudio?.revealUrl ? revealKey : null,
+  );
   const question = useAppSelector((state) => state.game.question);
   const reveal = useAppSelector((state) => state.game.reveal);
 
@@ -42,7 +63,7 @@ const Result = (params: {
       <div className="flex flex-col items-center justify-center h-[85dvh] gap-4">
         <div className="h-14 w-14 rounded-full border-4 border-light-bg dark:border-off-dark border-t-lprimary dark:border-t-dprimary animate-spin" />
         <p className="text-off-dark dark:text-off-white">
-          Checking your answer…
+          {t("Checking your answer…")}
         </p>
       </div>
     );
@@ -68,6 +89,7 @@ const Result = (params: {
       points={you.score}
       yourAnswer={you.answered ? yourAnswer : null}
       correctAnswers={correct}
+      next={params.next}
     />
   );
 };

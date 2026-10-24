@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import clsx from "clsx";
 import SelectProfile from "@/components/Player/SelectProfile";
 import { toast } from "react-toastify";
@@ -14,8 +14,11 @@ import { createPlayerSchema } from "@/lib/modules/forms/schemas";
 import { useCreatePlayerMutation } from "@/lib/modules/players/hooks";
 import { useJoinRoomMutation } from "@/lib/modules/game-sessions/hooks";
 import { clearPlayerLocalSession } from "@/lib/player-session";
+import { loadPlayerProfile, savePlayerProfile } from "@/lib/player-prefs";
 import { isAxiosError } from "axios";
 import { mutedText, primaryButtonClass } from "@/components/Game/GameUI";
+import { useLocale, useT } from "@/lib/i18n/context";
+import { randomPlayerName } from "@/lib/random-name";
 import {
   BackSquare,
   Steps,
@@ -42,7 +45,13 @@ const CreatePlayerForm = (props: {
    * room after being created — skipping the manual "enter room code" step.
    */
   joinGameCode?: string;
+  /** Called with the new player instead of going to the room-code step. */
+  onCreated?: (playerId: string) => void;
+  /** Replaces "Joining a private quiz" under the heading. */
+  subtitle?: ReactNode;
 }) => {
+  const t = useT();
+  const locale = useLocale();
   const router = useRouter();
   const mutation = useCreatePlayerMutation();
   const joinMutation = useJoinRoomMutation();
@@ -53,6 +62,16 @@ const CreatePlayerForm = (props: {
       profile: props.data.image,
     },
   });
+
+  // Start from the name and avatar used last time (if the form is still empty).
+  useEffect(() => {
+    const saved = loadPlayerProfile();
+    if (saved && !props.data.name) {
+      props.setData({ name: sanitizeName(saved.name), image: saved.image });
+    }
+    // Once, on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     reset({
@@ -84,11 +103,11 @@ const CreatePlayerForm = (props: {
         onError: (err) => {
           if (isAxiosError(err) && err.response?.status === 401) {
             clearPlayerLocalSession();
-            toast.error("Your session expired. Please try again.");
+            toast.error(t("Your session expired. Please try again."));
             return;
           }
           if (isAxiosError(err) && err.response?.status === 404) {
-            toast.error("This quiz link is invalid or the game has ended.");
+            toast.error(t("This quiz link is invalid or the game has ended."));
             return;
           }
           toast.error(getApiErrorMessage(err));
@@ -110,14 +129,21 @@ const CreatePlayerForm = (props: {
           if (typeof window !== "undefined") {
             window.localStorage.setItem("playerToken", res.accessToken);
           }
+          savePlayerProfile({ name: data.username, image: data.profile });
           if (props.joinGameCode) {
             autoJoin(props.joinGameCode);
+            return;
+          }
+          if (props.onCreated) {
+            window.localStorage.setItem("playerId", res.playerId);
+            props.onCreated(res.playerId);
             return;
           }
           router.push(`/player/joinRoom/${res.playerId}`);
         },
         onError: (err) => {
-          toast.error(getApiErrorMessage(err));
+          // Server refusals (e.g. a name not allowed) have German texts.
+          toast.error(t(getApiErrorMessage(err)));
         },
       },
     );
@@ -130,25 +156,27 @@ const CreatePlayerForm = (props: {
     >
       <div className="flex items-center justify-between">
         <BackSquare href="/" />
-        {!props.joinGameCode && <Steps step={1} />}
+        {!props.joinGameCode && !props.onCreated && <Steps step={1} />}
       </div>
       <div>
         <h1 className="text-[32px] md:text-[44px] font-extrabold tracking-[-0.03em] leading-[1.06]">
-          Create a custom profile
+          {t("Create a custom profile")}
         </h1>
         <p className={clsx("mt-2.5 text-base", mutedText)}>
-          {props.joinGameCode ? (
+          {props.subtitle ? (
+            props.subtitle
+          ) : props.joinGameCode ? (
             <>
-              Joining room{" "}
+              {t("Joining room")}{" "}
               <b className="font-bold tracking-[0.1em] text-lprimary dark:text-dprimary">
                 {props.joinGameCode}
               </b>
             </>
           ) : (
             <>
-              Joining a{" "}
+              {t("Joining a")}{" "}
               <b className="font-semibold text-dark dark:text-white">
-                private quiz
+                {t("private quiz")}
               </b>
             </>
           )}
@@ -163,36 +191,54 @@ const CreatePlayerForm = (props: {
         render={({ field, fieldState }) => (
           <label className="block">
             <span className={joinLabelClass}>
-              Display name
+              {t("Display name")}
               <span className={joinCounterClass}>
                 {field.value.length}/{NAME_MAX}
               </span>
             </span>
-            <input
-              type="text"
-              id="displayName"
-              name={field.name}
-              placeholder="Enter display name"
-              className={clsx(joinInputClass, "mt-2")}
-              required
-              autoComplete="off"
-              maxLength={NAME_MAX}
-              value={field.value}
-              onBlur={field.onBlur}
-              ref={field.ref}
-              aria-invalid={!!fieldState.error}
-              onChange={(e) => {
-                handleNameChange(e.target.value);
-                field.onChange(sanitizeName(e.target.value));
-              }}
-            />
+            <span className="mt-2 flex gap-2">
+              <input
+                type="text"
+                id="displayName"
+                name={field.name}
+                placeholder={t("Enter display name")}
+                className={clsx(joinInputClass, "min-w-0 flex-1")}
+                required
+                autoComplete="off"
+                maxLength={NAME_MAX}
+                value={field.value}
+                onBlur={field.onBlur}
+                ref={field.ref}
+                aria-invalid={!!fieldState.error}
+                onChange={(e) => {
+                  handleNameChange(e.target.value);
+                  field.onChange(sanitizeName(e.target.value));
+                }}
+              />
+              <button
+                type="button"
+                aria-label={t("Random name")}
+                title={t("Random name")}
+                onClick={() => {
+                  const name = randomPlayerName(locale);
+                  handleNameChange(name);
+                  field.onChange(name);
+                }}
+                className={clsx(
+                  joinInputClass,
+                  "!w-auto shrink-0 px-4 text-xl cursor-pointer hover:border-lprimary dark:hover:border-dprimary",
+                )}
+              >
+                🎲
+              </button>
+            </span>
             {fieldState.error?.message ? (
               <span className="mt-1.5 block text-sm text-red-light dark:text-red-dark">
                 {fieldState.error.message}
               </span>
             ) : (
               <span className={clsx("mt-1.5 block", joinCounterClass)}>
-                Letters, numbers and underscores only.
+                {t("Letters, numbers and underscores only.")}
               </span>
             )}
           </label>
@@ -204,7 +250,11 @@ const CreatePlayerForm = (props: {
         disabled={!props.data.name.trim() || pending}
         className={clsx(primaryButtonClass, "w-full py-4 text-[17px]")}
       >
-        {pending ? "Loading..." : props.joinGameCode ? "Join game" : "Next"}
+        {pending
+          ? t("Loading…")
+          : props.joinGameCode
+            ? t("Join game")
+            : t("Next")}
       </button>
     </form>
   );

@@ -4,9 +4,25 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
+import {
+  cleanPlayerName,
+  isOffensiveName,
+} from "../../common/utils/player-name";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CreatePlayerDto } from "./dto/create-player.dto";
 import { UpdatePlayerNameDto } from "./dto/update-player-name.dto";
+
+/** The name as stored: cleaned, not empty, nothing offensive. */
+function checkedName(raw: string): string {
+  const name = cleanPlayerName(raw);
+  if (!name) throw new BadRequestException("Display name is required");
+  if (isOffensiveName(name)) {
+    throw new BadRequestException(
+      "Please pick a different name — this one isn't allowed.",
+    );
+  }
+  return name;
+}
 
 @Injectable()
 export class PlayersService {
@@ -20,7 +36,7 @@ export class PlayersService {
   ): Promise<{ playerId: string; accessToken: string }> {
     const player = await this.prisma.db.player.create({
       data: {
-        name: dto.username,
+        name: checkedName(dto.username),
         profilePic: dto.profile,
       },
     });
@@ -31,11 +47,10 @@ export class PlayersService {
     return { playerId: player.id, accessToken };
   }
 
-  async updateName(dto: UpdatePlayerNameDto): Promise<{ playerId: string; name: string }> {
-    const cleanedName = dto.username.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 30);
-    if (!cleanedName) {
-      throw new BadRequestException("Display name is required");
-    }
+  async updateName(
+    dto: UpdatePlayerNameDto,
+  ): Promise<{ playerId: string; name: string }> {
+    const cleanedName = checkedName(dto.username);
     try {
       const player = await this.prisma.db.player.update({
         where: { id: dto.playerId },

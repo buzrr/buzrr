@@ -3,6 +3,7 @@
 import clsx from "clsx";
 import { MAX_QUESTION_CATEGORIES } from "@buzrr/contract";
 import { useCategoriesQuery } from "@/lib/modules/categories/hooks";
+import { useT } from "@/lib/i18n/context";
 import { categorySwatch } from "@/components/Duel/duelUi";
 
 /**
@@ -18,16 +19,19 @@ export default function CategoryChips({
   onChange: (categoryIds: string[]) => void;
   disabled?: boolean;
 }) {
+  const t = useT();
   const { data: categories, isPending } = useCategoriesQuery();
   if (isPending) {
     return (
-      <p className="text-xs text-off-dark dark:text-muted-dark">Loading…</p>
+      <p className="text-xs text-off-dark dark:text-muted-dark">
+        {t("Loading…")}
+      </p>
     );
   }
   if (!categories?.length) {
     return (
       <p className="text-xs text-off-dark dark:text-muted-dark">
-        No categories yet.
+        {t("No categories yet.")}
       </p>
     );
   }

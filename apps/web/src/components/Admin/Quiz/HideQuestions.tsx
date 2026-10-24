@@ -5,15 +5,28 @@ import {
   HideQuestions as HideQuestionsEnum,
   setHideQuestions,
 } from "@/state/hideQuestionsSlice";
+import { useT } from "@/lib/i18n/context";
 import { Switch } from "@/components/ui/Switch";
 
-const HideQuestions = () => {
+/** `defaultHidden`: initial state on mount (shown when there's nothing to hide). */
+const HideQuestions = ({
+  defaultHidden = true,
+}: {
+  defaultHidden?: boolean;
+}) => {
+  const t = useT();
   const dispatch = useAppDispatch();
 
   const visibility = useAppSelector((state) => state.hideQuestions.visibility);
 
   useEffect(() => {
-    dispatch(setHideQuestions(HideQuestionsEnum.hide));
+    dispatch(
+      setHideQuestions(
+        defaultHidden ? HideQuestionsEnum.hide : HideQuestionsEnum.show,
+      ),
+    );
+    // Only the initial state: adding the first question must not hide it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch]);
 
   const handle = (checked: boolean) => {
@@ -28,10 +41,10 @@ const HideQuestions = () => {
 
   return (
     <div className="flex items-center gap-3 shrink-0 whitespace-nowrap px-3.5 md:px-[18px] py-3 md:py-[13px] rounded-[14px] text-sm md:text-[14.5px] font-semibold bg-light-bg dark:bg-card-dark border border-lprimary/15 dark:border-white/5">
-      <span>Hide Questions</span>
+      <span>{t("Hide Questions")}</span>
       <Switch
         checked={isHidden}
-        aria-label="Hide questions"
+        aria-label={t("Hide questions")}
         className="cursor-pointer"
         onCheckedChange={handle}
       />

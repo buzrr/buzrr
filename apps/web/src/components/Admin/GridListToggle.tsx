@@ -4,9 +4,11 @@ import clsx from "clsx";
 import { setGridListToggle } from "@/state/admin/gridListSlice";
 import { IoGridOutline } from "react-icons/io5";
 import { useAppDispatch, useAppSelector } from "@/state/hooks";
+import { useT } from "@/lib/i18n/context";
 import { FaListUl } from "react-icons/fa6";
 
 export default function GridListToggle() {
+  const t = useT();
   const view = useAppSelector((state) => state.gridListToggle.view);
   const dispatch = useAppDispatch();
 
@@ -18,7 +20,7 @@ export default function GridListToggle() {
   return (
     <div
       role="group"
-      aria-label="View mode"
+      aria-label={t("View mode")}
       className="flex gap-1 p-1 md:p-[5px] h-fit shrink-0 rounded-[13px] bg-white dark:bg-card-dark border border-lprimary/15 dark:border-white/10"
     >
       {options.map((opt) => (

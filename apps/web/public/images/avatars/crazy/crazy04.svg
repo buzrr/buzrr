@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+<defs><pattern id="dots" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="6" cy="6" r="2.2" fill="#fff" opacity="0.28"/></pattern>
+<clipPath id="c"><circle cx="128" cy="128" r="128"/></clipPath></defs>
+<g clip-path="url(#c)"><rect width="256" height="256" fill="#4fc3f7"/><rect width="256" height="256" fill="url(#dots)"/>
+<path d="M24 196 Q24 70 128 70 Q232 70 232 196 Z" fill="#ffd166" stroke="#1b1530" stroke-width="7"/>
+<path d="M44 190 Q50 110 92 100 Q70 140 74 190 Z" fill="#7ed957" stroke="#1b1530" stroke-width="5"/><path d="M212 190 Q206 110 164 100 Q186 140 182 190 Z" fill="#7ed957" stroke="#1b1530" stroke-width="5"/>
+<circle cx="70" cy="170" r="9" fill="#e2352f" stroke="#1b1530" stroke-width="3"/><circle cx="186" cy="168" r="9" fill="#e2352f" stroke="#1b1530" stroke-width="3"/><circle cx="60" cy="140" r="9" fill="#e2352f" stroke="#1b1530" stroke-width="3"/>
+<circle cx="96" cy="134" r="24" fill="#fff" stroke="#1b1530" stroke-width="5"/><circle cx="101.8" cy="143.1" r="10.1" fill="#1b1530"/><circle cx="160" cy="128" r="30" fill="#fff" stroke="#1b1530" stroke-width="5"/><circle cx="152.1" cy="117.1" r="12.6" fill="#1b1530"/>
+<path d="M98 178 Q128 206 158 176 Z" fill="#7a1f2b" stroke="#1b1530" stroke-width="5"/><path d="M118 186 Q128 200 138 186" fill="#ff7a93"/></g></svg>

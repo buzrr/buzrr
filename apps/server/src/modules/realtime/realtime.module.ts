@@ -1,3 +1,4 @@
+import { BillingModule } from "../billing/billing.module";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { JwtModule } from "@nestjs/jwt";
@@ -8,6 +9,7 @@ import { RealtimeService } from "./realtime.service";
 
 @Module({
   imports: [
+    BillingModule,
     GameEngineModule,
     DuelModule,
     JwtModule.registerAsync({

@@ -1,6 +1,7 @@
 import {
   IsBoolean,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   MaxLength,
@@ -22,4 +23,9 @@ export class UpdateQuizDto {
   @IsOptional()
   @IsBoolean()
   isPublic?: boolean;
+
+  /** Replaces the quiz settings; validated by `quizSettingsSchema`. */
+  @IsOptional()
+  @IsObject()
+  settings?: Record<string, unknown>;
 }

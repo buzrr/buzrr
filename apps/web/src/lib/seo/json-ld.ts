@@ -2,7 +2,7 @@ import {
   LICENSE_URL,
   REPO_URL,
   SITE_DESCRIPTION,
-  SITE_NAME,
+  siteName,
   SITE_URL,
   SOCIAL_PROFILES,
   absoluteUrl,
@@ -27,7 +27,7 @@ export function organizationSchema(): JsonLdNode {
   return {
     "@type": "Organization",
     "@id": ORG_ID,
-    name: SITE_NAME,
+    name: siteName(),
     url: SITE_URL,
     logo: absoluteUrl("/icon.png"),
     sameAs: SOCIAL_PROFILES,
@@ -38,7 +38,7 @@ export function websiteSchema(): JsonLdNode {
   return {
     "@type": "WebSite",
     "@id": WEBSITE_ID,
-    name: SITE_NAME,
+    name: siteName(),
     url: SITE_URL,
     inLanguage: "en",
     publisher: { "@id": ORG_ID },
@@ -54,7 +54,7 @@ export function softwareApplicationSchema(): JsonLdNode {
   return {
     "@type": "WebApplication",
     "@id": SOFTWARE_ID,
-    name: SITE_NAME,
+    name: siteName(),
     url: SITE_URL,
     description: SITE_DESCRIPTION,
     applicationCategory: "EducationalApplication",
@@ -85,7 +85,7 @@ export function sourceCodeSchema(): JsonLdNode {
   return {
     "@type": "SoftwareSourceCode",
     "@id": `${SITE_URL}/#source`,
-    name: `${SITE_NAME} source code`,
+    name: `${siteName()} source code`,
     codeRepository: REPO_URL,
     license: LICENSE_URL,
     programmingLanguage: ["TypeScript", "Python"],

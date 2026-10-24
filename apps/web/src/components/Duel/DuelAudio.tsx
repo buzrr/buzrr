@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IoVolumeHigh, IoVolumeMute } from "react-icons/io5";
 import { useAppSelector } from "@/state/hooks";
+import { useT } from "@/lib/i18n/context";
 import { IconButton } from "@/components/ui/IconButton";
 
 const MUTE_KEY = "buzrr:duel-audio-muted";
@@ -37,6 +38,7 @@ export default function DuelAudio({
 }: {
   outcome: DuelOutcome | null;
 }) {
+  const t = useT();
   const phase = useAppSelector((state) => state.game.phase);
   const [muted, setMuted] = useState(false);
   const battleRef = useRef<HTMLAudioElement | null>(null);
@@ -125,7 +127,7 @@ export default function DuelAudio({
   return (
     <div className="fixed top-3 left-3 z-40">
       <IconButton
-        aria-label={muted ? "Unmute duel audio" : "Mute duel audio"}
+        aria-label={muted ? t("Unmute duel audio") : t("Mute duel audio")}
         className="bg-white dark:bg-dark text-dark dark:text-white rounded-full p-2 shadow border border-card-light dark:border-off-dark"
         onClick={toggleMute}
         icon={muted ? <IoVolumeMute size={20} /> : <IoVolumeHigh size={20} />}

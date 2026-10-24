@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import clsx from "clsx";
 import type { DailyStreak } from "@buzrr/contract";
 import { useStreakMonthQuery } from "@/lib/modules/duel/hooks";
+import { useT, pl, tx } from "@/lib/i18n/context";
 import {
   CheckIcon,
   ChevronLeftIcon,
@@ -37,6 +38,7 @@ function monthLabel(month: string): string {
  * finished duel a day (in the player's time zone) keeps the streak.
  */
 export default function StreakButton({ streak }: { streak: DailyStreak }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -63,7 +65,7 @@ export default function StreakButton({ streak }: { streak: DailyStreak }) {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        title="Daily duel streak"
+        title={t("Daily duel streak")}
         className={clsx(
           "flex h-9 cursor-pointer items-center gap-1.5 rounded-full border-[1.5px] px-3 text-base font-extrabold sm:h-10 sm:px-3.5 sm:text-[17px] transition-colors",
           open
@@ -73,7 +75,9 @@ export default function StreakButton({ streak }: { streak: DailyStreak }) {
       >
         <FlameIcon size={18} />
         {streak.current}
-        <span className="sr-only">day streak</span>
+        <span className="sr-only">
+          {t(pl(streak.current, "day streak", "day streak"))}
+        </span>
       </button>
       {open && (
         <StreakCalendar streak={streak} onClose={() => setOpen(false)} />
@@ -89,6 +93,7 @@ function StreakCalendar({
   streak: DailyStreak;
   onClose: () => void;
 }) {
+  const t = useT();
   const todayMonth = streak.today.slice(0, 7);
   const todayDate = Number(streak.today.slice(8, 10));
   const [month, setMonth] = useState(todayMonth);
@@ -107,15 +112,19 @@ function StreakCalendar({
   ];
 
   const banner = streak.playedToday
-    ? `Today's duel done · come back tomorrow for day ${streak.current + 1}`
+    ? tx("Today's duel done · come back tomorrow for day {n}", {
+        n: streak.current + 1,
+      })
     : streak.current > 0
-      ? `Play a duel today to keep your ${streak.current}-day streak`
-      : "Play a duel today to start a streak";
+      ? tx("Play a duel today to keep your {n}-day streak", {
+          n: streak.current,
+        })
+      : t("Play a duel today to start a streak");
 
   return (
     <div
       role="dialog"
-      aria-label="Daily duel streak"
+      aria-label={t("Daily duel streak")}
       className="absolute right-[-6px] top-[calc(100%+12px)] z-50 flex w-[min(360px,calc(100vw-24px))] flex-col gap-3.5 rounded-[22px] border border-lprimary/15 dark:border-white/10 bg-white dark:bg-dark p-4 sm:right-0 sm:p-5 text-dark dark:text-white shadow-[0_30px_70px_-24px_rgba(20,10,60,0.45)]"
     >
       <div className="flex items-center gap-3">
@@ -124,15 +133,15 @@ function StreakCalendar({
           {streak.current}
         </span>
         <div>
-          <b className="block text-[17px]">day streak</b>
+          <b className="block text-[17px]">{t("day streak")}</b>
           <small className="block text-[13px] text-off-dark dark:text-muted-dark">
-            Play one duel a day to keep it going
+            {t("Play one duel a day to keep it going")}
           </small>
         </div>
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close"
+          aria-label={t("Close")}
           className="ml-auto cursor-pointer self-start text-off-dark dark:text-muted-dark"
         >
           <CloseIcon size={18} />
@@ -153,7 +162,7 @@ function StreakCalendar({
 
       <div className="flex items-center justify-between">
         <MonthButton
-          label="Previous month"
+          label={t("Previous month")}
           disabled={month <= oldest}
           onClick={() => setMonth(shiftMonth(month, -1))}
         >
@@ -161,7 +170,7 @@ function StreakCalendar({
         </MonthButton>
         <b className="text-[15px]">{monthLabel(month)}</b>
         <MonthButton
-          label="Next month"
+          label={t("Next month")}
           disabled={isCurrentMonth}
           onClick={() => setMonth(shiftMonth(month, 1))}
         >
@@ -202,7 +211,11 @@ function StreakCalendar({
                     : "rounded-full ring-2 ring-inset ring-flame/60"),
                 future && "opacity-50",
               )}
-              aria-label={on ? `Day ${day}: duel played` : `Day ${day}`}
+              aria-label={
+                on
+                  ? tx("Day {n}: duel played", { n: day })
+                  : tx("Day {n}", { n: day })
+              }
             >
               {on && isToday ? <FlameIcon size={15} /> : day}
             </span>
@@ -211,9 +224,9 @@ function StreakCalendar({
       </div>
 
       <div className="grid grid-cols-3 border-t border-lprimary/15 dark:border-white/10 pt-3 text-center">
-        <Footer value={streak.current} label="Current" />
-        <Footer value={streak.best} label="Best" />
-        <Footer value={played.size} label="Days this month" />
+        <Footer value={streak.current} label={t("Current")} />
+        <Footer value={streak.best} label={t("Best")} />
+        <Footer value={played.size} label={t("Days this month")} />
       </div>
     </div>
   );

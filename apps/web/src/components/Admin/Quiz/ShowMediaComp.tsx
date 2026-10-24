@@ -1,8 +1,10 @@
 "use client";
 
 import { Box, Modal } from "@mui/material";
+import clsx from "clsx";
 import Image from "next/image";
 import { useState } from "react";
+import { useT } from "@/lib/i18n/context";
 import ModalCloseButton from "@/components/ModalCloseButton";
 
 const style = {
@@ -21,7 +23,13 @@ const style = {
   justifyContent: "center",
 };
 
-export default function ShowMedia(props: { media: string; mediaType: string }) {
+export default function ShowMedia(props: {
+  media: string;
+  mediaType: string;
+  /** Also opens it: e.g. the picture icon next to the button. */
+  icon?: React.ReactNode;
+}) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   function handleOpen() {
     setOpen(true);
@@ -35,11 +43,26 @@ export default function ShowMedia(props: { media: string; mediaType: string }) {
 
   return (
     <>
+      {props.icon && (
+        <button
+          type="button"
+          aria-label={t("View image")}
+          title={t("View image")}
+          onClick={handleOpen}
+          className="cursor-pointer hover:text-lprimary dark:hover:text-dprimary"
+        >
+          {props.icon}
+        </button>
+      )}
       <button
-        className="p-1 ml-auto text-xs text-white dark:text-dark bg-lprimary dark:bg-dprimary rounded-md"
+        type="button"
+        className={clsx(
+          "p-1 text-xs text-white dark:text-dark bg-lprimary dark:bg-dprimary rounded-md",
+          props.icon ? "ml-3" : "ml-auto",
+        )}
         onClick={handleOpen}
       >
-        View image
+        {t("View image")}
       </button>
 
       <Modal
@@ -57,7 +80,7 @@ export default function ShowMedia(props: { media: string; mediaType: string }) {
             <Image
               src={props.media}
               className="w-full h-full object-cover"
-              alt="media Image"
+              alt={t("media Image")}
               height={200}
               width={200}
             />

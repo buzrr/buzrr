@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/modules/query-keys";
 import { questionsApi } from "./api";
 
@@ -35,6 +31,20 @@ export function useReorderQuestionsMutation(quizId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: questionsApi.reorder,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.questions(quizId) });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.quizzes.detail(quizId),
+      });
+    },
+  });
+}
+
+export function useSetQuestionDisabledMutation(quizId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { questionId: string; disabled: boolean }) =>
+      questionsApi.setDisabled(v.questionId, v.disabled),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.questions(quizId) });
       queryClient.invalidateQueries({

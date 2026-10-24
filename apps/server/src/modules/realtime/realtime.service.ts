@@ -1,3 +1,9 @@
+import { EntitlementsService } from "../billing/entitlements.service";
+import {
+  loadSharedAvatars,
+  resolveGameLook,
+  roomSettings,
+} from "../../common/game-look/game-look";
 import { Injectable, Logger } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -9,7 +15,41 @@ export class RealtimeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly entitlements: EntitlementsService,
   ) {}
+
+  /**
+   * A player in the lobby picks another of the room's avatars. Returns the
+   * updated player, or null when the picture isn't one of this room's.
+   */
+  async setAvatar(playerId: string, gameSessionId: string, profilePic: string) {
+    const session = await this.prisma.db.gameSession.findUnique({
+      where: { id: gameSessionId },
+      include: {
+        quiz: {
+          select: {
+            settings: true,
+            logo: true,
+            user: { select: { preferences: true } },
+          },
+        },
+      },
+    });
+    if (!session) return null;
+    const { avatars } = resolveGameLook(
+      { settings: roomSettings(session), logo: session.quiz.logo },
+      session.quiz.user?.preferences,
+      (await this.entitlements.resolvePlan(session.creatorId)) === "pro",
+      await loadSharedAvatars(this.prisma.db),
+    );
+    if (!avatars.includes(profilePic)) return null;
+    const updated = await this.prisma.db.player.updateMany({
+      where: { id: playerId, gameId: gameSessionId },
+      data: { profilePic },
+    });
+    if (updated.count === 0) return null;
+    return this.prisma.db.player.findUnique({ where: { id: playerId } });
+  }
 
   async removePlayer(playerId: string, gameSessionId: string) {
     const result = await this.prisma.db.player.updateMany({

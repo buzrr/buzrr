@@ -7,6 +7,7 @@ import ModalCloseButton from "@/components/ModalCloseButton";
 import TextInput from "@/components/ui/TextInput";
 import { authClient } from "@/lib/auth-client";
 import { persistor } from "@/state/store";
+import { useT } from "@/lib/i18n/context";
 import style from "@/utils/modalStyle";
 
 const CONFIRM_PHRASE = "delete my profile";
@@ -17,6 +18,7 @@ const CONFIRM_PHRASE = "delete my profile";
  * also signs the user out; we then land them back on the landing page.
  */
 export default function DeleteProfileButton() {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [phrase, setPhrase] = useState("");
   const [pending, setPending] = useState(false);
@@ -35,7 +37,9 @@ export default function DeleteProfileButton() {
     const { error } = await authClient.deleteUser({});
     if (error) {
       setPending(false);
-      toast.error(error.message || "Could not delete your profile. Try again.");
+      toast.error(
+        error.message || t("Could not delete your profile. Try again."),
+      );
       return;
     }
     await persistor.purge();
@@ -49,7 +53,7 @@ export default function DeleteProfileButton() {
         onClick={() => setOpen(true)}
         className="text-sm text-white dark:text-dark dark:font-bold rounded-lg py-2 px-4 bg-red-light dark:bg-red-dark w-full cursor-pointer"
       >
-        Delete profile
+        {t("Delete profile")}
       </button>
 
       <Modal
@@ -68,17 +72,20 @@ export default function DeleteProfileButton() {
               id="delete-profile-title"
               className="text-xl font-bold mb-2 text-dark dark:text-white"
             >
-              Delete your profile?
+              {t("Delete your profile?")}
             </p>
             <p
               id="delete-profile-desc"
               className="text-[#4E4E56] dark:text-off-white mb-4 text-sm"
             >
-              This permanently deletes your account, your quizzes and your game
-              history. This cannot be undone.
+              {t(
+                "This permanently deletes your account, your quizzes and your game history. This cannot be undone.",
+              )}
             </p>
             <TextInput
-              label={`Type “${CONFIRM_PHRASE}” to confirm`}
+              label={t("Type “{phrase}” to confirm", {
+                phrase: CONFIRM_PHRASE,
+              })}
               placeholder={CONFIRM_PHRASE}
               autoComplete="off"
               value={phrase}
@@ -89,7 +96,7 @@ export default function DeleteProfileButton() {
               disabled={!matches || pending}
               className="mt-4 text-sm text-white dark:text-dark dark:font-bold rounded-lg py-2 px-4 bg-red-light dark:bg-red-dark w-full cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {pending ? "Deleting..." : "Delete profile"}
+              {pending ? "Deleting..." : t("Delete profile")}
             </button>
           </div>
         </Box>
