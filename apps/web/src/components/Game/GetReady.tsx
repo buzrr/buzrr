@@ -9,6 +9,7 @@ import {
   dangerButtonClass,
   mutedText,
   panelClass,
+  primaryButtonClass,
 } from "@/components/Game/GameUI";
 
 /**
@@ -19,31 +20,39 @@ import {
 export default function GetReady({
   title,
   onSkip,
+  onDownloads,
 }: {
   title?: string;
   /** Host with nobody playing: skip the countdown. */
   onSkip?: () => void;
+  /** Host, while devices still download the sound: wait for all (true) or go on. */
+  onDownloads?: (wait: boolean) => void;
 }) {
   const phase = useAppSelector((state) => state.game.phase);
   const deadline = useAppSelector((state) => state.game.deadline);
   const countdownMs = useAppSelector((state) => state.game.countdownMs);
   const qIndex = useAppSelector((state) => state.game.qIndex);
+  const waitingFor = useAppSelector((state) => state.game.waitingFor);
+  const devices = useAppSelector((state) => state.game.downloadDevices);
+  const done = useAppSelector((state) => state.game.downloadsDone);
+  const waitAll = useAppSelector((state) => state.game.waitAll);
   // Every frame, so the digits and the ring hit 0 exactly at the deadline.
   const remaining = useFrameCountdown(phase === "starting" ? deadline : 0);
   const seconds = Math.ceil(remaining);
-  const counting = phase === "starting" && deadline > 0 && remaining > 0;
+  const counting =
+    phase === "starting" && deadline > 0 && remaining > 0 && waitingFor === 0;
   // Whether this question's countdown really ran (one with time on it):
   // without one ("∞" questions, a host skipping it) there is no 0 to show.
   const [counted, setCounted] = useState<number | null>(null);
   if (phase === "starting" && countdownMs > 0 && counted !== qIndex) {
     setCounted(qIndex);
   }
-  // 0 is the end: red, still.
+  // 0 is the end: red, still — also while devices finish their downloads.
   const zero =
     counted === qIndex &&
     phase === "starting" &&
     deadline > 0 &&
-    remaining <= 0;
+    (remaining <= 0 || waitingFor > 0);
   // No countdown at all: an empty, still round.
   const empty =
     phase === "starting" && !counting && !zero && counted !== qIndex;
@@ -81,16 +90,53 @@ export default function GetReady({
         />
 
         <div className="relative min-h-6 flex items-center justify-center">
-          {counting || zero || empty ? (
+          {counting || ((zero || empty) && waitingFor === 0) ? (
             <p className={clsx("text-base md:text-lg font-medium", mutedText)}>
               {qIndex > 0
                 ? `Question ${qIndex + 1} coming up`
                 : "First question coming up"}
             </p>
+          ) : waitingFor > 0 && onDownloads ? (
+            <WaitingDots>
+              Audio downloads: {done} of {devices} done
+            </WaitingDots>
+          ) : waitingFor > 0 ? (
+            <WaitingDots>
+              Waiting for sound downloads · {waitingFor} left
+            </WaitingDots>
           ) : (
             <WaitingDots>Waiting for the question</WaitingDots>
           )}
         </div>
+        {onDownloads && phase === "starting" && waitingFor > 0 && (
+          <div className="relative flex flex-col items-center gap-3">
+            <p className={clsx("text-sm", mutedText)}>
+              {waitAll
+                ? "Waiting until every download is done."
+                : "Wait for them?"}
+            </p>
+            <div className="flex flex-wrap justify-center gap-2.5">
+              <button
+                type="button"
+                data-host-key="skip"
+                title={'You can also press "Esc"'}
+                onClick={() => onDownloads(false)}
+                className={dangerButtonClass}
+              >
+                No, go on
+              </button>
+              {!waitAll && (
+                <button
+                  type="button"
+                  onClick={() => onDownloads(true)}
+                  className={primaryButtonClass}
+                >
+                  Yes, wait until done
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </section>
       {onSkip && phase === "starting" && (
         // Skip sits bottom left, like on the question screen.

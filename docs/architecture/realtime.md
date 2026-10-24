@@ -64,7 +64,7 @@ in meta as `pacing` (games from before the field fall back by mode):
   close once every **connected** rostered player has answered.
 - A host-paced reveal whose parked deadline comes due is re-parked, not
   advanced.
-- A room's settings (moderated mode, reactions) come from
+- A room's settings (moderated mode, sounds, reactions) come from
   `roomSettings` (`common/game-look/game-look.ts`): the game's own
   `GameSession.settings` (the "Host quiz" dialog), else `Quiz.settings`.
   Every server read for a live room goes through it; moderation is copied
@@ -314,6 +314,50 @@ win for each player in `/users/me/stats`.
   the web client no longer used any of them — the server emits and accepts
   exactly what the current client speaks. Adding a compat alias "just in case"
   reintroduces the drift this removal cleared.
+
+## The lobby: everything ahead, start when ready
+
+A device joining a room (lobby, a reconnect, or late in the game) gets
+`preload-all`: every playable question's encrypted clips (no keys;
+`GameEngineService.lobbyAssets`, from Postgres, kept a minute). It downloads
+them through one `lobby` download slot, one after the other, and reports
+`assets-status` (files, `done` also after failures). The host gets
+`lobby-ready { ready, total, pending, forceAt }` at most once a second
+(`LobbyReadiness`): the lobby bar shows who is here (light) and who has
+everything (strong), "412 / 480 ready". `start-game` waits until no
+connected player is still downloading — devices quiet for 8 s don't count —
+or until `forceAt` (30 s after the last join or the first try): then the
+button says "Start anyway (n still loading)". The server checks the same
+rule. In the game the per-question `preload` hints then find the files in
+the cache (the client keeps up to 600), so the countdown rarely waits.
+
+## Question sounds: preload and the countdown's wait
+
+- During a reveal (or the get-ready slide) the room gets `preload` with the
+  next question's encrypted clips. Each device starts after a random pause of
+  up to 3 s (`PRELOAD_SPREAD_MS`, `lib/sound/preload.ts`) and reports
+  `preload-status` with `loaded: 0` at once, so the countdown counts it as
+  downloading.
+- **Download slots** (`MAX_PARALLEL_AUDIO_DOWNLOADS`, `audio-slots.ts`): a
+  device that has to download asks `preload-slot` first (ack `{ go, limited }`);
+  queued devices get `preload-go { qIndex }` as slots free up — on a `done`
+  report, a disconnect, or 8 s without progress (`SLOT_STALL_MS`). The host
+  never queues. While queued the device reports `loaded: 0` every 1.5 s, so
+  the countdown keeps counting it. In memory per server process; unlimited
+  when unset (the ack says `limited: false` and devices spread their own start).
+- Slots come in two kinds, each with its own limit: `question` (above) and
+  `lobby` — everything ahead (see the lobby above: one slot, the files one
+  after the other, `preload-slot` again every 4 s as a keepalive, then
+  `slot-done`).
+- A failed download is retried up to 5 times after a random, growing pause; a
+  clip given up reports `done: true, failed: true` — the countdown never
+  waits for it. Clips are mono, 64 kbit/s.
+- The countdown (`waitForDownloads`) waits for connected devices still
+  downloading, ignores ones whose progress stalled for 4 s, and gives up
+  after 30 s. Its `phase-change` carries `waitingFor`, `downloadDevices` and
+  `downloadsDone`; the host answers with `downloads-decision { wait }`: go on
+  now, or wait without the 30 s limit (`preloadWaitAll`, then `waitAll: true`).
+  Questions with "∞" time have no countdown and no wait.
 
 ## Lobby extras: bubbles and reactions
 

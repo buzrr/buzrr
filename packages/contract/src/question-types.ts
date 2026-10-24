@@ -33,6 +33,33 @@ export const UNLIMITED_TIME_OUT = 3600;
 export const isUnlimitedTime = (seconds: number | null | undefined) =>
   (seconds ?? 0) >= UNLIMITED_TIME_OUT;
 
+/**
+ * A question's optional sound, played on the host screen: from `startMs` for
+ * the question's time while it is open, and from `revealMs` (if set) at the
+ * reveal.
+ */
+export const questionAudioSchema = z.object({
+  /**
+   * What to load: the question's clip (encrypted, see `key`), or for sounds
+   * without clips (external links) the whole file, played from `startMs`.
+   */
+  url: z.string(),
+  startMs: z.number().int().nonnegative(),
+  revealMs: z.number().int().nonnegative().nullable(),
+  /** Where it plays; "quiz" follows the quiz's sound setting. */
+  playOn: z.enum(["quiz", "host", "players", "both", "off"]).default("quiz"),
+  /**
+   * Clip files are AES-256-GCM encrypted (12-byte IV, ciphertext + tag);
+   * `key` (base64url) decrypts the question clip and comes only with the
+   * question itself. The reveal clip's key comes with the reveal.
+   */
+  encrypted: z.boolean().optional(),
+  key: z.string().optional(),
+  /** The reveal clip (played from its start), if there is one. */
+  revealUrl: z.string().nullable().optional(),
+});
+export type QuestionAudio = z.infer<typeof questionAudioSchema>;
+
 const publicBase = z.object({
   id: z.string(),
   title: z.string(),
@@ -40,6 +67,7 @@ const publicBase = z.object({
   mediaType: z.string().nullable(),
   /** Seconds to answer. */
   timeOut: z.number().int().positive(),
+  audio: questionAudioSchema.nullable().optional(),
 });
 
 export const publicOptionSchema = z.object({
@@ -449,12 +477,19 @@ export function isScoredType(type: QuestionType): boolean {
 
 /**
  * Whether a question's "show answer" step has anything to show: a right
- * answer (the scored types). A poll, a word cloud, … skips it — moderated
- * games go on from "time's up", where the host already sees how the room
- * answered.
+ * answer (the scored types), or the reveal part of its own sound. A poll, a
+ * word cloud, … without one skips it — moderated games go on from "time's
+ * up", where the host already sees how the room answered.
  */
-export function revealHasPoint(question: { type: QuestionType }): boolean {
-  return isScoredType(question.type);
+export function revealHasPoint(question: {
+  type: QuestionType;
+  audio?: { revealMs?: number | null } | null;
+}): boolean {
+  return (
+    isScoredType(question.type) ||
+    (question.audio?.revealMs !== null &&
+      question.audio?.revealMs !== undefined)
+  );
 }
 
 /** Rows written before Question.type existed — and any unset type — mean this. */

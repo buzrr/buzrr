@@ -201,6 +201,10 @@ export function buildReveal(
     summary: summarizeAnswers(question, answerEntries(answers, roster)),
     avgTimeMs: averageAnswerMs(answers),
     fastest: fastestCorrect(question, answers, roster),
+    // The reveal clip becomes playable only now.
+    ...(question.audio?.revealKey
+      ? { audioRevealKey: question.audio.revealKey }
+      : {}),
   };
 }
 
@@ -292,12 +296,12 @@ export function buildSnapshot(
 
   // A host reconnecting in "closed" gets the tally its screen shows.
   if (!playerId && meta.phase === "closed" && question) {
-    const { fastest: _fastest, ...tally } = buildReveal(
-      question,
-      meta.qIndex,
-      answers,
-      roster,
-    );
+    const {
+      audioRevealKey: _key,
+      fastest: _fastest,
+      ...tally
+    } = buildReveal(question, meta.qIndex, answers, roster);
+    void _key;
     payload.closedSummary = tally;
   }
 

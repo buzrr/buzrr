@@ -12,6 +12,13 @@ tap 1-3 times 10 s into a question, 10 % right after the answer is shown.
 Each player also downloads what its browser would, with its own cache:
   - the player context
   - question images, as each question opens
+  - question sounds: the encrypted clips announced by `preload` (with
+    `preload-status` progress reports, like a phone, so the countdown can wait
+    for slow devices; with the server's download slots a device first asks
+    for one and waits for `preload-go`), or an external sound file when the
+    question opens, on devices where question sounds are on (`--sound-optin`
+    decides how many players switch sound on when the quiz plays it on the
+    host only)
 
 Measures:
   - HTTP latency: create player, join room
@@ -20,11 +27,13 @@ Measures:
   - submit-answer ack latency (accepted / rejected by reason)
   - broadcast spread: how far apart the players received question-start /
     question-end / phase-change for the same question
-  - downloads: latency and bytes per kind
+  - downloads: latency and bytes per kind, preload hint -> clips downloaded,
+    question sounds ready / still loading when the question opened, how long
+    countdowns waited for downloads
 
 Usage:
   python3 buzrrbench.py [--url https://www.buzrr.in] [--code ABC123] [--users 50]
-                        [--kbps 2000] [--no-assets] [--no-reactions]
+                        [--kbps 2000] [--sound-optin 0.3] [--no-assets] [--no-reactions]
                         [--timeout-after 60 --timeout-users 5] [--procs 4] [--probe-bots 20]
 
 With --timeout-after/--timeout-users, that many connected players "freeze" at
@@ -81,12 +90,20 @@ BUBBLE_REFRESH_S = 15.0
 # The run stops this long after DONE_SHARE of the connected players are done.
 DONE_SHARE = 0.95
 DONE_GRACE = 30.0
+# While queued for a download slot: "still here, loaded 0" this often.
+QUEUED_REPORT_EVERY = 1.5
+SLOT_ACK_TIMEOUT = 10.0
+SLOT_GIVE_UP = 90.0  # like the web client: start anyway after this long
+LOBBY_KEEPALIVE_EVERY = 4.0  # holding the lobby slot: ask again, refreshes it
 # During the game, reactions are rare: this share of all players taps 1-3
 # times once a question has run QUESTION_REACT_AFTER s, and this share
 # right after the answer is shown. In the lobby they tap regularly.
 QUESTION_REACT_SHARE = 0.03
 QUESTION_REACT_AFTER = 10.0
 REVEAL_REACT_SHARE = 0.10
+PRELOAD_REPORT_EVERY = 0.4  # like the web client's throttle
+# Tries per download, like the web client (lib/sound/preload.ts).
+DOWNLOAD_TRIES = 6
 CHUNK = 64 * 1024
 
 DEFAULT_EMOJIS = ["👍", "❤️", "😂"]
@@ -109,6 +126,9 @@ class Metrics:
         # (event, qIndex) -> receive timestamps (s), for broadcast spread
         self.recv: dict[tuple[str, int], list[float]] = defaultdict(list)
         self.bytes: Counter[str] = Counter()
+        # qIndex -> most devices a countdown waited for / longest wait (ms)
+        self.waiting_for: dict[int, int] = {}
+        self.wait_ms: dict[int, float] = {}
 
     def add(self, name: str, ms: float) -> None:
         self.lat[name].append(ms)
@@ -122,6 +142,8 @@ class Metrics:
             "lat": self.lat, "errors": self.errors, "counts": self.counts,
             "recv": [[ev, q, ts] for (ev, q), ts in self.recv.items()],
             "bytes": self.bytes,
+            "waiting_for": list(self.waiting_for.items()),
+            "wait_ms": list(self.wait_ms.items()),
         }
 
     def merge(self, d: dict) -> None:
@@ -132,6 +154,10 @@ class Metrics:
         self.bytes.update(d["bytes"])
         for ev, q, ts in d["recv"]:
             self.recv[(ev, q)].extend(ts)  # time.time(): comparable across processes
+        for q, n in d["waiting_for"]:
+            self.waiting_for[q] = self.waiting_for.get(q, 0) + n
+        for q, ms in d["wait_ms"]:
+            self.wait_ms[q] = max(self.wait_ms.get(q, 0.0), ms)
 
 
 M = Metrics()
@@ -234,6 +260,8 @@ class Bot:
     assets: bool = True
     kbps: float = 0.0  # download limit per device, 0 = none
     reacting: bool = True
+    sound_pref: bool | None = None  # the device's sound switch (None = default)
+    sound: dict = field(default_factory=dict)  # quiz sound settings
     reactions_on: bool = True
     emojis: list = field(default_factory=lambda: list(DEFAULT_EMOJIS))
     # The room's reaction budget, as the server sends it (reaction-limit).
@@ -242,9 +270,18 @@ class Bot:
     react_sent: list = field(default_factory=list)
     room_size: int = 0  # from reaction-limit
     cache: dict = field(default_factory=dict)  # bare url -> download task
+    failed_keys: set = field(default_factory=set)  # clips given up after all tries
+    progress: dict = field(default_factory=dict)  # bare url -> (loaded, total, done)
+    tracked: tuple | None = None  # (qIndex, [bare urls], hint time)
+    last_report: float = 0.0
     bw_free_at: float = 0.0  # when the device's downlink is free again (--kbps)
     tasks: set = field(default_factory=set)
+    question_audio: dict | None = None
     seen_q: set = field(default_factory=set)
+    wait_started: dict = field(default_factory=dict)  # qIndex -> first "waiting for downloads"
+    lobby_total: int = 0  # files from preload-all
+    lobby_done: bool = False
+    slot_go: dict = field(default_factory=dict)  # (kind, qIndex) -> asyncio.Event (preload-go)
     frozen_at: float = 0.0  # --timeout-*: when this player stopped sending (perf_counter)
 
     # -- helpers ------------------------------------------------------------------
@@ -264,6 +301,16 @@ class Bot:
         t = asyncio.create_task(coro)
         self.tasks.add(t)
         t.add_done_callback(self.tasks.discard)
+
+    def sound_here(self, play_on: str | None) -> bool:
+        """Whether sound with this placement plays on this device (see director.tsx)."""
+        if play_on == "quiz" or play_on is None:
+            play_on = self.sound.get("playOn", "host")
+        if play_on in ("both", "players"):
+            return self.sound_pref if self.sound_pref is not None else True
+        if play_on == "host" and self.sound.get("playerOptIn", True):
+            return bool(self.sound_pref)
+        return False
 
     async def http_json(self, method: str, path: str, metric: str, retries: int = 0, **kw):
         """JSON request; with `retries`, 5xx and network errors are retried like
@@ -350,6 +397,7 @@ class Bot:
             "GET", f"/api/game-sessions/player-play/{self.player_id}", "http player-play"
         )
         settings = (((ctx or {}).get("game") or {}).get("quiz") or {}).get("settings") or {}
+        self.sound = settings.get("sound") or {}
         self.reactions_on = settings.get("reactions", True) is not False
 
     # -- downloads ------------------------------------------------------------------
@@ -359,13 +407,33 @@ class Bot:
         key = url.split("?")[0]
         task = self.cache.get(key)
         if task is None or (task.done() and (task.cancelled() or task.exception())):
-            task = asyncio.create_task(self._download(url, kind))
+            task = asyncio.create_task(self._download_with_retry(url, key, kind))
             self.cache[key] = task
             self.tasks.add(task)
             task.add_done_callback(self.tasks.discard)
         return task
 
-    async def _download(self, url: str, kind: str) -> int:
+    async def _download_with_retry(self, url: str, key: str, kind: str) -> int:
+        """Like the web client: up to DOWNLOAD_TRIES tries, a random, growing
+        pause between them; a clip given up still reports "done" (failed),
+        so the countdown doesn't wait for it."""
+        for attempt in range(1, DOWNLOAD_TRIES + 1):
+            try:
+                return await self._download(url, key, kind)
+            except asyncio.CancelledError:
+                raise
+            except Exception:  # noqa: BLE001
+                if attempt == DOWNLOAD_TRIES:
+                    M.counts[f"downloads failed after {DOWNLOAD_TRIES} tries: {kind}"] += 1
+                    self.progress[key] = (0, 0, True)
+                    self.failed_keys.add(key)
+                    self.notify()
+                    raise
+                M.counts[f"download retries: {kind}"] += 1
+                await asyncio.sleep((0.4 + random.random() * 0.8) * attempt)
+        return 0
+
+    async def _download(self, url: str, key: str, kind: str) -> int:
         full = urljoin(self.base + "/", url)
         t0 = time.perf_counter()
         loaded = 0
@@ -376,8 +444,13 @@ class Bot:
                 if r.status >= 400:
                     M.err(f"download {kind}: HTTP {r.status}")
                     raise RuntimeError(f"HTTP {r.status}")
+                total = int(r.headers.get("Content-Length") or 0)
+                self.progress[key] = (0, total, False)
+                self.notify()
                 async for chunk in r.content.iter_chunked(CHUNK):
                     loaded += len(chunk)
+                    self.progress[key] = (loaded, total, False)
+                    self.notify()
                     if self.kbps:
                         # One downlink per device, shared by its parallel downloads.
                         now = time.perf_counter()
@@ -388,7 +461,10 @@ class Bot:
         except Exception as e:  # noqa: BLE001
             if not isinstance(e, RuntimeError):
                 M.err(f"download {kind}: {type(e).__name__}")
+            self.progress.pop(key, None)
             raise
+        self.progress[key] = (loaded, total or loaded, True)
+        self.notify()
         M.add(f"download {kind}", (time.perf_counter() - t0) * 1000)
         M.counts[f"downloads: {kind}"] += 1
         M.bytes[kind] += loaded
@@ -397,6 +473,31 @@ class Bot:
     def download(self, url: str | None, kind: str) -> None:
         if url and self.assets:
             self.fetch(url, kind).add_done_callback(lambda t: t.cancelled() or t.exception())
+
+    def notify(self) -> None:
+        """`preload-status` for the tracked question, throttled; "done" always."""
+        if not self.tracked or self.tracked[2] is None:
+            return  # nothing tracked, or "done" already reported
+        q_index, keys, hint_at = self.tracked
+        loaded = total = 0
+        done = True
+        for k in keys:
+            lo, to, d = self.progress.get(k, (0, 0, False))
+            loaded += lo
+            total += to
+            done = done and d
+        now = time.perf_counter()
+        if not done and now - self.last_report < PRELOAD_REPORT_EVERY:
+            return
+        self.last_report = now
+        if done:
+            M.add("preload hint -> clips downloaded", (now - hint_at) * 1000)
+            self.tracked = (q_index, keys, None)
+        if self.sio.connected:
+            payload = {"qIndex": q_index, "loaded": loaded, "total": total, "done": done}
+            if done and any(k in self.failed_keys for k in keys):
+                payload["failed"] = True
+            self.spawn(self._emit("preload-status", payload))
 
     async def _emit(self, event: str, payload) -> None:
         if self.frozen:
@@ -407,13 +508,138 @@ class Bot:
         except Exception:  # noqa: BLE001
             M.err(f"{event} emit failed")
 
+    def on_preload(self, data: dict) -> None:
+        M.counts["preload hints received"] += 1
+        if not self.assets or not self.sound_here(data.get("playOn")):
+            return
+        urls = data.get("urls") or []
+        q = data["qIndex"]
+        self.tracked = (q, [u.split("?")[0] for u in urls], time.perf_counter())
+        self.notify()
+        if all(u.split("?")[0] in self.cache for u in urls):
+            self.start_preload(urls)
+        else:
+            self.spawn(self._preload_in_turn(q, urls))
+
+    def start_preload(self, urls: list) -> None:
+        for u in urls:
+            self.download(u, "question sound (preload)")
+        self.notify()
+
+    async def wait_for_slot(self, kind: str, q: int, waiting=None) -> None:
+        """Like the web client: ask for a download slot (kind "question" /
+        "lobby") and wait for `preload-go` if queued; `waiting` runs every
+        QUEUED_REPORT_EVERY s meanwhile."""
+        t0 = time.perf_counter()
+        go = self.slot_go.setdefault((kind, q), asyncio.Event())
+        go.clear()
+        try:
+            ack = await self.sio.call(
+                "preload-slot", {"qIndex": q, "kind": kind}, timeout=SLOT_ACK_TIMEOUT
+            )
+        except Exception:  # noqa: BLE001 - no answer (older server): just go
+            ack = {"go": True}
+        if ack.get("go"):
+            M.counts[f"download slot ({kind}): at once"] += 1
+            return
+        M.counts[f"download slot ({kind}): queued"] += 1
+        deadline = t0 + SLOT_GIVE_UP
+        while not go.is_set() and time.perf_counter() < deadline:
+            try:
+                await asyncio.wait_for(go.wait(), QUEUED_REPORT_EVERY)
+            except asyncio.TimeoutError:
+                if waiting:
+                    waiting()
+        if not go.is_set():
+            M.counts[f"download slot ({kind}): gave up waiting"] += 1
+        M.add(f"download slot wait ({kind})", (time.perf_counter() - t0) * 1000)
+
+    async def _preload_in_turn(self, q: int, urls: list) -> None:
+        def keepalive():
+            self.last_report = 0.0  # "loaded 0" again, not throttled away
+            self.notify()
+        await self.wait_for_slot("question", q, keepalive)
+        self.start_preload(urls)
+
+    async def preload_all(self, data: dict) -> None:
+        """Like the browser in the lobby: every question's sound where it
+        plays here, through the "lobby" download slot, one after the other,
+        reporting assets-status."""
+        if not self.assets:
+            return
+        # It comes with the connect: wait until the client counts as connected.
+        for _ in range(50):
+            if self.sio.connected:
+                break
+            await asyncio.sleep(0.1)
+        urls = []
+        for q in data.get("questions") or []:
+            if self.sound_here(q.get("playOn")):
+                urls += q.get("urls") or []
+        self.lobby_total = len(urls)
+        missing = [u for u in urls if u.split("?")[0] not in self.cache]
+        loaded = len(urls) - len(missing)
+        t0 = time.perf_counter()
+
+        async def status(done: bool, failed: bool = False):
+            payload = {"loaded": loaded, "total": len(urls), "done": done}
+            if failed:
+                payload["failed"] = True
+            await self._emit("assets-status", payload)
+
+        await status(not missing)
+        if not missing:
+            self.lobby_done = True
+            return
+        await self.wait_for_slot("lobby", 0)
+
+        async def keepalive():
+            while True:
+                await asyncio.sleep(LOBBY_KEEPALIVE_EVERY)
+                self.spawn(self._emit_ack("preload-slot", {"qIndex": 0, "kind": "lobby"}))
+                await status(False)
+        alive = asyncio.create_task(keepalive())
+        failed = False
+        try:
+            for u in missing:
+                try:
+                    await self.fetch(u, "lobby preload")
+                except Exception:  # noqa: BLE001 - counted in the download
+                    failed = True
+                loaded += 1
+        finally:
+            alive.cancel()
+            self.spawn(self._emit("slot-done", {"qIndex": 0, "kind": "lobby"}))
+        await status(True, failed)
+        self.lobby_done = True
+        M.add("lobby preload (all assets)", (time.perf_counter() - t0) * 1000)
+
+    async def _emit_ack(self, event: str, payload) -> None:
+        if self.frozen or not self.sio.connected:
+            return
+        try:
+            await self.sio.call(event, payload, timeout=SLOT_ACK_TIMEOUT)
+        except Exception:  # noqa: BLE001
+            pass
+
     def on_question(self, q_index: int, question: dict) -> None:
-        """What the question screen loads as it opens: its image."""
+        """What the question screen loads as it opens: image, sound."""
         if not self.assets or q_index in self.seen_q:
             return
         self.seen_q.add(q_index)
+        self.question_audio = question.get("audio")
         if question.get("media"):
             self.download(question["media"], "question image")
+        audio = question.get("audio")
+        if audio and self.sound_here(audio.get("playOn")):
+            key = audio["url"].split("?")[0]
+            if audio.get("encrypted"):
+                ready = self.progress.get(key, (0, 0, False))[2]
+                M.counts["question sound ready when it opened" if ready
+                         else "question sound still loading when it opened"] += 1
+                self.download(audio["url"], "question sound (late)")
+            else:
+                self.download(audio["url"], "question sound (file)")
 
     def set_phase(self, phase: str) -> None:
         self.phase = phase
@@ -441,11 +667,28 @@ class Bot:
         async def _started(_data=None):
             self.set_phase("starting")
             M.recv[("game-started", 0)].append(time.time())
+            if self.lobby_total:
+                M.counts["assets ready at start" if self.lobby_done
+                         else "assets still loading at start"] += 1
+
+        @s.on("preload-all")
+        async def _preload_all(data):
+            self.spawn(self.preload_all(data))
 
         @s.on("phase-change")
         async def _phase(data):
             self.set_phase(data["phase"])
-            M.recv[(f"phase-change:{data['phase']}", data["qIndex"])].append(time.time())
+            q = data["qIndex"]
+            if data.get("waitingFor") is not None:
+                # Countdown over, still waiting for devices' downloads.
+                M.waiting_for[q] = max(M.waiting_for.get(q, 0), data["waitingFor"])
+                self.wait_started.setdefault(q, time.perf_counter())
+                return
+            M.recv[(f"phase-change:{data['phase']}", q)].append(time.time())
+
+        @s.on("preload")
+        async def _preload(data):
+            self.on_preload(data)
 
         @s.on("reaction-limit")
         async def _react_limit(data):
@@ -459,9 +702,17 @@ class Bot:
         async def _react_limited(_data=None):
             M.counts["reactions rejected by the server"] += 1
 
+        @s.on("preload-go")
+        async def _preload_go(data):
+            key = (data.get("kind") or "question", data["qIndex"])
+            self.slot_go.setdefault(key, asyncio.Event()).set()
+
         @s.on("question-start")
         async def _qstart(data):
             q = data["index"]
+            if q in self.wait_started:
+                ms = (time.perf_counter() - self.wait_started.pop(q)) * 1000
+                M.wait_ms[q] = max(M.wait_ms.get(q, 0.0), ms)
             self.set_phase("question")
             M.recv[("question-start", q)].append(time.time())
             self.on_question(q, data["question"])
@@ -474,6 +725,10 @@ class Bot:
         async def _qend(data):
             self.set_phase("reveal")
             M.recv[("question-end", data["index"])].append(time.time())
+            audio = self.question_audio
+            if data.get("audioRevealKey") and audio and self.sound_here(audio.get("playOn")):
+                # Decrypting the reveal clip: preloaded, unless the device joined late.
+                self.download(audio.get("revealUrl"), "question sound (late)")
             # The answer is out: a good moment for a smiley.
             if self.reacting and random.random() < REVEAL_REACT_SHARE:
                 self.spawn(self.tap(delay=random.uniform(0.5, 3.0), taps=random.randint(1, 3)))
@@ -729,6 +984,11 @@ def report(started: float, no_game_end: int | None = None) -> None:
         for kind, n in sorted(M.bytes.items()):
             print(f"  {kind:38s} files={M.counts[f'downloads: {kind}']:6d}  {n / 1e6:10.2f} MB")
         print(f"  {'total':38s} {'':12s} {sum(M.bytes.values()) / 1e6:10.2f} MB")
+    if M.waiting_for:
+        print("\nCountdowns waiting for downloads")
+        for q in sorted(M.waiting_for):
+            print(f"  q{q + 1:<3d} up to {M.waiting_for[q]:4d} devices, "
+                  f"waited {M.wait_ms.get(q, 0.0):8.1f} ms")
     if no_game_end is not None:
         M.counts["bots without game end"] = no_game_end
     if M.counts:
@@ -750,7 +1010,9 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--ramp", type=float, default=20.0, help="players started per second (default 20)")
     ap.add_argument("--kbps", type=float, default=0.0,
                     help="download bandwidth per player in kbit/s, e.g. 2000 for a weak phone (default: unlimited)")
-    ap.add_argument("--no-assets", action="store_true", help="skip all downloads (images)")
+    ap.add_argument("--sound-optin", type=float, default=0.3,
+                    help="share of players who switch sound on when the quiz plays it on the host only (default 0.3)")
+    ap.add_argument("--no-assets", action="store_true", help="skip all downloads (images, sounds)")
     ap.add_argument("--no-reactions", action="store_true", help="players send no reactions")
     ap.add_argument("--react-share", type=float, default=0.2,
                     help="share of players who send reactions at all (default 0.2)")
@@ -782,6 +1044,7 @@ async def run_bots(args: argparse.Namespace, base: str, code: str, users: int) -
                 assets=not args.no_assets,
                 kbps=args.kbps,
                 reacting=not args.no_reactions and random.random() < args.react_share,
+                sound_pref=True if random.random() < args.sound_optin else None,
                 emojis=list(DEFAULT_EMOJIS) if random.random() < 0.3 else random.sample(EMOJI_POOL, 3),
             )
             for i in range(users)
@@ -893,7 +1156,7 @@ def run_parent(args: argparse.Namespace, base: str, code: str, users: int) -> No
         cmd = [sys.executable, os.path.abspath(__file__),
                "--url", base, "--code", code, "--users", str(n),
                "--ramp", str(args.ramp / procs), "--kbps", str(args.kbps),
-               "--probe-bots", str(probes[i]),
+               "--sound-optin", str(args.sound_optin), "--probe-bots", str(probes[i]),
                "--child-out", out, "--first-idx", str(first), "--label", f"p{i + 1}"]
         if args.no_assets:
             cmd.append("--no-assets")

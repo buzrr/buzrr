@@ -4,6 +4,7 @@ import {
   quizSettingsSchema,
   type ModerationSettings,
   type QuizSettings,
+  type SoundSettings,
 } from "@buzrr/contract";
 import Switch from "@/components/ui/Switch";
 
@@ -33,7 +34,7 @@ export function quizSettingsOf(raw: unknown): QuizSettings {
 }
 
 /**
- * The quiz settings controls: live reactions, moderated mode.
+ * The quiz settings controls: question sounds, live reactions, moderated mode.
  * Controlled — the quiz editor saves every change, the "Host quiz" dialog
  * keeps them for the game it opens.
  */
@@ -47,12 +48,49 @@ export default function QuizSettingsFields({
   disabled?: boolean;
 }) {
   const mod = settings.moderation;
+  const setSound = (patch: Partial<SoundSettings>) =>
+    onChange({ ...settings, sound: { ...settings.sound, ...patch } });
   const setModeration = (patch: Partial<ModerationSettings>) =>
     onChange({ ...settings, moderation: { ...mod, ...patch } });
+  const selectClass =
+    "w-44 rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent dark:bg-dark px-2 py-1 text-[13px]";
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-sm font-semibold">Quiz settings</span>
+      <div className="flex flex-col gap-1.5 text-sm">
+        <span className="font-semibold">Question sounds</span>
+        <label className="flex items-center gap-2">
+          <span className="w-20 shrink-0 text-[13px]">Play on</span>
+          <select
+            aria-label="Where sounds play"
+            value={settings.sound.playOn}
+            disabled={disabled}
+            onChange={(e) =>
+              setSound({ playOn: e.target.value as SoundSettings["playOn"] })
+            }
+            className={selectClass}
+          >
+            <option value="host">Host&apos;s screen</option>
+            <option value="players">Players&apos; devices</option>
+            <option value="both">Both</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        {settings.sound.playOn === "host" && (
+          <label className="flex items-center gap-2">
+            <Switch
+              aria-label="Players can turn sound on"
+              checked={settings.sound.playerOptIn}
+              disabled={disabled}
+              onCheckedChange={(checked) => setSound({ playerOptIn: checked })}
+            />
+            <span className="text-[13px] max-w-[230px]">
+              Players can turn sound on for themselves
+            </span>
+          </label>
+        )}
+      </div>
+      <span className="mt-1 text-sm font-semibold">Quiz settings</span>
       <div className="flex items-center gap-2">
         <Switch
           aria-label="Live reactions"

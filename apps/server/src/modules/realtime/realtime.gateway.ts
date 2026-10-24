@@ -4,7 +4,13 @@ import {
   REACTION_WINDOW_MS,
   reactionLimitFor,
   bubbleStatsSchema,
+  downloadsDecisionSchema,
   duelQueueSchema,
+  assetsStatusSchema,
+  downloadKindSchema,
+  preloadSlotSchema,
+  preloadStatusSchema,
+  slotDoneSchema,
   reactionSchema,
   submitAnswerSchema,
 } from "@buzrr/contract";
@@ -22,7 +28,9 @@ import { MatchmakingService } from "../duel/matchmaking.service";
 import { GameEngineService } from "../game-engine/game-engine.service";
 import { GameStoreService } from "../game-engine/game-store.service";
 import { RealtimeService } from "./realtime.service";
+import { AudioSlots, type Grant } from "./audio-slots";
 import { ReactionBudgets } from "./reaction-budgets";
+import { LobbyReadiness } from "./lobby-readiness";
 import type {
   DuelInviteAcceptAck,
   TypedServer,
@@ -41,6 +49,9 @@ const BUBBLE_RESEND_BATCHES = 15;
 const ROOM_REACTIONS_PER_S = 40;
 /** A disconnected lobby player keeps their place at least this long. */
 const REJOIN_GRACE_MS = 10_000;
+
+/** The host's lobby readiness: at most this often. */
+const LOBBY_READY_EVERY_MS = 1_000;
 
 @WebSocketGateway({
   cors: {
@@ -63,6 +74,11 @@ export class RealtimeGateway
   @WebSocketServer()
   server: TypedServer;
 
+  /** MAX_PARALLEL_AUDIO_DOWNLOADS per room and kind (unset/0 = unlimited). */
+  private readonly slots = new AudioSlots(
+    Math.max(0, Number(process.env.MAX_PARALLEL_AUDIO_DOWNLOADS) || 0),
+  );
+
   constructor(
     private readonly realtimeService: RealtimeService,
     private readonly engine: GameEngineService,
@@ -78,9 +94,68 @@ export class RealtimeGateway
     this.engine.onNewRound((code, winners) =>
       this.resetReactions(code, winners),
     );
+    if (this.slots.limited) {
+      setInterval(
+        () => this.grant(this.slots.sweep(Date.now())),
+        1_000,
+      ).unref();
+    }
   }
 
   private readonly reactionBudgets = new ReactionBudgets();
+  private readonly readiness = new LobbyReadiness();
+  /** Rooms with a lobby-ready update queued for the host (at most 1/s). */
+  private readonly readyTimers = new Map<
+    string,
+    ReturnType<typeof setTimeout>
+  >();
+
+  /** Player ids with a socket in the room right now. */
+  private connectedPlayers(gameCode: string): string[] {
+    const ids = new Set<string>();
+    for (const sid of this.server.sockets.adapter.rooms.get(gameCode) ?? []) {
+      const id = this.server.sockets.sockets.get(sid)?.data.playerId;
+      if (id) ids.add(id);
+    }
+    return [...ids];
+  }
+
+  /**
+   * The host's lobby readiness, at most once a second; while devices are
+   * still downloading it keeps ticking (quiet ones drop out, the "start
+   * anyway" time comes).
+   */
+  private queueLobbyReady(gameCode: string): void {
+    if (this.readyTimers.has(gameCode)) return;
+    this.readyTimers.set(
+      gameCode,
+      setTimeout(() => {
+        this.readyTimers.delete(gameCode);
+        const status = this.readiness.status(
+          gameCode,
+          this.connectedPlayers(gameCode),
+          Date.now(),
+        );
+        this.server.to(`host:${gameCode}`).emit("lobby-ready", status);
+        if (status.pending > 0) this.queueLobbyReady(gameCode);
+      }, LOBBY_READY_EVERY_MS),
+    );
+  }
+
+  /** Everything this room's devices can load ahead (signed for the room). */
+  private async sendLobbyAssets(
+    socket: TypedSocket,
+    gameCode: string,
+  ): Promise<void> {
+    try {
+      const payload = await this.engine.lobbyAssets(gameCode);
+      if (payload.questions.length > 0 || socket.data.playerId) {
+        socket.emit("preload-all", signAssetsDeep(payload));
+      }
+    } catch (error) {
+      this.logger.error("Error sending lobby assets:", error);
+    }
+  }
 
   private roomSize(gameCode: string): number {
     return this.server.sockets.adapter.rooms.get(gameCode)?.size ?? 0;
@@ -134,6 +209,16 @@ export class RealtimeGateway
         windowMs: REACTION_WINDOW_MS,
         reset: true,
         winner: true,
+      });
+    }
+  }
+
+  /** Queued devices whose download slot came free. */
+  private grant(grants: Grant[]): void {
+    for (const g of grants) {
+      this.server.to(g.socketId).emit("preload-go", {
+        qIndex: g.qIndex,
+        kind: downloadKindSchema.catch("question").parse(g.kind),
       });
     }
   }
@@ -551,7 +636,62 @@ export class RealtimeGateway
     socket.once("disconnect", () => clearInterval(check));
   }
 
+  /**
+   * Download progress of the next question's sound, from players and the host
+   * (stored as "host"). The countdown into that question waits on it.
+   */
+  private registerPreloadStatus(
+    socket: TypedSocket,
+    gameCode: string,
+    id: string,
+  ) {
+    let last = 0;
+    socket.on("preload-slot", (payload, ack) => {
+      const parsed = preloadSlotSchema.safeParse(payload);
+      if (!parsed.success || typeof ack !== "function") return;
+      const go = this.slots.request(
+        gameCode,
+        parsed.data.kind,
+        parsed.data.qIndex,
+        id,
+        socket.id,
+        Date.now(),
+      );
+      ack({ go, limited: this.slots.limited });
+    });
+    socket.on("slot-done", (payload) => {
+      const parsed = slotDoneSchema.safeParse(payload);
+      if (!parsed.success) return;
+      const { kind, qIndex } = parsed.data;
+      this.grant(this.slots.release(gameCode, kind, qIndex, id, Date.now()));
+    });
+    socket.once("disconnect", () =>
+      this.grant(this.slots.leave(gameCode, id, socket.id, Date.now())),
+    );
+    socket.on("preload-status", (payload) => {
+      const parsed = preloadStatusSchema.safeParse(payload);
+      if (!parsed.success) return;
+      const now = Date.now();
+      const { qIndex, loaded, total, done } = parsed.data;
+      if (done) {
+        this.grant(this.slots.release(gameCode, "question", qIndex, id, now));
+      } else this.slots.touch(gameCode, "question", qIndex, id, now);
+      // Progress at most every 300 ms; "done" always gets through.
+      if (!done && now - last < 300) return;
+      last = now;
+      void this.store
+        .setPreloadStatus(gameCode, qIndex, id, {
+          loaded,
+          total,
+          done,
+          at: now,
+        })
+        .catch((err) => this.logger.error("Error storing preload status", err));
+    });
+  }
+
   private registerHostHandlers(socket: TypedSocket, gameCode: string): void {
+    this.registerPreloadStatus(socket, gameCode, "host");
     socket.on("remove-player", async (p: { id: string }) => {
       try {
         const removed = await this.realtimeService.removePlayer(
@@ -571,8 +711,24 @@ export class RealtimeGateway
       }
     });
 
+    // The host's lobby: everything to load ahead too, and the readiness.
+    void this.sendLobbyAssets(socket, gameCode);
+    this.queueLobbyReady(gameCode);
     socket.on("start-game", async () => {
       this.logger.log(`Start requested for ${gameCode}`);
+      // Only when every connected player has their downloads — or the wait
+      // is over (30 s after the last join / the first try).
+      if (
+        !this.readiness.mayStart(
+          gameCode,
+          this.connectedPlayers(gameCode),
+          Date.now(),
+        )
+      ) {
+        this.logger.log(`Start of ${gameCode} waits for downloads`);
+        this.queueLobbyReady(gameCode);
+        return;
+      }
       try {
         await this.engine.startGame(gameCode);
       } catch (error) {
@@ -588,6 +744,16 @@ export class RealtimeGateway
       }
     });
 
+    socket.on("downloads-decision", async (payload) => {
+      const parsed = downloadsDecisionSchema.safeParse(payload);
+      if (!parsed.success) return;
+      try {
+        await this.engine.downloadsDecision(gameCode, parsed.data.wait);
+      } catch (error) {
+        this.logger.error("Error applying the downloads decision:", error);
+      }
+    });
+
     socket.on("end-game-session", async () => {
       try {
         await this.engine.endGame(gameCode);
@@ -598,6 +764,9 @@ export class RealtimeGateway
   }
 
   private registerPlayerHandlers(socket: TypedSocket, gameCode: string): void {
+    if (socket.data.playerId) {
+      this.registerPreloadStatus(socket, gameCode, socket.data.playerId);
+    }
     // Lobby bubble game: the latest totals per player are collected per room
     // and go to the host once a second as one batch (bubbleBatches).
     // Live reactions: a budget per player (reactionLimitFor the room's size)
@@ -615,6 +784,20 @@ export class RealtimeGateway
       ...(winner ? { winner: true } : {}),
     });
     this.announceRoomSize(gameCode);
+    // Downloads ahead: everything in the lobby, also for late joiners.
+    const pid = socket.data.playerId;
+    if (pid) {
+      this.readiness.joined(gameCode, pid, Date.now());
+      this.queueLobbyReady(gameCode);
+      void this.sendLobbyAssets(socket, gameCode);
+      socket.on("assets-status", (payload) => {
+        const parsed = assetsStatusSchema.safeParse(payload);
+        if (!parsed.success) return;
+        this.readiness.report(gameCode, pid, parsed.data.done, Date.now());
+        this.queueLobbyReady(gameCode);
+      });
+      socket.once("disconnect", () => this.queueLobbyReady(gameCode));
+    }
     socket.on("reaction", (payload) => {
       const playerId = socket.data.playerId;
       if (!playerId) return;

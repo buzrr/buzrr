@@ -7,6 +7,8 @@ import { QRCodeSVG } from "qrcode.react";
 import { LuCheck, LuCopy, LuShare2, LuSkipForward } from "react-icons/lu";
 import { toast } from "react-toastify";
 import { useAppSelector } from "@/state/hooks";
+import { useAudioSegment } from "@/lib/audio-cues";
+import { useGameSound } from "@/lib/sound/director";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
 import { buildJoinUrl } from "@/lib/join-link";
 import {
@@ -46,6 +48,17 @@ export default function QuestionScreen(props: QuestionScreenProps) {
   const answered = useAppSelector((state) => state.game.answeredCount);
   const players = useAppSelector((state) => state.game.players);
   const live = useAppSelector((state) => state.game.liveSummary);
+  // The question's sound: from its start cue, for the question's time —
+  // if the quiz's sound settings put it on this screen.
+  const sound = useGameSound();
+  const audioHere = sound ? sound.questionAudioHere(question?.audio) : true;
+  useAudioSegment(
+    audioHere ? question?.audio?.url : null,
+    question?.audio?.startMs,
+    question ? question.timeOut * 1000 : null,
+    question?.id,
+    question?.audio?.key,
+  );
   const remaining = useServerCountdown(deadline);
   const [copied, setCopied] = useState(false);
   const [canShare, setCanShare] = useState(false);

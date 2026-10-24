@@ -29,7 +29,9 @@ import {
 } from "@/components/Game/GameUI";
 import { AnimatedNumber, useFlipReorder } from "@/components/Game/motion";
 import { revealHasPoint } from "@buzrr/contract";
+import { useAudioSegment } from "@/lib/audio-cues";
 import { RevealDensity } from "@/components/QuestionTypes/MultipleChoice";
+import { useGameSound } from "@/lib/sound/director";
 import ConfettiBurst from "@/components/ConfettiBurst";
 import {
   closedNextLabel,
@@ -109,6 +111,19 @@ export default function QuesResult(props: QuesResultProps) {
     scoresStepPending(moderation) &&
     scoredQ &&
     qIndex < qCount - 1;
+  // The reveal cue plays when the answer is shown, until the host moves on.
+  const sound = useGameSound();
+  const audioHere = sound ? sound.questionAudioHere(question?.audio) : true;
+  const a = question?.audio;
+  useAudioSegment(
+    phase === "reveal" && audioHere
+      ? (a?.revealUrl ?? (a?.encrypted ? null : a?.url))
+      : null,
+    a?.revealMs,
+    null,
+    question?.id,
+    a?.revealUrl ? reveal?.audioRevealKey : null,
+  );
   // Re-armed on every step: "Show answer" keeps this screen mounted.
   const [advancing, setAdvancing] = useState(false);
   const [armedPhase, setArmedPhase] = useState(phase);

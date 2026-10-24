@@ -17,4 +17,8 @@ export class UnavailableStorage extends MediaStorage {
   }
 
   async remove(): Promise<void> {}
+
+  async read(): Promise<Buffer | null> {
+    return null;
+  }
 }

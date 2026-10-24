@@ -6,7 +6,11 @@ import {
 } from "@buzrr/contract";
 import { ANSWER_GRACE_MS } from "../../../common/utils/answer-timing";
 import { planBotAnswer } from "../../../common/utils/duel-bot";
-import { acceptsMoreAnswers, toPublicQuestion } from "../../question-types";
+import {
+  acceptsMoreAnswers,
+  preloadUrls,
+  toPublicQuestion,
+} from "../../question-types";
 import type { ModerationSettings } from "@buzrr/contract";
 import type { LiveQuestion } from "../game-engine.types";
 import {
@@ -56,7 +60,9 @@ export type EngineEvent =
   /** Close the open question now (everyone connected has answered). */
   | { type: "close-question"; qIndex: number }
   /** The roster shrank or a player dropped (kick, ban, leave, disconnect). */
-  | { type: "roster-changed" };
+  | { type: "roster-changed" }
+  /** The host, while the countdown waits for downloads: keep waiting or go. */
+  | { type: "downloads-decision"; wait: boolean };
 
 /**
  * What the shell must load for each event. `answer-recorded` runs once per
@@ -68,11 +74,19 @@ export type EngineEvent =
 export const PARTS_FOR: Record<EngineEvent["type"], readonly StatePart[]> = {
   start: [],
   "host-next": ["questions", "roster", "answers", "scores"],
-  deadline: ["questions", "roster", "answers", "scores"],
+  // Preloads: a countdown into a question with sound waits for downloads.
+  deadline: ["questions", "roster", "answers", "scores", "preloads"],
   "answer-recorded": ["questions", "roster"],
   "close-question": ["questions", "roster", "answers", "scores"],
   // Questions too: whether the open one may close early depends on its type.
   "roster-changed": ["questions", "roster", "answers", "scores"],
+  "downloads-decision": [
+    "questions",
+    "roster",
+    "answers",
+    "scores",
+    "preloads",
+  ],
 };
 
 export interface StepContext {
@@ -121,6 +135,8 @@ export function step(
       return onDeadline(state, now, pacing, ctx);
     case "answer-recorded":
       return onAnswerRecorded(state, event.qIndex, event.answered);
+    case "downloads-decision":
+      return downloadsDecision(state, event.wait, now, ctx);
     case "close-question":
       // Only the question that met the early-close condition: if another
       // path already revealed it and opened the next, this is stale.
@@ -182,6 +198,7 @@ function start(
             payload: { phase: "ready", qIndex: 0 },
           },
         },
+        ...preloadEffects({ ...state, questions: event.questions }, 0),
       ],
     };
   }
@@ -211,6 +228,7 @@ function start(
           ...(mod ? { moderation: mod } : {}),
         },
       },
+      ...preloadEffects({ ...state, questions: event.questions }, 0),
       { kind: "arm-timer", at: firstQuestionAt },
     ],
   };
@@ -234,7 +252,7 @@ function hostNext(
     case "ready":
       return startCountdown(state, state.meta.qIndex, now, ctx);
     case "starting":
-      // Skip the countdown: e.g. a host running
+      // Skip the countdown (and any wait for downloads): e.g. a host running
       // the quiz with nobody playing.
       return openQuestion(state, state.meta.qIndex, now, ctx);
     case "question":
@@ -281,8 +299,12 @@ function onDeadline(
   if (meta.pausedAt) return noop(state);
   switch (meta.phase) {
     case "starting":
-      // Question 1 after "start game", or a moderated game's next question.
-      return openQuestion(state, meta.qIndex, now, ctx);
+      // Question 1 after "start game", or a moderated game's next question —
+      // unless devices are still downloading its sound.
+      return (
+        waitForDownloads(state, now) ??
+        openQuestion(state, meta.qIndex, now, ctx)
+      );
     case "question":
       if (!meta.qStartAt) {
         // Legacy meta only — the window and the phase are one write now.
@@ -322,9 +344,13 @@ function advance(
     const mod = moderationOf(meta);
     // The get-ready slide opens the round only (before question 1): after a
     // host click on "Next question" another click would add nothing.
+    // A question with sound always gets a countdown, so downloads can finish.
     // … unless it has no time limit: those open straight away.
     const nextQ = state.questions[meta.qIndex + 1];
-    if (mod && !isUnlimitedTime(nextQ?.timeOut)) {
+    if (
+      !isUnlimitedTime(nextQ?.timeOut) &&
+      (mod || preloadUrls(nextQ).length > 0)
+    ) {
       return startCountdown(state, meta.qIndex + 1, now, ctx);
     }
     return openQuestion(state, meta.qIndex + 1, now, ctx);
@@ -349,6 +375,7 @@ function enterReady(state: GameState, index: number): Transition {
           payload: { phase: "ready", qIndex: index },
         },
       },
+      ...preloadEffects(state, index),
     ],
   };
 }
@@ -423,6 +450,7 @@ function closeQuestion(
       },
       // The host screen shows how the room answered before the answer.
       ...closedSummaryEffects(state),
+      ...preloadEffects(state, state.meta.qIndex + 1),
     ],
   };
 }
@@ -481,6 +509,7 @@ function showScores(
         payload: { phase: "scores", qIndex: meta.qIndex },
       },
     },
+    ...preloadEffects(state, meta.qIndex + 1),
   );
   return { state: withMeta(state, patch), effects };
 }
@@ -518,6 +547,8 @@ function openQuestion(
     qId: question.id,
     qStartAt: now,
     qDeadline: deadline,
+    preloadWaitSince: 0,
+    preloadWaitAll: 0,
     ...(plan ? { botAnswer: JSON.stringify(plan.answer), botAnswerAt } : {}),
   };
 
@@ -625,6 +656,8 @@ function reveal(
       },
     });
   }
+  // While the room looks at this answer, devices fetch the next sound.
+  effects.push(...preloadEffects(state, meta.qIndex + 1));
   return { state: withMeta(state, patch), effects };
 }
 
@@ -744,16 +777,117 @@ function onRosterChanged(state: GameState): Transition {
   return noop(state);
 }
 
-/** Host only: the tally of the question that just closed. */
+/** Tell the room to download question `index`'s sound clips now (if any). */
+function preloadEffects(state: GameState, index: number): Effect[] {
+  const urls = preloadUrls(state.questions[index]);
+  return urls.length > 0
+    ? [
+        {
+          kind: "emit",
+          to: ROOM,
+          message: {
+            event: "preload",
+            payload: {
+              qIndex: index,
+              urls,
+              playOn: state.questions[index]?.audio?.playOn ?? "quiz",
+            },
+          },
+        },
+      ]
+    : [];
+}
+
+/** A device is ignored once its download stops moving this long. */
+export const DOWNLOAD_STALL_MS = 4_000;
+/** The countdown never waits longer than this for downloads. */
+export const DOWNLOAD_MAX_WAIT_MS = 30_000;
+const DOWNLOAD_RECHECK_MS = 1_000;
+
+/**
+ * The countdown is over, but devices that report downloading the question's
+ * sound aren't done: keep counting (re-checking every second) — except for
+ * devices that went quiet (no progress for `DOWNLOAD_STALL_MS`), left, or
+ * once `DOWNLOAD_MAX_WAIT_MS` have passed, so no one can block the game.
+ * Null = go ahead and open the question.
+ */
+function waitForDownloads(state: GameState, now: number): Transition | null {
+  const { meta } = state;
+  if (preloadUrls(state.questions[meta.qIndex]).length === 0) return null;
+  const connected = new Set(
+    state.roster.filter((p) => p.connected).map((p) => p.id),
+  );
+  if (meta.hostConnected) connected.add("host");
+  const here = Object.entries(state.preloads).filter(([id]) =>
+    connected.has(id),
+  );
+  const pending = here.filter(
+    ([, s]) => !s.done && now - s.at < DOWNLOAD_STALL_MS,
+  ).length;
+  const since = meta.preloadWaitSince || now;
+  // The host may lift the time limit ("wait until all are done"); stalled
+  // devices are still ignored, so no single phone can hold the room.
+  const capped = !meta.preloadWaitAll && now - since >= DOWNLOAD_MAX_WAIT_MS;
+  if (pending === 0 || capped) return null;
+  const at = now + DOWNLOAD_RECHECK_MS;
+  const patch = { preloadWaitSince: since, qDeadline: at };
+  return {
+    state: withMeta(state, patch),
+    effects: [
+      { kind: "set-deadline", at },
+      { kind: "patch-meta", patch },
+      {
+        kind: "emit",
+        to: ROOM,
+        message: {
+          event: "phase-change",
+          payload: {
+            phase: "starting",
+            qIndex: meta.qIndex,
+            waitingFor: pending,
+            downloadDevices: here.length,
+            downloadsDone: here.filter(([, s]) => s.done).length,
+            ...(meta.preloadWaitAll ? { waitAll: true } : {}),
+          },
+          deadline: at,
+        },
+      },
+      { kind: "arm-timer", at },
+    ],
+  };
+}
+
+/**
+ * The host's answer while the countdown waits for downloads: open the
+ * question now, or wait for every device (no `DOWNLOAD_MAX_WAIT_MS`). Only
+ * while actually waiting — a late click after the question opened is stale.
+ */
+function downloadsDecision(
+  state: GameState,
+  wait: boolean,
+  now: number,
+  ctx: StepContext,
+): Transition {
+  const { meta } = state;
+  if (meta.phase !== "starting" || !meta.preloadWaitSince) return noop(state);
+  if (!wait) return openQuestion(state, meta.qIndex, now, ctx);
+  const patch = { preloadWaitAll: 1 };
+  return {
+    state: withMeta(state, patch),
+    effects: [{ kind: "patch-meta", patch }],
+  };
+}
+
+/** Host only: the tally of the question that just closed (no reveal key). */
 function closedSummaryEffects(state: GameState): Effect[] {
   const question = state.questions[state.meta.qIndex];
   if (!question) return [];
-  const { fastest: _fastest, ...tally } = buildReveal(
-    question,
-    state.meta.qIndex,
-    state.answers,
-    state.roster,
-  );
+  const {
+    audioRevealKey: _key,
+    fastest: _fastest,
+    ...tally
+  } = buildReveal(question, state.meta.qIndex, state.answers, state.roster);
+  void _key;
   return [
     {
       kind: "emit",

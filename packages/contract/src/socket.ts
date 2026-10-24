@@ -57,8 +57,19 @@ export const moderationSettingsSchema = z.object({
   confirmNextQuestion: z.boolean().default(true),
 });
 
+/** Where question sounds play: the host's screen, the players' devices, both, or nowhere. */
+export const soundPlayOnSchema = z.enum(["host", "players", "both", "off"]);
+
+/** A quiz's sounds: where its questions' own sounds play. */
+export const soundSettingsSchema = z.object({
+  playOn: soundPlayOnSchema.default("host"),
+  /** With sounds on the host only: players may switch them on for themselves. */
+  playerOptIn: z.boolean().default(true),
+});
+
 /** `Quiz.settings`. Unknown/missing keys fall back to the defaults. */
 export const quizSettingsSchema = z.object({
+  sound: soundSettingsSchema.prefault({}),
   moderation: moderationSettingsSchema.prefault({}),
   /** Players can send live reactions (👍 ❤️ 😂) that fly across the host screen. */
   reactions: z.boolean().default(true),
@@ -118,8 +129,56 @@ export const phaseChangeSchema = z.object({
   qIndex: z.number().int(),
   /** "starting": time until the question opens (display only). */
   remainingMs: z.number().optional(),
+  /** "starting", countdown over: devices still downloading the question's sound. */
+  waitingFor: z.number().int().optional(),
+  /** With `waitingFor`: devices that report this question's download, and how many are done. */
+  downloadDevices: z.number().int().optional(),
+  downloadsDone: z.number().int().optional(),
+  /** With `waitingFor`: the host chose to wait until every download is done. */
+  waitAll: z.boolean().optional(),
 });
 
+/**
+ * What a download slot is for: a question's sound clips, or everything ahead
+ * (fetched once, in the lobby). Each kind has its own
+ * MAX_PARALLEL_AUDIO_DOWNLOADS per room.
+ */
+export const downloadKindSchema = z.enum(["question", "lobby"]);
+export type DownloadKind = z.infer<typeof downloadKindSchema>;
+
+/** A device asks for one of the room's download slots (`preload-slot`). */
+export const preloadSlotSchema = z.object({
+  /** The question (kind "question"); 0 for the lobby. */
+  qIndex: z.number().int().nonnegative(),
+  kind: downloadKindSchema.default("question"),
+});
+/** The device is done with its slot (the lobby's; questions report `preload-status`). */
+export const slotDoneSchema = preloadSlotSchema;
+/**
+ * `go`: start downloading now. Otherwise wait for `preload-go` — the server
+ * hands out at most MAX_PARALLEL_AUDIO_DOWNLOADS slots per room at a time.
+ * `limited`: slots are rationed (the device needn't spread its start itself).
+ */
+export interface PreloadSlotAck {
+  go: boolean;
+  limited: boolean;
+}
+/** The host's answer while the countdown waits for downloads. */
+export const downloadsDecisionSchema = z.object({
+  /** true = wait until every device is done (no time limit), false = open the question now. */
+  wait: z.boolean(),
+});
+export type DownloadsDecisionPayload = z.infer<typeof downloadsDecisionSchema>;
+
+/** A device's download progress for question `qIndex`'s sound clips. */
+export const preloadStatusSchema = z.object({
+  qIndex: z.number().int().nonnegative(),
+  loaded: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+  done: z.boolean(),
+  /** Done, but a clip couldn't be fetched (it won't play on this device). */
+  failed: z.boolean().optional(),
+});
 export const gameModeSchema = z.enum(["classic", "duel"]);
 
 /**
@@ -159,6 +218,8 @@ export const questionEndSchema = z.object({
   summary: revealSummarySchema,
   /** Mean answer time across everyone who answered; null when nobody did. */
   avgTimeMs: z.number().nullable(),
+  /** Decrypts the question sound's reveal clip (see `questionAudioSchema`). */
+  audioRevealKey: z.string().optional(),
   /** Scored questions: the (up to) three quickest right answers. */
   fastest: z
     .array(
@@ -171,6 +232,49 @@ export const questionEndSchema = z.object({
     )
     .optional(),
 });
+
+/**
+ * Sent ahead (during the previous question's reveal / scores, the get-ready
+ * slide or the countdown): the next question's sound clips to download now.
+ * They are encrypted — the keys come with the question and its reveal.
+ */
+export const preloadSchema = z.object({
+  qIndex: z.number().int(),
+  urls: z.array(z.string()),
+  /** The question sound's own placement, so devices that won't play it skip the download. */
+  playOn: z.enum(["quiz", "host", "players", "both", "off"]),
+});
+
+/**
+ * Everything encrypted a device can load ahead (every question's clips),
+ * sent when it joins the lobby — and to anyone joining later.
+ */
+export const preloadAllSchema = z.object({
+  questions: z.array(preloadSchema),
+});
+export type PreloadAllPayload = z.infer<typeof preloadAllSchema>;
+
+/** A device's progress on `preload-all` (files, not bytes); done counts failures too. */
+export const assetsStatusSchema = z.object({
+  loaded: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+  done: z.boolean(),
+  failed: z.boolean().optional(),
+});
+export type AssetsStatusPayload = z.infer<typeof assetsStatusSchema>;
+
+/**
+ * Host lobby: how many connected players have everything (`ready` of
+ * `total`), how many are still downloading (`pending`; quiet ones don't
+ * count), and from when the host may start anyway (`forceAt`, epoch ms; 0
+ * = no wait). The start button waits for `pending` 0 or `forceAt`.
+ */
+export interface LobbyReadyPayload {
+  ready: number;
+  total: number;
+  pending: number;
+  forceAt: number;
+}
 
 /** Answers received so far for the open question (classic host meter). */
 export const answerCountSchema = z.object({
@@ -411,7 +515,11 @@ export const removePlayerSchema = z.object({ id: z.string().min(1) });
 export type GamePhase = z.infer<typeof gamePhaseSchema>;
 export type ModerationSettings = z.infer<typeof moderationSettingsSchema>;
 export type QuizSettings = z.infer<typeof quizSettingsSchema>;
+export type SoundPlayOn = z.infer<typeof soundPlayOnSchema>;
+export type SoundSettings = z.infer<typeof soundSettingsSchema>;
 export type PhaseChangePayload = z.infer<typeof phaseChangeSchema>;
+export type PreloadPayload = z.infer<typeof preloadSchema>;
+export type PreloadStatusPayload = z.infer<typeof preloadStatusSchema>;
 export type BubbleStatsPayload = z.infer<typeof bubbleStatsSchema>;
 export type ReactionPayload = z.infer<typeof reactionSchema>;
 export type PlayerReactionPayload = z.infer<typeof playerReactionSchema>;
@@ -455,6 +563,14 @@ export interface ServerToClientEvents {
   "state-sync": (payload: StateSyncPayload) => void;
   /** Moderated games: ready / starting (countdown) / closed / scores. */
   "phase-change": (payload: PhaseChangePayload) => void;
+  /** Download the next question's (encrypted) sound clips now. */
+  preload: (payload: PreloadPayload) => void;
+  /** Everything to load ahead, on joining the lobby (see `assets-status`). */
+  "preload-all": (payload: PreloadAllPayload) => void;
+  /** Host only: the lobby's download readiness, at most once a second. */
+  "lobby-ready": (payload: LobbyReadyPayload) => void;
+  /** This device's download slot for question `qIndex` is free (see `preload-slot`). */
+  "preload-go": (payload: { qIndex: number; kind?: DownloadKind }) => void;
   /**
    * Host only, moderated "closed" step: how the room answered, before the
    * answer is shown (the host screen keeps the correct one hidden).
@@ -523,6 +639,19 @@ export interface ClientToServerEvents {
   "bubble-stats": (payload: BubbleStatsPayload) => void;
   /** One tap on a reaction button (rate limited server-side). */
   reaction: (payload: ReactionPayload) => void;
+  /** Download progress of the next question's sound (see `preload`). */
+  "preload-status": (payload: PreloadStatusPayload) => void;
+  /** Progress on `preload-all`. */
+  "assets-status": (payload: AssetsStatusPayload) => void;
+  /** Ask for a download slot before fetching the question's sound. */
+  "preload-slot": (
+    payload: z.input<typeof preloadSlotSchema>,
+    ack: (result: PreloadSlotAck) => void,
+  ) => void;
+  /** Done with a download slot (the lobby's files). */
+  "slot-done": (payload: z.infer<typeof slotDoneSchema>) => void;
+  /** Host: keep waiting for downloads, or open the question now. */
+  "downloads-decision": (payload: DownloadsDecisionPayload) => void;
   // -- host intents (the server decides what each one means) --
   "remove-player": (player: { id: string }, gameCode?: string) => void;
   "start-game": (gameCode?: string) => void;

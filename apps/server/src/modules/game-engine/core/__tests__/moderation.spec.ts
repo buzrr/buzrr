@@ -189,6 +189,32 @@ describe("moderated question flow", () => {
     expect(next.meta).toMatchObject({ phase: "starting", qIndex: 1 });
   });
 
+  it("…unless its own sound has a reveal part", () => {
+    const closed = questionOpen(
+      {},
+      { phase: "closed", moderation: moderated() },
+    );
+    const poll = {
+      ...closed,
+      questions: closed.questions.map((q, i) =>
+        i === 0
+          ? {
+              ...q,
+              type: "poll" as const,
+              audio: {
+                url: "https://x/song.mp3",
+                startMs: 0,
+                revealMs: 30_000,
+                playOn: "quiz" as const,
+              },
+            }
+          : q,
+      ),
+    };
+    const { state: next } = step(poll, { type: "host-next" }, T0);
+    expect(next.meta.phase).toBe("reveal");
+  });
+
   it("after the scores the next question counts down (get-ready only opens the round)", () => {
     const scores = questionOpen(
       {},
@@ -329,5 +355,208 @@ describe("moderated snapshots", () => {
       { phase: "scores", moderation: moderated() },
     );
     expect(buildSnapshot(scores, null, T0).leaderboard).toBeDefined();
+  });
+});
+
+describe("sound clips", () => {
+  const withClip = (id: string) => ({
+    ...question(id),
+    audio: {
+      url: `https://x/${id}.mp3`,
+      startMs: 0,
+      revealMs: 0,
+      playOn: "quiz" as const,
+      clipUrl: `https://x/${id}.bin`,
+      clipKey: `${id}-qkey`,
+      revealClipUrl: `https://x/${id}-r.bin`,
+      revealKey: `${id}-rkey`,
+    },
+  });
+
+  it("the reveal preloads the next question's clips — without any key", () => {
+    const open = questionOpen({ questions: [question("q1"), withClip("q2")] });
+    const now = open.meta.qDeadline + ANSWER_GRACE_MS;
+    const { effects } = step(open, { type: "deadline" }, now);
+    const pre = emitted(effects).find((e) => e.event === "preload");
+    expect(pre?.message).toMatchObject({
+      payload: { qIndex: 1, urls: ["https://x/q2.bin", "https://x/q2-r.bin"] },
+    });
+    expect(JSON.stringify(pre)).not.toContain("key");
+  });
+
+  it("the reveal key comes with the reveal, not with the question", () => {
+    const open = questionOpen({ questions: [withClip("q1"), question("q2")] });
+    const now = open.meta.qDeadline + ANSWER_GRACE_MS;
+    const end = emitted(step(open, { type: "deadline" }, now).effects).find(
+      (e) => e.event === "question-end",
+    );
+    expect(end?.message).toMatchObject({
+      payload: { audioRevealKey: "q1-rkey" },
+    });
+    const snap = buildSnapshot(open, "p1", T0);
+    expect(JSON.stringify(snap)).not.toContain("q1-rkey");
+    expect(snap.question?.audio).toMatchObject({ key: "q1-qkey" });
+  });
+});
+
+describe("the countdown waits for sound downloads", () => {
+  const withClip = {
+    ...question("q2"),
+    audio: {
+      url: "https://x/q2.mp3",
+      startMs: 0,
+      revealMs: null,
+      playOn: "quiz" as const,
+      clipUrl: "https://x/q2.bin",
+      clipKey: "k",
+    },
+  };
+  const counting = (preloads: GameState["preloads"], since = 0) =>
+    state({
+      questions: [question("q1"), withClip],
+      preloads,
+      meta: {
+        ...state().meta,
+        phase: "starting",
+        qIndex: 1,
+        qCount: 2,
+        qDeadline: T0,
+        preloadWaitSince: since,
+      },
+    });
+  const loading = (at: number) => ({ loaded: 10, total: 100, done: false, at });
+
+  it("keeps counting while a connected device is still downloading", () => {
+    const { state: next, effects } = step(
+      counting({ p1: loading(T0 - 500) }),
+      { type: "deadline" },
+      T0,
+    );
+    expect(next.meta.phase).toBe("starting");
+    expect(next.meta.preloadWaitSince).toBe(T0);
+    const pc = emitted(effects).find((e) => e.event === "phase-change");
+    expect(pc?.message).toMatchObject({ payload: { waitingFor: 1 } });
+  });
+
+  it("opens once everyone is done", () => {
+    const done = { loaded: 100, total: 100, done: true, at: T0 };
+    expect(
+      step(counting({ p1: done, p2: done }), { type: "deadline" }, T0).state
+        .meta.phase,
+    ).toBe("question");
+  });
+
+  it("ignores a download that stopped moving, and a player who left", () => {
+    const stalled = counting({ p1: loading(T0 - 5_000) });
+    expect(step(stalled, { type: "deadline" }, T0).state.meta.phase).toBe(
+      "question",
+    );
+    const gone = counting({ ghost: loading(T0) });
+    expect(step(gone, { type: "deadline" }, T0).state.meta.phase).toBe(
+      "question",
+    );
+  });
+
+  it("never waits longer than the cap", () => {
+    const long = counting({ p1: loading(T0) }, T0 - 31_000);
+    expect(step(long, { type: "deadline" }, T0).state.meta.phase).toBe(
+      "question",
+    );
+  });
+
+  it("reports how many devices are done", () => {
+    const done = { loaded: 100, total: 100, done: true, at: T0 };
+    const { effects } = step(
+      counting({ p1: loading(T0), p2: done }),
+      { type: "deadline" },
+      T0,
+    );
+    const pc = emitted(effects).find((e) => e.event === "phase-change");
+    expect(pc?.message).toMatchObject({
+      payload: { waitingFor: 1, downloadDevices: 2, downloadsDone: 1 },
+    });
+  });
+
+  it("the host can go on now, or lift the time limit", () => {
+    const waiting = counting({ p1: loading(T0) }, T0 - 1_000);
+    expect(
+      step(waiting, { type: "downloads-decision", wait: false }, T0).state.meta
+        .phase,
+    ).toBe("question");
+    const all = step(
+      waiting,
+      { type: "downloads-decision", wait: true },
+      T0,
+    ).state;
+    expect(all.meta.preloadWaitAll).toBe(1);
+    // Past the 30 s cap, still waiting for the device that is downloading.
+    const later = { ...all, preloads: { p1: loading(T0 + 40_000) } };
+    const { state: next, effects } = step(
+      later,
+      { type: "deadline" },
+      T0 + 40_000,
+    );
+    expect(next.meta.phase).toBe("starting");
+    const pc = emitted(effects).find((e) => e.event === "phase-change");
+    expect(pc?.message).toMatchObject({ payload: { waitAll: true } });
+  });
+
+  it("ignores a decision when nothing is waiting", () => {
+    const fresh = counting({ p1: loading(T0) });
+    const { state: next } = step(
+      fresh,
+      { type: "downloads-decision", wait: false },
+      T0,
+    );
+    expect(next.meta.phase).toBe("starting");
+  });
+
+  it("a question without sound doesn't wait at all", () => {
+    const plain = state({
+      preloads: { p1: loading(T0) },
+      meta: {
+        ...state().meta,
+        phase: "starting",
+        qIndex: 1,
+        qCount: 2,
+        qDeadline: T0,
+      },
+    });
+    expect(step(plain, { type: "deadline" }, T0).state.meta.phase).toBe(
+      "question",
+    );
+  });
+});
+
+describe("the countdown before a question", () => {
+  it("doesn't reveal the coming question", () => {
+    const counting = state({
+      meta: {
+        ...state().meta,
+        phase: "starting",
+        qIndex: 1,
+        qDeadline: T0 + 3000,
+      },
+    });
+    const snap = buildSnapshot(counting, null, T0);
+    expect(snap.question).toBeUndefined();
+    expect(JSON.stringify(snap)).not.toContain("Question q2");
+  });
+});
+
+describe("playing without players", () => {
+  it("host-next skips the countdown into the question", () => {
+    const counting = state({
+      roster: [],
+      meta: {
+        ...state().meta,
+        phase: "starting",
+        qIndex: 0,
+        qCount: 2,
+        qDeadline: T0 + 4000,
+      },
+    });
+    const { state: next } = step(counting, { type: "host-next" }, T0);
+    expect(next.meta).toMatchObject({ phase: "question", qIndex: 0 });
   });
 });

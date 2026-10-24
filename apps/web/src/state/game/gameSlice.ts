@@ -9,6 +9,8 @@ import type {
   LeaderboardEntry,
   ModerationSettings,
   PhaseChangePayload,
+  PreloadAllPayload,
+  PreloadPayload,
   PublicQuestion,
   QuestionEndPayload,
   QuestionStartPayload,
@@ -73,6 +75,10 @@ export interface GameLiveState {
   streaks: GameOverPayload["streaks"] | null;
   /** Moderated games: the quiz's moderation settings; null otherwise. */
   moderation: ModerationSettings | null;
+  /** The latest preload hint (next question's sound clips). */
+  preload: PreloadPayload | null;
+  /** Countdown over, devices still downloading the question's sound. */
+  waitingFor: number;
   /** How many are in the room (server's `reaction-limit`); 0 = not told. */
   roomSize: number;
   /**
@@ -81,6 +87,12 @@ export interface GameLiveState {
    * here, not in the bar, so a bar mounted later still knows it.
    */
   reactionBudget: { limit: number; windowMs: number; resetSeq: number };
+  /** Everything to load ahead in the lobby (`preload-all`). */
+  lobbyAssets: PreloadAllPayload | null;
+  /** While waiting: devices reporting the download / done, and whether the host chose to wait for all. */
+  downloadDevices: number;
+  downloadsDone: number;
+  waitAll: boolean;
   /** Host, moderated "closed": how the room answered (answer still hidden). */
   closedSummary: QuestionEndPayload | null;
   /** Player: how long their answer to the open question took (from the ack). */
@@ -135,9 +147,15 @@ const initialState: GameLiveState = {
   category: null,
   streaks: null,
   moderation: null,
+  preload: null,
   myAnswerMs: null,
+  waitingFor: 0,
   roomSize: 0,
   reactionBudget: { limit: 5, windowMs: REACTION_WINDOW_MS, resetSeq: 0 },
+  lobbyAssets: null,
+  downloadDevices: 0,
+  downloadsDone: 0,
+  waitAll: false,
   closedSummary: null,
 };
 
@@ -258,6 +276,9 @@ const gameSlice = createSlice({
       state.gameOver = false;
       state.moderation = action.payload.moderation ?? null;
     },
+    lobbyAssetsKnown: (state, action: PayloadAction<PreloadAllPayload>) => {
+      state.lobbyAssets = action.payload;
+    },
     roomSizeKnown: (state, action: PayloadAction<number>) => {
       state.roomSize = action.payload;
     },
@@ -277,6 +298,9 @@ const gameSlice = createSlice({
         resetSeq: state.reactionBudget.resetSeq + (p.reset ? 1 : 0),
       };
       if (typeof p.players === "number") state.roomSize = p.players;
+    },
+    preloadHint: (state, action: PayloadAction<PreloadPayload>) => {
+      state.preload = action.payload;
     },
     /** Moderated games: ready / starting / closed / scores. */
     phaseChange: (state, action: PayloadAction<PhaseChangePayload>) => {
@@ -298,6 +322,10 @@ const gameSlice = createSlice({
         state.answeredCount = 0;
         state.liveSummary = null;
       }
+      state.waitingFor = p.waitingFor ?? 0;
+      state.downloadDevices = p.downloadDevices ?? 0;
+      state.downloadsDone = p.downloadsDone ?? 0;
+      state.waitAll = p.waitAll ?? false;
       if (p.phase === "starting") {
         const ms = p.remainingMs ?? 0;
         state.deadline = Date.now() + ms;
@@ -421,8 +449,10 @@ export const {
   applySync,
   gameStarted,
   phaseChange,
+  preloadHint,
   roomSizeKnown,
   reactionBudgetKnown,
+  lobbyAssetsKnown,
   closedSummaryReceived,
   questionStart,
   questionEnd,

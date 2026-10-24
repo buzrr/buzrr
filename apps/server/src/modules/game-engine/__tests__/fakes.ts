@@ -45,6 +45,7 @@ export class MemoryStore {
       answers: Object.fromEntries(
         this.answers.get(qIndex ?? this.meta.qIndex) ?? [],
       ),
+      preloads: {},
       scores: [...this.scores].map(([playerId, score]) => ({
         playerId,
         score,

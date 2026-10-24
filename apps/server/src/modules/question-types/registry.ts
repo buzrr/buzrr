@@ -74,7 +74,42 @@ export function scoreAnswer(
 }
 
 export function toPublicQuestion(question: LiveQuestion): PublicQuestion {
-  return handlerFor(question.type).toPublic(question);
+  // The sound is the same for every type, so it is added here rather than in
+  // each handler's `toPublic`.
+  return {
+    ...handlerFor(question.type).toPublic(question),
+    audio: publicAudio(question.audio),
+  };
+}
+
+/** What devices get: the encrypted clips (question key only), or the file. */
+function publicAudio(audio: LiveQuestion["audio"]): PublicQuestion["audio"] {
+  if (!audio) return null;
+  if (!audio.clipUrl || !audio.clipKey) {
+    return {
+      url: audio.url,
+      startMs: audio.startMs,
+      revealMs: audio.revealMs,
+      playOn: audio.playOn,
+    };
+  }
+  return {
+    url: audio.clipUrl,
+    startMs: 0,
+    revealMs: audio.revealClipUrl ? 0 : null,
+    playOn: audio.playOn,
+    encrypted: true,
+    key: audio.clipKey,
+    revealUrl: audio.revealClipUrl ?? null,
+  };
+}
+
+/** The clips to download ahead of a question (no keys). */
+export function preloadUrls(question: LiveQuestion | undefined): string[] {
+  const a = question?.audio;
+  return a?.clipUrl
+    ? [a.clipUrl, ...(a.revealClipUrl ? [a.revealClipUrl] : [])]
+    : [];
 }
 
 /** `entries` oldest first — types that list answers show the newest first. */
@@ -144,6 +179,14 @@ export interface QuestionRecord {
   timeOut: number;
   config: unknown;
   options: LiveOption[];
+  audio?: string | null;
+  audioStartMs?: number | null;
+  audioRevealMs?: number | null;
+  audioPlayOn?: string | null;
+  audioClip?: string | null;
+  audioClipKey?: string | null;
+  audioRevealClip?: string | null;
+  audioRevealKey?: string | null;
 }
 
 type LiveOption = LiveQuestion["options"][number];
@@ -154,6 +197,13 @@ type LiveOption = LiveQuestion["options"][number];
  * no longer passes its type's checks. Callers skip nulls rather than failing
  * the whole game over one bad row.
  */
+const AUDIO_PLAY_ON = ["host", "players", "both", "off"] as const;
+function audioPlayOn(
+  raw: string | null | undefined,
+): "quiz" | (typeof AUDIO_PLAY_ON)[number] {
+  return AUDIO_PLAY_ON.find((v) => v === raw) ?? "quiz";
+}
+
 export function toLiveQuestion(row: QuestionRecord): LiveQuestion | null {
   if (!isQuestionType(row.type)) return null;
   try {
@@ -177,6 +227,18 @@ export function toLiveQuestion(row: QuestionRecord): LiveQuestion | null {
         isCorrect: o.isCorrect,
       })),
       config: definition.config,
+      audio: row.audio
+        ? {
+            url: row.audio,
+            startMs: row.audioStartMs ?? 0,
+            revealMs: row.audioRevealMs ?? null,
+            playOn: audioPlayOn(row.audioPlayOn),
+            clipUrl: row.audioClip ?? null,
+            clipKey: row.audioClipKey ?? null,
+            revealClipUrl: row.audioRevealClip ?? null,
+            revealKey: row.audioRevealKey ?? null,
+          }
+        : null,
     };
   } catch (err) {
     if (err instanceof QuestionDefinitionError) return null;

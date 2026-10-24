@@ -8,6 +8,7 @@ import {
   HEARTBEAT_TIMEOUT_MS,
   HOST_LEADERBOARD_TOP,
   PLAYER_LEADERBOARD_TOP,
+  type PreloadAllPayload,
 } from "@buzrr/contract";
 import { roomSettings } from "../../common/game-look/game-look";
 import { signAssetsDeep } from "../../common/storage/asset-signing";
@@ -27,9 +28,13 @@ import {
   acceptsMoreAnswers,
   isScored,
   mergeAnswers,
+  preloadUrls,
   summarizeAnswers,
   toLiveQuestion,
 } from "../question-types";
+
+/** How long a room's lobby download list is reused (joins come in waves). */
+const LOBBY_ASSETS_TTL_MS = 60_000;
 import {
   answerEntries,
   hostOfLeaderboard,
@@ -286,6 +291,10 @@ export class GameEngineService
       case "closed-summary":
         target.emit("closed-summary", message.payload);
         break;
+      case "preload":
+        // Encrypted clips only; signed so the room can fetch them.
+        target.emit("preload", signAssetsDeep(message.payload));
+        break;
       case "phase-change":
         target.emit("phase-change", {
           ...message.payload,
@@ -468,6 +477,52 @@ export class GameEngineService
 
   // -- host intents ------------------------------------------------------------
 
+  /** Per room: what devices load in the lobby, kept a minute (many joins). */
+  private lobbyAssetCache = new Map<
+    string,
+    { at: number; payload: PreloadAllPayload }
+  >();
+
+  /**
+   * Everything a device can download ahead for this room: every playable
+   * question's encrypted clips (no keys), in play order. Read
+   * from Postgres (the questions only reach Redis at the start).
+   */
+  async lobbyAssets(gameCode: string): Promise<PreloadAllPayload> {
+    const cached = this.lobbyAssetCache.get(gameCode);
+    if (cached && Date.now() - cached.at < LOBBY_ASSETS_TTL_MS) {
+      return cached.payload;
+    }
+    const session = await this.prisma.db.gameSession.findUnique({
+      where: { gameCode },
+      include: {
+        quiz: {
+          include: {
+            questions: {
+              where: { disabled: false },
+              orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+              include: { options: { orderBy: OPTION_ORDER } },
+            },
+          },
+        },
+      },
+    });
+    const questions = (session?.quiz.questions ?? [])
+      .map((q) => toLiveQuestion(q))
+      .filter((q): q is LiveQuestion => q !== null);
+    const payload: PreloadAllPayload = {
+      questions: questions
+        .map((q, qIndex) => ({
+          qIndex,
+          urls: preloadUrls(q),
+          playOn: q.audio?.playOn ?? "quiz",
+        }))
+        .filter((p) => p.urls.length > 0),
+    };
+    this.lobbyAssetCache.set(gameCode, { at: Date.now(), payload });
+    return payload;
+  }
+
   async startGame(gameCode: string): Promise<void> {
     const state = await this.store.loadState(gameCode, PARTS_FOR.start);
     if (!state || state.meta.phase !== "lobby") {
@@ -534,6 +589,11 @@ export class GameEngineService
    */
   async hostNext(gameCode: string): Promise<void> {
     await this.dispatch(gameCode, { type: "host-next" });
+  }
+
+  /** Host, countdown waiting for downloads: keep waiting (no limit) or go. */
+  async downloadsDecision(gameCode: string, wait: boolean): Promise<void> {
+    await this.dispatch(gameCode, { type: "downloads-decision", wait });
   }
 
   async endGame(

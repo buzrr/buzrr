@@ -21,6 +21,7 @@ import { ClosedSlide, ReadySlide } from "@/components/Game/ModeratedSteps";
 import { closedNextLabel } from "@/lib/moderation";
 import { isScoredType, revealHasPoint } from "@buzrr/contract";
 import { ReactionOverlay } from "@/components/Game/Flyers";
+import { GameSounds, SoundToggle } from "@/lib/sound/director";
 
 interface QuizQuestionItem {
   title?: string;
@@ -33,6 +34,7 @@ interface QuizQuestionItem {
 interface QuizQuestion {
   id?: string;
   title?: string;
+  settings?: unknown;
   questions?: QuizQuestionItem[];
 }
 
@@ -108,114 +110,117 @@ const GameLobby = (params: {
     </span>
   );
 
-  if (!inGame) {
-    // idle / lobby / starting — the pre-question countdown
-    return (
-      <>
-        <ConnectionBanner />
-        <ReactionOverlay
-          socket={socket}
-          nameOf={(id) => roster.find((p) => p.id === id)?.name}
-        />
-        <GetReady
-          title={title}
-          onSkip={
-            roster.some((p) => p.connected)
-              ? undefined
-              : () => socket.emit("host-next")
-          }
-        />
-      </>
-    );
-  }
-
+  // One sound provider for every phase (question sounds and their preloads).
   return (
-    // No site footer here: the game uses the full height (the admin
-    // layout's footer padding is taken back with -mb-12).
-    <div className="w-full flex flex-col px-4 sm:px-6 lg:px-8 -mb-12 min-h-[100dvh] md:min-h-0 md:h-[100dvh] text-dark dark:text-white">
-      <ConnectionBanner />
-      <ReactionOverlay
-        socket={socket}
-        nameOf={(id) => roster.find((p) => p.id === id)?.name}
-      />
-      <HostHeader
-        title={title}
-        roomId={params.roomId}
-        alreadyEnded={alreadyEnded}
-        endRedirect={endRedirect}
-        controlsBelowOnPhone
-        middle={
-          <>
-            {(phase === "reveal" ||
-              phase === "scores" ||
-              phase === "ready") && (
-              <span className="hidden md:inline-flex">{codePill}</span>
-            )}
-            {qCount > 0 && (
-              <Progress
-                qIndex={qIndex}
-                qCount={qCount}
-                final={showLeaderboard}
-                compact
-              />
-            )}
-          </>
-        }
-      />
-      {phase === "question" ? (
-        <QuestionScreen socket={socket} gameCode={params.gameCode} />
-      ) : phase === "ready" ? (
-        <ReadySlide
-          key={`ready-${qIndex}`}
-          onNext={() => socket.emit("host-next")}
-        />
-      ) : phase === "closed" && closedSummary ? (
-        // How the room answered; "Show answer" then marks the right one.
-        <QuesResult
-          key={`answer-${qIndex}`}
-          socket={socket}
-          roomId={params.roomId}
-        />
-      ) : phase === "closed" ? (
-        <ClosedSlide
-          key={`closed-${qIndex}`}
-          onNext={() => socket.emit("host-next")}
-          nextLabel={closedNextLabel(
-            moderation,
-            qIndex,
-            qCount,
-            question ? isScoredType(question.type) : true,
-            question ? revealHasPoint(question) : true,
-          )}
-        />
-      ) : phase === "reveal" || phase === "scores" ? (
-        // "Show answer" keeps the tally on screen (same key as "closed"),
-        // so only the right answer animates; "show scores" keeps it too
-        // and slides the standings in beside it.
-        <QuesResult
-          key={`answer-${qIndex}`}
-          socket={socket}
-          roomId={params.roomId}
-        />
+    <GameSounds role="host" quizSettings={params.quizQuestions?.settings}>
+      {!inGame ? (
+        // idle / lobby / starting — the pre-question countdown
+        <>
+          <SoundToggle />
+          <ConnectionBanner />
+          <ReactionOverlay
+            socket={socket}
+            nameOf={(id) => roster.find((p) => p.id === id)?.name}
+          />
+          <GetReady
+            title={title}
+            onSkip={
+              roster.some((p) => p.connected)
+                ? undefined
+                : () => socket.emit("host-next")
+            }
+            onDownloads={(wait) => socket.emit("downloads-decision", { wait })}
+          />
+        </>
       ) : (
-        <LeaderBoard
-          roomId={params.roomId}
-          quizTitle={title}
-          alreadyEnded={alreadyEnded}
-          quizId={params.quizQuestions?.id}
-        />
+        // No site footer here: the game uses the full height (the admin
+        // layout's footer padding is taken back with -mb-12).
+        <div className="w-full flex flex-col px-4 sm:px-6 lg:px-8 -mb-12 min-h-[100dvh] md:min-h-0 md:h-[100dvh] text-dark dark:text-white">
+          <ConnectionBanner />
+          <ReactionOverlay
+            socket={socket}
+            nameOf={(id) => roster.find((p) => p.id === id)?.name}
+          />
+          <HostHeader
+            title={title}
+            roomId={params.roomId}
+            alreadyEnded={alreadyEnded}
+            endRedirect={endRedirect}
+            controlsBelowOnPhone
+            middle={
+              <>
+                {(phase === "reveal" ||
+                  phase === "scores" ||
+                  phase === "ready") && (
+                  <span className="hidden md:inline-flex">{codePill}</span>
+                )}
+                {qCount > 0 && (
+                  <Progress
+                    qIndex={qIndex}
+                    qCount={qCount}
+                    final={showLeaderboard}
+                    compact
+                  />
+                )}
+              </>
+            }
+          />
+          {phase === "question" ? (
+            <QuestionScreen socket={socket} gameCode={params.gameCode} />
+          ) : phase === "ready" ? (
+            <ReadySlide
+              key={`ready-${qIndex}`}
+              onNext={() => socket.emit("host-next")}
+            />
+          ) : phase === "closed" && closedSummary ? (
+            // How the room answered; "Show answer" then marks the right one.
+            <QuesResult
+              key={`answer-${qIndex}`}
+              socket={socket}
+              roomId={params.roomId}
+            />
+          ) : phase === "closed" ? (
+            <ClosedSlide
+              key={`closed-${qIndex}`}
+              onNext={() => socket.emit("host-next")}
+              nextLabel={closedNextLabel(
+                moderation,
+                qIndex,
+                qCount,
+                question ? isScoredType(question.type) : true,
+                question ? revealHasPoint(question) : true,
+              )}
+            />
+          ) : phase === "reveal" || phase === "scores" ? (
+            // "Show answer" keeps the tally on screen (same key as "closed"),
+            // so only the right answer animates; "show scores" keeps it too
+            // and slides the standings in beside it.
+            <QuesResult
+              key={`answer-${qIndex}`}
+              socket={socket}
+              roomId={params.roomId}
+            />
+          ) : (
+            <LeaderBoard
+              roomId={params.roomId}
+              quizTitle={title}
+              alreadyEnded={alreadyEnded}
+              quizId={params.quizQuestions?.id}
+            />
+          )}
+          {/* Phones: the room goes to the game; code, Live and "End" wait
+              at the very end of the page. */}
+          <div className="md:hidden flex flex-wrap items-center justify-center gap-2 pt-4 pb-5">
+            {codePill}
+            <HostControls
+              roomId={params.roomId}
+              endRedirect={endRedirect}
+              alreadyEnded={alreadyEnded}
+            />
+          </div>
+        </div>
       )}
-      {/* Phones: the room goes to the game; code, Live and "End" wait
-          at the very end of the page. */}
-      <div className="md:hidden flex flex-wrap items-center justify-center gap-2 pt-4 pb-5">
-        {codePill}
-        <HostControls
-          roomId={params.roomId}
-          endRedirect={endRedirect}
-          alreadyEnded={alreadyEnded}
-        />
-      </div>
-    </div>
+    </GameSounds>
   );
 };
 

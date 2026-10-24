@@ -6,6 +6,7 @@ import type { GameState, StatePart } from "./core/state";
 import {
   GameMeta,
   LiveQuestion,
+  PreloadStatus,
   RosterEntry,
   ScoreEntry,
   StoredAnswer,
@@ -23,6 +24,7 @@ const keys = {
   /** Scores of players who left or were removed, restored if they rejoin. */
   departed: (c: string) => `game:${c}:departed`,
   owner: (c: string) => `game:${c}:owner`,
+  preloads: (c: string, q: number) => `game:${c}:preloads:${q}`,
   deadlines: () => `games:deadlines`,
 };
 
@@ -36,8 +38,24 @@ const NUMERIC_META = new Set([
   "botElo",
   "botAnswerAt",
   "pausedAt",
+  "preloadWaitSince",
+  "preloadWaitAll",
 ]);
 const BOOLEAN_META = new Set(["hostConnected", "rated"]);
+
+function parsePreloads(
+  raw: Record<string, string> | null,
+): Record<string, PreloadStatus> {
+  const out: Record<string, PreloadStatus> = {};
+  for (const [id, json] of Object.entries(raw ?? {})) {
+    try {
+      out[id] = JSON.parse(json) as PreloadStatus;
+    } catch {
+      // ignore a broken entry
+    }
+  }
+  return out;
+}
 
 function parseMeta(raw: Record<string, string>): GameMeta | null {
   if (!raw || Object.keys(raw).length === 0) return null;
@@ -260,6 +278,7 @@ export class GameStoreService {
       if (part === "scores") {
         pipe.zrevrange(keys.lb(code), 0, -1, "WITHSCORES");
       }
+      if (part === "preloads") pipe.hgetall(keys.preloads(code, answersOf));
     }
     const results = (await pipe.exec()) ?? [];
     for (const [err] of results) if (err) throw err;
@@ -273,6 +292,7 @@ export class GameStoreService {
       roster: [],
       answers: {},
       scores: [],
+      preloads: {},
     };
     parts.forEach((part, i) => {
       const value = results[i]?.[1] ?? null;
@@ -282,11 +302,27 @@ export class GameStoreService {
         state.roster = parseRoster(value as Record<string, string>);
       } else if (part === "answers") {
         state.answers = parseAnswers(value as Record<string, string>);
+      } else if (part === "preloads") {
+        state.preloads = parsePreloads(value as Record<string, string>);
       } else {
         state.scores = parseScores(value as string[]);
       }
     });
     return state;
+  }
+
+  /** A device's download progress for question `qIndex`'s sound. */
+  async setPreloadStatus(
+    code: string,
+    qIndex: number,
+    deviceId: string,
+    status: PreloadStatus,
+  ): Promise<void> {
+    await this.redis
+      .multi()
+      .hset(keys.preloads(code, qIndex), deviceId, JSON.stringify(status))
+      .expire(keys.preloads(code, qIndex), TTL_SECONDS)
+      .exec();
   }
 
   async patchMeta(code: string, patch: Partial<GameMeta>): Promise<void> {

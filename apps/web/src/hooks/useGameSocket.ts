@@ -11,7 +11,9 @@ import {
   gameOver,
   gameStarted,
   phaseChange,
+  preloadHint,
   reactionBudgetKnown,
+  lobbyAssetsKnown,
   closedSummaryReceived,
   leaderboardReceived,
   playerConnection,
@@ -22,6 +24,11 @@ import {
   setConnection,
 } from "@/state/game/gameSlice";
 import type { GameSocket } from "@/types/socket";
+import {
+  onAssetsProgress,
+  onPreloadProgress,
+  setSlotChannel,
+} from "@/lib/sound/preload";
 
 export interface UseGameSocketOptions {
   userType: "admin" | "player" | "duel";
@@ -57,6 +64,11 @@ export function resyncOnReturn(
  * so reconnects need no client-side bookkeeping — the whole screen re-renders
  * from the fresh snapshot.
  */
+/** How long the server gets to answer `preload-slot`. */
+const SLOT_ACK_MS = 10_000;
+/** A queued device starts anyway after this long (the countdown has moved on by then). */
+const SLOT_GIVE_UP_MS = 90_000;
+
 export function useGameSocket({
   userType,
   gameCode,
@@ -130,12 +142,81 @@ export function useGameSocket({
     conn.on("state-sync", (payload) => dispatch(applySync(payload)));
     conn.on("game-started", (payload) => dispatch(gameStarted(payload)));
     conn.on("phase-change", (payload) => dispatch(phaseChange(payload)));
+    conn.on("preload", (payload) => dispatch(preloadHint(payload)));
+    conn.on("preload-all", (p) => dispatch(lobbyAssetsKnown(p)));
+    // Lobby downloads: progress at most every second, "done" always.
+    let lastAssets = 0;
+    const offAssets = onAssetsProgress((r) => {
+      const now = Date.now();
+      if (!r.done && now - lastAssets < 1000) return;
+      lastAssets = now;
+      if (conn.connected) conn.emit("assets-status", r);
+    });
     // The reaction budget (and the room's size) — kept in the store, so a
     // reaction bar mounted later (the final standings') still knows it.
     conn.on("reaction-limit", (p) => dispatch(reactionBudgetKnown(p)));
     conn.on("closed-summary", (payload) =>
       dispatch(closedSummaryReceived(payload)),
     );
+    // Report downloads of the next question's sound (throttled; "done" always).
+    let lastReport = 0;
+    const offProgress = onPreloadProgress((r) => {
+      const now = Date.now();
+      if (!r.done && now - lastReport < 400) return;
+      lastReport = now;
+      if (conn.connected) conn.emit("preload-status", r);
+    });
+    // Download slots: ask the server before fetching a question's sound or
+    // the lobby's files; a queued device waits for `preload-go` (asking again
+    // after a reconnect). No answer (an older server) or no turn within
+    // SLOT_GIVE_UP_MS: go. The host never queues: its screen plays the
+    // sounds for the room, so it fetches them all at once.
+    setSlotChannel(
+      userType === "admin"
+        ? null
+        : {
+            keepAlive: (kind, qIndex) => {
+              // Asking again while holding the slot just refreshes it.
+              if (conn.connected) {
+                conn
+                  .timeout(SLOT_ACK_MS)
+                  .emit("preload-slot", { qIndex, kind }, () => undefined);
+              }
+            },
+            done: (kind, qIndex) => {
+              if (conn.connected) conn.emit("slot-done", { qIndex, kind });
+            },
+            wait: (kind, qIndex) =>
+              new Promise((resolve) => {
+                let settled = false;
+                const finish = (limited: boolean) => {
+                  if (settled) return;
+                  settled = true;
+                  clearTimeout(giveUp);
+                  conn.off("preload-go", onGo);
+                  conn.off("connect", ask);
+                  resolve({ limited });
+                };
+                const onGo = (p: { qIndex: number; kind?: string }) => {
+                  if (p.qIndex === qIndex && (p.kind ?? "question") === kind) {
+                    finish(true);
+                  }
+                };
+                const ask = () =>
+                  conn
+                    .timeout(SLOT_ACK_MS)
+                    .emit("preload-slot", { qIndex, kind }, (err, res) => {
+                      if (err) finish(false);
+                      else if (res.go) finish(res.limited);
+                    });
+                const giveUp = setTimeout(() => finish(true), SLOT_GIVE_UP_MS);
+                conn.on("preload-go", onGo);
+                conn.on("connect", ask);
+                if (conn.connected) ask();
+              }),
+          },
+    );
+
     conn.on("question-start", (payload) => dispatch(questionStart(payload)));
     conn.on("question-end", (payload) => dispatch(questionEnd(payload)));
     conn.on("answer-result", (payload) => dispatch(answerResult(payload)));
@@ -168,6 +249,9 @@ export function useGameSocket({
 
     return () => {
       clearInterval(heartbeat);
+      offProgress();
+      offAssets();
+      setSlotChannel(null);
       conn.io.off("reconnect_failed", onReconnectFailed);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       conn.disconnect();

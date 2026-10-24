@@ -41,20 +41,17 @@ describe("asset signing (local store)", () => {
     expect(signAssetUrl("https://elsewhere/x.png")).toBe(
       "https://elsewhere/x.png",
     );
-    const signed = signAssetUrl(`${BASE}/abc123.jpg`);
-    expect(stripAssetSignature(signed)).toBe(`${BASE}/abc123.jpg`);
+    const signed = signAssetUrl(`${BASE}/abc123.mp3`);
+    expect(stripAssetSignature(signed)).toBe(`${BASE}/abc123.mp3`);
   });
 
   it("signs nested payloads", () => {
     const out = signAssetsDeep({
-      question: {
-        media: `${BASE}/a.png`,
-        quiz: { thumbnail: `${BASE}/b.png` },
-      },
+      question: { media: `${BASE}/a.png`, audio: { url: `${BASE}/b.mp3` } },
       title: "plain text",
     });
     expect(out.question.media).toContain("?sig=");
-    expect(out.question.quiz.thumbnail).toContain("?sig=");
+    expect(out.question.audio.url).toContain("?sig=");
     expect(out.title).toBe("plain text");
   });
 
