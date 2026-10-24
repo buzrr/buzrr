@@ -64,6 +64,11 @@ in meta as `pacing` (games from before the field fall back by mode):
   close once every **connected** rostered player has answered.
 - A host-paced reveal whose parked deadline comes due is re-parked, not
   advanced.
+- A room's settings (moderated mode, reactions) come from
+  `roomSettings` (`common/game-look/game-look.ts`): the game's own
+  `GameSession.settings` (the "Host quiz" dialog), else `Quiz.settings`.
+  Every server read for a live room goes through it; moderation is copied
+  into meta at `start-game`.
 - Self-paced play (each player on their own clock) is planned; the strategy
   is where its advance rules belong, but it also needs per-player question
   state that `GameState` doesn't model yet (ADR-012).
@@ -94,7 +99,8 @@ instanceId)` — a `SET NX PX 20000` owner lock with renew-if-held Lua — so
   (comment in `ensureSweeper`: an unconditional 15s poll ≈ 350K Redis
   commands/month at zero users). Don't make them unconditional.
 
-Grace timers (lobby disconnect 60s, duel forfeit 30s) are **in-memory only**
+Grace timers (lobby disconnect 35s after the last heartbeat, duel forfeit 30s)
+are **in-memory only**
 (`disconnectTimers`) — they do not survive a restart. The sweeper is the
 backstop for the two that matter: the abandon check for classic, and
 `sweepDuelForfeits` for duel forfeits (below). Lobby removal has none.
@@ -210,7 +216,12 @@ stripped** by the question type's handler (`toPublicQuestion` in
 including the player's own: a question-phase `state-sync` tells a player
 _that_ (and what) they answered, but `you.isCorrect`/`score` stay masked
 until the reveal, and `you.totalScore`/`rank` are the standings as of the
-last reveal (`buildSnapshot`).
+last reveal (`buildSnapshot`). The REST side holds the same line: the public
+join context (`GET /game-sessions/player-play/:playerId`,
+`getPlayerPlayContext`) carries no question texts, options or media — only
+what the waiting screen needs — and
+local-store media links are signed only as their question opens
+([backend.md](backend.md#cross-cutting-services-srccommon)).
 
 Ranks are **dense**: equal scores share a rank and the next score is one
 place below (900, 500, 500, 0 → 1, 2, 2, 3; `denseRanks` in the contract).
@@ -259,14 +270,36 @@ win for each player in `/users/me/stats`.
 - `question-end` (and reveal-phase `state-sync.reveal`) carries `summary` —
   whatever the question's type reveals (multiple choice: `counts` aligned
   with the options + `correctOptionIds`) — and `avgTimeMs`, the mean answer
-  time of everyone who answered (`null` if nobody did). A reveal-phase
+  time of everyone who answered (`null` if nobody did) — plus, for scored
+  types, `fastest`: the up to three quickest right answers (name, picture,
+  ms). In a moderated game's `closed` step the host alone gets
+  `closed-summary`, the same tally without `fastest` (the host screen keeps
+  the answer hidden); a host's closed-phase `state-sync` carries it as
+  `closedSummary`. A player's own answer time (`timeTakenMs`) comes with the
+  `submit-answer` ack and `answer-result`. A reveal-phase
   snapshot also includes the public `question`, so a client reconnecting
   mid-reveal can render it.
   Reveal-time `leaderboard` entries (the reveal broadcast, a roster change
   during the reveal, and reveal-phase `state-sync`) carry `delta` — points earned on that question;
-  final/ended leaderboards omit it.
+  So does the final broadcast (`isFinal`), so the host's board adds the last
+  question's points once more; it also carries `revealInMs`
+  (`finalRevealMs`, `packages/contract/src/standings-timing.ts` — the host
+  board's timing, shared): when the host's count-up is over. Moderated games
+  show players their final place only then. Final-phase snapshots and ended
+  leaderboards omit `delta`.
+  A room-wide `leaderboard` with more than `PLAYER_LEADERBOARD_TOP` (10)
+  entries is split in `GameEngineService.send`: the host room gets the top
+  `HOST_LEADERBOARD_TOP` (50) — with `delta`, also whoever was in the top 50
+  before the question (`hostOfLeaderboard`) — plus `total`, the rest of the
+  room (`.except(host:{code})`) the top 10 plus `total`. A host `state-sync`
+  is trimmed the same way.
+  Sending the whole board to everyone grows with the room twice over
+  (entries × recipients); at 109 players it delayed the `phase-change` behind
+  it by about 300ms. A player's own standing comes with `answer-result`, and a
+  player's `state-sync` carries the top plus their own row and
+  `leaderboardTotal`.
 - Event names: `question-start`, `question-end`, `answer-result`,
-  `answer-count`, `live-summary` (host room only), `leaderboard`, `game-over`,
+  `answer-count`, `live-summary` and `closed-summary` (host room only), `leaderboard`, `game-over`,
   `state-sync`, `player-connection`,
   `player-joined/removed/left`, `game-started`, `game-session-ended`, plus the
   `duel:*` family.
@@ -281,6 +314,35 @@ win for each player in `/users/me/stats`.
   the web client no longer used any of them — the server emits and accepts
   exactly what the current client speaks. Adding a compat alias "just in case"
   reintroduces the drift this removal cleared.
+
+## Lobby extras: bubbles and reactions
+
+- **Bubble game:** players send `bubble-stats` (their running hits/misses)
+  only when they changed — at most once a second, in a room of
+  `BUBBLE_CROWD` (150) or more at most every `BUBBLE_CROWD_EVERY_MS` (10 s;
+  the room size comes with `reaction-limit`, whose step changes at 150 too) —
+  plus a refresh every 15 s; an idle phone sends nothing else. The gateway keeps the latest
+  totals per player in a per-room map and sends the host one
+  `bubble-stats-batch` a second with the players whose totals changed since
+  it last told the host (`players: { [playerId]: { hits, misses } }`); what
+  was sent is forgotten every 15 batches, so the refreshes reach a host that
+  reconnected. A room quiet for 10 batches stops its timer. At 500 players
+  that is one event a second into the host's browser instead of about 500.
+- **Reactions:** relayed to `host:{code}` one by one, within a budget per
+  player (`reactionLimitFor` the room's size: < 50 → 30, < 150 → 10,
+  < 500 → 5, else 2) per `REACTION_WINDOW_MS` (60 s), counted per player
+  (a reconnect gets no new budget) and started afresh with every
+  `question-start` and the final standings (`reaction-limit` with
+  `reset`); there the top three get `limit: 0` (`winner`), no limit at all. Over it the player gets `reaction-limited { retryInMs }`: a
+  "limit reached" toast, the buttons fade until then. Above
+  `ROOM_REACTIONS_PER_S` (40) in a room within one second, only each
+  player's first reaction of that second passes. A room whose
+  settings (`roomSettings`) have `reactions` off hides the players' reaction
+  bar (client-side; the gateway does not check it).
+- **Host lobby:** applies reactions in batches (every 500 ms) and joins every
+  250 ms; player cards are memoised, so an update re-renders only the cards
+  it changed. Above 40 players no reorder animation and no count-up numbers,
+  above 60 no bubbles rise out of the cards.
 
 ## Changing the socket contract — touch list
 
@@ -327,8 +389,25 @@ information, it does.
 5. Snapshot is sent immediately.
 
 Disconnect: hosts flip `hostConnected` meta (`hostDisconnected`); players get
-marked disconnected and a grace timer starts (60s lobby removal, or 30s duel
-forfeit via `resolveDuelForfeit`); duel-queue sockets are dequeued.
+marked disconnected and a grace timer starts (lobby removal, or 30s duel
+forfeit via `resolveDuelForfeit`); duel-queue sockets are dequeued. The lobby
+removal comes `HEARTBEAT_TIMEOUT_MS` (35s) after the player's last heartbeat,
+at least 10s after the disconnect (a page reload), or 35s after the disconnect
+for clients that don't beat. It only takes them off the Redis roster and the
+host's list: their Postgres row still points at the room, so a player who
+comes back is simply admitted again.
+
+**Heartbeat.** Player clients emit `heartbeat` on connect, on returning to the
+foreground and every `HEARTBEAT_INTERVAL_MS` (10s, `@buzrr/contract`). The
+gateway (`watchHeartbeat`) records it in `socket.data.lastBeatAt`; a socket
+that has beaten once and then stays quiet for `HEARTBEAT_TIMEOUT_MS` (35s,
+three missed beats) gets its transport closed. The transport's own ping can't
+tell a frozen page from a live one. Closing the transport rather than the
+socket makes a page that wakes up reconnect by itself, since a server-side
+socket disconnect reads as "refused" and is never retried. Mid-game the player
+then only shows as offline and keeps score and answers. Clients that never
+beat (older pages) are left to the transport ping. The host's in-game counters
+("x of y answered", responses) count online players only.
 
 **Presence is per person, not per socket**, so a closing socket only marks its
 owner gone if they have no other socket in the game. A client that reconnects
@@ -348,7 +427,11 @@ gone (the previous behaviour). Covered by
 
 ## Kick / ban semantics
 
-- Kick = Redis roster+score removal, `player-removed` broadcast **before**
+- Kick = Redis roster removal with the score taken off the leaderboard but
+  parked in `game:{code}:departed` (`REMOVE_PLAYER_SCRIPT`). A player who
+  rejoins later (not banned) gets it back in `REGISTER_PLAYER_SCRIPT`, and
+  their answers never left. Same for a voluntary `leave-room` and the lobby
+  removal. Then `player-removed` broadcast **before**
   `disconnectSockets(true)` on `player:{id}` (so the kicked client hears it),
   then `afterRosterShrink` (may trigger early reveal / leaderboard refresh).
 - Ban = room-scoped Redis set `game:{code}:banned`, written **before** the

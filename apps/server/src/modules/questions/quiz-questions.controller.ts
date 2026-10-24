@@ -27,12 +27,13 @@ export class QuizQuestionsController {
   @Post(":quizId/questions")
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseInterceptors(FileInterceptor("file"))
-  upsert(
+  async upsert(
     @CurrentAccountUser() user: AuthUser,
     @Param("quizId") quizId: string,
     @Body() body: Record<string, string>,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.questions.upsertFromMultipart(user, quizId, body, file);
+    await this.questions.upsertFromMultipart(user, quizId, body, file);
+    await this.questions.touchQuiz(quizId);
   }
 }

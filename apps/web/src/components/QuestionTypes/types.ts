@@ -37,6 +37,8 @@ export interface QuestionRenderer<T extends QuestionType> {
   RevealBreakdown: ComponentType<{
     question: PublicQuestion<T>;
     summary: RevealSummary<T>;
+    /** Show the tally without marking the right answer (not revealed yet). */
+    hideCorrect?: boolean;
   }>;
 
   /** How many answered, and how many of those were right. */
