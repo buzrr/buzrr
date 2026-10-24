@@ -18,6 +18,9 @@ import {
   MediaUnavailableError,
   UnsupportedMediaError,
 } from "../../common/storage/media-storage";
+import { cutClip, toMp3 } from "../../common/storage/audio-transcode";
+import { encryptClip } from "../../common/storage/clip-crypto";
+import { stripAssetSignature } from "../../common/storage/asset-signing";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
 import {
@@ -27,8 +30,12 @@ import {
 } from "../question-types";
 import { CategoriesService } from "../categories/categories.service";
 import { ReorderQuestionsDto } from "./dto/reorder-questions.dto";
+import { inAuthoredOrder, OPTION_ORDER } from "../../common/utils/option-order";
 
 type MultipartBody = Record<string, string | undefined>;
+
+/** How long the reveal clip plays (from the reveal cue). */
+const REVEAL_CLIP_MS = 15_000;
 
 function parseJsonField(raw: string | undefined, field: string): unknown {
   if (raw === undefined || raw.trim() === "") return undefined;
@@ -103,7 +110,7 @@ export class QuestionsService {
     await this.assertQuizOwned(quizId, user.userId);
     const questions = await this.prisma.db.question.findMany({
       where: { quizId },
-      include: { options: true },
+      include: { options: { orderBy: OPTION_ORDER } },
       orderBy: { order: "asc" },
     });
     return { status: 200, questions };
@@ -158,6 +165,30 @@ export class QuestionsService {
     return { status: 200, message: "Success" };
   }
 
+  /** Disables (skipped in games and counts) or re-enables a question. */
+  async setDisabled(
+    user: AuthUser,
+    quesId: string,
+    disabled: boolean,
+  ): Promise<{ id: string; disabled: boolean }> {
+    const question = await this.prisma.db.question.findUnique({
+      where: { id: quesId },
+      include: { quiz: true },
+    });
+    if (!question) {
+      throw new NotFoundException("Question not found");
+    }
+    if (!ownsQuestion(question, user.userId)) {
+      throw new ForbiddenException("Unauthorized");
+    }
+    await this.prisma.db.question.update({
+      where: { id: quesId },
+      data: { disabled },
+    });
+    await this.touchQuiz(question.quizId);
+    return { id: quesId, disabled };
+  }
+
   async delete(user: AuthUser, quesId: string): Promise<void> {
     const question = await this.prisma.db.question.findUnique({
       where: { id: quesId },
@@ -182,6 +213,15 @@ export class QuestionsService {
         data: { order: { decrement: 1 } },
       }),
     ]);
+    await this.touchQuiz(quizId);
+  }
+
+  /** A question changed: the quiz counts as updated (quiz list order). */
+  async touchQuiz(quizId: string | null | undefined): Promise<void> {
+    if (!quizId) return;
+    await this.prisma.db.quiz
+      .update({ where: { id: quizId }, data: { updatedAt: new Date() } })
+      .catch(() => undefined);
   }
 
   async upsertFromMultipart(
@@ -189,13 +229,17 @@ export class QuestionsService {
     quizId: string,
     body: MultipartBody,
     file: Express.Multer.File | undefined,
+    audioFile?: Express.Multer.File,
   ): Promise<void> {
     const quiz = await this.assertQuizOwned(quizId, user.userId);
 
     const title = body.title?.trim();
     const time = body.time;
     const quesId = body.ques_id?.trim() || undefined;
-    const file_link = body.file_link;
+    // Links sent back by the editor are signed; the database keeps them bare.
+    const file_link = body.file_link
+      ? stripAssetSignature(body.file_link)
+      : body.file_link;
     const file_type = body.media_type;
     const type = body.type?.trim() || DEFAULT_QUESTION_TYPE;
 
@@ -222,7 +266,17 @@ export class QuestionsService {
 
     // Ownership first: the old media we may delete below is the edited
     // question's own, read from the database.
-    let existing: { media: string | null } | null = null;
+    let existing: {
+      media: string | null;
+      audio: string | null;
+      audioStartMs: number | null;
+      audioRevealMs: number | null;
+      timeOut: number;
+      audioClip: string | null;
+      audioClipKey: string | null;
+      audioRevealClip: string | null;
+      audioRevealKey: string | null;
+    } | null = null;
     if (quesId) {
       const question = await this.prisma.db.question.findUnique({
         where: { id: quesId },
@@ -243,12 +297,15 @@ export class QuestionsService {
     let fileLink = "";
     let mediaType = "";
 
-    if (file && file.size > 0) {
-      let uploaded;
+    const store = async (
+      upload: Express.Multer.File,
+      kind: "image" | "audio",
+    ) => {
       try {
-        uploaded = await this.storage.upload(file.buffer, {
-          contentType: file.mimetype,
-          filename: file.originalname,
+        return await this.storage.upload(upload.buffer, {
+          contentType: upload.mimetype,
+          filename: upload.originalname,
+          kind,
         });
       } catch (err) {
         if (err instanceof UnsupportedMediaError) {
@@ -259,6 +316,36 @@ export class QuestionsService {
         }
         throw err;
       }
+    };
+
+    // Sound: a new upload replaces it, `audio_link` keeps a URL (normally the
+    // stored one), neither means the question has none.
+    let audio: string | null = null;
+    let audioMp3: Buffer | null = null;
+    if (audioFile && audioFile.size > 0) {
+      audioMp3 = await toMp3(audioFile.buffer);
+      audio = (await store({ ...audioFile, buffer: audioMp3 }, "audio")).url;
+    } else if (body.audio_link && /^https?:\/\//.test(body.audio_link)) {
+      audio = stripAssetSignature(body.audio_link);
+    }
+    const cueMs = (raw: string | undefined) => {
+      const n = parseInt(raw ?? "", 10);
+      return Number.isFinite(n) && n >= 0 ? Math.min(n, 86_400_000) : null;
+    };
+    const audioFields = {
+      audio,
+      audioStartMs: audio ? (cueMs(body.audio_start_ms) ?? 0) : null,
+      audioRevealMs: audio ? cueMs(body.audio_reveal_ms) : null,
+      // null = like the quiz's sound setting
+      audioPlayOn:
+        audio &&
+        ["host", "players", "both", "off"].includes(body.audio_play_on ?? "")
+          ? body.audio_play_on!
+          : null,
+    };
+
+    if (file && file.size > 0) {
+      const uploaded = await store(file, "image");
       fileLink = uploaded.url;
       mediaType = uploaded.mediaType;
     } else if (file_link) {
@@ -267,6 +354,14 @@ export class QuestionsService {
     }
 
     const timeOut = parseInt(time ?? "", 10) || DEFAULT_TIME_OUT;
+    const clips = await this.audioClips(
+      audio,
+      audioMp3,
+      audioFields.audioStartMs,
+      audioFields.audioRevealMs,
+      timeOut,
+      existing,
+    );
     // Any create/edit re-enters the moderation queue if the quiz is public --
     // approved content doesn't stay approved across an edit, since the
     // reviewed text may have changed. Moderation only feeds the duel pool, so
@@ -290,25 +385,33 @@ export class QuestionsService {
             timeOut,
             media: fileLink || null,
             mediaType: mediaType || null,
+            ...audioFields,
+            ...clips.fields,
             moderationStatus,
             reportCount: 0,
           },
         });
         await tx.option.deleteMany({ where: { questionId: quesId } });
         await tx.option.createMany({
-          data: options.map((o) => ({
-            title: o.title,
-            isCorrect: o.isCorrect,
-            questionId: quesId,
-          })),
+          data: inAuthoredOrder(
+            options.map((o) => ({
+              title: o.title,
+              isCorrect: o.isCorrect,
+              questionId: quesId,
+            })),
+          ),
         });
         await tx.questionReport.deleteMany({ where: { questionId: quesId } });
       });
       // Only now, and only the question's own stored media — never a URL
       // the client sent (`file_link`), which could name anyone's upload.
       if (existing?.media && existing.media !== fileLink) {
-        await this.storage.remove(existing.media);
+        await this.removeUnused(existing.media);
       }
+      if (existing?.audio && existing.audio !== audio) {
+        await this.removeUnused(existing.audio);
+      }
+      for (const old of clips.replaced) await this.removeUnused(old);
     } else {
       await this.prisma.db.$transaction(async (tx) => {
         const count = await tx.question.count({ where: { quizId } });
@@ -317,11 +420,13 @@ export class QuestionsService {
             title,
             type,
             config,
-            options: { create: options },
+            options: { create: inAuthoredOrder(options) },
             quizId,
             timeOut,
             media: fileLink || null,
             mediaType: mediaType || null,
+            ...audioFields,
+            ...clips.fields,
             order: count + 1,
             moderationStatus,
             createdById: user.userId,
@@ -329,6 +434,87 @@ export class QuestionsService {
         });
       });
     }
+  }
+
+  /**
+   * The encrypted clips devices load for a question's sound: the window that
+   * plays while it is open (start cue, the question's time) and the reveal
+   * window (reveal cue, 15 s). Re-cut only when the sound, a cue or the time
+   * changed (or clips are missing); `replaced` lists the old files to delete
+   * once the question row points at the new ones.
+   */
+  private async audioClips(
+    audio: string | null,
+    freshMp3: Buffer | null,
+    startMs: number | null,
+    revealMs: number | null,
+    timeOut: number,
+    existing: {
+      media: string | null;
+      audio: string | null;
+      audioStartMs: number | null;
+      audioRevealMs: number | null;
+      timeOut: number;
+      audioClip: string | null;
+      audioClipKey: string | null;
+      audioRevealClip: string | null;
+      audioRevealKey: string | null;
+    } | null,
+  ) {
+    const old = [existing?.audioClip, existing?.audioRevealClip].filter(
+      (u): u is string => Boolean(u),
+    );
+    const none = {
+      audioClip: null,
+      audioClipKey: null,
+      audioRevealClip: null,
+      audioRevealKey: null,
+    };
+    if (!audio) return { fields: none, replaced: old };
+    const unchanged =
+      !freshMp3 &&
+      existing?.audio === audio &&
+      existing.audioClip &&
+      existing.audioStartMs === startMs &&
+      existing.audioRevealMs === revealMs &&
+      existing.timeOut === timeOut &&
+      (revealMs === null || existing.audioRevealClip);
+    if (unchanged && existing) {
+      return {
+        fields: {
+          audioClip: existing.audioClip,
+          audioClipKey: existing.audioClipKey,
+          audioRevealClip: existing.audioRevealClip,
+          audioRevealKey: existing.audioRevealKey,
+        },
+        replaced: [],
+      };
+    }
+    const source = freshMp3 ?? (await this.storage.read(audio));
+    // An external link we can't read plays as before: the whole file.
+    if (!source) return { fields: none, replaced: old };
+    const put = async (clip: Buffer) => {
+      const { blob, key } = encryptClip(clip);
+      const { url } = await this.storage.upload(blob, {
+        contentType: "application/octet-stream",
+        kind: "encrypted",
+      });
+      return { url, key };
+    };
+    const q = await put(await cutClip(source, startMs ?? 0, timeOut * 1000));
+    const r =
+      revealMs === null
+        ? null
+        : await put(await cutClip(source, revealMs, REVEAL_CLIP_MS));
+    return {
+      fields: {
+        audioClip: q.url,
+        audioClipKey: q.key,
+        audioRevealClip: r?.url ?? null,
+        audioRevealKey: r?.key ?? null,
+      },
+      replaced: old,
+    };
   }
 
   /**
@@ -406,5 +592,23 @@ export class QuestionsService {
     ]);
     const ids = rows.map((question) => question.id);
     return { created: ids.length, ids };
+  }
+
+  /**
+   * Removes an upload unless another question still uses it — duplicated
+   * quizzes share their files with the original.
+   */
+  private async removeUnused(url: string): Promise<void> {
+    const questions = await this.prisma.db.question.count({
+      where: {
+        OR: [
+          { media: url },
+          { audio: url },
+          { audioClip: url },
+          { audioRevealClip: url },
+        ],
+      },
+    });
+    if (questions === 0) await this.storage.remove(url);
   }
 }

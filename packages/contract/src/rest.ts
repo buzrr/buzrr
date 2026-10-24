@@ -5,6 +5,7 @@ import {
   MIN_TIME_OUT,
   questionTypeSchema,
 } from "./question-types";
+import { quizSettingsSchema } from "./socket";
 
 // ---------------------------------------------------------------------------
 // REST bodies that carry questions. Type-specific rules (how many options,
@@ -192,6 +193,17 @@ export const streakMonthQuerySchema = z.object({
   month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "month must be YYYY-MM"),
 });
 
+/**
+ * `POST /api/game-sessions` — open a room for a quiz. `settings`: this
+ * game's own (the "Host quiz" dialog); missing = the quiz's. `saveAsDefault`
+ * also stores them as the quiz's settings.
+ */
+export const createGameSessionSchema = z.object({
+  quizId: z.string().min(1),
+  settings: quizSettingsSchema.optional(),
+  saveAsDefault: z.boolean().optional(),
+});
+
 export const streakMonthSchema = z.object({
   month: z.string(),
   /** Days of the month (1-based) with a finished duel. */
@@ -229,3 +241,6 @@ export type DuelProfile = z.infer<typeof duelProfileSchema>;
 export type CreateDuelInvite = z.output<typeof createDuelInviteSchema>;
 export type SetTimeZone = z.infer<typeof setTimeZoneSchema>;
 export type StreakMonth = z.infer<typeof streakMonthSchema>;
+/** What a client sends (settings with defaults optional). */
+export type CreateGameSessionBody = z.input<typeof createGameSessionSchema>;
+export type CreateGameSession = z.output<typeof createGameSessionSchema>;
