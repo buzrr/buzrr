@@ -128,6 +128,10 @@ export default function LeaderBoard({
   alreadyEnded: boolean;
 }) {
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
+  // A big room: the host is sent the top HOST_LEADERBOARD_TOP and the count.
+  const playerCount =
+    useAppSelector((state) => state.game.leaderboardTotal) ??
+    leaderboard.length;
   const qCount = useAppSelector((state) => state.game.qCount);
   // Ranks are shared by equal scores, so a step can hold several players.
   const onPlace = (place: number) =>
@@ -150,8 +154,11 @@ export default function LeaderBoard({
             Thank you for joining!
           </h2>
           <p className={clsx("mt-2 text-[15px]", mutedText)}>
-            {quizTitle} · {qCount} question{qCount === 1 ? "" : "s"} ·{" "}
-            {leaderboard.length} player{leaderboard.length === 1 ? "" : "s"}
+            {quizTitle} ·{" "}
+            {qCount === 1 ? `${qCount} question` : `${qCount} questions`} ·{" "}
+            {playerCount === 1
+              ? `${playerCount} player`
+              : `${playerCount} players`}
           </p>
         </div>
         <div className="flex-1 grid grid-cols-[1fr_1.15fr_1fr] gap-3 items-end min-h-0">
@@ -178,7 +185,9 @@ export default function LeaderBoard({
         <div className="flex items-center justify-between px-5 md:px-[26px] pt-5 md:pt-6 pb-3.5">
           <h3 className="text-xl md:text-[22px] font-bold">Full rankings</h3>
           <span className={clsx("text-[13.5px]", mutedText)}>
-            {leaderboard.length} player{leaderboard.length === 1 ? "" : "s"}
+            {playerCount === 1
+              ? `${playerCount} player`
+              : `${playerCount} players`}
           </span>
         </div>
         <div className="md:flex-1 md:min-h-0 md:overflow-y-auto px-3 md:px-[18px] pb-4 flex flex-col gap-1.5">

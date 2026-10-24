@@ -8,6 +8,7 @@ import Switch from "@/components/ui/Switch";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { useUpdateQuizMutation } from "@/lib/modules/quizzes/hooks";
 import type { QuizDetail } from "@/lib/modules/quizzes/api";
+import QuizSettingsCard from "@/components/Admin/Quiz/QuizSettingsCard";
 
 function formatSessionDate(createdAt: string | Date) {
   const d = typeof createdAt === "string" ? new Date(createdAt) : createdAt;
@@ -76,6 +77,7 @@ export function QuizInfoContent(props: {
             appearing in 1v1 duels
           </span>
         </div>
+        <QuizSettingsCard quiz={props.quiz} />
         {showHostForm && (
           <div className="w-full mt-[18px]">
             <HostQuizForm
