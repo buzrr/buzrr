@@ -114,13 +114,20 @@ disconnect`), emits `request-sync` on connect as a safety net and when the
   guest in-game screens share the top bar, option keys and panel styles in
   `components/Game/GameUI.tsx`; the host screen and the desktop
   guest/duel screen show a `TimerRing`; mobile guest/duel shows a compact
-  `TimerBar`.
+  `TimerBar`. The host's standings (`QuesResult`, `Leaderboard`) play in
+  steps timed by contract `standings-timing.ts`: the old order, points count
+  up, the top `RANKING_ROWS` (20) re-sort (`lib/ranking.ts`); at the end the
+  podium fills 3-2-1, then fireworks.
 - Guest screen: `Player/PlayPageClient` → `Player/GamePage` →
   `Player/GameScreens/*` (`Question` submits with ack + rollback toast,
   `Result`, `WaitGameStart` with the canvas bubble mini-game in `Game.tsx`,
   `Leaderboard`). Reactions: `Game/Flyers` — `ReactionBar` on the phone
   (👍 ❤️ 😂 plus up to 4 own emojis kept in the browser,
   `lib/player-prefs.ts`), `ReactionOverlay` flyers on the host screen.
+  Final standings: moderated, the place waits `revealInMs`
+  (`finalRevealInMs` in the slice); the result is kept in localStorage
+  (`lib/final-result.ts`), so the thank-you screen outlives the room and a
+  reload.
 - Duel screen: `Duel/DuelGameClient` (score bar, countdown with category and
   streak chip, reuses `GameScreens/Question`/`Result`, rating + daily-streak
   result panel, `DuelAudio`). Duel home: `CategoryPicker`, `DuelProfileCard`,

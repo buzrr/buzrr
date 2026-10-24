@@ -5,9 +5,8 @@ import Image from "next/image";
 import { DEFAULT_AVATAR } from "@/constants";
 import { useAppSelector } from "@/state/hooks";
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import EndQuizButton from "@/components/Admin/EndQuizButton";
-import { useEndRoomMutation } from "@/lib/modules/game-sessions/hooks";
+import ConfettiBurst from "@/components/ConfettiBurst";
 import {
   labelClass,
   mutedText,
@@ -17,6 +16,17 @@ import {
 } from "@/components/Game/GameUI";
 import type { LeaderboardEntry } from "@buzrr/contract";
 import { rankBadgeClass } from "./QuesResult";
+import { PODIUM_STEP_MS, podiumStartMs } from "@/lib/podium";
+import {
+  RANK_STAGGER_MS,
+  rowMotionClass,
+  useRankingReveal,
+} from "@/lib/ranking";
+import { AnimatedNumber, useFlipReorder } from "@/components/Game/motion";
+import { podiumEmoji } from "@/components/Game/Flyers";
+
+/** A heart rises from each winner this long after they step onto the podium. */
+const PODIUM_HEART_MS = 1200;
 
 const PODIUM = {
   1: {
@@ -53,53 +63,75 @@ function podiumNames(entries: LeaderboardEntry[]) {
 function PodiumSpot({
   entries,
   place,
+  revealed,
 }: {
   entries: LeaderboardEntry[];
   place: 1 | 2 | 3;
+  /** The players step onto it (until then only the step stands). */
+  revealed: boolean;
 }) {
   const p = PODIUM[place];
-  if (entries.length === 0) return <div />;
   const shown = entries.slice(0, MAX_PODIUM_AVATARS);
   const shared = entries.length > 1;
+  // Once they stand on it: a heart rises from each winner.
+  const ids = shown.map((e) => e.playerId).join("|");
+  useEffect(() => {
+    if (!ids || !revealed) return;
+    const tm = setTimeout(
+      () => ids.split("|").forEach((id) => podiumEmoji(id, "❤️")),
+      PODIUM_HEART_MS,
+    );
+    return () => clearTimeout(tm);
+  }, [ids, revealed]);
+  if (entries.length === 0) return <div />;
   return (
     <div className="flex flex-col items-center gap-1.5 min-w-0">
-      <div className="flex items-center">
-        {shown.map((entry, i) => (
-          <span
-            key={entry.playerId}
-            className={clsx("rounded-full p-1", i > 0 && "-ml-4 md:-ml-6")}
-            style={{ background: p.color }}
-          >
-            <Image
-              src={entry.profilePic || DEFAULT_AVATAR}
-              width={104}
-              height={104}
-              alt=""
-              className={clsx(
-                "rounded-full object-cover",
-                shared ? "size-11 md:size-16" : p.avatar,
-              )}
-            />
-          </span>
-        ))}
-      </div>
-      <span
-        title={shared ? entries.map((e) => e.name).join(", ") : undefined}
+      <div
         className={clsx(
-          "mt-1.5 max-w-full truncate font-bold",
-          place === 1 ? "text-base md:text-xl" : "text-sm md:text-[17px]",
+          "flex flex-col items-center gap-1.5 min-w-0 max-w-full",
+          revealed ? "animate-podium-in" : "invisible",
         )}
       >
-        {podiumNames(entries)}
-      </span>
-      {shared && (
-        <span className="sr-only">
-          Tied: {entries.map((e) => e.name).join(", ")}
+        <div className="flex items-center">
+          {shown.map((entry, i) => (
+            // Their reactions fly from here (ReactionOverlay).
+            <span
+              key={entry.playerId}
+              className={clsx("rounded-full p-1", i > 0 && "-ml-4 md:-ml-6")}
+              style={{ background: p.color }}
+              data-podium-player={entry.playerId}
+            >
+              <Image
+                src={entry.profilePic || DEFAULT_AVATAR}
+                width={104}
+                height={104}
+                alt=""
+                className={clsx(
+                  "rounded-full object-cover",
+                  shared ? "size-11 md:size-16" : p.avatar,
+                )}
+              />
+            </span>
+          ))}
+        </div>
+        <span
+          title={shared ? entries.map((e) => e.name).join(", ") : undefined}
+          className={clsx(
+            "mt-1.5 max-w-full truncate font-bold",
+            place === 1 ? "text-base md:text-xl" : "text-sm md:text-[17px]",
+          )}
+        >
+          {podiumNames(entries)}
         </span>
-      )}
-      <span className={clsx("text-xs md:text-sm font-semibold", mutedText)}>
-        {entries[0]!.score.toLocaleString()} pts
-      </span>
+        {shared && (
+          <span className="sr-only">
+            Tied: {entries.map((e) => e.name).join(", ")}
+          </span>
+        )}
+        <span className={clsx("text-xs md:text-sm font-semibold", mutedText)}>
+          {entries[0]!.score.toLocaleString()} pts
+        </span>
+      </div>
       <div
         className={clsx(
           "mt-2.5 w-full rounded-t-[18px] rounded-b-lg border-t-[5px] flex flex-col items-center pt-4",
@@ -121,8 +153,11 @@ function PodiumSpot({
   );
 }
 
-/** Small games: how long the final podium shows before the editor. */
-const LEAVE_AFTER_MS = 6000;
+/** The last question's points stay on the final rankings this long. */
+const DELTA_SHOW_MS = 20_000;
+
+/** Final podium: a new burst of fireworks this often. */
+const FIREWORKS_EVERY_MS = 6000;
 
 export default function LeaderBoard({
   roomId,
@@ -133,32 +168,9 @@ export default function LeaderBoard({
   roomId: string;
   quizTitle: string;
   alreadyEnded: boolean;
-  /** With fewer than three players the host goes straight back here. */
+  /** Ending the game goes back to this quiz's editor. */
   quizId?: string;
 }) {
-  const router = useRouter();
-  const endRoom = useEndRoomMutation();
-  // The roster, not the leaderboard: the final standings may not have
-  // arrived yet on the first render (an empty list closed every game).
-  const players = useAppSelector((state) => state.game.players.length);
-  // A test run or a tiny game: no podium ceremony — save the result and go
-  // back to the quiz editor.
-  const [stay, setStay] = useState(false);
-  const leaving = Boolean(quizId) && players < 3 && !stay;
-  const left = useRef(false);
-  useEffect(() => {
-    if (!leaving || left.current) return;
-    // A few seconds on the podium first; "Stay here" cancels.
-    const t = setTimeout(() => {
-      left.current = true;
-      const back = () => router.push(`/admin/quiz/${quizId}`);
-      if (alreadyEnded) back();
-      else endRoom.mutate(roomId, { onSettled: back });
-    }, LEAVE_AFTER_MS);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leaving]);
-
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
   // A big room: the host is sent the top HOST_LEADERBOARD_TOP and the count.
   const playerCount =
@@ -168,12 +180,48 @@ export default function LeaderBoard({
   // Ranks are shared by equal scores, so a step can hold several players.
   const onPlace = (place: number) =>
     leaderboard.filter((entry) => entry.rank === place);
-  // A shared step names only some of its players ("Ana +2"), so the full
-  // list keeps everyone.
-  const rest = leaderboard;
+  // The rankings (the podium's included — a shared step names only some of
+  // its players, "Ana +2"): straight after the last question (entries carry
+  // its `delta`) the old top first, its points count up, then the new
+  // order; the new points stay green for DELTA_SHOW_MS (lib/ranking.ts).
+  const {
+    rows: rest,
+    counted: settled,
+    ranked,
+    animating: withDelta,
+    countMs,
+  } = useRankingReveal(leaderboard);
+  const animating = withDelta;
+  const [deltaShown, setDeltaShown] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setDeltaShown(false), DELTA_SHOW_MS);
+    return () => clearTimeout(t);
+  }, []);
+  const listRef = useRef<HTMLDivElement>(null);
+  useFlipReorder(listRef, rest.map((r) => r.playerId).join());
+
+  // Once the rankings have settled, the winners step onto the podium —
+  // third, second, first — then the fireworks start, a new burst every few
+  // seconds until the host ends the game.
+  const [podiumStage, setPodiumStage] = useState(0);
+  useEffect(() => {
+    const start = podiumStartMs(withDelta, countMs);
+    const timers = [1, 2, 3, 4].map((stage, i) =>
+      setTimeout(() => setPodiumStage(stage), start + i * PODIUM_STEP_MS),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [withDelta, countMs]);
+  const fireworks = podiumStage >= 4;
+  const [burst, setBurst] = useState(0);
+  useEffect(() => {
+    if (!fireworks) return;
+    const t = setInterval(() => setBurst((b) => b + 1), FIREWORKS_EVERY_MS);
+    return () => clearInterval(t);
+  }, [fireworks]);
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
+      {fireworks && <ConfettiBurst key={burst} duration={2500} />}
       <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-2 gap-3.5 md:gap-5">
         <section
           className={clsx(
@@ -195,9 +243,21 @@ export default function LeaderBoard({
             </p>
           </div>
           <div className="flex-1 grid grid-cols-[1fr_1.15fr_1fr] gap-3 items-end min-h-0">
-            <PodiumSpot entries={onPlace(2)} place={2} />
-            <PodiumSpot entries={onPlace(1)} place={1} />
-            <PodiumSpot entries={onPlace(3)} place={3} />
+            <PodiumSpot
+              entries={onPlace(2)}
+              place={2}
+              revealed={podiumStage >= 2}
+            />
+            <PodiumSpot
+              entries={onPlace(1)}
+              place={1}
+              revealed={podiumStage >= 3}
+            />
+            <PodiumSpot
+              entries={onPlace(3)}
+              place={3}
+              revealed={podiumStage >= 1}
+            />
           </div>
         </section>
 
@@ -215,19 +275,35 @@ export default function LeaderBoard({
                 : `${playerCount} players`}
             </span>
           </div>
-          <div className="md:flex-1 md:min-h-0 md:overflow-y-auto px-3 md:px-[18px] pb-4 flex flex-col gap-1.5">
-            {rest.map((lead) => (
+          <div
+            ref={listRef}
+            className="md:flex-1 md:min-h-0 md:overflow-y-auto px-3 md:px-[18px] pb-4 flex flex-col gap-1.5"
+          >
+            {rest.map((lead, i) => (
               <div
                 key={lead.playerId}
-                className="flex items-center gap-3 md:gap-[13px] rounded-[14px] border border-transparent px-2.5 py-[9px] transition-colors hover:bg-light-bg dark:hover:bg-card-dark hover:border-lprimary/15 dark:hover:border-white/5"
+                data-flip-id={lead.playerId}
+                className={clsx(
+                  "flex items-center gap-3 md:gap-[13px] rounded-[14px] border border-transparent px-2.5 py-[9px] transition-colors hover:bg-light-bg dark:hover:bg-card-dark hover:border-lprimary/15 dark:hover:border-white/5",
+                  rowMotionClass(lead),
+                )}
               >
                 <span
+                  key={ranked ? "ranked" : "unranked"}
                   className={clsx(
-                    "size-[30px] shrink-0 rounded-[9px] flex items-center justify-center text-sm font-bold",
-                    rankBadgeClass(lead.rank),
+                    "size-[30px] shrink-0 rounded-[9px] flex items-center justify-center text-sm font-bold transition-colors duration-500",
+                    // Numbers only once the rows stand in their new order,
+                    // popping in top to bottom.
+                    rankBadgeClass(ranked ? lead.shownRank : 0),
+                    ranked && animating && "animate-pop-in",
                   )}
+                  style={
+                    ranked && animating
+                      ? { animationDelay: `${i * RANK_STAGGER_MS}ms` }
+                      : undefined
+                  }
                 >
-                  {lead.rank}
+                  {ranked ? lead.shownRank : ""}
                 </span>
                 <Image
                   src={lead.profilePic || DEFAULT_AVATAR}
@@ -239,8 +315,21 @@ export default function LeaderBoard({
                 <span className="flex-1 min-w-0 truncate text-[15px] font-semibold">
                   {lead.name}
                 </span>
+                {deltaShown && (lead.delta ?? 0) > 0 && (
+                  <span
+                    className={clsx(
+                      "min-w-11 text-right text-[12.5px] font-bold text-green-600 dark:text-green-500",
+                      settled && "animate-pop",
+                    )}
+                  >
+                    +{lead.delta}
+                  </span>
+                )}
                 <span className="min-w-16 text-right text-base font-bold tabular-nums">
-                  {lead.score.toLocaleString()}
+                  <AnimatedNumber
+                    value={lead.shownScore}
+                    duration={lead.countMs || 800}
+                  />
                 </span>
               </div>
             ))}
@@ -254,23 +343,12 @@ export default function LeaderBoard({
       </div>
       {/* Same place as "Next question": the very bottom of the screen. */}
       <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-3 py-3 bg-light-bg/90 dark:bg-dark-bg/90 backdrop-blur [&>button]:w-full md:[&>button]:w-auto md:[&>button]:min-w-80">
-        {leaving && (
-          <span className={clsx("text-sm", mutedText)}>
-            Small game — back to the quiz in a few seconds.{" "}
-            <button
-              type="button"
-              onClick={() => setStay(true)}
-              className="font-semibold text-lprimary dark:text-dprimary hover:underline cursor-pointer"
-            >
-              Stay here
-            </button>
-          </span>
-        )}
         <EndQuizButton
           roomId={roomId}
-          redirectTo="/admin"
+          redirectTo={quizId ? `/admin/quiz/${quizId}` : "/admin"}
           alreadyEnded={alreadyEnded}
-          primaryLabel="Back to quizzes"
+          primaryLabel={alreadyEnded ? "Back to the quiz" : "End game"}
+          danger={!alreadyEnded}
         />
       </div>
     </div>

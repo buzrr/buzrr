@@ -1,4 +1,9 @@
-import { isScoredType, isUnlimitedTime, revealHasPoint } from "@buzrr/contract";
+import {
+  finalRevealMs,
+  isScoredType,
+  isUnlimitedTime,
+  revealHasPoint,
+} from "@buzrr/contract";
 import { ANSWER_GRACE_MS } from "../../../common/utils/answer-timing";
 import { planBotAnswer } from "../../../common/utils/duel-bot";
 import { acceptsMoreAnswers, toPublicQuestion } from "../../question-types";
@@ -11,6 +16,7 @@ import {
 } from "./moderation";
 import { pacingFor, type PacingStrategy } from "./pacing";
 import {
+  HOST,
   ROOM,
   withMeta,
   type Effect,
@@ -415,6 +421,8 @@ function closeQuestion(
           payload: { phase: "closed", qIndex: state.meta.qIndex },
         },
       },
+      // The host screen shows how the room answered before the answer.
+      ...closedSummaryEffects(state),
     ],
   };
 }
@@ -626,6 +634,11 @@ function enterFinal(state: GameState, pacing: PacingStrategy): Transition {
     return noop(state);
   }
   const patch = { phase: "final" as const, qDeadline: 0 };
+  const finalEntries = buildLeaderboard(
+    state.scores,
+    state.roster,
+    state.answers,
+  );
   const effects: Effect[] = [
     { kind: "clear-timer" },
     // Waits on the host until the game ends; parked so the abandon sweep
@@ -638,8 +651,11 @@ function enterFinal(state: GameState, pacing: PacingStrategy): Transition {
       message: {
         event: "leaderboard",
         payload: {
-          entries: buildLeaderboard(state.scores, state.roster),
+          // With the last question's points (`delta`): the host's board
+          // re-sorts once more and shows them.
+          entries: finalEntries,
           isFinal: true,
+          revealInMs: finalRevealMs(finalEntries),
         },
       },
     },
@@ -726,4 +742,23 @@ function onRosterChanged(state: GameState): Transition {
     });
   }
   return noop(state);
+}
+
+/** Host only: the tally of the question that just closed. */
+function closedSummaryEffects(state: GameState): Effect[] {
+  const question = state.questions[state.meta.qIndex];
+  if (!question) return [];
+  const { fastest: _fastest, ...tally } = buildReveal(
+    question,
+    state.meta.qIndex,
+    state.answers,
+    state.roster,
+  );
+  return [
+    {
+      kind: "emit",
+      to: HOST,
+      message: { event: "closed-summary", payload: tally },
+    },
+  ];
 }

@@ -270,12 +270,23 @@ win for each player in `/users/me/stats`.
 - `question-end` (and reveal-phase `state-sync.reveal`) carries `summary` —
   whatever the question's type reveals (multiple choice: `counts` aligned
   with the options + `correctOptionIds`) — and `avgTimeMs`, the mean answer
-  time of everyone who answered (`null` if nobody did). A reveal-phase
+  time of everyone who answered (`null` if nobody did) — plus, for scored
+  types, `fastest`: the up to three quickest right answers (name, picture,
+  ms). In a moderated game's `closed` step the host alone gets
+  `closed-summary`, the same tally without `fastest` (the host screen keeps
+  the answer hidden); a host's closed-phase `state-sync` carries it as
+  `closedSummary`. A player's own answer time (`timeTakenMs`) comes with the
+  `submit-answer` ack and `answer-result`. A reveal-phase
   snapshot also includes the public `question`, so a client reconnecting
   mid-reveal can render it.
   Reveal-time `leaderboard` entries (the reveal broadcast, a roster change
   during the reveal, and reveal-phase `state-sync`) carry `delta` — points earned on that question;
-  final/ended leaderboards omit it.
+  So does the final broadcast (`isFinal`), so the host's board adds the last
+  question's points once more; it also carries `revealInMs`
+  (`finalRevealMs`, `packages/contract/src/standings-timing.ts` — the host
+  board's timing, shared): when the host's count-up is over. Moderated games
+  show players their final place only then. Final-phase snapshots and ended
+  leaderboards omit `delta`.
   A room-wide `leaderboard` with more than `PLAYER_LEADERBOARD_TOP` (10)
   entries is split in `GameEngineService.send`: the host room gets the top
   `HOST_LEADERBOARD_TOP` (50) — with `delta`, also whoever was in the top 50
@@ -288,7 +299,7 @@ win for each player in `/users/me/stats`.
   player's `state-sync` carries the top plus their own row and
   `leaderboardTotal`.
 - Event names: `question-start`, `question-end`, `answer-result`,
-  `answer-count`, `live-summary` (host room only), `leaderboard`, `game-over`,
+  `answer-count`, `live-summary` and `closed-summary` (host room only), `leaderboard`, `game-over`,
   `state-sync`, `player-connection`,
   `player-joined/removed/left`, `game-started`, `game-session-ended`, plus the
   `duel:*` family.
@@ -322,7 +333,7 @@ win for each player in `/users/me/stats`.
   < 500 → 5, else 2) per `REACTION_WINDOW_MS` (60 s), counted per player
   (a reconnect gets no new budget) and started afresh with every
   `question-start` and the final standings (`reaction-limit` with
-  `reset`). Over it the player gets `reaction-limited { retryInMs }`: a
+  `reset`); there the top three get `limit: 0` (`winner`), no limit at all. Over it the player gets `reaction-limited { retryInMs }`: a
   "limit reached" toast, the buttons fade until then. Above
   `ROOM_REACTIONS_PER_S` (40) in a room within one second, only each
   player's first reaction of that second passes. A room whose

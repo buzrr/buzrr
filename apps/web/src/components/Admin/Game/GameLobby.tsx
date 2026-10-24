@@ -66,6 +66,7 @@ const GameLobby = (params: {
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const qCount = useAppSelector((state) => state.game.qCount);
   const moderation = useAppSelector((state) => state.game.moderation);
+  const closedSummary = useAppSelector((state) => state.game.closedSummary);
   const question = useAppSelector((state) => state.game.question);
   const roster = useAppSelector((state) => state.game.players);
 
@@ -168,6 +169,13 @@ const GameLobby = (params: {
           key={`ready-${qIndex}`}
           onNext={() => socket.emit("host-next")}
         />
+      ) : phase === "closed" && closedSummary ? (
+        // How the room answered; "Show answer" then marks the right one.
+        <QuesResult
+          key={`answer-${qIndex}`}
+          socket={socket}
+          roomId={params.roomId}
+        />
       ) : phase === "closed" ? (
         <ClosedSlide
           key={`closed-${qIndex}`}
@@ -181,8 +189,9 @@ const GameLobby = (params: {
           )}
         />
       ) : phase === "reveal" || phase === "scores" ? (
-        // "Show standings" keeps the answer on screen and adds the
-        // standings beside it.
+        // "Show answer" keeps the tally on screen (same key as "closed"),
+        // so only the right answer animates; "show scores" keeps it too
+        // and slides the standings in beside it.
         <QuesResult
           key={`answer-${qIndex}`}
           socket={socket}

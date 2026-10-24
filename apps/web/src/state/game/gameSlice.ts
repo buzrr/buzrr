@@ -46,6 +46,8 @@ export interface GameLiveState {
   leaderboard: LeaderboardEntry[];
   /** Players: how many are on the board when `leaderboard` is only its top. */
   leaderboardTotal: number | null;
+  /** Final leaderboard: when (ms after it came) the host's podium stands. */
+  finalRevealInMs: number | null;
   isFinalLeaderboard: boolean;
   players: {
     id: string;
@@ -74,11 +76,15 @@ export interface GameLiveState {
   /** How many are in the room (server's `reaction-limit`); 0 = not told. */
   roomSize: number;
   /**
-   * The reaction budget (server's `reaction-limit`): `limit` per `windowMs`;
-   * `resetSeq` counts fresh starts. Kept here, not in the bar, so a bar
-   * mounted later still knows it.
+   * The reaction budget (server's `reaction-limit`): `limit` per `windowMs`,
+   * 0 = no limit (the final top three); `resetSeq` counts fresh starts. Kept
+   * here, not in the bar, so a bar mounted later still knows it.
    */
   reactionBudget: { limit: number; windowMs: number; resetSeq: number };
+  /** Host, moderated "closed": how the room answered (answer still hidden). */
+  closedSummary: QuestionEndPayload | null;
+  /** Player: how long their answer to the open question took (from the ack). */
+  myAnswerMs: number | null;
 }
 
 export interface Standing {
@@ -117,6 +123,7 @@ const initialState: GameLiveState = {
   reveal: null,
   leaderboard: [],
   leaderboardTotal: null,
+  finalRevealInMs: null,
   isFinalLeaderboard: false,
   players: [],
   you: null,
@@ -128,8 +135,10 @@ const initialState: GameLiveState = {
   category: null,
   streaks: null,
   moderation: null,
+  myAnswerMs: null,
   roomSize: 0,
   reactionBudget: { limit: 5, windowMs: REACTION_WINDOW_MS, resetSeq: 0 },
+  closedSummary: null,
 };
 
 /**
@@ -203,6 +212,7 @@ const gameSlice = createSlice({
       state.players = s.players;
       state.you = s.you ?? null;
       state.moderation = s.moderation ?? null;
+      state.closedSummary = s.closedSummary ?? null;
       // Mid-question (and in moderated "closed") the server sends the
       // standing as of the last reveal — none yet on the first question.
       if (
@@ -219,6 +229,14 @@ const gameSlice = createSlice({
         (state.standing?.qIndex ?? -1) <= s.qIndex - 1
       ) {
         state.standing = nextStanding(state.standing, s.qIndex - 1, s.you);
+      }
+    },
+    closedSummaryReceived: (
+      state,
+      action: PayloadAction<QuestionEndPayload>,
+    ) => {
+      if (action.payload.index === state.qIndex) {
+        state.closedSummary = action.payload;
       }
     },
     gameStarted: (
@@ -292,6 +310,7 @@ const gameSlice = createSlice({
     questionStart: (state, action: PayloadAction<QuestionStartPayload>) => {
       const q = action.payload;
       state.phase = "question";
+      state.closedSummary = null;
       state.qIndex = q.index;
       state.qCount = q.qCount;
       state.question = q.question;
@@ -300,6 +319,10 @@ const gameSlice = createSlice({
       state.liveSummary = null;
       state.reveal = null;
       state.you = null;
+      state.myAnswerMs = null;
+    },
+    answerTimed: (state, action: PayloadAction<number>) => {
+      state.myAnswerMs = action.payload;
     },
     questionEnd: (state, action: PayloadAction<QuestionEndPayload>) => {
       state.phase = "reveal";
@@ -336,10 +359,12 @@ const gameSlice = createSlice({
         entries: LeaderboardEntry[];
         total?: number;
         isFinal: boolean;
+        revealInMs?: number;
       }>,
     ) => {
       state.leaderboard = action.payload.entries;
       state.leaderboardTotal = action.payload.total ?? null;
+      state.finalRevealInMs = action.payload.revealInMs ?? null;
       state.isFinalLeaderboard = action.payload.isFinal;
       if (action.payload.isFinal) {
         state.phase = "final";
@@ -398,9 +423,11 @@ export const {
   phaseChange,
   roomSizeKnown,
   reactionBudgetKnown,
+  closedSummaryReceived,
   questionStart,
   questionEnd,
   answerResult,
+  answerTimed,
   answerCount,
   liveSummary,
   leaderboardReceived,

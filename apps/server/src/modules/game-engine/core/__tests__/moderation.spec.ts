@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { ModerationSettings } from "@buzrr/contract";
+import {
+  SETTLE_DELAY_MS,
+  countUpMs,
+  finalRevealMs,
+  type ModerationSettings,
+} from "@buzrr/contract";
 import { ANSWER_GRACE_MS } from "../../../../common/utils/answer-timing";
 import { START_COUNTDOWN_MS, step } from "../machine";
 import type { GameState } from "../state";
@@ -140,7 +145,12 @@ describe("moderated question flow", () => {
     const now = open.meta.qDeadline + ANSWER_GRACE_MS;
     const { state: next } = step(open, { type: "deadline" }, now);
     expect(next.meta.phase).toBe("closed");
-    expect(events(open, { type: "deadline" }, now)).toEqual(["phase-change"]);
+    // The room only learns the step; the tally goes to the host alone.
+    const out = emitted(step(open, { type: "deadline" }, now).effects);
+    expect(out.map((e) => e.event)).toEqual(["phase-change", "closed-summary"]);
+    expect(out.find((e) => e.event === "closed-summary")?.to).toEqual({
+      host: true,
+    });
   });
 
   it("'show answer' reveals without the standings, 'show scores' sends them", () => {
@@ -188,7 +198,7 @@ describe("moderated question flow", () => {
     expect(next.meta).toMatchObject({ phase: "starting", qIndex: 1 });
   });
 
-  it("after the last question's answer the final standings come straight away", () => {
+  it("after the last question's answer the final standings come straight away, with its points", () => {
     const last = questionOpen(
       {
         answers: { p1: answer("q2-a", { isCorrect: true, score: 900 }) },
@@ -204,10 +214,16 @@ describe("moderated question flow", () => {
       payload: {
         isFinal: true,
         entries: expect.arrayContaining([
-          expect.objectContaining({ playerId: "p1", score: 900 }),
+          expect.objectContaining({ playerId: "p1", delta: 900 }),
         ]),
+        // Players learn their place as the host's board has added the
+        // points: after a 900-point count-up.
+        revealInMs: finalRevealMs([{ score: 900, delta: 900 }]),
       },
     });
+    expect(finalRevealMs([{ score: 900, delta: 900 }])).toBe(
+      SETTLE_DELAY_MS + countUpMs(900),
+    );
   });
 
   it("standings shown with the answer stay away from the last question's answer", () => {

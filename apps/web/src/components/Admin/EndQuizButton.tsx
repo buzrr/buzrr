@@ -1,5 +1,6 @@
 "use client";
 
+import clsx from "clsx";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { isAxiosError } from "axios";
@@ -26,6 +27,7 @@ export default function EndQuizButton({
   inline = false,
   pill = false,
   primaryLabel,
+  danger = false,
 }: {
   roomId: string;
   redirectTo?: string;
@@ -36,6 +38,8 @@ export default function EndQuizButton({
   pill?: boolean;
   /** Render as the gameplay primary button with this label instead. */
   primaryLabel?: string;
+  /** The primary button in red: it ends the game. */
+  danger?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -65,7 +69,14 @@ export default function EndQuizButton({
       {primaryLabel ? (
         <button
           type="button"
-          className={primaryButtonClass}
+          className={
+            danger
+              ? clsx(
+                  primaryButtonClass,
+                  "!bg-none !bg-red-light dark:!bg-red-dark dark:!text-dark !shadow-[0_10px_24px_-10px_#e5544e]",
+                )
+              : primaryButtonClass
+          }
           disabled={ending}
           onClick={() =>
             alreadyEnded ? router.push(redirectTo) : void confirmEnd()

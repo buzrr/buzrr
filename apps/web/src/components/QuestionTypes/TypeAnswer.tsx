@@ -236,27 +236,29 @@ export const typeAnswerRenderer: QuestionRenderer<"type_answer"> = {
     );
   },
 
-  RevealBreakdown({ summary }) {
+  RevealBreakdown({ summary, hideCorrect }) {
     const maxCount = Math.max(1, ...summary.answers.map((a) => a.count));
     const twoCols = summary.answers.length >= 5;
     return (
       <div className="flex-1 flex flex-col gap-3">
-        <CorrectGlow>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1 rounded-full bg-green-500 px-2 py-0.5 text-[11.5px] font-bold tracking-[0.04em] uppercase text-white">
-              <LuCheck size={13} strokeWidth={3} />
-              Correct
-            </span>
-            {summary.accepted.map((a) => (
-              <b
-                key={a}
-                className="text-[17px] text-green-600 dark:text-green-500"
-              >
-                {a}
-              </b>
-            ))}
-          </div>
-        </CorrectGlow>
+        {!hideCorrect && (
+          <CorrectGlow>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full bg-green-500 px-2 py-0.5 text-[11.5px] font-bold tracking-[0.04em] uppercase text-white">
+                <LuCheck size={13} strokeWidth={3} />
+                Correct
+              </span>
+              {summary.accepted.map((a) => (
+                <b
+                  key={a}
+                  className="text-[17px] text-green-600 dark:text-green-500"
+                >
+                  {a}
+                </b>
+              ))}
+            </div>
+          </CorrectGlow>
+        )}
         {summary.answers.length === 0 ? (
           <p className={clsx("text-sm py-6 text-center", mutedText)}>
             Nobody answered.
@@ -269,7 +271,7 @@ export const typeAnswerRenderer: QuestionRenderer<"type_answer"> = {
             )}
           >
             {summary.answers.map((a, i) => {
-              const ok = a.correct;
+              const ok = !hideCorrect && a.correct;
               const pct = Math.round((a.count / summary.responses) * 100);
               return (
                 <div key={`${a.text}-${i}`} className="flex flex-col gap-[7px]">

@@ -241,9 +241,14 @@ export class GameEngineService
     }
   }
 
-  /** Told when a new round begins (a question opens, the final standings). */
-  private roundListeners = new Set<(gameCode: string) => void>();
-  onNewRound(listener: (gameCode: string) => void): void {
+  /**
+   * Told when a new round begins (a question opens, the final standings —
+   * then with the players on places 1–3).
+   */
+  private roundListeners = new Set<
+    (gameCode: string, winners?: string[]) => void
+  >();
+  onNewRound(listener: (gameCode: string, winners?: string[]) => void): void {
     this.roundListeners.add(listener);
   }
 
@@ -251,22 +256,35 @@ export class GameEngineService
     if (!this.io) {
       throw new Error("GameEngineService used before gateway init");
     }
+    if ("room" in to && message.event === "question-start") {
+      for (const l of this.roundListeners) l(gameCode);
+    }
     if (
       "room" in to &&
-      (message.event === "question-start" ||
-        (message.event === "leaderboard" && message.payload.isFinal))
+      message.event === "leaderboard" &&
+      message.payload.isFinal
     ) {
-      for (const l of this.roundListeners) l(gameCode);
+      const winners = message.payload.entries
+        .filter((e) => e.rank <= 3)
+        .map((e) => e.playerId);
+      for (const l of this.roundListeners) l(gameCode, winners);
     }
     // Per-player rooms work cross-instance via the redis adapter.
     const target =
-      "player" in to ? this.io.to(`player:${to.player}`) : this.io.to(gameCode);
+      "player" in to
+        ? this.io.to(`player:${to.player}`)
+        : "host" in to
+          ? this.io.to(`host:${gameCode}`)
+          : this.io.to(gameCode);
     switch (message.event) {
       case "game-started":
         target.emit("game-started", {
           remainingMs: Math.max(0, message.deadline - Date.now()),
           ...(message.moderation ? { moderation: message.moderation } : {}),
         });
+        break;
+      case "closed-summary":
+        target.emit("closed-summary", message.payload);
         break;
       case "phase-change":
         target.emit("phase-change", {
@@ -309,6 +327,10 @@ export class GameEngineService
                 total: entries.length,
               }
             : message.payload;
+        if ("host" in to) {
+          target.emit("leaderboard", forHost);
+          break;
+        }
         if (!("room" in to) || entries.length <= PLAYER_LEADERBOARD_TOP) {
           target.emit("leaderboard", message.payload);
           break;
@@ -645,7 +667,11 @@ export class GameEngineService
     if (question && !isScored(question.type)) {
       this.scheduleLiveSummary(gameCode);
     }
-    return { accepted: true, answer: judgement.stored.answer };
+    return {
+      accepted: true,
+      answer: judgement.stored.answer,
+      timeTakenMs: judgement.stored.timeTakenMs,
+    };
   }
 
   /**

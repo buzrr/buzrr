@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LuBan, LuPlay, LuX } from "react-icons/lu";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -28,37 +28,23 @@ import {
   primaryButtonClass,
 } from "@/components/Game/GameUI";
 import { AnimatedNumber, useFlipReorder } from "@/components/Game/motion";
+import { revealHasPoint } from "@buzrr/contract";
+import { RevealDensity } from "@/components/QuestionTypes/MultipleChoice";
+import ConfettiBurst from "@/components/ConfettiBurst";
 import {
-  HOST_LEADERBOARD_TOP,
-  denseRanks,
-  type LeaderboardEntry,
-} from "@buzrr/contract";
-import {
+  closedNextLabel,
   leaderboardWithReveal,
   nextQuestionLabel,
   scoresStepPending,
 } from "@/lib/moderation";
 import type { GameSocket } from "@/types/socket";
+import {
+  RANK_STAGGER_MS,
+  rowMotionClass,
+  useRankingReveal,
+} from "@/lib/ranking";
 
 /** Hold the old standings until the answer bars have mostly filled. */
-const SETTLE_DELAY_MS = 1100;
-
-/**
- * The standings as they were before this question: each score minus its
- * `delta`, re-ranked the way the server ranks (ties share a rank). The
- * server only sends the new ones.
- */
-function previousStandings(entries: LeaderboardEntry[]) {
-  const sorted = entries
-    .map((entry, i) => ({ entry, i, prev: entry.score - (entry.delta ?? 0) }))
-    .sort((a, b) => b.prev - a.prev || a.i - b.i);
-  const ranks = denseRanks(sorted.map((s) => s.prev));
-  return sorted.map(({ entry, prev }, i) => ({
-    ...entry,
-    shownScore: prev,
-    shownRank: ranks[i]!,
-  }));
-}
 
 interface QuesResultProps {
   socket: GameSocket;
@@ -87,7 +73,11 @@ export default function QuesResult(props: QuesResultProps) {
   const { socket, roomId } = props;
   const dispatch = useAppDispatch();
   const question = useAppSelector((state) => state.game.question);
-  const reveal = useAppSelector((state) => state.game.reveal);
+  const revealed = useAppSelector((state) => state.game.reveal);
+  const closedSummary = useAppSelector((state) => state.game.closedSummary);
+  // Moderated "closed": the tally is on screen, the right answer isn't yet.
+  const closed = useAppSelector((state) => state.game.phase === "closed");
+  const reveal = closed ? closedSummary : revealed;
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
   const leaderboardTotal = useAppSelector(
     (state) => state.game.leaderboardTotal,
@@ -103,15 +93,23 @@ export default function QuesResult(props: QuesResultProps) {
   const scoredQ = question ? isScoredType(question.type) : true;
   const showBoard =
     scoredQ &&
+    !closed &&
     (phase === "scores" ||
       leaderboardWithReveal(moderation, qIndex >= qCount - 1));
+  // "Show standings" after the answer was on screen: the standings slide in.
+  const [boardSlidesIn, setBoardSlidesIn] = useState(false);
+  const [boardWas, setBoardWas] = useState(showBoard);
+  if (boardWas !== showBoard) {
+    setBoardWas(showBoard);
+    setBoardSlidesIn(showBoard);
+  }
   // Not after the last question: the final standings come next.
   const nextIsScores =
     phase === "reveal" &&
     scoresStepPending(moderation) &&
     scoredQ &&
     qIndex < qCount - 1;
-  // Re-armed on every step: "Show standings" keeps this screen mounted.
+  // Re-armed on every step: "Show answer" keeps this screen mounted.
   const [advancing, setAdvancing] = useState(false);
   const [armedPhase, setArmedPhase] = useState(phase);
   if (armedPhase !== phase) {
@@ -145,23 +143,28 @@ export default function QuesResult(props: QuesResultProps) {
     question.options.length >= 5;
   const scored = question ? isScoredType(question.type) : true;
 
-  // Start on the pre-question standings (once they are on screen), then
-  // count scores up and let rows glide into their new ranks.
-  const [settled, setSettled] = useState(false);
-  const [settleArmed, setSettleArmed] = useState(showBoard);
-  if (settleArmed !== showBoard) {
-    setSettleArmed(showBoard);
-    setSettled(false);
-  }
-  useEffect(() => {
-    if (!showBoard) return;
-    const t = setTimeout(() => setSettled(true), SETTLE_DELAY_MS);
-    return () => clearTimeout(t);
-  }, [showBoard]);
-
   // "Show answer": the whole question grows once, briefly, as the right
   // answer turns green.
   const answerRef = useRef<HTMLElement>(null);
+  // Every answer has to fit the panel (tablets, two-line questions): while
+  // it overflows, step down to a denser layout — per question, one way.
+  const [dense, setDense] = useState<{ id: string; level: number }>();
+  const qid = question?.id ?? "";
+  const density = dense?.id === qid ? dense.level : 0;
+  useLayoutEffect(() => {
+    const el = answerRef.current;
+    if (!el || !qid || density >= 2) return;
+    const check = () => {
+      if (window.innerWidth < 768) return; // phones scroll the page
+      if (el.scrollHeight > el.clientHeight + 1) {
+        setDense({ id: qid, level: density + 1 });
+      }
+    };
+    check();
+    const observer = new ResizeObserver(check);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [qid, density]);
   useEffect(() => {
     if (phase !== "reveal") return;
     answerRef.current?.animate(
@@ -173,20 +176,14 @@ export default function QuesResult(props: QuesResultProps) {
       { duration: 800, easing: "cubic-bezier(.2,.8,.2,1)" },
     );
   }, [phase]);
-  // The server sends the host the top HOST_LEADERBOARD_TOP before and after
-  // the question: the old top shows first, then the new one.
-  const rows = useMemo(
-    () =>
-      (settled
-        ? leaderboard.map((e) => ({
-            ...e,
-            shownScore: e.score,
-            shownRank: e.rank,
-          }))
-        : previousStandings(leaderboard)
-      ).slice(0, HOST_LEADERBOARD_TOP),
-    [leaderboard, settled],
-  );
+  // The old top RANKING_ROWS, then the points count up, then the new order
+  // (lib/ranking.ts). The server sends the host enough for both.
+  const {
+    rows,
+    counted: settled,
+    ranked,
+    animating,
+  } = useRankingReveal(leaderboard, showBoard);
   const playerCount = leaderboardTotal ?? leaderboard.length;
 
   // An emoji meant for the board (a right answer at the reveal, the scores
@@ -248,17 +245,28 @@ export default function QuesResult(props: QuesResultProps) {
     <div className="flex-1 min-h-0 flex flex-col">
       <div
         className={clsx(
-          "flex-1 min-h-0 flex flex-col md:grid gap-3.5 md:gap-5",
-          showAnswerPanel && showBoard ? "md:grid-cols-2" : "md:grid-cols-1",
+          "flex-1 min-h-0 flex flex-col md:grid gap-3.5",
+          // Results to leaderboard 3:2. With the answer on
+          // screen first, the standings open beside it ("show scores"): the
+          // same two columns, the second growing from nothing.
+          !showAnswerPanel
+            ? "md:grid-cols-1 md:gap-5"
+            : showBoard
+              ? "md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:gap-x-5"
+              : "md:grid-cols-[minmax(0,1fr)_minmax(0,0fr)] md:gap-x-0",
+          showAnswerPanel &&
+            "md:transition-[grid-template-columns,column-gap] md:duration-700 md:ease-[cubic-bezier(.2,.8,.2,1)]",
         )}
       >
+        {/* The results animation. */}
+        {phase === "reveal" && <ConfettiBurst duration={1400} />}
         {showAnswerPanel && (
           <section
             ref={answerRef}
             className={clsx(
               panelClass,
               "flex flex-col p-5 md:px-[30px] md:min-h-0 md:overflow-y-auto [scrollbar-width:thin]",
-              manyOptions
+              manyOptions || density >= 1
                 ? "gap-3 md:gap-3.5 md:py-5"
                 : "gap-5 md:gap-[22px] md:py-7",
             )}
@@ -272,14 +280,19 @@ export default function QuesResult(props: QuesResultProps) {
                   <QuestionTypePill type={question.type} />
                 )}
               </div>
-              <h2 className="mt-2 text-lg md:text-[22px] font-bold leading-[1.3] tracking-[-0.01em] text-pretty wrap-break-word">
+              <h2
+                className={clsx(
+                  "mt-2 text-lg font-bold leading-[1.3] tracking-[-0.01em] text-pretty wrap-break-word",
+                  density >= 1 ? "md:text-[19px]" : "md:text-[22px]",
+                )}
+              >
                 {question?.title}
               </h2>
             </div>
             <div
               className={clsx(
                 "grid gap-2 md:gap-3",
-                scored ? "grid-cols-3" : "grid-cols-2",
+                scored && !closed ? "grid-cols-3" : "grid-cols-2",
               )}
             >
               <StatTile
@@ -287,13 +300,50 @@ export default function QuesResult(props: QuesResultProps) {
                 suffix={` /${Math.max(players.filter((p) => p.connected).length, responses)}`}
                 label="Responses"
               />
-              {scored && (
+              {scored && !closed && (
                 <StatTile value={`${correctPct}%`} label="Got it right" />
               )}
               <StatTile value={avgTime} label="Avg. answer time" />
             </div>
             {question && reveal && (
-              <RevealBreakdown question={question} summary={reveal.summary} />
+              <RevealDensity.Provider value={density}>
+                <RevealBreakdown
+                  question={question}
+                  summary={reveal.summary}
+                  hideCorrect={closed}
+                />
+              </RevealDensity.Provider>
+            )}
+            {!closed && reveal?.fastest && reveal.fastest.length > 0 && (
+              <div className="mt-auto pt-3 border-t border-lprimary/15 dark:border-white/10">
+                <span className={labelClass}>Fastest right answers</span>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  {reveal.fastest.map((f, i) => (
+                    <div
+                      key={f.playerId}
+                      className="flex items-center gap-2 min-w-0 rounded-xl px-2.5 py-2 bg-green-500/8 border border-green-500/30 animate-fade-up"
+                      style={{ animationDelay: `${300 + i * 150}ms` }}
+                    >
+                      <span className="text-lg shrink-0">
+                        {["🥇", "🥈", "🥉"][i]}
+                      </span>
+                      <Image
+                        src={f.profilePic || DEFAULT_AVATAR}
+                        width={28}
+                        height={28}
+                        alt=""
+                        className="size-7 shrink-0 rounded-full object-cover"
+                      />
+                      <span className="flex-1 min-w-0">
+                        <b className="block truncate text-[13.5px]">{f.name}</b>
+                        <span className={clsx("text-xs", mutedText)}>
+                          {(f.timeMs / 1000).toFixed(1)} s
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </section>
         )}
@@ -303,6 +353,8 @@ export default function QuesResult(props: QuesResultProps) {
             className={clsx(
               panelClass,
               "flex flex-col md:min-h-0 md:overflow-hidden",
+              // Coming in after the answer: slides in beside it.
+              boardSlidesIn && "animate-board-in",
             )}
           >
             <div className="flex items-center justify-between px-5 md:px-[26px] pt-5 md:pt-6 pb-3.5">
@@ -317,21 +369,33 @@ export default function QuesResult(props: QuesResultProps) {
               ref={listRef}
               className="md:flex-1 md:min-h-0 md:overflow-y-auto px-3 md:px-[18px] pb-2.5 flex flex-col gap-1.5"
             >
-              {rows.map((lead) => {
+              {rows.map((lead, i) => {
                 const connected = connectedById.get(lead.playerId);
                 return (
                   <div
                     key={lead.playerId}
                     data-flip-id={lead.playerId}
-                    className="group relative bg-white dark:bg-dark flex items-center gap-3 md:gap-[13px] rounded-[14px] border border-transparent px-2.5 py-[9px] transition-colors hover:bg-light-bg dark:hover:bg-card-dark hover:border-lprimary/15 dark:hover:border-white/5"
+                    className={clsx(
+                      "group relative bg-white dark:bg-dark flex items-center gap-3 md:gap-[13px] rounded-[14px] border border-transparent px-2.5 py-[9px] transition-colors hover:bg-light-bg dark:hover:bg-card-dark hover:border-lprimary/15 dark:hover:border-white/5",
+                      rowMotionClass(lead),
+                    )}
                   >
                     <span
+                      key={ranked ? "ranked" : "unranked"}
                       className={clsx(
                         "size-[30px] shrink-0 rounded-[9px] flex items-center justify-center text-sm font-bold transition-colors duration-500",
-                        rankBadgeClass(lead.shownRank),
+                        // Numbers only once the rows stand in their new order,
+                        // popping in top to bottom.
+                        rankBadgeClass(ranked ? lead.shownRank : 0),
+                        ranked && animating && "animate-pop-in",
                       )}
+                      style={
+                        ranked && animating
+                          ? { animationDelay: `${i * RANK_STAGGER_MS}ms` }
+                          : undefined
+                      }
                     >
-                      {lead.shownRank}
+                      {ranked ? lead.shownRank : ""}
                     </span>
                     <span className="relative shrink-0">
                       <Image
@@ -375,7 +439,10 @@ export default function QuesResult(props: QuesResultProps) {
                       </span>
                     )}
                     <span className="min-w-[52px] text-right text-base font-bold tabular-nums">
-                      <AnimatedNumber value={lead.shownScore} />
+                      <AnimatedNumber
+                        value={lead.shownScore}
+                        duration={lead.countMs || 800}
+                      />
                     </span>
                     <span className="flex gap-0.5 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
                       <button
@@ -423,11 +490,19 @@ export default function QuesResult(props: QuesResultProps) {
           }}
           className={clsx(primaryButtonClass, "w-full md:w-auto md:min-w-80")}
         >
-          {nextIsScores
-            ? "Show standings"
-            : isLastQuestion
-              ? "Final leaderboard"
-              : nextQuestionLabel(qIndex, qCount)}
+          {closed
+            ? closedNextLabel(
+                moderation,
+                qIndex,
+                qCount,
+                scoredQ,
+                question ? revealHasPoint(question) : true,
+              )
+            : nextIsScores
+              ? "Show standings"
+              : isLastQuestion
+                ? "Final leaderboard"
+                : nextQuestionLabel(qIndex, qCount)}
           <LuPlay size={17} className="fill-current" />
         </button>
       </div>

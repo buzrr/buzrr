@@ -322,7 +322,7 @@ describe("gameStarted", () => {
 });
 
 describe("reactionBudgetKnown", () => {
-  it("keeps the budget for bars mounted later; a reset counts", () => {
+  it("keeps the budget for bars mounted later; 0 is no limit, a reset counts", () => {
     let s = reducer(
       fresh(),
       reactionBudgetKnown({ limit: 5, windowMs: 60_000, players: 40 }),
@@ -333,10 +333,11 @@ describe("reactionBudgetKnown", () => {
       s,
       reactionBudgetKnown({ limit: 5, windowMs: 60_000, reset: true }),
     );
+    // A winner at the final standings.
     s = reducer(
       s,
-      reactionBudgetKnown({ limit: 2, windowMs: 60_000, reset: true }),
+      reactionBudgetKnown({ limit: 0, windowMs: 60_000, reset: true }),
     );
-    expect(s.reactionBudget).toMatchObject({ limit: 2, resetSeq: 2 });
+    expect(s.reactionBudget).toMatchObject({ limit: 0, resetSeq: 2 });
   });
 });

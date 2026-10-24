@@ -131,6 +131,23 @@ export function useFlyers(): {
  * Host screens: every reaction a player taps floats up the right-hand side,
  * with the player's name (`nameOf`) under it.
  */
+const PODIUM_EVENT = "buzrr:podium-emoji";
+
+/** An emoji rising from a winner's avatar on the final podium (host). */
+export function podiumEmoji(playerId: string, emoji: string) {
+  window.dispatchEvent(
+    new CustomEvent(PODIUM_EVENT, { detail: { playerId, emoji } }),
+  );
+}
+
+/** A player's avatar on the final podium, if it is on screen. */
+function podiumAvatar(playerId: string): DOMRect | null {
+  const el = document.querySelector(
+    `[data-podium-player="${CSS.escape(playerId)}"]`,
+  );
+  return el ? el.getBoundingClientRect() : null;
+}
+
 export function ReactionOverlay({
   socket,
   nameOf,
@@ -148,6 +165,23 @@ export function ReactionOverlay({
     const onReaction = (r: { playerId: string; emoji: string }) => {
       const w = window.innerWidth;
       const h = window.innerHeight;
+      // The final top three: their emojis fly off their heads.
+      const head = podiumAvatar(r.playerId);
+      if (head) {
+        spawn({
+          emoji: r.emoji,
+          x:
+            head.left +
+            head.width / 2 +
+            (Math.random() - 0.5) * head.width * 0.4,
+          y: head.top,
+          dx: (Math.random() - 0.5) * 160,
+          rise: Math.max(160, head.top * (0.8 + Math.random() * 0.2)),
+          size: 34 + Math.random() * 14,
+          duration: 2200 + Math.random() * 1200,
+        });
+        return;
+      }
       spawn({
         emoji: r.emoji,
         x: w - 40 - Math.random() * Math.min(220, w * 0.25),
@@ -159,9 +193,15 @@ export function ReactionOverlay({
         label: nameRef.current?.(r.playerId),
       });
     };
+    const onPodium = (e: Event) =>
+      onReaction(
+        (e as CustomEvent<{ playerId: string; emoji: string }>).detail,
+      );
     socket.on("reaction", onReaction);
+    window.addEventListener(PODIUM_EVENT, onPodium);
     return () => {
       socket.off("reaction", onReaction);
+      window.removeEventListener(PODIUM_EVENT, onPodium);
     };
   }, [socket, spawn]);
   return <>{layer}</>;
@@ -239,6 +279,8 @@ export function ReactionBar({
   inline = false,
   oneShot = false,
   onSent,
+  blink = false,
+  hint,
 }: {
   socket: GameSocket | null;
   inline?: boolean;
@@ -248,6 +290,10 @@ export function ReactionBar({
    */
   oneShot?: boolean;
   onSent?: () => void;
+  /** Catch the eye (the final standings' top). */
+  blink?: boolean;
+  /** A call to send, shown beside the bar (the podium). */
+  hint?: string;
 }) {
   const [shot, setShot] = useState(false);
   const { spawn, layer } = useFlyers();
@@ -261,9 +307,9 @@ export function ReactionBar({
   // afresh with every question): after that the buttons rest until the
   // oldest tap drops out of the window; a tap then says so.
   const taps = useRef<number[]>([]);
-  // The server's budget, from the store.
+  // The server's budget, from the store (0 = no limit: the final top three).
   const budget = useAppSelector((st) => st.game.reactionBudget);
-  const limit = budget.limit;
+  const limit = budget.limit > 0 ? budget.limit : Infinity;
   const windowMs = budget.windowMs;
   const [blockedUntil, setBlockedUntil] = useState(0);
   // A fresh start (every question, the final standings): count anew — the
@@ -281,6 +327,8 @@ export function ReactionBar({
     });
   useEffect(() => {
     if (!socket) return;
+    // A winner (no limit from now on) is told once the host's podium
+    // stands — the bar's "share your emojis" hint — not early.
     const onLimited = ({ retryInMs }: { retryInMs: number }) => {
       setBlockedUntil(Date.now() + retryInMs);
       limitReached();
@@ -314,7 +362,10 @@ export function ReactionBar({
       taps.current = [];
     }
     taps.current = taps.current.filter((at) => now - at < windowMs);
-    if (now < blockedUntil || taps.current.length >= limit) {
+    if (
+      limit !== Infinity &&
+      (now < blockedUntil || taps.current.length >= limit)
+    ) {
       limitReached();
       return;
     }
@@ -350,6 +401,11 @@ export function ReactionBar({
 
   return (
     <>
+      {hint && !inline && (
+        <div className="fixed z-40 bottom-[7.25rem] left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-16 md:bottom-16 rounded-full bg-lprimary dark:bg-dprimary px-3.5 py-1.5 text-sm font-bold text-white dark:text-dark shadow-lg animate-bounce whitespace-nowrap pointer-events-none">
+          {hint}
+        </div>
+      )}
       <div
         className={clsx(
           "flex gap-1 rounded-full bg-white/85 dark:bg-dark/85 p-1.5 border border-lprimary/15 dark:border-white/10",
@@ -358,6 +414,7 @@ export function ReactionBar({
             : "fixed z-40 shadow-lg backdrop-blur flex-row bottom-14 left-1/2 -translate-x-1/2 md:flex-col md:left-auto md:translate-x-0 md:right-2 md:bottom-14",
           // Faded, but a tap still says why nothing happens.
           blockedFor > 0 && "opacity-45",
+          blink && blockedFor === 0 && "animate-bar-blink",
         )}
       >
         {BASE_REACTION_EMOJIS.map((emoji) => (

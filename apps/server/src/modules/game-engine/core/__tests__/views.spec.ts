@@ -51,6 +51,7 @@ describe("buildAnswerResult", () => {
       score: 0,
       totalScore: 0,
       rank: 1,
+      timeTakenMs: null,
     });
     const scores = [
       { playerId: "p2", score: 900 },
@@ -110,6 +111,7 @@ describe("buildSnapshot", () => {
       totalScore: 600,
       // As of the last reveal: 600 behind p2's 1000.
       rank: 2,
+      timeTakenMs: 1000,
     });
   });
 

@@ -2,11 +2,13 @@
 
 import clsx from "clsx";
 import {
-  useEffect,
-  useRef,
+  useContext,
+  createContext,
   useState,
   type ComponentProps,
   type ReactNode,
+  useEffect,
+  useRef,
 } from "react";
 import { LuCheck } from "react-icons/lu";
 import {
@@ -87,6 +89,10 @@ function optionTextClass(options: { title: string }[]) {
   return "text-[17px] md:text-xl";
 }
 
+/**
+ * How the room answered an option question, the right option(s) flagged.
+ * Shared by the scored option types.
+ */
 /** The right answer lights up: green border and a light green fill. */
 export function CorrectGlow({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -132,9 +138,12 @@ export function CorrectGlow({ children }: { children: ReactNode }) {
 }
 
 /**
- * How the room answered an option question, the right option(s) flagged.
- * Shared by the scored option types.
+ * How tight the results view must be to fit its panel: 0 = normal, 1 =
+ * tighter, 2 = tightest (two columns from three options). Set by the host's
+ * results screen when its panel overflows.
  */
+export const RevealDensity = createContext(0);
+
 export function OptionsReveal({
   options,
   counts,
@@ -146,20 +155,35 @@ export function OptionsReveal({
   correctOptionIds: string[];
   renderKey?: (index: number) => ReactNode;
 }) {
+  const density = useContext(RevealDensity);
   // Bars share out the picks; with multi-select one player can count twice.
   const picks = counts.reduce((sum, c) => sum + c, 0);
   const maxCount = Math.max(1, ...counts);
+  // Every option has to fit on screen: from five options on two columns —
+  // from three when the panel is short (e.g. a tablet, a two-line question).
+  const twoCols = options.length >= (density >= 2 ? 3 : 5);
   return (
-    <div className="flex-1 flex flex-col justify-center gap-3.5">
+    <div
+      className={clsx(
+        "flex-1 grid content-center",
+        twoCols
+          ? "gap-x-5 gap-y-1 sm:grid-cols-2"
+          : density >= 1
+            ? "gap-1.5"
+            : "gap-3.5",
+        density >= 1 &&
+          "[&_.reveal-row]:gap-1 [&_.reveal-label]:text-base md:[&_.reveal-label]:text-lg",
+      )}
+    >
       {options.map((opt, i) => {
         const count = counts[i] ?? 0;
         const ok = correctOptionIds.includes(opt.id);
         const pct = picks > 0 ? Math.round((count / picks) * 100) : 0;
-        return (
-          <div key={opt.id} className="flex flex-col gap-[7px]">
+        const row = (
+          <div className="reveal-row flex flex-col gap-[7px]">
             <div
               className={clsx(
-                "flex items-center gap-2.5 text-[15px] font-semibold",
+                "reveal-label flex items-center gap-2.5 text-lg md:text-[22px] font-semibold",
                 ok && "text-green-600 dark:text-green-500",
               )}
             >
@@ -186,6 +210,16 @@ export function OptionsReveal({
               correct={ok}
               delayMs={i * 90}
             />
+          </div>
+        );
+        return ok ? (
+          <CorrectGlow key={opt.id}>{row}</CorrectGlow>
+        ) : (
+          <div
+            key={opt.id}
+            className="-mx-2.5 px-2.5 py-1.5 border-2 border-transparent"
+          >
+            {row}
           </div>
         );
       })}
@@ -298,12 +332,12 @@ export const multipleChoiceRenderer: QuestionRenderer<"multiple_choice"> = {
     );
   },
 
-  RevealBreakdown({ question, summary }) {
+  RevealBreakdown({ question, summary, hideCorrect }) {
     return (
       <OptionsReveal
         options={question.options}
         counts={summary.counts}
-        correctOptionIds={summary.correctOptionIds}
+        correctOptionIds={hideCorrect ? [] : summary.correctOptionIds}
       />
     );
   },

@@ -34,7 +34,7 @@ export interface GameState {
 export type StatePart = "questions" | "roster" | "answers" | "scores";
 
 /** Who an emitted message goes to. */
-export type Audience = { room: true } | { player: string };
+export type Audience = { room: true } | { player: string } | { host: true };
 
 /** Messages the core asks the shell to send — a subset of the socket contract. */
 export type Outbound =
@@ -44,6 +44,7 @@ export type Outbound =
       deadline: number;
       moderation?: ModerationSettings;
     }
+  | { event: "closed-summary"; payload: QuestionEndPayload }
   | {
       event: "phase-change";
       payload: Omit<PhaseChangePayload, "remainingMs">;
@@ -107,6 +108,7 @@ export interface Transition {
 }
 
 export const ROOM: Audience = { room: true };
+export const HOST: Audience = { host: true };
 
 export function withMeta(
   state: GameState,

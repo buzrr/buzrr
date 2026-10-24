@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppSelector } from "@/state/hooks";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
@@ -19,6 +19,7 @@ import { usePlayerSocket } from "@/hooks/usePlayerSocket";
 import { ReactionBar } from "@/components/Game/Flyers";
 import { SCORES_EMOJI_TOP, quizSettingsSchema } from "@buzrr/contract";
 import { playersApi } from "@/lib/modules/players/api";
+import { saveFinalResult } from "@/lib/final-result";
 
 interface GameSessionWithQuiz extends GameSession {
   quiz: {
@@ -38,6 +39,9 @@ interface GameSessionWithQuiz extends GameSession {
  * arrives over the socket (`question-start` / `state-sync`), so no quiz
  * pre-fetch is needed for gameplay.
  */
+/** On the final standings the top this many get a blinking emoji bar. */
+const FINAL_BLINK_TOP = 15;
+
 const GamePage = (params: {
   player: { id: string };
   game: GameSessionWithQuiz;
@@ -47,9 +51,35 @@ const GamePage = (params: {
   const [showLeaveModal, setShowLeaveModal] = useState(false);
 
   const phase = useAppSelector((state) => state.game.phase);
+  const phaseRef = useRef(phase);
+  useEffect(() => {
+    phaseRef.current = phase;
+  });
+  const leaderboard = useAppSelector((state) => state.game.leaderboard);
+  const playerCount =
+    useAppSelector((state) => state.game.leaderboardTotal) ??
+    leaderboard.length;
+  // Our row when we're on the board's top; below it the place and points
+  // come from answer-result (`you.rank` / `you.totalScore`, used below).
+  const mine = leaderboard.find((e) => e.playerId === params.player.id);
   const question = useAppSelector((state) => state.game.question);
   const you = useAppSelector((state) => state.game.you);
   const qIndex = useAppSelector((state) => state.game.qIndex);
+  const moderation = useAppSelector((state) => state.game.moderation);
+  const finalRevealInMs = useAppSelector((state) => state.game.finalRevealInMs);
+  // The final standings: moderated, the place (and the podium's emoji call)
+  // waits until the host's board has re-sorted and filled the podium — the
+  // server says when (nothing to wait for after a reconnect).
+  const [finalRevealed, setFinalRevealed] = useState(false);
+  const atFinal = phase === "final" || phase === "ended";
+  useEffect(() => {
+    if (!atFinal) return;
+    const wait = moderation && phase === "final" ? (finalRevealInMs ?? 0) : 0;
+    const t = setTimeout(() => setFinalRevealed(true), wait);
+    return () => clearTimeout(t);
+  }, [atFinal, phase, moderation, finalRevealInMs]);
+  const finalRank =
+    finalRevealed && atFinal ? (mine?.rank ?? you?.rank ?? null) : null;
   // The question whose board got this player's emoji: the bar stays away
   // while that board (reveal, scores) is on screen.
   const [boardEmojiQ, setBoardEmojiQ] = useState<number | null>(null);
@@ -70,9 +100,35 @@ const GamePage = (params: {
       );
       router.replace(`/player/joinRoom/${params.player.id}`);
     },
-    onSessionEnded: () =>
-      router.replace(`/player/joinRoom/${params.player.id}`),
+    // After the final leaderboard the thank-you screen stays put when the
+    // host closes the room; only a room that ends earlier sends players back.
+    onSessionEnded: () => {
+      if (phaseRef.current !== "final" && phaseRef.current !== "ended") {
+        router.replace(`/player/joinRoom/${params.player.id}`);
+      }
+    },
   });
+
+  // Keep the final result for the thank-you screen (survives the room).
+  useEffect(() => {
+    if ((phase === "final" || phase === "ended") && leaderboard.length > 0) {
+      saveFinalResult({
+        playerId: params.player.id,
+        quizTitle: game.quiz.title ?? "",
+        position: mine?.rank ?? you?.rank ?? null,
+        score: mine?.score ?? you?.totalScore ?? 0,
+        players: playerCount,
+      });
+    }
+  }, [
+    phase,
+    leaderboard,
+    playerCount,
+    mine,
+    you,
+    params.player.id,
+    game.quiz.title,
+  ]);
 
   // Guard the browser/hardware back button: leaving the game is confirmed via
   // a modal instead of silently dropping the player on the previous screen.
@@ -130,7 +186,17 @@ const GamePage = (params: {
             onSent={() => setBoardEmojiQ(qIndex)}
           />
         ) : (
-          <ReactionBar socket={socket} />
+          <ReactionBar
+            socket={socket}
+            // The final standings' top: an eye-catching bar — the podium is
+            // asked to share.
+            blink={finalRank !== null && finalRank <= FINAL_BLINK_TOP}
+            hint={
+              finalRank !== null && finalRank <= 3
+                ? "Share your emojis now!"
+                : undefined
+            }
+          />
         ))}
       {phase !== "question" && phase !== "reveal" && phase !== "closed" && (
         <ConnectionStatusPill className="fixed left-3 bottom-3 z-40" />
@@ -184,8 +250,11 @@ const GamePage = (params: {
       ) : phase === "final" || phase === "ended" ? (
         <LeaderBoard
           playerId={params.player.id}
-          position={you?.rank ?? null}
-          score={you?.totalScore ?? 0}
+          position={mine?.rank ?? you?.rank ?? null}
+          score={mine?.score ?? you?.totalScore ?? 0}
+          quizTitle={game.quiz.title ?? undefined}
+          players={playerCount}
+          held={!finalRevealed}
         />
       ) : (
         // "starting" — the pre-question countdown

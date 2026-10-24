@@ -94,11 +94,16 @@ export function reactionLimitFor(players: number): number {
   if (players < 500) return 5;
   return 2;
 }
-/** The room's current reaction budget; `reset`: start counting afresh. */
+/**
+ * The room's current reaction budget; `reset`: start counting afresh.
+ * `limit` 0 = no limit: the top three on the final standings (`winner`)
+ * may send as many as they like.
+ */
 export interface ReactionLimitPayload {
   limit: number;
   windowMs: number;
   reset?: boolean;
+  winner?: boolean;
   /** How many are in the room (its reaction limit follows it). */
   players?: number;
 }
@@ -154,6 +159,17 @@ export const questionEndSchema = z.object({
   summary: revealSummarySchema,
   /** Mean answer time across everyone who answered; null when nobody did. */
   avgTimeMs: z.number().nullable(),
+  /** Scored questions: the (up to) three quickest right answers. */
+  fastest: z
+    .array(
+      z.object({
+        playerId: z.string(),
+        name: z.string(),
+        profilePic: z.string().nullable(),
+        timeMs: z.number(),
+      }),
+    )
+    .optional(),
 });
 
 /** Answers received so far for the open question (classic host meter). */
@@ -187,6 +203,8 @@ export const answerResultSchema = z.object({
    * the standing as of the last reveal, so it gives nothing away.
    */
   rank: z.number().int().nullable(),
+  /** How long this player took to answer (server-measured), if they did. */
+  timeTakenMs: z.number().nullable().optional(),
 });
 
 /**
@@ -212,6 +230,11 @@ export const leaderboardSchema = z.object({
   /** How many players there are, when `entries` is only the top. */
   total: z.number().int().optional(),
   isFinal: z.boolean(),
+  /**
+   * Final leaderboard: ms until the host's board has re-sorted and filled
+   * the podium (`finalRevealMs`) — players see their place then.
+   */
+  revealInMs: z.number().int().nonnegative().optional(),
 });
 
 const eloChangesSchema = z.record(
@@ -315,6 +338,8 @@ export const stateSyncSchema = z.object({
   you: answerResultSchema.optional(),
   /** Present for moderated games. */
   moderation: moderationSettingsSchema.optional(),
+  /** Host connections in "closed": the answers so far (see `closed-summary`). */
+  closedSummary: questionEndSchema.optional(),
 });
 
 export const submitAnswerSchema = z.object({
@@ -330,6 +355,8 @@ export const submitAnswerAckSchema = z.object({
    * submissions this is everything they have sent so far.
    */
   answer: questionAnswerSchema.optional(),
+  /** Accepted first answers: how long the player took (server-measured). */
+  timeTakenMs: z.number().optional(),
 });
 
 /** A roster member as announced on join/leave/kick. */
@@ -428,6 +455,11 @@ export interface ServerToClientEvents {
   "state-sync": (payload: StateSyncPayload) => void;
   /** Moderated games: ready / starting (countdown) / closed / scores. */
   "phase-change": (payload: PhaseChangePayload) => void;
+  /**
+   * Host only, moderated "closed" step: how the room answered, before the
+   * answer is shown (the host screen keeps the correct one hidden).
+   */
+  "closed-summary": (payload: QuestionEndPayload) => void;
   /** Host only: a waiting player's bubble mini-game totals. */
   /**
    * Host only: the bubble totals of every player that changed since the
