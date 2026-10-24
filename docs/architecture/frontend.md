@@ -17,7 +17,7 @@ setup exists (see [infrastructure.md](infrastructure.md#vinext)).
 | `/admin/(gameplay)/play/[roomId]` (lobby) & `/game/[roomId]` (live host screen)                                                                  | host                      | session per page                                              |
 | `/admin/(mains)/ai`, `/admin/ai/[spaceId]` — AI Knowledge Spaces                                                                                 | host (account)            | same; nav entry hidden unless `NEXT_PUBLIC_AI_API_URL` is set |
 | `/admin/(privileged)/duel-portal` (+ `/upload`, `/categories`) — duel questions by status, bulk upload, categories; `/moderation` redirects here | admin+superadmin          | role re-check in `(privileged)/layout.tsx`                    |
-| `/admin/(privileged)/superadmin/admins`                                                                                                          | superadmin                | nested layout re-check                                        |
+| `/admin/(privileged)/superadmin/admins` — user management (search, create local users, reset passwords, roles)                                   | superadmin                | nested layout re-check                                        |
 | `/player`, `/player/joinRoom/[playerId]`, `/player/play/[playerId]`                                                                              | anonymous guests          | none (player identity in localStorage)                        |
 | `/join/[gameCode]`                                                                                                                               | guests via shared link/QR | none                                                          |
 | `/duel`, `/duel/game/[gameCode]`, `/duel/invite/[code]`, `/duel/profile`                                                                         | account                   | per-page `requireDuelSession`                                 |
@@ -31,7 +31,7 @@ ReduxProvider → QueryProvider → Vercel Analytics and the SEO metadata.
 
 Classic-mode navigation sequences (duel flow: [duels.md](duels.md#client-side-flow-web)):
 
-- **Host**: `/admin` (quiz list) → quiz detail → host → `POST /game-sessions`
+- **Host**: `/admin` (quiz list) → quiz detail → "Host quiz" (settings dialog) → `POST /game-sessions`
   → `/admin/play/[roomId]` (lobby; `roomId` = GameSession id) → start-game →
   `/admin/game/[roomId]` (live; the final leaderboard renders here in place —
   no auto-navigation on game over). The durable result is reached later from
@@ -114,11 +114,20 @@ disconnect`), emits `request-sync` on connect as a safety net and when the
   guest in-game screens share the top bar, option keys and panel styles in
   `components/Game/GameUI.tsx`; the host screen and the desktop
   guest/duel screen show a `TimerRing`; mobile guest/duel shows a compact
-  `TimerBar`.
+  `TimerBar`. The host's standings (`QuesResult`, `Leaderboard`) play in
+  steps timed by contract `standings-timing.ts`: the old order, points count
+  up, the top `RANKING_ROWS` (20) re-sort (`lib/ranking.ts`); at the end the
+  podium fills 3-2-1, then fireworks.
 - Guest screen: `Player/PlayPageClient` → `Player/GamePage` →
   `Player/GameScreens/*` (`Question` submits with ack + rollback toast,
   `Result`, `WaitGameStart` with the canvas bubble mini-game in `Game.tsx`,
-  `Leaderboard`).
+  `Leaderboard`). Reactions: `Game/Flyers` — `ReactionBar` on the phone
+  (👍 ❤️ 😂 plus up to 4 own emojis kept in the browser,
+  `lib/player-prefs.ts`), `ReactionOverlay` flyers on the host screen.
+  Final standings: moderated, the place waits `revealInMs`
+  (`finalRevealInMs` in the slice); the result is kept in localStorage
+  (`lib/final-result.ts`), so the thank-you screen outlives the room and a
+  reload.
 - Duel screen: `Duel/DuelGameClient` (score bar, countdown with category and
   streak chip, reuses `GameScreens/Question`/`Result`, rating + daily-streak
   result panel, `DuelAudio`). Duel home: `CategoryPicker`, `DuelProfileCard`,
@@ -141,6 +150,28 @@ disconnect`), emits `request-sync` on connect as a safety net and when the
 - Join flows: `Player/Setup/*` (create profile → join by code) and
   `JoinViaLinkClient` for `/join/[gameCode]` links/QR (`lib/join-link.ts`
   builds the URLs from `NEXT_PUBLIC_APP_URL`).
+
+## UI language (`src/lib/i18n/`)
+
+English is the source language: every UI text is written in English in the
+code and wrapped — `t("Text {n}", { n })` from `useT()` in client components,
+`await getT()` in server components, `tx()` in helpers outside React, and
+`pl(n, "one", "many")` for plurals. `translate()` looks the English text up in
+`de.ts` (German, keyed by the English original); a text without an entry
+stays English, so a missing translation never breaks a screen.
+
+- The language comes from the `buzrr-lang` cookie (set by the selector in
+  Settings → Account, per device), else the browser's `Accept-Language`, else
+  English (`pickLocale`). The root layout reads it once per request and
+  provides it via `I18nProvider`; changing it reloads the page.
+- Dates and decimals follow the locale (`useLocale()` / `currentLocale()`),
+  the report's CSV uses `;` and decimal commas in German.
+- AI quizzes are written in the host's UI language (`language` in the
+  create-AI-quiz body; the server defaults to English).
+- Adding a language: add it to `LOCALES` / `LANGUAGE_NAMES` in `locale.ts`, a
+  dictionary next to `de.ts`, and a branch in `translate()`.
+- New UI text: write it in English inside `t()`, and add the German entry to
+  `de.ts`.
 
 ## Styling & UI conventions
 

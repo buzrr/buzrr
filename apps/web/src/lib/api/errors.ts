@@ -16,7 +16,7 @@ export function getApiErrorMessage(error: unknown): string {
 
 export type PlanLimitDetails = {
   message: string;
-  limit: "quizzes" | "ai_tokens";
+  limit: "quizzes" | "ai_tokens" | "feature";
   max?: number;
   resetsAt?: string | null;
 };

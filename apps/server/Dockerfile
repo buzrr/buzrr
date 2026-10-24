@@ -20,7 +20,9 @@ COPY package.json yarn.lock .yarnrc.yml tsconfig.json prisma.config.ts ./
 COPY .yarn/releases ./.yarn/releases
 COPY packages ./packages
 COPY apps/server/package.json ./apps/server/
-RUN yarn workspaces focus server @buzrr/prisma @buzrr/contract
+# The package cache survives between builds (BuildKit cache mount).
+RUN --mount=type=cache,target=/root/.yarn/berry/cache \
+    yarn workspaces focus server @buzrr/prisma @buzrr/contract
 
 COPY apps/server ./apps/server
 RUN yarn workspace @buzrr/contract build \
@@ -30,7 +32,8 @@ RUN yarn workspace @buzrr/contract build \
 # --------------------------------------------------------------------------- #
 
 FROM node:20-bookworm-slim AS runtime
-RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+# ffmpeg re-encodes uploaded audio (WAV, OGG, FLAC, M4A, …) to MP3.
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ffmpeg \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 ENV NODE_ENV=production \

@@ -11,6 +11,7 @@ import {
   type QuestionType,
 } from "@buzrr/contract";
 import { OptionKey, mutedText } from "@/components/Game/GameUI";
+import { useT, tx, pl } from "@/lib/i18n/context";
 import {
   QUESTION_TYPE_META,
   QuestionTypeIcon,
@@ -49,7 +50,7 @@ export function QuestionTypeTag({ type }: { type: QuestionType }) {
   return (
     <span className="shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap rounded-[9px] px-3 py-1.5 text-[13px] font-bold bg-lprimary/10 dark:bg-white/5 text-lprimary dark:text-dprimary">
       <QuestionTypeIcon type={type} size={14} />
-      {QUESTION_TYPE_META[type].name}
+      {tx(QUESTION_TYPE_META[type].name)}
     </span>
   );
 }
@@ -76,6 +77,7 @@ export default function QuestionCardBody({
 }: {
   question: CardQuestion;
 }) {
+  const t = useT();
   const type = cardType(question);
   const options = cardOptions(question);
 
@@ -102,7 +104,7 @@ export default function QuestionCardBody({
               )}
             />
             <span className="min-w-0">{op.title}</span>
-            {op.isCorrect && <span className="sr-only">(correct)</span>}
+            {op.isCorrect && <span className="sr-only">{t("(correct)")}</span>}
           </p>
         ))}
       </div>
@@ -127,7 +129,7 @@ export default function QuestionCardBody({
           ))}
         </div>
         <p className={clsx("mt-3 text-[13px]", mutedText)}>
-          No correct answer · votes shown live
+          {t("No correct answer · votes shown live")}
         </p>
       </>
     );
@@ -142,9 +144,16 @@ export default function QuestionCardBody({
     return (
       <div className={dashClass}>
         {multipleSubmissions
-          ? "Players send words one at a time, as many as they like"
-          : `Players type up to ${maxAnswers} ${maxAnswers === 1 ? "word" : "words"}`}
-        <span className={chipClass}>word</span>
+          ? t("Players send words one at a time, as many as they like")
+          : tx(
+              pl(
+                maxAnswers,
+                "Players type up to {n} word",
+                "Players type up to {n} words",
+              ),
+              { n: maxAnswers },
+            )}
+        <span className={chipClass}>{t("word")}</span>
         <span className={chipClass}>…</span>
       </div>
     );
@@ -153,7 +162,7 @@ export default function QuestionCardBody({
   if (type === "rating") {
     const cfg = configOf(rating.config, question.config, {
       scale: "5" as const,
-      lowLabel: "Not at all",
+      lowLabel: t("Not at all"),
       highLabel: "Very",
     });
     const max = ratingMax(cfg.scale);
@@ -188,9 +197,9 @@ export default function QuestionCardBody({
   });
   return (
     <div className={dashClass}>
-      Free text · up to {cfg.maxLength} characters
-      {cfg.allowAnonymous ? " · anonymous allowed" : ""}
-      {cfg.multipleSubmissions ? " · multiple answers" : ""}
+      {t("Free text · up to {n} characters", { n: cfg.maxLength })}
+      {cfg.allowAnonymous ? ` · ${t("anonymous allowed")}` : ""}
+      {cfg.multipleSubmissions ? ` · ${t("multiple answers")}` : ""}
     </div>
   );
 }

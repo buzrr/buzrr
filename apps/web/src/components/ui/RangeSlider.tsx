@@ -7,6 +7,7 @@ export default function RangeSlider({
   onChange,
   ticks,
   label,
+  tickValues,
 }: {
   min: number;
   max: number;
@@ -14,6 +15,9 @@ export default function RangeSlider({
   onChange: (v: number) => void;
   ticks: string[];
   label: string;
+  /** The value each tick stands for (clicking a tick sets it); when omitted,
+   *  a numeric label's own number, else evenly spaced over min..max. */
+  tickValues?: number[];
 }) {
   const pct = ((value - min) / (max - min)) * 100;
   return (
@@ -34,9 +38,27 @@ export default function RangeSlider({
         className="-mt-1 flex justify-between text-[11.5px] font-medium text-[#8a8896] dark:text-muted-dark"
         aria-hidden="true"
       >
-        {ticks.map((t) => (
-          <span key={t}>{t}</span>
-        ))}
+        {ticks.map((t, i) => {
+          // A label that is a number ("5", "15s") stands for that value.
+          const v =
+            tickValues?.[i] ??
+            (/^\d+/.test(t)
+              ? parseInt(t, 10)
+              : Math.round(
+                  min + ((max - min) * i) / Math.max(1, ticks.length - 1),
+                ));
+          return (
+            <button
+              key={t}
+              type="button"
+              tabIndex={-1}
+              onClick={() => onChange(v)}
+              className="-mx-1.5 px-1.5 py-1 rounded hover:text-lprimary dark:hover:text-dprimary cursor-pointer"
+            >
+              {t}
+            </button>
+          );
+        })}
       </div>
     </>
   );

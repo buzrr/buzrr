@@ -1,12 +1,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import { ProLock, useHasPro } from "@/components/Billing/ProFeature";
 import { toast } from "react-toastify";
 import { z } from "zod";
 import GridListToggle from "@/components/Admin/GridListToggle";
@@ -19,6 +20,25 @@ import TextInput from "@/components/ui/TextInput";
 import { DEFAULT_AVATAR } from "@/constants";
 import { authClient } from "@/lib/auth-client";
 import { useEntitlementsQuery } from "@/lib/modules/billing/hooks";
+import { useInstance } from "@/lib/instance-context";
+import { LuImagePlus, LuTrash2 } from "react-icons/lu";
+import clsx from "clsx";
+import { dropTargetClass, useFileDrop } from "@/hooks/useFileDrop";
+import { BUILTIN_SOUND_SKINS } from "@buzrr/contract";
+import { getApiErrorMessage } from "@/lib/api/errors";
+import { BUILTIN_SKINS, type BuiltinSkinId } from "@/lib/sound/synth";
+import { useSoundSkinsQuery } from "@/lib/modules/sound-skins/hooks";
+import {
+  usePreferencesQuery,
+  useSetDefaultLogo,
+  useUpdatePreferences,
+} from "@/lib/modules/preferences/hooks";
+import {
+  useT,
+  localePreference,
+  setLocalePreference,
+} from "@/lib/i18n/context";
+import { AVATAR_SKIN_NAMES } from "@/components/Admin/AvatarSkins/AvatarSkinsClient";
 
 const accountSchema = z.object({
   name: z
@@ -83,26 +103,189 @@ function PreferenceRow({
 }
 
 function PreferencesCard() {
+  const t = useT();
   return (
     <SettingsCard
-      title="Appearance & Preferences"
-      description="How Buzrr looks and behaves for you. Saved on this device."
+      title={t("Appearance & Preferences")}
+      description={t(
+        "How Buzrr looks and behaves for you. Saved on this device.",
+      )}
     >
       <PreferenceRow
-        label="Theme"
-        description="Switch between light and dark mode."
+        label={t("Theme")}
+        description={t("Switch between light and dark mode.")}
         control={<ThemeToggle />}
       />
       <PreferenceRow
-        label="Default quiz view"
-        description="How your quizzes are laid out on the Quizzes page."
+        label={t("Default quiz view")}
+        description={t("How your quizzes are laid out on the Quizzes page.")}
         control={<GridListToggle />}
       />
     </SettingsCard>
   );
 }
 
+/** Defaults for all the user's games: logo, audio skin, avatar skin. */
+function GameDefaultsCard() {
+  const t = useT();
+  const prefs = usePreferencesQuery();
+  const update = useUpdatePreferences();
+  const setLogo = useSetDefaultLogo();
+  const skins = useSoundSkinsQuery();
+  const logoInput = useRef<HTMLInputElement>(null);
+  const logo = prefs.data?.defaultLogo ?? null;
+  const onErr = (err: unknown) => toast.error(getApiErrorMessage(err));
+  const hasPro = useHasPro();
+  // A picture dropped onto the logo field becomes the default logo.
+  const { over, dropProps } = useFileDrop((file) => {
+    if (file.type.startsWith("image/"))
+      setLogo.mutate(file, { onError: onErr });
+    else toast.error(t("Drop a picture"));
+  }, setLogo.isPending);
+  const defaultSkin = prefs.data?.defaultSoundSkin ?? "builtin:show";
+  const defaultSkinName = (BUILTIN_SOUND_SKINS as readonly string[]).includes(
+    defaultSkin,
+  )
+    ? t(BUILTIN_SKINS[defaultSkin as BuiltinSkinId].name)
+    : ((skins.data ?? []).find((sk) => sk.id === defaultSkin)?.name ??
+      t("Audio skin"));
+  return (
+    <SettingsCard
+      title={t("Game defaults")}
+      description={t("Used by all your quizzes unless a quiz sets its own.")}
+    >
+      <PreferenceRow
+        label={t("Default logo")}
+        description={t("Shown on game screens instead of the site logo.")}
+        control={
+          hasPro === false && !logo ? (
+            <ProLock what={t("Your own logo")} />
+          ) : (
+            <div className="flex items-center gap-2" {...dropProps}>
+              <button
+                type="button"
+                onClick={() => logoInput.current?.click()}
+                disabled={setLogo.isPending}
+                title={logo ? t("Change logo") : t("Upload a logo")}
+                className={clsx(
+                  "size-14 shrink-0 rounded-xl border-[1.5px] border-dashed border-lprimary/25 dark:border-white/15 flex items-center justify-center overflow-hidden cursor-pointer hover:border-dprimary",
+                  over && dropTargetClass,
+                )}
+              >
+                {logo ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- signed upload URL
+                  <img
+                    src={logo}
+                    alt={t("Default logo")}
+                    className="max-h-full max-w-full object-contain p-1"
+                  />
+                ) : (
+                  <LuImagePlus
+                    size={22}
+                    className="text-lprimary dark:text-dprimary"
+                  />
+                )}
+              </button>
+              {logo && (
+                <button
+                  type="button"
+                  aria-label={t("Remove default logo")}
+                  onClick={() => setLogo.mutate(null, { onError: onErr })}
+                  className="size-8 rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:text-[#e5544e] cursor-pointer"
+                >
+                  <LuTrash2 size={16} />
+                </button>
+              )}
+              <input
+                ref={logoInput}
+                type="file"
+                accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif"
+                className="sr-only"
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  e.target.value = "";
+                  if (f) setLogo.mutate(f, { onError: onErr });
+                }}
+              />
+            </div>
+          )
+        }
+      />
+      <PreferenceRow
+        label={t("Default audio skin")}
+        description={t("Music and effects of quizzes set to “Default”.")}
+        control={
+          // Like the avatar skin: a link to the page where it is picked.
+          <Link
+            href="/admin/audio-skins"
+            className="text-sm font-semibold text-lprimary dark:text-dprimary hover:underline whitespace-nowrap"
+          >
+            {defaultSkinName} →
+          </Link>
+        }
+      />
+      <PreferenceRow
+        label={t("Default avatar skin")}
+        description={t("The pictures players pick from.")}
+        control={
+          <Link
+            href="/admin/avatar-skins"
+            className="text-sm font-semibold text-lprimary dark:text-dprimary hover:underline whitespace-nowrap"
+          >
+            {t(AVATAR_SKIN_NAMES[prefs.data?.defaultAvatarSkin ?? "original"])}{" "}
+            →
+          </Link>
+        }
+      />
+    </SettingsCard>
+  );
+}
+
+/** UI language: English, German, or the browser's (cookie, per device). */
+function LanguageSelect() {
+  const t = useT();
+  const [choice, setChoice] = useState<"en" | "de" | "auto">("auto");
+  useEffect(() => setChoice(localePreference()), []);
+  return (
+    <select
+      aria-label={t("Language")}
+      value={choice}
+      onChange={(e) =>
+        setLocalePreference(e.target.value as "en" | "de" | "auto")
+      }
+      className="w-44 rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent dark:bg-dark px-2 py-1 text-[13px] text-dark dark:text-white"
+    >
+      <option value="auto">{t("Automatic (browser)")}</option>
+      <option value="en">English</option>
+      <option value="de">Deutsch</option>
+    </select>
+  );
+}
+
 function AccountCard() {
+  const t = useT();
+  // How this account signs in (Google, or email + password), not assumed.
+  const [signInMethod, setSignInMethod] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void authClient
+      .listAccounts()
+      .then((res) => {
+        if (!alive) return;
+        const ids = (res.data ?? []).map((a) => a.providerId);
+        setSignInMethod(
+          ids.includes("google")
+            ? "Google"
+            : ids.includes("credential")
+              ? "email and password"
+              : null,
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
   const { data: session } = authClient.useSession();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -139,10 +322,10 @@ function AccountCard() {
       image: values.image || null,
     });
     if (error) {
-      toast.error(error.message || "Could not update your profile.");
+      toast.error(error.message || t("Could not update your profile."));
       return;
     }
-    toast.success("Profile updated");
+    toast.success(t("Profile updated"));
     queryClient.invalidateQueries({ queryKey: ["duel", "me"] });
     // Server components read the session through a short-lived cookie
     // cache; refresh so they don't keep showing the old name.
@@ -151,20 +334,27 @@ function AccountCard() {
 
   return (
     <SettingsCard
-      title="Account"
-      description="Your public identity across quizzes and duels."
+      title={t("Account")}
+      description={t("Your public identity across quizzes and duels.")}
     >
+      <PreferenceRow
+        label={t("Language")}
+        description={t(
+          "For you and for players on this device. “Automatic” follows the browser.",
+        )}
+        control={<LanguageSelect />}
+      />
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <TextInput
-          label="Display name"
+          label={t("Display name")}
           error={errors.name?.message}
           autoComplete="off"
           {...register("name")}
         />
         <div className="flex items-end gap-4">
           <TextInput
-            label="Avatar URL"
-            placeholder="https://..."
+            label={t("Avatar URL")}
+            placeholder={t("https://...")}
             error={errors.image?.message}
             autoComplete="off"
             containerClassName="flex-1"
@@ -173,16 +363,19 @@ function AccountCard() {
           <Image
             src={previewSrc}
             className="rounded-full shrink-0 mb-1"
-            alt="Avatar preview"
+            alt={t("Avatar preview")}
             width={48}
             height={48}
           />
         </div>
         <div>
-          <p className="text-sm font-bold text-dark dark:text-white">Email</p>
+          <p className="text-sm font-bold text-dark dark:text-white">
+            {t("Email")}
+          </p>
           <p className="text-sm text-off-dark dark:text-off-white">
-            {session?.user.email} · Signed in with Google — email can&apos;t be
-            changed here.
+            {session?.user.email}
+            {signInMethod ? ` · Signed in with ${signInMethod}` : ""}{" "}
+            {t("— email can't be changed here.")}
           </p>
         </div>
         <Button
@@ -192,7 +385,7 @@ function AccountCard() {
           isLoading={isSubmitting}
           loadingText="Saving..."
         >
-          Save changes
+          {t("Save changes")}
         </Button>
       </form>
     </SettingsCard>
@@ -200,25 +393,26 @@ function AccountCard() {
 }
 
 function PlanCard() {
+  const t = useT();
   const { data } = useEntitlementsQuery();
   return (
     <SettingsCard
-      title="Plan"
-      description="Your Buzrr plan, usage and subscription."
+      title={t("Plan")}
+      description={t("Your Buzrr plan, usage and subscription.")}
     >
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm text-dark dark:text-white">
           {data
             ? data.plan === "pro"
-              ? "You're on Buzrr Pro."
-              : "You're on the Free plan."
-            : "Loading your plan…"}
+              ? t("You're on Buzrr Pro.")
+              : t("You're on the Free plan.")
+            : t("Loading your plan…")}
         </p>
         <Link
           href="/admin/billing"
           className="text-sm font-bold text-lprimary dark:text-dprimary underline underline-offset-2"
         >
-          Plan & Billing
+          {t("Plan & Billing")}
         </Link>
       </div>
     </SettingsCard>
@@ -226,17 +420,20 @@ function PlanCard() {
 }
 
 function DangerZoneCard() {
+  const t = useT();
   return (
     <SettingsCard
-      title="Danger zone"
-      description="Sign out of this device, or permanently delete your profile."
+      title={t("Danger zone")}
+      description={t(
+        "Sign out of this device, or permanently delete your profile.",
+      )}
       className="border border-red-light dark:border-red-dark"
     >
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="w-full sm:w-64">
           <SignOutButton
-            btnTitle="Sign out"
-            confirmText="Are you sure you want to sign out?"
+            btnTitle={t("Sign out")}
+            confirmText={t("Are you sure you want to sign out?")}
             btnStyle="text-sm text-white dark:text-dark dark:font-bold rounded-lg py-2 px-4 bg-red-light dark:bg-red-dark w-full cursor-pointer"
           />
         </div>
@@ -249,6 +446,8 @@ function DangerZoneCard() {
 }
 
 export default function SettingsClient() {
+  const t = useT();
+  const { billing } = useInstance();
   return (
     <div className="w-full p-4 md:p-6">
       <div className="flex items-center gap-2 mb-4">
@@ -256,13 +455,14 @@ export default function SettingsClient() {
           <NavbarToggle />
         </span>
         <h1 className="text-2xl font-black text-dark dark:text-white">
-          Settings
+          {t("Settings")}
         </h1>
       </div>
       <div className="flex flex-col gap-6">
         <PreferencesCard />
+        <GameDefaultsCard />
         <AccountCard />
-        <PlanCard />
+        {billing && <PlanCard />}
         <DangerZoneCard />
       </div>
     </div>

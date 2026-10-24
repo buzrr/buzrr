@@ -5,9 +5,13 @@
  * The apex `buzrr.in` redirects to www, so www is canonical.
  */
 export const SITE_URL = "https://www.buzrr.in";
-export const SITE_NAME = "Buzrr";
+import { getInstanceConfig } from "@/lib/instance";
 
-export const DEFAULT_TITLE =
+/** The site's name (instance TITLE, else Buzrr) — read at request time. */
+export const siteName = () => getInstanceConfig().title || "Buzrr";
+
+export const defaultTitle = () =>
+  getInstanceConfig().title ||
   "Buzrr — Open-Source Live Quiz Platform with Ranked 1v1 Quiz Battles";
 
 /** The one-sentence definition reused in metadata and JSON-LD. */

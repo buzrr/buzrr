@@ -13,6 +13,7 @@ import { InputField } from "@/components/InputField";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { createQuizSchema } from "@/lib/modules/forms/schemas";
 import { useUpdateQuizMutation } from "@/lib/modules/quizzes/hooks";
+import { useT } from "@/lib/i18n/context";
 import type { QuizListItem } from "@/lib/modules/quizzes/api";
 
 type FormValues = z.infer<typeof createQuizSchema>;
@@ -26,6 +27,7 @@ export default function EditQuizModal({
   open: boolean;
   setOpen: (open: boolean) => void;
 }) {
+  const t = useT();
   const mutation = useUpdateQuizMutation();
   const { control, handleSubmit, reset } = useForm<FormValues>({
     resolver: zodResolver(createQuizSchema),
@@ -49,7 +51,7 @@ export default function EditQuizModal({
       },
       {
         onSuccess: () => {
-          toast.success("Quiz updated");
+          toast.success(t("Quiz updated"));
           setOpen(false);
         },
         onError: (err) => toast.error(getApiErrorMessage(err)),
@@ -79,7 +81,7 @@ export default function EditQuizModal({
             id="edit-quiz-title"
             className="text-xl font-bold mb-2 text-dark dark:text-white"
           >
-            Edit quiz
+            {t("Edit quiz")}
           </p>
           <form onSubmit={onSubmit} className="flex flex-col">
             <Controller
@@ -89,11 +91,11 @@ export default function EditQuizModal({
                 <InputField
                   type="text"
                   name="title"
-                  placeholder="Enter quiz title"
+                  placeholder={t("Enter quiz title")}
                   className="text-dark dark:text-white dark:bg-dark my-2 rounded-xl mt-1 border"
                   required
                   autoComplete="off"
-                  label="Quiz title"
+                  label={t("Quiz title")}
                   fieldValue={field.value}
                   onTitleChange={field.onChange}
                   error={!!fieldState.error}
@@ -108,11 +110,11 @@ export default function EditQuizModal({
                 <InputField
                   type="text"
                   name="description"
-                  placeholder="Description"
+                  placeholder={t("Description")}
                   autoComplete="off"
                   className="text-dark dark:text-white dark:bg-dark mt-1 border rounded-xl"
                   textarea={true}
-                  label="Description (Optional)"
+                  label={t("Description (Optional)")}
                   fieldValue={field.value ?? ""}
                   onTitleChange={field.onChange}
                   error={!!fieldState.error}
@@ -121,7 +123,7 @@ export default function EditQuizModal({
               )}
             />
             <SubmitButton
-              text="Save changes"
+              text={t("Save changes")}
               loader="Saving..."
               isPending={mutation.isPending}
             />

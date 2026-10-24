@@ -7,10 +7,12 @@ import {
   LuEllipsisVertical,
   LuExternalLink,
   LuLayers,
+  LuCopy,
   LuPencil,
   LuTrash2,
   LuUsers,
 } from "react-icons/lu";
+import { useT, pl } from "@/lib/i18n/context";
 import type { QuizListItem } from "@/lib/modules/quizzes/api";
 
 function quizHue(id: string) {
@@ -40,14 +42,17 @@ function QuizMenu({
   view,
   onOpenChange,
   onEdit,
+  onDuplicate,
   onDelete,
 }: {
   quizHref: string;
   view: "grid" | "list";
   onOpenChange: (open: boolean) => void;
   onEdit: () => void;
+  onDuplicate: () => void;
   onDelete: () => void;
 }) {
+  const t = useT();
   const [open, setOpenState] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -91,7 +96,7 @@ function QuizMenu({
     >
       <button
         type="button"
-        aria-label="More options"
+        aria-label={t("More options")}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
@@ -119,7 +124,7 @@ function QuizMenu({
             onClick={() => setOpen(false)}
           >
             <LuExternalLink />
-            Open
+            {t("Open")}
           </Link>
           <button
             type="button"
@@ -134,7 +139,22 @@ function QuizMenu({
             }}
           >
             <LuPencil />
-            Edit
+            {t("Edit")}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={clsx(
+              itemClass,
+              "text-dark dark:text-white hover:bg-lprimary/10 dark:hover:bg-white/5 [&>svg]:text-off-dark dark:[&>svg]:text-[#9a9aa2]",
+            )}
+            onClick={() => {
+              setOpen(false);
+              onDuplicate();
+            }}
+          >
+            <LuCopy />
+            {t("Duplicate")}
           </button>
           <div className="h-px mx-2 my-0.5 bg-lprimary/15 dark:bg-white/10" />
           <button
@@ -150,7 +170,7 @@ function QuizMenu({
             }}
           >
             <LuTrash2 />
-            Delete
+            {t("Delete")}
           </button>
         </div>
       )}
@@ -162,13 +182,16 @@ export default function QuizCard({
   quiz,
   view,
   onEdit,
+  onDuplicate,
   onDelete,
 }: {
   quiz: QuizListItem;
   view: "grid" | "list";
   onEdit: () => void;
+  onDuplicate: () => void;
   onDelete: () => void;
 }) {
+  const t = useT();
   const [menuOpen, setMenuOpen] = useState(false);
   const href = `/admin/quiz/${quiz.id}`;
   const questions = quiz._count?.questions ?? 0;
@@ -185,11 +208,11 @@ export default function QuizCard({
     >
       <span>
         <LuLayers size={14} />
-        {questions} question{questions === 1 ? "" : "s"}
+        {t(pl(questions, "{n} question", "{n} questions"), { n: questions })}
       </span>
       <span>
         <LuUsers size={14} />
-        {plays} play{plays === 1 ? "" : "s"}
+        {t(pl(plays, "{n} play", "{n} plays"), { n: plays })}
       </span>
     </div>
   );
@@ -244,6 +267,7 @@ export default function QuizCard({
         view={view}
         onOpenChange={setMenuOpen}
         onEdit={onEdit}
+        onDuplicate={onDuplicate}
         onDelete={onDelete}
       />
     </div>

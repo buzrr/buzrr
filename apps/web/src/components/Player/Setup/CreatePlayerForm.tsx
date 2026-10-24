@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import clsx from "clsx";
 import SelectProfile from "@/components/Player/SelectProfile";
 import { toast } from "react-toastify";
@@ -14,6 +14,7 @@ import { createPlayerSchema } from "@/lib/modules/forms/schemas";
 import { useCreatePlayerMutation } from "@/lib/modules/players/hooks";
 import { useJoinRoomMutation } from "@/lib/modules/game-sessions/hooks";
 import { clearPlayerLocalSession } from "@/lib/player-session";
+import { loadPlayerProfile, savePlayerProfile } from "@/lib/player-prefs";
 import { isAxiosError } from "axios";
 import { mutedText, primaryButtonClass } from "@/components/Game/GameUI";
 import {
@@ -42,6 +43,10 @@ const CreatePlayerForm = (props: {
    * room after being created — skipping the manual "enter room code" step.
    */
   joinGameCode?: string;
+  /** Called with the new player instead of going to the room-code step. */
+  onCreated?: (playerId: string) => void;
+  /** Replaces "Joining a private quiz" under the heading. */
+  subtitle?: ReactNode;
 }) => {
   const router = useRouter();
   const mutation = useCreatePlayerMutation();
@@ -53,6 +58,16 @@ const CreatePlayerForm = (props: {
       profile: props.data.image,
     },
   });
+
+  // Start from the name and avatar used last time (if the form is still empty).
+  useEffect(() => {
+    const saved = loadPlayerProfile();
+    if (saved && !props.data.name) {
+      props.setData({ name: sanitizeName(saved.name), image: saved.image });
+    }
+    // Once, on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     reset({
@@ -110,8 +125,14 @@ const CreatePlayerForm = (props: {
           if (typeof window !== "undefined") {
             window.localStorage.setItem("playerToken", res.accessToken);
           }
+          savePlayerProfile({ name: data.username, image: data.profile });
           if (props.joinGameCode) {
             autoJoin(props.joinGameCode);
+            return;
+          }
+          if (props.onCreated) {
+            window.localStorage.setItem("playerId", res.playerId);
+            props.onCreated(res.playerId);
             return;
           }
           router.push(`/player/joinRoom/${res.playerId}`);
@@ -130,14 +151,16 @@ const CreatePlayerForm = (props: {
     >
       <div className="flex items-center justify-between">
         <BackSquare href="/" />
-        {!props.joinGameCode && <Steps step={1} />}
+        {!props.joinGameCode && !props.onCreated && <Steps step={1} />}
       </div>
       <div>
         <h1 className="text-[32px] md:text-[44px] font-extrabold tracking-[-0.03em] leading-[1.06]">
           Create a custom profile
         </h1>
         <p className={clsx("mt-2.5 text-base", mutedText)}>
-          {props.joinGameCode ? (
+          {props.subtitle ? (
+            props.subtitle
+          ) : props.joinGameCode ? (
             <>
               Joining room{" "}
               <b className="font-bold tracking-[0.1em] text-lprimary dark:text-dprimary">

@@ -187,6 +187,11 @@ services:
       RATELIMIT: "OFF"
       # The landing-page reel streams from a CDN; empty keeps it offline.
       LANDING_VIDEO_URL: ${LANDING_VIDEO_URL:-}
+      # Instance options (docs/self-hosting.md), read at request time.
+      PRIVATE_BUZZ: ${PRIVATE_BUZZ:-}
+      TITLE: ${TITLE:-}
+      CONTACT_EMAIL: ${CONTACT_EMAIL:-}
+      DUELS: ${DUELS:-}
     ports:
       - "3000:3000"
     volumes:

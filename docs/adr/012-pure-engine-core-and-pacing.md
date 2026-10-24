@@ -43,8 +43,8 @@ had no clean place to go.
   `state-sync` revealed whether their stored answer was correct (and the
   points it moved). `you` is now masked until the reveal (invariant #18).
 - Self-paced play needs per-player question state the shared machine doesn't
-  model; the strategy is where its "who advances" rules will live, but the
-  state model will need extending. Not built.
+  model. _(2026-10-20: built outside the machine as "Play alone" tests over
+  REST, reusing the pure rules — ADR-016.)_
 - The shell itself (Lua races, recovery, ELO persistence) is still only
   exercised end to end, not by unit tests.
 

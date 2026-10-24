@@ -20,6 +20,7 @@ import { openTextHandler } from "./types/open-text";
 import { pollHandler } from "./types/poll";
 import { ratingHandler } from "./types/rating";
 import { trueFalseHandler } from "./types/true-false";
+import { typeAnswerHandler } from "./types/type-answer";
 import { wordCloudHandler } from "./types/word-cloud";
 
 /**
@@ -29,6 +30,7 @@ import { wordCloudHandler } from "./types/word-cloud";
 const HANDLERS: { [K in QuestionType]: QuestionTypeHandler<K> } = {
   multiple_choice: multipleChoiceHandler,
   true_false: trueFalseHandler,
+  type_answer: typeAnswerHandler,
   poll: pollHandler,
   word_cloud: wordCloudHandler,
   rating: ratingHandler,
@@ -72,7 +74,58 @@ export function scoreAnswer(
 }
 
 export function toPublicQuestion(question: LiveQuestion): PublicQuestion {
-  return handlerFor(question.type).toPublic(question);
+  // The sound is the same for every type, so it is added here rather than in
+  // each handler's `toPublic`.
+  return {
+    ...handlerFor(question.type).toPublic(question),
+    audio: publicAudio(question.audio),
+    // The picture: the encrypted copy (preloaded) and its key, when made.
+    ...(question.mediaClip && question.mediaKey
+      ? { media: question.mediaClip, mediaKey: question.mediaKey }
+      : {}),
+  };
+}
+
+/** What devices get: the encrypted clips (question key only), or the file. */
+function publicAudio(audio: LiveQuestion["audio"]): PublicQuestion["audio"] {
+  if (!audio) return null;
+  if (!audio.clipUrl || !audio.clipKey) {
+    return {
+      url: audio.url,
+      startMs: audio.startMs,
+      revealMs: audio.revealMs,
+      playOn: audio.playOn,
+    };
+  }
+  return {
+    url: audio.clipUrl,
+    startMs: 0,
+    revealMs: audio.revealClipUrl ? 0 : null,
+    playOn: audio.playOn,
+    encrypted: true,
+    key: audio.clipKey,
+    revealUrl: audio.revealClipUrl ?? null,
+  };
+}
+
+/** The encrypted picture to download ahead of a question (no key). */
+export function preloadImageUrls(question: LiveQuestion | undefined): string[] {
+  return question?.mediaClip && question.mediaKey ? [question.mediaClip] : [];
+}
+
+/** Whether a question has anything for devices to download ahead. */
+export function hasPreload(question: LiveQuestion | undefined): boolean {
+  return (
+    preloadUrls(question).length > 0 || preloadImageUrls(question).length > 0
+  );
+}
+
+/** The clips to download ahead of a question (no keys). */
+export function preloadUrls(question: LiveQuestion | undefined): string[] {
+  const a = question?.audio;
+  return a?.clipUrl
+    ? [a.clipUrl, ...(a.revealClipUrl ? [a.revealClipUrl] : [])]
+    : [];
 }
 
 /** `entries` oldest first — types that list answers show the newest first. */
@@ -142,6 +195,16 @@ export interface QuestionRecord {
   timeOut: number;
   config: unknown;
   options: LiveOption[];
+  audio?: string | null;
+  audioStartMs?: number | null;
+  audioRevealMs?: number | null;
+  audioPlayOn?: string | null;
+  audioClip?: string | null;
+  audioClipKey?: string | null;
+  audioRevealClip?: string | null;
+  audioRevealKey?: string | null;
+  mediaClip?: string | null;
+  mediaKey?: string | null;
 }
 
 type LiveOption = LiveQuestion["options"][number];
@@ -152,6 +215,13 @@ type LiveOption = LiveQuestion["options"][number];
  * no longer passes its type's checks. Callers skip nulls rather than failing
  * the whole game over one bad row.
  */
+const AUDIO_PLAY_ON = ["host", "players", "both", "off"] as const;
+function audioPlayOn(
+  raw: string | null | undefined,
+): "quiz" | (typeof AUDIO_PLAY_ON)[number] {
+  return AUDIO_PLAY_ON.find((v) => v === raw) ?? "quiz";
+}
+
 export function toLiveQuestion(row: QuestionRecord): LiveQuestion | null {
   if (!isQuestionType(row.type)) return null;
   try {
@@ -168,6 +238,8 @@ export function toLiveQuestion(row: QuestionRecord): LiveQuestion | null {
       title: row.title,
       media: row.media,
       mediaType: row.mediaType,
+      mediaClip: row.mediaClip ?? null,
+      mediaKey: row.mediaKey ?? null,
       timeOut: row.timeOut,
       options: options.map((o) => ({
         id: o.id,
@@ -175,6 +247,18 @@ export function toLiveQuestion(row: QuestionRecord): LiveQuestion | null {
         isCorrect: o.isCorrect,
       })),
       config: definition.config,
+      audio: row.audio
+        ? {
+            url: row.audio,
+            startMs: row.audioStartMs ?? 0,
+            revealMs: row.audioRevealMs ?? null,
+            playOn: audioPlayOn(row.audioPlayOn),
+            clipUrl: row.audioClip ?? null,
+            clipKey: row.audioClipKey ?? null,
+            revealClipUrl: row.audioRevealClip ?? null,
+            revealKey: row.audioRevealKey ?? null,
+          }
+        : null,
     };
   } catch (err) {
     if (err instanceof QuestionDefinitionError) return null;

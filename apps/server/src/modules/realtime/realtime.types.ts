@@ -35,6 +35,8 @@ export interface SocketData {
    * the presence signal that the host is sitting on the invite page.
    */
   duelInviteCode?: string;
+  /** Player sockets: when the device last sent a `heartbeat` (ms). */
+  lastBeatAt?: number;
 }
 
 export type TypedServer = import("socket.io").Server<
