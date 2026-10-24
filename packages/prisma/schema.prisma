@@ -114,6 +114,8 @@ model Quiz {
   thumbnail    String?
   /// Public quizzes feed the duel-mode question pool.
   isPublic     Boolean       @default(false)
+  /// Quiz settings (`quizSettingsSchema` in @buzrr/contract), e.g. moderated mode.
+  settings     Json          @default("{}")
   gameResults  GameResult[]
   gameSessions GameSession[]
   questions    Question[]
@@ -139,7 +141,29 @@ model Question {
   timeOut          Int                @default(15)
   media            String?
   mediaType        String?
+  /// Optional sound (MP3) played on the host screen: from `audioStartMs` for
+  /// the question's time while it is open, from `audioRevealMs` at the reveal.
+  audio            String?
+  audioStartMs     Int?
+  audioRevealMs    Int?
+  /// Where the sound plays: null = like the quiz's sound setting, otherwise
+  /// "host" | "players" | "both" | "off".
+  audioPlayOn      String?
+  /// What devices actually load: the two played windows cut from `audio`
+  /// (mono, 96 kbit/s), each AES-256-GCM encrypted with its own key. The
+  /// question key goes out with `question-start`, the reveal key with the
+  /// reveal, so a clip can be preloaded early without being playable early.
+  audioClip        String?
+  audioClipKey     String?
+  audioRevealClip  String?
+  audioRevealKey   String?
+  /// The picture as devices load it ahead of time: AES-256-GCM encrypted,
+  /// the key goes out with `question-start` (images only).
+  mediaClip        String?
+  mediaKey         String?
   order            Int                @default(1)
+  /// Kept in the quiz, but skipped in games, question counts and scoring.
+  disabled         Boolean            @default(false)
   /// Per-question moderation gate for the duel pool; the quiz's `isPublic`
   /// flag alone no longer decides eligibility.
   moderationStatus ModerationStatus   @default(draft)
@@ -243,6 +267,10 @@ model GameSession {
   creatorId String
   gameCode  String   @unique
   isPlaying Boolean  @default(false)
+  /// This game's settings (`quizSettingsSchema`), chosen by the host when
+  /// opening the room; null = the quiz's. Read through `roomSettings`
+  /// (apps/server/src/common/game-look).
+  settings  Json?
   createdAt DateTime @default(now())
   creator   User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)

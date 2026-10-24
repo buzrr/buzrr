@@ -1,4 +1,5 @@
 "use client";
+import QuestionPicture from "@/components/Game/QuestionPicture";
 import clsx from "clsx";
 import Image from "next/image";
 import type { ReactNode } from "react";
@@ -11,7 +12,12 @@ import {
   LuTrophy,
   LuX,
 } from "react-icons/lu";
-import type { PublicQuestion, QuestionAnswer } from "@buzrr/contract";
+import {
+  isScoredType,
+  type PublicQuestion,
+  type QuestionAnswer,
+} from "@buzrr/contract";
+import { scoresStepPending } from "@/lib/moderation";
 import { DEFAULT_AVATAR } from "@/constants";
 import { useAppSelector } from "@/state/hooks";
 import type { Standing } from "@/state/game/gameSlice";
@@ -247,6 +253,14 @@ const QuestionAndResult = (params: {
   const standing = useAppSelector((state) =>
     state.game.mode === "classic" ? state.game.standing : null,
   );
+  // Moderated: a player learns their new place with the host's scores step
+  // (or the final standings), not with the answer.
+  const moderation = useAppSelector((state) => state.game.moderation);
+  const liveQuestion = useAppSelector((state) => state.game.question);
+  const placeLater =
+    moderation !== null &&
+    (liveQuestion ? isScoredType(liveQuestion.type) : true) &&
+    (qIndex >= qCount - 1 || scoresStepPending(moderation));
   // Answers submitted while offline would be rejected anyway — lock the UI.
   const offline = connection !== "connected";
   // Display-only countdown against the server deadline; the reveal is pushed
@@ -366,7 +380,7 @@ const QuestionAndResult = (params: {
               </div>
             </div>
           )}
-          {!isQuestion && you && (
+          {!isQuestion && you && !placeLater && (
             <div className="hidden md:grid grid-cols-2 gap-3">
               <StatTile
                 value={you.rank ? ordinal(you.rank) : "—"}
@@ -390,8 +404,9 @@ const QuestionAndResult = (params: {
           >
             {params.question?.mediaType === "image" &&
               params.question.media && (
-                <Image
-                  src={params.question.media}
+                <QuestionPicture
+                  media={params.question.media}
+                  mediaKey={params.question.mediaKey}
                   className="mb-4 md:mb-5 mx-auto max-h-[28dvh] w-auto rounded-2xl"
                   alt="Question image"
                   height={320}
@@ -458,18 +473,35 @@ const QuestionAndResult = (params: {
             <h2 className="text-[26px] md:text-[40px] font-extrabold tracking-[-0.02em]">
               {status.heading}
             </h2>
-            <span
-              className={clsx(
-                "text-lg md:text-[26px] font-bold animate-fade-up",
-                status.accent,
-              )}
-            >
-              {params.status === "timesout"
-                ? "No answer this round"
-                : params.status === "received"
-                  ? "Not scored — thanks for answering"
-                  : `+${params.points ?? 0} points`}
-            </span>
+            {/* Moderated with standings to come: the points come with them
+                (the scores step's own row, or the final standings). */}
+            {!(
+              placeLater &&
+              (params.status === "correct" || params.status === "incorrect")
+            ) && (
+              <span
+                className={clsx(
+                  "text-lg md:text-[26px] font-bold animate-fade-up",
+                  status.accent,
+                )}
+              >
+                {params.status === "timesout"
+                  ? "No answer this round"
+                  : params.status === "received"
+                    ? "Not scored — thanks for answering"
+                    : `+${params.points ?? 0} points`}
+              </span>
+            )}
+            {params.status !== "timesout" && you?.timeTakenMs != null && (
+              <span className={clsx("text-sm font-semibold", mutedText)}>
+                You answered within{" "}
+                {(you.timeTakenMs / 1000).toLocaleString("en", {
+                  maximumFractionDigits: 1,
+                  minimumFractionDigits: 1,
+                })}{" "}
+                seconds
+              </span>
+            )}
             <div className="mt-3 md:mt-[22px] flex flex-col gap-3 md:gap-4 w-full max-w-[420px] animate-fade-up [animation-delay:150ms]">
               <AnswerRow
                 label="Your answer"
@@ -490,7 +522,7 @@ const QuestionAndResult = (params: {
                   </AnswerRow>
                 ))}
             </div>
-            {standing && standing.qIndex === qIndex && (
+            {standing && standing.qIndex === qIndex && !placeLater && (
               <StandingCard standing={standing} playerCount={players.length} />
             )}
             <div className="mt-4 md:mt-[26px]">

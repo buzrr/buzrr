@@ -7,11 +7,16 @@ import type {
   GamePhase,
   LiveSummaryPayload,
   LeaderboardEntry,
+  ModerationSettings,
+  PhaseChangePayload,
+  PreloadAllPayload,
+  PreloadPayload,
   PublicQuestion,
   QuestionEndPayload,
   QuestionStartPayload,
   StateSyncPayload,
 } from "@buzrr/contract";
+import { REACTION_WINDOW_MS } from "@buzrr/contract";
 import type { ConnectionStatus } from "@/types/socket";
 
 /**
@@ -41,6 +46,10 @@ export interface GameLiveState {
   liveSummary: LiveSummaryPayload | null;
   reveal: QuestionEndPayload | null;
   leaderboard: LeaderboardEntry[];
+  /** Players: how many are on the board when `leaderboard` is only its top. */
+  leaderboardTotal: number | null;
+  /** Final leaderboard: when (ms after it came) the host's podium stands. */
+  finalRevealInMs: number | null;
   isFinalLeaderboard: boolean;
   players: {
     id: string;
@@ -64,6 +73,30 @@ export interface GameLiveState {
   category: DuelCategoryRef;
   /** Duels only: daily streak per signed-in playerId, from game-over. */
   streaks: GameOverPayload["streaks"] | null;
+  /** Moderated games: the quiz's moderation settings; null otherwise. */
+  moderation: ModerationSettings | null;
+  /** The latest preload hint (next question's sound clips). */
+  preload: PreloadPayload | null;
+  /** Countdown over, devices still downloading the question's sound. */
+  waitingFor: number;
+  /** How many are in the room (server's `reaction-limit`); 0 = not told. */
+  roomSize: number;
+  /**
+   * The reaction budget (server's `reaction-limit`): `limit` per `windowMs`,
+   * 0 = no limit (the final top three); `resetSeq` counts fresh starts. Kept
+   * here, not in the bar, so a bar mounted later still knows it.
+   */
+  reactionBudget: { limit: number; windowMs: number; resetSeq: number };
+  /** Everything to load ahead in the lobby (`preload-all`). */
+  lobbyAssets: PreloadAllPayload | null;
+  /** While waiting: devices reporting the download / done, and whether the host chose to wait for all. */
+  downloadDevices: number;
+  downloadsDone: number;
+  waitAll: boolean;
+  /** Host, moderated "closed": how the room answered (answer still hidden). */
+  closedSummary: QuestionEndPayload | null;
+  /** Player: how long their answer to the open question took (from the ack). */
+  myAnswerMs: number | null;
 }
 
 export interface Standing {
@@ -101,6 +134,8 @@ const initialState: GameLiveState = {
   liveSummary: null,
   reveal: null,
   leaderboard: [],
+  leaderboardTotal: null,
+  finalRevealInMs: null,
   isFinalLeaderboard: false,
   players: [],
   you: null,
@@ -111,6 +146,17 @@ const initialState: GameLiveState = {
   rated: false,
   category: null,
   streaks: null,
+  moderation: null,
+  preload: null,
+  myAnswerMs: null,
+  waitingFor: 0,
+  roomSize: 0,
+  reactionBudget: { limit: 5, windowMs: REACTION_WINDOW_MS, resetSeq: 0 },
+  lobbyAssets: null,
+  downloadDevices: 0,
+  downloadsDone: 0,
+  waitAll: false,
+  closedSummary: null,
 };
 
 /**
@@ -119,15 +165,24 @@ const initialState: GameLiveState = {
  * ended — so a larger number is always a later moment.
  */
 export function gameProgress(phase: GamePhase, qIndex: number): number {
+  // Per question: ready → starting (countdown) → question → closed → reveal →
+  // scores; unmoderated games skip ready/closed/scores.
+  const base = 1 + qIndex * 6;
   switch (phase) {
     case "lobby":
       return 0;
+    case "ready":
+      return base;
     case "starting":
-      return 1;
+      return base + 1;
     case "question":
-      return 2 + qIndex * 2;
+      return base + 2;
+    case "closed":
+      return base + 3;
     case "reveal":
-      return 3 + qIndex * 2;
+      return base + 4;
+    case "scores":
+      return base + 5;
     case "final":
       return Number.MAX_SAFE_INTEGER - 1;
     case "ended":
@@ -170,16 +225,22 @@ const gameSlice = createSlice({
       }
       state.reveal = s.reveal ?? null;
       state.leaderboard = s.leaderboard ?? [];
+      state.leaderboardTotal = s.leaderboardTotal ?? null;
       state.isFinalLeaderboard = s.phase === "final" || s.phase === "ended";
       state.players = s.players;
       state.you = s.you ?? null;
-      // Mid-question the server sends the standing as of the last reveal —
-      // none yet on the first question.
-      if (s.you && (s.phase === "reveal" || s.phase === "final")) {
+      state.moderation = s.moderation ?? null;
+      state.closedSummary = s.closedSummary ?? null;
+      // Mid-question (and in moderated "closed") the server sends the
+      // standing as of the last reveal — none yet on the first question.
+      if (
+        s.you &&
+        (s.phase === "reveal" || s.phase === "scores" || s.phase === "final")
+      ) {
         state.standing = nextStanding(state.standing, s.qIndex, s.you);
       } else if (
         s.you &&
-        s.phase === "question" &&
+        (s.phase === "question" || s.phase === "closed") &&
         s.qIndex > 0 &&
         // `answer-result` lands just ahead of the reveal, so a late snapshot
         // of the same question must not roll that standing back.
@@ -188,16 +249,96 @@ const gameSlice = createSlice({
         state.standing = nextStanding(state.standing, s.qIndex - 1, s.you);
       }
     },
-    gameStarted: (state, action: PayloadAction<{ remainingMs: number }>) => {
-      state.phase = "starting";
+    closedSummaryReceived: (
+      state,
+      action: PayloadAction<QuestionEndPayload>,
+    ) => {
+      if (action.payload.index === state.qIndex) {
+        state.closedSummary = action.payload;
+      }
+    },
+    gameStarted: (
+      state,
+      action: PayloadAction<{
+        remainingMs: number;
+        moderation?: ModerationSettings;
+      }>,
+    ) => {
+      // A moderated game with a get-ready slide opens on it (the server's
+      // `phase-change: ready` follows) — never a countdown in between.
+      const mod = action.payload.moderation;
+      state.phase =
+        mod?.enabled && mod.confirmNextQuestion ? "ready" : "starting";
+      state.qIndex = 0;
       // Display-only: the server opens question 1 on its own timer.
       state.deadline = Date.now() + action.payload.remainingMs;
       state.countdownMs = action.payload.remainingMs;
       state.gameOver = false;
+      state.moderation = action.payload.moderation ?? null;
+    },
+    lobbyAssetsKnown: (state, action: PayloadAction<PreloadAllPayload>) => {
+      state.lobbyAssets = action.payload;
+    },
+    roomSizeKnown: (state, action: PayloadAction<number>) => {
+      state.roomSize = action.payload;
+    },
+    reactionBudgetKnown: (
+      state,
+      action: PayloadAction<{
+        limit: number;
+        windowMs: number;
+        reset?: boolean;
+        players?: number;
+      }>,
+    ) => {
+      const p = action.payload;
+      state.reactionBudget = {
+        limit: Math.max(0, p.limit),
+        windowMs: p.windowMs,
+        resetSeq: state.reactionBudget.resetSeq + (p.reset ? 1 : 0),
+      };
+      if (typeof p.players === "number") state.roomSize = p.players;
+    },
+    preloadHint: (state, action: PayloadAction<PreloadPayload>) => {
+      state.preload = action.payload;
+    },
+    /** Moderated games: ready / starting / closed / scores. */
+    phaseChange: (state, action: PayloadAction<PhaseChangePayload>) => {
+      const p = action.payload;
+      if (
+        gameProgress(p.phase, p.qIndex) <
+        gameProgress(
+          state.phase === "idle" ? "lobby" : state.phase,
+          state.qIndex,
+        )
+      ) {
+        return;
+      }
+      state.phase = p.phase;
+      state.qIndex = p.qIndex;
+      if (p.phase === "ready" || p.phase === "starting") {
+        state.question = null;
+        state.reveal = null;
+        state.answeredCount = 0;
+        state.liveSummary = null;
+      }
+      state.waitingFor = p.waitingFor ?? 0;
+      state.downloadDevices = p.downloadDevices ?? 0;
+      state.downloadsDone = p.downloadsDone ?? 0;
+      state.waitAll = p.waitAll ?? false;
+      if (p.phase === "starting") {
+        const ms = p.remainingMs ?? 0;
+        state.deadline = Date.now() + ms;
+        state.countdownMs = ms;
+      } else {
+        state.deadline = 0;
+        state.countdownMs = 0;
+      }
     },
     questionStart: (state, action: PayloadAction<QuestionStartPayload>) => {
       const q = action.payload;
       state.phase = "question";
+      state.closedSummary = null;
       state.qIndex = q.index;
       state.qCount = q.qCount;
       state.question = q.question;
@@ -206,6 +347,10 @@ const gameSlice = createSlice({
       state.liveSummary = null;
       state.reveal = null;
       state.you = null;
+      state.myAnswerMs = null;
+    },
+    answerTimed: (state, action: PayloadAction<number>) => {
+      state.myAnswerMs = action.payload;
     },
     questionEnd: (state, action: PayloadAction<QuestionEndPayload>) => {
       state.phase = "reveal";
@@ -240,10 +385,14 @@ const gameSlice = createSlice({
       state,
       action: PayloadAction<{
         entries: LeaderboardEntry[];
+        total?: number;
         isFinal: boolean;
+        revealInMs?: number;
       }>,
     ) => {
       state.leaderboard = action.payload.entries;
+      state.leaderboardTotal = action.payload.total ?? null;
+      state.finalRevealInMs = action.payload.revealInMs ?? null;
       state.isFinalLeaderboard = action.payload.isFinal;
       if (action.payload.isFinal) {
         state.phase = "final";
@@ -261,6 +410,7 @@ const gameSlice = createSlice({
     ) => {
       state.phase = "ended";
       state.leaderboard = action.payload.entries;
+      state.leaderboardTotal = null;
       state.isFinalLeaderboard = true;
       state.gameOver = true;
       state.eloChanges = action.payload.eloChanges ?? null;
@@ -298,9 +448,16 @@ const gameSlice = createSlice({
 export const {
   applySync,
   gameStarted,
+  phaseChange,
+  preloadHint,
+  roomSizeKnown,
+  reactionBudgetKnown,
+  lobbyAssetsKnown,
+  closedSummaryReceived,
   questionStart,
   questionEnd,
   answerResult,
+  answerTimed,
   answerCount,
   liveSummary,
   leaderboardReceived,

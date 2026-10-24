@@ -56,6 +56,12 @@ export class QuizzesController {
     return this.quizzes.importQuestions(user, body);
   }
 
+  /** A copy of the quiz with all its questions (not its past games). */
+  @Post(":id/duplicate")
+  duplicate(@CurrentAccountUser() user: AuthUser, @Param("id") id: string) {
+    return this.quizzes.duplicate(user, id);
+  }
+
   @Patch(":id")
   update(
     @CurrentAccountUser() user: AuthUser,

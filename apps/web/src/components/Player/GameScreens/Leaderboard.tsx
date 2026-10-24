@@ -2,6 +2,7 @@
 import clsx from "clsx";
 import Link from "next/link";
 import ConfettiBurst from "@/components/ConfettiBurst";
+import { clearFinalResult } from "@/lib/final-result";
 import {
   StatTile,
   labelClass,
@@ -15,6 +16,14 @@ interface Stats {
   playerId: string;
   position: number | null;
   score: number;
+  quizTitle?: string;
+  /** Players in the final standings. */
+  players?: number;
+  /**
+   * Not yet: the host's board re-sorts and fills the podium first
+   * (moderated games) — the place shows after.
+   */
+  held?: boolean;
 }
 
 const PLACE_COLOR: Record<number, string> = {
@@ -24,9 +33,31 @@ const PLACE_COLOR: Record<number, string> = {
 };
 
 const Leaderboard = (params: Stats) => {
+  const held = params.held ?? false;
   const onPodium =
     params.position !== null && params.position >= 1 && params.position <= 3;
   const ringColor = onPodium ? PLACE_COLOR[params.position!] : undefined;
+
+  if (held) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[80dvh] px-4 text-dark dark:text-white">
+        <div
+          className={clsx(
+            panelClass,
+            "w-full max-w-md px-6 sm:px-10 py-12 text-center animate-fade-up",
+          )}
+        >
+          <span className={labelClass}>Final results</span>
+          <p className="mt-5 text-2xl font-extrabold animate-pulse">
+            Final results coming up
+          </p>
+          <p className={clsx("mt-3 text-sm", mutedText)}>
+            Watch the big screen!
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -38,7 +69,11 @@ const Leaderboard = (params: Stats) => {
             "w-full max-w-md px-6 sm:px-10 py-10 text-center animate-fade-up",
           )}
         >
-          <span className={labelClass}>Final results</span>
+          <span className={labelClass}>
+            {params.quizTitle
+              ? `${params.quizTitle} · final results`
+              : "Final results"}
+          </span>
           <div
             className="mx-auto mt-5 size-28 rounded-full flex items-center justify-center text-4xl font-extrabold tracking-[-0.02em] animate-pop-in [animation-delay:200ms] bg-lprimary/8 dark:bg-white/5 border-[5px]"
             style={{ borderColor: ringColor ?? "transparent" }}
@@ -46,10 +81,14 @@ const Leaderboard = (params: Stats) => {
             {params.position ? ordinal(params.position) : "🎉"}
           </div>
           <h1 className="mt-6 text-[28px] md:text-[34px] font-extrabold tracking-[-0.02em] leading-[1.1]">
-            Quiz completed!
+            Thank you for playing!
           </h1>
           <p className={clsx("mt-2 text-[15px]", mutedText)}>
-            Great game — here&apos;s how you did.
+            {params.position
+              ? params.players
+                ? `You finished ${ordinal(params.position)} of ${params.players}.`
+                : `You finished ${ordinal(params.position)}.`
+              : "Great game — here's how you did."}
           </p>
 
           <div className="mt-8 grid grid-cols-2 gap-3 text-left">
@@ -66,6 +105,7 @@ const Leaderboard = (params: Stats) => {
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
             <Link
               href={`/player/joinRoom/${params.playerId}`}
+              onClick={clearFinalResult}
               className={clsx(primaryButtonClass, "w-full px-5")}
             >
               Join another game
