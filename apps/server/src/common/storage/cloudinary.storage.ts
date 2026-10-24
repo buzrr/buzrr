@@ -38,6 +38,14 @@ export class CloudinaryStorage extends MediaStorage {
     });
   }
 
+  async read(url: string): Promise<Buffer | null> {
+    if (!isCloudinaryUrl(url)) return null;
+    const res = await fetch(url, { signal: AbortSignal.timeout(30_000) }).catch(
+      () => null,
+    );
+    return res?.ok ? Buffer.from(await res.arrayBuffer()) : null;
+  }
+
   async remove(url: string): Promise<void> {
     if (!isCloudinaryUrl(url)) return;
     const publicId = getPublicIdFromUrl(url);
@@ -47,10 +55,17 @@ export class CloudinaryStorage extends MediaStorage {
     });
   }
 
-  async upload(buffer: Buffer, _meta?: UploadMeta): Promise<StoredMedia> {
+  async upload(buffer: Buffer, meta?: UploadMeta): Promise<StoredMedia> {
+    // Cloudinary files audio under its "video" resource type.
+    const options =
+      meta?.kind === "audio"
+        ? { resource_type: "video" as const }
+        : meta?.kind === "encrypted"
+          ? { resource_type: "raw" as const }
+          : {};
     return new Promise((resolve, reject) => {
       cloudinary.uploader
-        .upload_stream({}, (error, result) => {
+        .upload_stream(options, (error, result) => {
           if (error) {
             reject(error);
             return;

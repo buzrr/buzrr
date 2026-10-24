@@ -13,7 +13,8 @@ import type { PlanId, PlanLimits } from "./plans";
 /** Either the root client or an interactive-transaction client. */
 type Db = Prisma.TransactionClient;
 
-export type PlanLimitKind = "quizzes" | "ai_tokens";
+/** "feature": a Pro-only feature (own audio skins). */
+export type PlanLimitKind = "quizzes" | "ai_tokens" | "feature";
 
 export type Entitlements = {
   plan: PlanId;
@@ -86,12 +87,42 @@ function hashReleaseToken(token: string): string {
  * `subscriptions` table on every call — never from the JWT, which lives 7 days
  * (same reasoning as `RolesGuard`, invariant #13).
  */
+/** A positive integer from the environment, else `fallback`. */
+function envCount(name: string, fallback: number): number {
+  const n = Number(process.env[name]);
+  return Number.isInteger(n) && n > 0 ? n : fallback;
+}
+
+/**
+ * Room size per plan, overridable per instance: `MAX_PLAYERS_FREE`,
+ * `MAX_PLAYERS_PRO`, and — with billing off, where every account counts as
+ * Pro — `MAX_PLAYERS_NOBILLING` (defaults: the plan limits).
+ */
+function roomSizeFor(plan: PlanId, billingEnabled: boolean): number {
+  if (!billingEnabled) {
+    return envCount("MAX_PLAYERS_NOBILLING", PLAN_LIMITS.pro.maxPlayers);
+  }
+  return plan === "free"
+    ? envCount("MAX_PLAYERS_FREE", PLAN_LIMITS.free.maxPlayers)
+    : envCount("MAX_PLAYERS_PRO", PLAN_LIMITS.pro.maxPlayers);
+}
+
 @Injectable()
 export class EntitlementsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly billing: BillingConfig,
   ) {}
+
+  /**
+   * Own audio skins are a Pro feature (every account has them without
+   * billing). Refuses with a PLAN_LIMIT otherwise.
+   */
+  async assertPro(userId: string, feature: string): Promise<void> {
+    if ((await this.resolvePlan(userId)) !== "pro") {
+      throw planLimitError("feature", `${feature} is a Pro feature`);
+    }
+  }
 
   async resolvePlan(userId: string, db: Db = this.prisma.db): Promise<PlanId> {
     if (!this.billing.enabled) return "pro";
@@ -173,6 +204,7 @@ export class EntitlementsService {
   /**
    * Room-size cap for a host. `hostSizeLimit` survives as a manual override,
    * so an account an admin raised by hand never loses capacity on Free.
+   * The plan's size can be set per instance (see `roomSizeFor`).
    */
   async maxPlayersFor(
     userId: string,
@@ -185,7 +217,10 @@ export class EntitlementsService {
         select: { hostSizeLimit: true },
       }),
     ]);
-    return Math.max(PLAN_LIMITS[plan].maxPlayers, user?.hostSizeLimit ?? 0);
+    return Math.max(
+      roomSizeFor(plan, this.billing.enabled),
+      user?.hostSizeLimit ?? 0,
+    );
   }
 
   /**

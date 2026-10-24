@@ -1,17 +1,27 @@
 "use client";
+import { useHostHotkeys } from "@/hooks/useHostHotkeys";
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+/** How long the game screen waits for a "start" before returning to the lobby. */
+const LOBBY_BOUNCE_MS = 5000;
 import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import { setPlayers } from "@/state/admin/playersSlice";
 import type { Option } from "@/types/db";
 import type { PlayerPayload } from "@buzrr/contract";
 import { useAdminSocket } from "@/hooks/useAdminSocket";
 import ConnectionBanner from "@/components/ConnectionBanner";
-import { GameTopBar } from "@/components/Game/GameUI";
-import EndQuizButton from "@/components/Admin/EndQuizButton";
+import { Progress } from "@/components/Game/GameUI";
+import HostHeader, { HostControls, headerPillClass } from "./HostHeader";
 import GetReady from "@/components/Game/GetReady";
 import QuestionScreen from "./QuestionScreen";
 import QuesResult from "./QuesResult";
 import LeaderBoard from "./Leaderboard";
+import { ClosedSlide, ReadySlide } from "@/components/Game/ModeratedSteps";
+import { closedNextLabel } from "@/lib/moderation";
+import { isScoredType, revealHasPoint } from "@buzrr/contract";
+import { ReactionOverlay } from "@/components/Game/Flyers";
+import { GameSounds, LiveSounds, SoundToggle } from "@/lib/sound/director";
 
 interface QuizQuestionItem {
   title?: string;
@@ -24,6 +34,7 @@ interface QuizQuestionItem {
 interface QuizQuestion {
   id?: string;
   title?: string;
+  settings?: unknown;
   questions?: QuizQuestionItem[];
 }
 
@@ -38,10 +49,28 @@ const GameLobby = (params: {
   players: PlayerPayload[];
   quizQuestions: QuizQuestion;
 }) => {
+  // Space: the next button on screen; Escape: skip / go on.
+  useHostHotkeys();
   const dispatch = useAppDispatch();
   const phase = useAppSelector((state) => state.game.phase);
+  const router = useRouter();
+  // The game screen of a room that never started (the start got lost —
+  // e.g. a server restart): after a grace period for the start to land, the
+  // host goes back to the waiting room and its Start button.
+  useEffect(() => {
+    if (phase !== "lobby") return;
+    const tm = setTimeout(
+      () => router.replace(`/admin/play/${params.roomId}`),
+      LOBBY_BOUNCE_MS,
+    );
+    return () => clearTimeout(tm);
+  }, [phase, router, params.roomId]);
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const qCount = useAppSelector((state) => state.game.qCount);
+  const moderation = useAppSelector((state) => state.game.moderation);
+  const closedSummary = useAppSelector((state) => state.game.closedSummary);
+  const question = useAppSelector((state) => state.game.question);
+  const roster = useAppSelector((state) => state.game.players);
 
   useEffect(() => {
     dispatch(setPlayers(params.players));
@@ -56,50 +85,144 @@ const GameLobby = (params: {
   // yet, so the button must still end (and save); only "ended" is a plain exit.
   const showLeaderboard = phase === "final" || phase === "ended";
   const alreadyEnded = phase === "ended";
-  const inGame = phase === "question" || phase === "reveal" || showLeaderboard;
+  const inGame =
+    phase === "question" ||
+    phase === "reveal" ||
+    phase === "ready" ||
+    phase === "closed" ||
+    phase === "scores" ||
+    showLeaderboard;
   const title = params.quizQuestions?.title ?? "Quiz";
 
   if (!socket) return null;
 
-  if (!inGame) {
-    // idle / lobby / starting — the pre-question countdown
-    return (
-      <>
-        <ConnectionBanner />
-        <GetReady title={title} />
-      </>
-    );
-  }
+  // Fewer than two players: a try-out — "End" goes back to editing the quiz.
+  const endRedirect =
+    roster.length < 2 && params.quizQuestions?.id
+      ? `/admin/quiz/${params.quizQuestions.id}`
+      : undefined;
+  const codePill = (
+    <span title="Game code" className={`shrink-0 ${headerPillClass}`}>
+      <span className="font-medium opacity-60">Code</span>
+      <b className="font-extrabold tracking-[0.1em] text-lprimary dark:text-dprimary">
+        {params.gameCode}
+      </b>
+    </span>
+  );
 
+  // One sound provider for every phase: remounting it between the countdown
+  // and the question screens restarted (or lost) the music.
   return (
-    <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 pb-4 md:pb-0 md:h-[calc(100dvh-10rem)] text-dark dark:text-white">
-      <ConnectionBanner />
-      <GameTopBar
-        title={title}
-        qIndex={qIndex}
-        qCount={qCount}
-        final={showLeaderboard}
-        gameCode={phase === "reveal" ? params.gameCode : undefined}
-        right={
-          <EndQuizButton
-            inline
+    <GameSounds role="host" quizSettings={params.quizQuestions?.settings}>
+      <LiveSounds socket={socket} />
+      {!inGame ? (
+        // idle / lobby / starting — the pre-question countdown
+        <>
+          <SoundToggle />
+          <ConnectionBanner />
+          <ReactionOverlay
+            socket={socket}
+            nameOf={(id) => roster.find((p) => p.id === id)?.name}
+          />
+          <GetReady
+            title={title}
+            onSkip={
+              roster.some((p) => p.connected)
+                ? undefined
+                : () => socket.emit("host-next")
+            }
+            onDownloads={(wait) => socket.emit("downloads-decision", { wait })}
+          />
+        </>
+      ) : (
+        // No site footer here: the game uses the full height (the admin
+        // layout's footer padding is taken back with -mb-12).
+        <div className="w-full flex flex-col px-4 sm:px-6 lg:px-8 -mb-12 min-h-[100dvh] md:min-h-0 md:h-[100dvh] text-dark dark:text-white">
+          <ConnectionBanner />
+          <ReactionOverlay
+            socket={socket}
+            nameOf={(id) => roster.find((p) => p.id === id)?.name}
+          />
+          <HostHeader
+            title={title}
             roomId={params.roomId}
             alreadyEnded={alreadyEnded}
+            endRedirect={endRedirect}
+            controlsBelowOnPhone
+            middle={
+              <>
+                {(phase === "reveal" ||
+                  phase === "scores" ||
+                  phase === "ready") && (
+                  <span className="hidden md:inline-flex">{codePill}</span>
+                )}
+                {qCount > 0 && (
+                  <Progress
+                    qIndex={qIndex}
+                    qCount={qCount}
+                    final={showLeaderboard}
+                    compact
+                  />
+                )}
+              </>
+            }
           />
-        }
-      />
-      {phase === "question" ? (
-        <QuestionScreen socket={socket} gameCode={params.gameCode} />
-      ) : phase === "reveal" ? (
-        <QuesResult socket={socket} roomId={params.roomId} />
-      ) : (
-        <LeaderBoard
-          roomId={params.roomId}
-          quizTitle={title}
-          alreadyEnded={alreadyEnded}
-        />
+          {phase === "question" ? (
+            <QuestionScreen socket={socket} gameCode={params.gameCode} />
+          ) : phase === "ready" ? (
+            <ReadySlide
+              key={`ready-${qIndex}`}
+              onNext={() => socket.emit("host-next")}
+            />
+          ) : phase === "closed" && closedSummary ? (
+            // How the room answered; "Show answer" then marks the right one.
+            <QuesResult
+              key={`answer-${qIndex}`}
+              socket={socket}
+              roomId={params.roomId}
+            />
+          ) : phase === "closed" ? (
+            <ClosedSlide
+              key={`closed-${qIndex}`}
+              onNext={() => socket.emit("host-next")}
+              nextLabel={closedNextLabel(
+                moderation,
+                qIndex,
+                qCount,
+                question ? isScoredType(question.type) : true,
+                question ? revealHasPoint(question) : true,
+              )}
+            />
+          ) : phase === "reveal" || phase === "scores" ? (
+            // "Show answer" keeps the tally on screen (same key as "closed"),
+            // so only the right answer animates; "show scores" keeps it too
+            // and slides the standings in beside it.
+            <QuesResult
+              key={`answer-${qIndex}`}
+              socket={socket}
+              roomId={params.roomId}
+            />
+          ) : (
+            <LeaderBoard
+              roomId={params.roomId}
+              quizTitle={title}
+              alreadyEnded={alreadyEnded}
+              quizId={params.quizQuestions?.id}
+            />
+          )}
+          {/* Phones: the room goes to the game; code, Live and "End" wait
+              at the very end of the page. */}
+          <div className="md:hidden flex flex-wrap items-center justify-center gap-2 pt-4 pb-5">
+            {codePill}
+            <HostControls
+              roomId={params.roomId}
+              endRedirect={endRedirect}
+              alreadyEnded={alreadyEnded}
+            />
+          </div>
+        </div>
       )}
-    </div>
+    </GameSounds>
   );
 };
 

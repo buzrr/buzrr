@@ -7,6 +7,7 @@ import {
   LuEllipsisVertical,
   LuExternalLink,
   LuLayers,
+  LuCopy,
   LuPencil,
   LuTrash2,
   LuUsers,
@@ -40,12 +41,14 @@ function QuizMenu({
   view,
   onOpenChange,
   onEdit,
+  onDuplicate,
   onDelete,
 }: {
   quizHref: string;
   view: "grid" | "list";
   onOpenChange: (open: boolean) => void;
   onEdit: () => void;
+  onDuplicate: () => void;
   onDelete: () => void;
 }) {
   const [open, setOpenState] = useState(false);
@@ -136,6 +139,21 @@ function QuizMenu({
             <LuPencil />
             Edit
           </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={clsx(
+              itemClass,
+              "text-dark dark:text-white hover:bg-lprimary/10 dark:hover:bg-white/5 [&>svg]:text-off-dark dark:[&>svg]:text-[#9a9aa2]",
+            )}
+            onClick={() => {
+              setOpen(false);
+              onDuplicate();
+            }}
+          >
+            <LuCopy />
+            Duplicate
+          </button>
           <div className="h-px mx-2 my-0.5 bg-lprimary/15 dark:bg-white/10" />
           <button
             type="button"
@@ -162,11 +180,13 @@ export default function QuizCard({
   quiz,
   view,
   onEdit,
+  onDuplicate,
   onDelete,
 }: {
   quiz: QuizListItem;
   view: "grid" | "list";
   onEdit: () => void;
+  onDuplicate: () => void;
   onDelete: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -244,6 +264,7 @@ export default function QuizCard({
         view={view}
         onOpenChange={setMenuOpen}
         onEdit={onEdit}
+        onDuplicate={onDuplicate}
         onDelete={onDelete}
       />
     </div>

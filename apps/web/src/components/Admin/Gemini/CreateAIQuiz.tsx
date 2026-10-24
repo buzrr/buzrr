@@ -22,6 +22,11 @@ import {
 import ActionCard from "@/components/Admin/Home/ActionCard";
 import AiMagicLoader from "@/components/Admin/Gemini/AiMagicLoader";
 import RangeSlider from "@/components/ui/RangeSlider";
+import Segmented from "@/components/ui/Segmented";
+import {
+  QUESTION_TYPE_META,
+  QuestionTypeIcon,
+} from "@/components/QuestionTypes/meta";
 import {
   fieldLabelClass,
   inputClass,
@@ -38,7 +43,26 @@ const DEFAULTS: FormValues = {
   description: "",
   questions: 10,
   time: 20,
+  difficulty: 3,
+  multipleChoice: 3,
+  trueFalse: 1,
+  typeAnswer: 1,
 };
+/** The scored types the AI writes, each none / few / medium / many. */
+const AI_TYPES = [
+  { field: "multipleChoice", type: "multiple_choice" },
+  { field: "trueFalse", type: "true_false" },
+  { field: "typeAnswer", type: "type_answer" },
+] as const;
+const AMOUNT_NAMES = ["None", "Few", "Medium", "Many"] as const;
+/** Difficulty 1–5, by name. */
+const DIFFICULTY_NAMES = [
+  "Easy",
+  "Fairly easy",
+  "Medium",
+  "Fairly hard",
+  "Hard",
+] as const;
 
 export default function CreateAIQuiz({ className }: { className?: string }) {
   const router = useRouter();
@@ -53,17 +77,21 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
       defaultValues: DEFAULTS,
     });
 
-  const [title, description, questions, time] = watch([
+  const [title, description, questions, time, mc, tf, ta] = watch([
     "title",
     "description",
     "questions",
     "time",
+    "multipleChoice",
+    "trueFalse",
+    "typeAnswer",
   ]);
   const n = Number(questions) || 0;
-  const t = Number(time) || 0;
+  const secs = Number(time) || 0;
   const canGenerate =
     title.trim().length > 0 &&
     description.trim().length > 0 &&
+    mc + tf + ta > 0 &&
     !mutation.isPending;
 
   const close = () => {
@@ -78,6 +106,10 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
         description: data.description,
         questions: data.questions,
         time: data.time,
+        difficulty: data.difficulty,
+        multipleChoice: data.multipleChoice,
+        trueFalse: data.trueFalse,
+        typeAnswer: data.typeAnswer,
       },
       {
         onSuccess: (res) => {
@@ -182,7 +214,7 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                         type="text"
                         maxLength={60}
                         autoComplete="off"
-                        placeholder='Example: "My 20th Bday Quiz"'
+                        placeholder={'Example: "My 20th Bday Quiz"'}
                         className={inputClass}
                       />
                     </label>
@@ -258,7 +290,7 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                                     setCustomTime(mode === "Custom");
                                     if (mode === "Slider") {
                                       field.onChange(
-                                        Math.min(60, Math.max(5, t || 20)),
+                                        Math.min(60, Math.max(5, secs || 20)),
                                       );
                                     }
                                   }}
@@ -314,7 +346,7 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                         ) : (
                           <>
                             <span className="-mt-1 text-[22px] font-extrabold tracking-[-0.02em] leading-none text-lprimary dark:text-dprimary">
-                              {t}
+                              {secs}
                               <small
                                 className={clsx(
                                   "ml-[3px] text-[13px] font-semibold",
@@ -328,7 +360,7 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                               label="Seconds per question"
                               min={5}
                               max={60}
-                              value={Math.min(60, Math.max(5, t))}
+                              value={Math.min(60, Math.max(5, secs))}
                               onChange={field.onChange}
                               ticks={["5s", "15s", "30s", "45s", "60s"]}
                             />
@@ -338,12 +370,122 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                     )}
                   />
                 </div>
+                <Controller
+                  name="difficulty"
+                  control={control}
+                  render={({ field }) => {
+                    const level = Number(field.value) || 3;
+                    return (
+                      <div
+                        className={clsx(
+                          "flex flex-col gap-3 rounded-2xl p-4",
+                          subtleCardClass,
+                        )}
+                      >
+                        <div className={fieldLabelClass}>
+                          Difficulty
+                          <span className="text-[15px] font-extrabold text-lprimary dark:text-dprimary">
+                            {DIFFICULTY_NAMES[level - 1]!}
+                          </span>
+                        </div>
+                        <div
+                          role="radiogroup"
+                          aria-label="Difficulty"
+                          className="grid grid-cols-5 gap-1 rounded-xl p-[3px] bg-lprimary/8 dark:bg-white/5"
+                        >
+                          {DIFFICULTY_NAMES.map((name, i) => {
+                            const on = level === i + 1;
+                            return (
+                              <button
+                                key={name}
+                                type="button"
+                                role="radio"
+                                aria-checked={on}
+                                aria-label={name}
+                                title={name}
+                                onClick={() => field.onChange(i + 1)}
+                                className={clsx(
+                                  "rounded-[9px] py-2 text-sm font-bold tabular-nums cursor-pointer transition-colors",
+                                  on
+                                    ? "bg-white dark:bg-dark text-lprimary dark:text-dprimary shadow-[0_1px_3px_rgba(0,0,0,0.12)]"
+                                    : clsx(
+                                        mutedText,
+                                        "hover:text-dark dark:hover:text-white",
+                                      ),
+                                )}
+                              >
+                                {i + 1}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div
+                          className={clsx(
+                            "flex justify-between text-xs -mt-1",
+                            mutedText,
+                          )}
+                        >
+                          <span>Easy</span>
+                          <span>Hard</span>
+                        </div>
+                      </div>
+                    );
+                  }}
+                />
+                <div
+                  className={clsx(
+                    "flex flex-col gap-3 rounded-2xl p-4",
+                    subtleCardClass,
+                  )}
+                >
+                  <div className={fieldLabelClass}>Question types</div>
+                  {AI_TYPES.map(({ field: name, type }) => (
+                    <Controller
+                      key={name}
+                      name={name}
+                      control={control}
+                      render={({ field }) => (
+                        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+                          <span className="inline-flex items-center gap-2 text-sm font-semibold">
+                            <QuestionTypeIcon type={type} size={16} />
+                            {QUESTION_TYPE_META[type].name}
+                          </span>
+                          <Segmented<number>
+                            label={QUESTION_TYPE_META[type].name}
+                            value={field.value}
+                            onChange={field.onChange}
+                            options={AMOUNT_NAMES.map((amount, i) => ({
+                              value: i,
+                              label: amount,
+                            }))}
+                          />
+                        </div>
+                      )}
+                    />
+                  ))}
+                  {ta > 0 && secs > 0 && (
+                    <span className={clsx("text-xs", mutedText)}>
+                      Typed answers get more time:{" "}
+                      {Math.min(
+                        600,
+                        Math.max(Math.round(secs * 1.5), secs + 10),
+                      )}{" "}
+                      s.
+                    </span>
+                  )}
+                  {mc + tf + ta === 0 && (
+                    <span className="text-xs text-red-light dark:text-red-dark">
+                      Pick at least one question type.
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="mt-[22px] flex flex-col md:flex-row items-stretch md:items-center gap-3.5 border-t border-lprimary/15 dark:border-white/10 px-5 pt-[18px] pb-6 md:px-7 md:pt-[22px] md:pb-[26px]">
                 <p className={clsx("flex-1 text-[13px]", mutedText)}>
-                  {n} {n === 1 ? "question" : "questions"} · {t || "—"}s each ·
-                  about {Math.max(1, Math.round((n * t) / 60))} min to play
+                  {n === 1 ? `${n} question` : `${n} questions`} · {secs || "—"}
+                  s each · about {Math.max(1, Math.round((n * secs) / 60))} min
+                  to play
                 </p>
                 <button
                   type="submit"

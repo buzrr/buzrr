@@ -1,4 +1,5 @@
 "use client";
+import type { QuizSettings } from "@buzrr/contract";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/modules/query-keys";
@@ -58,6 +59,7 @@ export function useUpdateQuizMutation() {
       title?: string;
       description?: string;
       isPublic?: boolean;
+      settings?: QuizSettings;
     }) => quizzesApi.update(quizId, body),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.quizzes.all });
@@ -76,6 +78,38 @@ export function useDeleteQuizMutation() {
       queryClient.invalidateQueries({ queryKey: queryKeys.quizzes.all });
       // Frees a slot under the Free plan's quiz cap.
       queryClient.invalidateQueries({ queryKey: queryKeys.billing.me });
+    },
+  });
+}
+
+export function useAiStatusQuery() {
+  return useQuery({
+    queryKey: ["quizzes", "ai-status"],
+    queryFn: quizzesApi.aiStatus,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useDuplicateQuizMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: quizzesApi.duplicate,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.quizzes.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.billing.me });
+    },
+  });
+}
+
+export function useDeleteResultsMutation(quizId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: quizzesApi.deleteResults,
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.quizzes.detail(quizId),
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.quizzes.all });
     },
   });
 }

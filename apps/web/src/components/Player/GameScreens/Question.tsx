@@ -1,11 +1,14 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAppSelector } from "@/state/hooks";
+import { useAppDispatch, useAppSelector } from "@/state/hooks";
+import { answerTimed } from "@/state/game/gameSlice";
 import { toast } from "react-toastify";
 import QuestionAndResult from "./QuesAndResult";
 import type { PublicQuestion, QuestionAnswer } from "@buzrr/contract";
 import type { GameSocket } from "@/types/socket";
 import { acceptsMoreAnswers } from "@/components/QuestionTypes";
+import { useAudioSegment } from "@/lib/audio-cues";
+import { useGameSound } from "@/lib/sound/director";
 
 /**
  * Answers go over the socket and the server measures the time taken; the
@@ -29,6 +32,16 @@ const Question = (params: {
   /** A submission is in flight (multi-submission questions stay open). */
   const [pending, setPending] = useState(false);
   const more = acceptsMoreAnswers(params.question);
+  // The question's sound, when the quiz plays it on players' devices.
+  const sound = useGameSound();
+  const audio = params.question.audio;
+  useAudioSegment(
+    sound?.questionAudioHere(audio) ? audio?.url : null,
+    audio?.startMs,
+    params.question.timeOut * 1000,
+    params.question.id,
+    audio?.key,
+  );
   /**
    * The pick whose ack has not come back yet. A socket that drops mid-flight
    * never calls it — socket.io discards pending acks on close — so without
@@ -47,6 +60,7 @@ const Question = (params: {
     unacked.current = null;
   }, [params.question.id]);
 
+  const dispatch = useAppDispatch();
   const send = useCallback(
     (picked: QuestionAnswer, opts?: { silent?: boolean }) => {
       const sentFor = liveQuestionId.current;
@@ -68,6 +82,9 @@ const Question = (params: {
           setPending(false);
           if (result.accepted) {
             unacked.current = null;
+            if (result.timeTakenMs !== undefined) {
+              dispatch(answerTimed(result.timeTakenMs));
+            }
             // The server sends back everything this player has sent so far.
             if (result.answer) setAnswer(result.answer);
             return;
@@ -87,7 +104,7 @@ const Question = (params: {
         },
       );
     },
-    [params.socket, qIndex, more],
+    [params.socket, qIndex, more, dispatch],
   );
 
   /**

@@ -11,6 +11,12 @@ export type StorageDriver = "cloudinary" | "s3" | "local" | "none";
 export interface UploadMeta {
   contentType: string;
   filename?: string;
+  /**
+   * What the upload must be (sniffed accordingly); default "image".
+   * "encrypted" is for server-made blobs (encrypted audio clips) — never for
+   * anything a client sent.
+   */
+  kind?: "image" | "audio" | "encrypted";
 }
 
 /**
@@ -34,6 +40,9 @@ export abstract class MediaStorage {
    * not break editing questions that still point at the old store.
    */
   abstract remove(url: string): Promise<void>;
+
+  /** The stored bytes of a URL this driver issued (null if not ours/gone). */
+  abstract read(url: string): Promise<Buffer | null>;
 }
 
 /** An upload the configured store refuses; the message is user-facing. */

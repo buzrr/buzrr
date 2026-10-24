@@ -1,8 +1,10 @@
 "use client";
 
+import clsx from "clsx";
+import { isUnlimitedTime } from "@buzrr/contract";
 import ShowMedia from "./ShowMediaComp";
 import Image from "next/image";
-import { LuClock, LuGripVertical } from "react-icons/lu";
+import { LuClock, LuGripVertical, LuImage, LuMusic } from "react-icons/lu";
 import AddQuesForm from "./AddQuesForm";
 import QuestionCardBody, {
   QuestionTypeTag,
@@ -22,6 +24,7 @@ import type { QuestionWithOptions } from "@/lib/modules/questions/api";
 import {
   useDeleteQuestionMutation,
   useQuestionsQuery,
+  useSetQuestionDisabledMutation,
   useReorderQuestionsMutation,
 } from "@/lib/modules/questions/hooks";
 
@@ -32,11 +35,19 @@ export default function AllQues(props: { quizId: string }) {
   const { data, isPending, isError } = useQuestionsQuery(props.quizId);
   const reorderMutation = useReorderQuestionsMutation(props.quizId);
   const deleteMutation = useDeleteQuestionMutation(props.quizId);
+  const disableMutation = useSetQuestionDisabledMutation(props.quizId);
 
   const questions = useMemo(() => {
     const list = (data?.questions ?? []) as QuestionRow[];
     return [...list].sort((a, b) => a.order - b.order);
   }, [data?.questions]);
+  // Numbered as played: disabled questions are skipped.
+  const playNumber = useMemo(() => {
+    const m = new Map<string, number>();
+    let n = 0;
+    for (const q of questions) if (!q.disabled) m.set(q.id, ++n);
+    return m;
+  }, [questions]);
 
   const [delQuesModalOpen, setDelQuesModalOpen] = useState(false);
   const [delQuesId, setDelQuesId] = useState("");
@@ -164,8 +175,20 @@ export default function AllQues(props: { quizId: string }) {
                         {...provided.draggableProps}
                         {...provided.dragHandleProps}
                       >
-                        <div className="relative rounded-[18px] overflow-hidden border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 transition-[border-color,box-shadow] hover:border-lprimary dark:hover:border-dprimary hover:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.5)]">
-                          <div className="flex gap-3.5 px-4 md:px-[22px] pt-4 md:pt-5 pb-4">
+                        <div
+                          className={clsx(
+                            "relative rounded-[18px] overflow-hidden border transition-[border-color,box-shadow] hover:border-lprimary dark:hover:border-dprimary hover:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.5)]",
+                            ques.disabled
+                              ? "border-dashed bg-[repeating-linear-gradient(135deg,transparent_0_10px,rgba(120,120,140,0.07)_10px_20px)] bg-black/[0.03] dark:bg-white/[0.02] border-lprimary/20 dark:border-white/10"
+                              : "bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5",
+                          )}
+                        >
+                          <div
+                            className={clsx(
+                              "flex gap-3.5 px-4 md:px-[22px] pt-4 md:pt-5 pb-4",
+                              ques.disabled && "opacity-45 grayscale",
+                            )}
+                          >
                             <span className="hidden md:flex shrink-0 pt-[3px] cursor-grab text-[#8a8896] dark:text-muted-dark">
                               <LuGripVertical size={18} />
                             </span>
@@ -173,7 +196,9 @@ export default function AllQues(props: { quizId: string }) {
                               <div className="flex items-start justify-between gap-4 mb-3.5">
                                 <p className="text-base md:text-[17px] font-bold leading-[1.35] wrap-break-word min-w-0">
                                   <span className="text-lprimary dark:text-dprimary">
-                                    {index + 1}.
+                                    {ques.disabled
+                                      ? "–"
+                                      : `${playNumber.get(ques.id)}.`}
                                   </span>{" "}
                                   {ques?.title}
                                 </p>
@@ -181,7 +206,9 @@ export default function AllQues(props: { quizId: string }) {
                                   <QuestionTypeTag type={cardType(ques)} />
                                   <span className="shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap rounded-[9px] px-3 py-1.5 text-[13px] font-bold bg-lprimary/10 dark:bg-white/5">
                                     <LuClock size={14} />
-                                    {ques?.timeOut} sec
+                                    {isUnlimitedTime(ques?.timeOut)
+                                      ? "∞"
+                                      : `${ques?.timeOut ?? 0} sec`}
                                   </span>
                                 </div>
                               </div>
@@ -199,6 +226,25 @@ export default function AllQues(props: { quizId: string }) {
                             >
                               Delete
                             </button>
+                            <button
+                              type="button"
+                              disabled={disableMutation.isPending}
+                              className="text-sm font-semibold text-off-dark dark:text-muted-dark hover:underline cursor-pointer disabled:opacity-60"
+                              onClick={() =>
+                                disableMutation.mutate(
+                                  {
+                                    questionId: ques.id,
+                                    disabled: !ques.disabled,
+                                  },
+                                  {
+                                    onError: (err) =>
+                                      toast.error(getApiErrorMessage(err)),
+                                  },
+                                )
+                              }
+                            >
+                              {ques.disabled ? "Enable" : "Disable"}
+                            </button>
                             <BasicModal
                               isEdit={true}
                               wide
@@ -214,12 +260,34 @@ export default function AllQues(props: { quizId: string }) {
                                 />
                               )}
                             </BasicModal>
-                            {ques.media && (
-                              <ShowMedia
-                                media={ques.media}
-                                mediaType={ques.mediaType ?? ""}
-                              />
-                            )}
+                            <span className="ml-auto flex items-center gap-2.5 text-off-dark dark:text-muted-dark">
+                              {ques.disabled && (
+                                <span className="text-xs font-bold tracking-[0.06em] uppercase rounded-full px-2.5 py-0.5 bg-black/10 dark:bg-white/10">
+                                  Disabled · skipped
+                                </span>
+                              )}
+                              {/* What the question brings along. */}
+                              {ques.audio && (
+                                <LuMusic
+                                  size={17}
+                                  aria-label="With music"
+                                  role="img"
+                                />
+                              )}
+                              {/* The picture: its icon (opens it too), a
+                                  little gap, then "View image". */}
+                              {ques.media && (
+                                <ShowMedia
+                                  media={ques.media}
+                                  mediaType={ques.mediaType ?? ""}
+                                  icon={
+                                    ques.mediaType !== "audio" ? (
+                                      <LuImage size={17} />
+                                    ) : undefined
+                                  }
+                                />
+                              )}
+                            </span>
                           </div>
                         </div>
                       </div>

@@ -20,6 +20,16 @@ const ROWS: { feature: string; free: string | true; pro: string | true }[] = [
   { feature: "AI Knowledge Spaces", free: true, pro: true },
   { feature: "Live rooms with code, link & QR join", free: true, pro: true },
   { feature: "Ranked 1v1 duels", free: true, pro: true },
+  {
+    feature: "Built-in audio skins (TV Game Show, Arcade, Chill)",
+    free: true,
+    pro: true,
+  },
+  {
+    feature: "Your own audio skins (your music, cue points, test bench)",
+    free: "—",
+    pro: true,
+  },
 ];
 
 function Cell({ value }: { value: string | true }) {

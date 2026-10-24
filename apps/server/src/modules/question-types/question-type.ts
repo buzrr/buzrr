@@ -2,6 +2,7 @@ import type {
   AuthoredOption,
   PublicQuestion,
   QuestionAnswer,
+  QuestionAudio,
   QuestionConfig,
   QuestionType,
   RevealSummary,
@@ -25,10 +26,31 @@ export interface LiveQuestion<T extends QuestionType = QuestionType> {
   title: string;
   media: string | null;
   mediaType: string | null;
+  /** The picture encrypted for preloading, and its key (sent at the start). */
+  mediaClip?: string | null;
+  mediaKey?: string | null;
   /** Seconds to answer. */
   timeOut: number;
   options: LiveOption[];
   config: QuestionConfig<T>;
+  /** Optional sound (see `questionAudioSchema`); server-side with the clip keys. */
+  audio?: LiveAudio | null;
+}
+
+/**
+ * A question's sound as the engine holds it: the original's cues plus the
+ * encrypted clips and their keys, which never leave the server except the
+ * question key with the question and the reveal key with the reveal.
+ */
+export interface LiveAudio {
+  url: string;
+  startMs: number;
+  revealMs: number | null;
+  playOn: QuestionAudio["playOn"];
+  clipUrl?: string | null;
+  clipKey?: string | null;
+  revealClipUrl?: string | null;
+  revealKey?: string | null;
 }
 
 /** A submitted answer that made sense for its question, and its verdict. */

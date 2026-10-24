@@ -6,9 +6,12 @@ import ActionCard from "./ActionCard";
 import CreateAIQuiz from "../Gemini/CreateAIQuiz";
 import ImportQuizModal from "./ImportQuizModal";
 import { useAppSelector } from "@/state/hooks";
+import { useAiStatusQuery } from "@/lib/modules/quizzes/hooks";
 
 export default function QuizActionCards() {
   const view = useAppSelector((state) => state.gridListToggle.view);
+  // No AI model configured on the server: no AI card.
+  const ai = useAiStatusQuery();
 
   return (
     <div
@@ -25,9 +28,11 @@ export default function QuizActionCards() {
         subtitle="Build from the ground up"
       />
       <ImportQuizModal />
-      <CreateAIQuiz
-        className={view === "grid" ? "col-span-2 md:col-span-1" : undefined}
-      />
+      {ai.data?.available && (
+        <CreateAIQuiz
+          className={view === "grid" ? "col-span-2 md:col-span-1" : undefined}
+        />
+      )}
     </div>
   );
 }
