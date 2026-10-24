@@ -1,7 +1,7 @@
 import { combineReducers, configureStore } from "@reduxjs/toolkit";
 import playerReducer from "./admin/playersSlice";
 import gameReducer from "./game/gameSlice";
-import pageThemeReducer from "./pageThemeSlice";
+import pageThemeReducer, { PageTheme } from "./pageThemeSlice";
 import hideQuestionsReducer from "./hideQuestionsSlice";
 import navToggleReducer from "./admin/navtoggleSlice";
 import gridListToggleReducer from "./admin/gridListSlice";
@@ -31,15 +31,21 @@ const rootReducer = combineReducers({
 const persistConfig: PersistConfig<ReturnType<typeof rootReducer>> = {
   key: "root",
   storage,
-  version: 2,
+  version: 3,
   migrate: async (state): Promise<PersistedState> => {
     if (!state) return state;
-    const legacy = state as PersistedState & Record<string, unknown>;
+    let legacy = state as PersistedState & Record<string, unknown>;
     if ("adminscreen" in legacy && !("adminScreen" in legacy)) {
-      return {
-        ...legacy,
-        adminScreen: legacy.adminscreen,
-      } as PersistedState;
+      legacy = { ...legacy, adminScreen: legacy.adminscreen };
+    }
+    // Before v3 the theme defaulted to light, so a stored "light" was not
+    // necessarily chosen: follow the device instead. Dark was a choice.
+    const theme = legacy.pageTheme as { theme?: PageTheme } | undefined;
+    if (
+      (legacy._persist?.version ?? -1) < 3 &&
+      theme?.theme === PageTheme.light
+    ) {
+      legacy = { ...legacy, pageTheme: { ...theme, theme: PageTheme.system } };
     }
     return legacy;
   },

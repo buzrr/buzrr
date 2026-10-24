@@ -4,6 +4,15 @@ import {
   OnApplicationBootstrap,
   OnApplicationShutdown,
 } from "@nestjs/common";
+import {
+  HEARTBEAT_TIMEOUT_MS,
+  HOST_LEADERBOARD_TOP,
+  PLAYER_LEADERBOARD_TOP,
+  type PreloadAllPayload,
+} from "@buzrr/contract";
+import { roomSettings } from "../../common/game-look/game-look";
+import { signAssetsDeep } from "../../common/storage/asset-signing";
+import { finalClipOf } from "../sound-skins/final-clip";
 import type { GameOverPayload, QuestionAnswer } from "@buzrr/contract";
 import type { DuelOutcome, Prisma } from "@buzrr/prisma";
 import { nanoid } from "nanoid";
@@ -20,10 +29,20 @@ import {
   acceptsMoreAnswers,
   isScored,
   mergeAnswers,
+  preloadImageUrls,
+  preloadUrls,
+  questionStats,
   summarizeAnswers,
   toLiveQuestion,
 } from "../question-types";
-import { answerEntries } from "./core/views";
+
+/** How long a room's lobby download list is reused (joins come in waves). */
+const LOBBY_ASSETS_TTL_MS = 60_000;
+import {
+  answerEntries,
+  hostOfLeaderboard,
+  topOfLeaderboard,
+} from "./core/views";
 import type {
   SocketData,
   StateSyncPayload,
@@ -53,20 +72,34 @@ import {
 import { DuelBotService } from "./duel-bot.service";
 import {
   GameMeta,
+  GamePhase,
   LeaderboardEntry,
   LiveQuestion,
   RosterEntry,
 } from "./game-engine.types";
 import { GameStoreService, parseAnswer } from "./game-store.service";
+import { OPTION_ORDER } from "../../common/utils/option-order";
 
-/** How long a disconnected lobby player is kept before removal. */
-const LOBBY_DISCONNECT_GRACE_MS = 60_000;
+/** How long a disconnected lobby player is kept before removal (default). */
+const LOBBY_DISCONNECT_GRACE_MS = HEARTBEAT_TIMEOUT_MS;
 const SWEEP_INTERVAL_MS = 15_000;
 /**
  * How often, at most, the host is sent the running results of an unscored
  * question. A trailing timer per game, so a burst of answers costs one read.
  */
 const LIVE_SUMMARY_MS = 1_000;
+/**
+ * Phases of a game in progress — past the lobby, before the final standings.
+ * A draining instance waits for these (see runningHere).
+ */
+const RUNNING_PHASES: ReadonlySet<GamePhase> = new Set<GamePhase>([
+  "starting",
+  "ready",
+  "question",
+  "closed",
+  "reveal",
+  "scores",
+]);
 
 /**
  * The shell around the engine's pure core (`./core`). The rules of the game —
@@ -131,6 +164,26 @@ export class GameEngineService
     for (const t of this.timers.values()) clearTimeout(t);
     for (const t of this.disconnectTimers.values()) clearTimeout(t);
     for (const t of this.liveSummaryTimers.values()) clearTimeout(t);
+  }
+
+  /**
+   * Games in progress that still run on this instance: a timer of theirs is
+   * armed here, or a host/player socket of theirs is connected here. A
+   * draining instance (rolling deploy, see HealthController.drain) keeps
+   * serving until this is empty, so games finish where they run instead of
+   * losing their timers and in-memory room state mid-question.
+   */
+  async runningHere(): Promise<string[]> {
+    const codes = new Set(this.timers.keys());
+    for (const socket of this.io?.sockets.sockets.values() ?? []) {
+      if (socket.data.gameCode) codes.add(socket.data.gameCode);
+    }
+    const running: string[] = [];
+    for (const code of codes) {
+      const meta = await this.store.getMeta(code);
+      if (meta && RUNNING_PHASES.has(meta.phase)) running.push(code);
+    }
+    return running;
   }
 
   // -- core plumbing -----------------------------------------------------------
@@ -229,27 +282,75 @@ export class GameEngineService
     }
   }
 
+  /**
+   * Told when a new round begins (a question opens, the final standings —
+   * then with the players on places 1–3).
+   */
+  private roundListeners = new Set<
+    (gameCode: string, winners?: string[]) => void
+  >();
+  onNewRound(listener: (gameCode: string, winners?: string[]) => void): void {
+    this.roundListeners.add(listener);
+  }
+
   private send(gameCode: string, to: Audience, message: Outbound): void {
     if (!this.io) {
       throw new Error("GameEngineService used before gateway init");
     }
+    if ("room" in to && message.event === "question-start") {
+      for (const l of this.roundListeners) l(gameCode);
+    }
+    if (
+      "room" in to &&
+      message.event === "leaderboard" &&
+      message.payload.isFinal
+    ) {
+      const winners = message.payload.entries
+        .filter((e) => e.rank <= 3)
+        .map((e) => e.playerId);
+      for (const l of this.roundListeners) l(gameCode, winners);
+    }
     // Per-player rooms work cross-instance via the redis adapter.
     const target =
-      "player" in to ? this.io.to(`player:${to.player}`) : this.io.to(gameCode);
+      "player" in to
+        ? this.io.to(`player:${to.player}`)
+        : "host" in to
+          ? this.io.to(`host:${gameCode}`)
+          : this.io.to(gameCode);
     switch (message.event) {
       case "game-started":
         target.emit("game-started", {
           remainingMs: Math.max(0, message.deadline - Date.now()),
+          ...(message.moderation ? { moderation: message.moderation } : {}),
+        });
+        break;
+      case "closed-summary":
+        target.emit("closed-summary", message.payload);
+        break;
+      case "preload":
+        // Encrypted clips only; signed so the room can fetch them.
+        target.emit("preload", signAssetsDeep(message.payload));
+        break;
+      case "phase-change":
+        target.emit("phase-change", {
+          ...message.payload,
+          ...(message.deadline !== undefined
+            ? { remainingMs: Math.max(0, message.deadline - Date.now()) }
+            : {}),
         });
         break;
       case "question-start":
         // What is left of the window once the writes before this broadcast
         // are done — the clock has been running since the window opened, so
         // the client is told the truth rather than the full timeOut.
-        target.emit("question-start", {
-          ...message.payload,
-          remainingMs: Math.max(0, message.deadline - Date.now()),
-        });
+        // The question's media only becomes loadable now, for the room.
+        target.emit(
+          "question-start",
+          signAssetsDeep({
+            ...message.payload,
+            remainingMs: Math.max(0, message.deadline - Date.now()),
+          }),
+        );
         break;
       case "question-end":
         target.emit("question-end", message.payload);
@@ -260,9 +361,39 @@ export class GameEngineService
       case "answer-count":
         target.emit("answer-count", message.payload);
         break;
-      case "leaderboard":
-        target.emit("leaderboard", message.payload);
+      case "leaderboard": {
+        const { entries } = message.payload;
+        // The host shows its top (and who just dropped out of it).
+        const forHost =
+          entries.length > HOST_LEADERBOARD_TOP
+            ? {
+                ...message.payload,
+                entries: hostOfLeaderboard(entries),
+                total: entries.length,
+              }
+            : message.payload;
+        if ("host" in to) {
+          target.emit("leaderboard", forHost);
+          break;
+        }
+        if (!("room" in to) || entries.length <= PLAYER_LEADERBOARD_TOP) {
+          target.emit("leaderboard", message.payload);
+          break;
+        }
+        // The players get the top (and their own standing from
+        // answer-result) — one small broadcast.
+        this.io.to(`host:${gameCode}`).emit("leaderboard", forHost);
+        this.io
+          .to(gameCode)
+          .except(`host:${gameCode}`)
+          .emit("leaderboard", {
+            ...message.payload,
+            entries: topOfLeaderboard(entries),
+            total: entries.length,
+          });
+        // Their own place comes with answer-result (once per question).
         break;
+      }
     }
   }
 
@@ -382,9 +513,61 @@ export class GameEngineService
 
   // -- host intents ------------------------------------------------------------
 
+  /** Per room: what devices load in the lobby, kept a minute (many joins). */
+  private lobbyAssetCache = new Map<
+    string,
+    { at: number; payload: PreloadAllPayload }
+  >();
+
+  /**
+   * Everything a device can download ahead for this room: every playable
+   * question's encrypted clips and picture (no keys), in play order. Read
+   * from Postgres (the questions only reach Redis at the start).
+   */
+  async lobbyAssets(gameCode: string): Promise<PreloadAllPayload> {
+    const cached = this.lobbyAssetCache.get(gameCode);
+    if (cached && Date.now() - cached.at < LOBBY_ASSETS_TTL_MS) {
+      return cached.payload;
+    }
+    const session = await this.prisma.db.gameSession.findUnique({
+      where: { gameCode },
+      include: {
+        quiz: {
+          include: {
+            questions: {
+              where: { disabled: false },
+              orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+              include: { options: { orderBy: OPTION_ORDER } },
+            },
+          },
+        },
+      },
+    });
+    const questions = (session?.quiz.questions ?? [])
+      .map((q) => toLiveQuestion(q))
+      .filter((q): q is LiveQuestion => q !== null);
+    const payload: PreloadAllPayload = {
+      questions: questions
+        .map((q, qIndex) => ({
+          qIndex,
+          urls: preloadUrls(q),
+          images: preloadImageUrls(q),
+          playOn: q.audio?.playOn ?? "quiz",
+        }))
+        .filter((p) => p.urls.length > 0 || p.images.length > 0),
+    };
+    this.lobbyAssetCache.set(gameCode, { at: Date.now(), payload });
+    return payload;
+  }
+
   async startGame(gameCode: string): Promise<void> {
     const state = await this.store.loadState(gameCode, PARTS_FOR.start);
-    if (!state || state.meta.phase !== "lobby") return;
+    if (!state || state.meta.phase !== "lobby") {
+      this.logger.warn(
+        `Start of ${gameCode} ignored: ${state ? `phase ${state.meta.phase}` : "no live state"}`,
+      );
+      return;
+    }
 
     const session = await this.prisma.db.gameSession.findUnique({
       where: { gameCode },
@@ -392,8 +575,10 @@ export class GameEngineService
         quiz: {
           include: {
             questions: {
+              // Disabled questions are skipped: not played, counted or scored.
+              where: { disabled: false },
               orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-              include: { options: { orderBy: { createdAt: "asc" } } },
+              include: { options: { orderBy: OPTION_ORDER } },
             },
           },
         },
@@ -416,9 +601,29 @@ export class GameEngineService
       );
     }
 
+    // Moderated mode comes from the room's settings (invalid → unmoderated).
+    const settings = roomSettings(session);
+    const moderation = settings.moderation;
+    // A user sound skin's final song is preloaded encrypted; its key goes
+    // out with the final leaderboard.
+    const skinId = settings.sound.skin;
+    const skin = !skinId.startsWith("builtin:")
+      ? await this.prisma.db.soundSkin.findUnique({
+          where: { id: skinId },
+          select: { finalClip: true },
+        })
+      : null;
+    const finalSoundKey = finalClipOf(skin?.finalClip)?.key ?? null;
+
     const { effects } = step(
       state,
-      { type: "start", questions, quizTitle: session.quiz.title },
+      {
+        type: "start",
+        questions,
+        quizTitle: session.quiz.title,
+        moderation: moderation?.enabled ? moderation : null,
+        finalSoundKey,
+      },
       Date.now(),
     );
     await this.run(gameCode, effects);
@@ -432,6 +637,11 @@ export class GameEngineService
    */
   async hostNext(gameCode: string): Promise<void> {
     await this.dispatch(gameCode, { type: "host-next" });
+  }
+
+  /** Host, countdown waiting for downloads: keep waiting (no limit) or go. */
+  async downloadsDecision(gameCode: string, wait: boolean): Promise<void> {
+    await this.dispatch(gameCode, { type: "downloads-decision", wait });
   }
 
   async endGame(
@@ -565,7 +775,11 @@ export class GameEngineService
     if (question && !isScored(question.type)) {
       this.scheduleLiveSummary(gameCode);
     }
-    return { accepted: true, answer: judgement.stored.answer };
+    return {
+      accepted: true,
+      answer: judgement.stored.answer,
+      timeTakenMs: judgement.stored.timeTakenMs,
+    };
   }
 
   /**
@@ -705,7 +919,12 @@ export class GameEngineService
    * timeout later). Marking the player gone then would count a live player
    * as absent — and the early close would skip them on the next question.
    */
-  async playerDisconnected(gameCode: string, playerId: string): Promise<void> {
+  async playerDisconnected(
+    gameCode: string,
+    playerId: string,
+    /** Lobby: how long until a player still gone leaves the list. */
+    lobbyGraceMs = LOBBY_DISCONNECT_GRACE_MS,
+  ): Promise<void> {
     // `player:{id}` also holds a duel user's queue/invite sockets — only a
     // socket in this game, as this player, counts as them still being here.
     const stillHere = () =>
@@ -769,7 +988,7 @@ export class GameEngineService
         void this.removeIfStillGone(gameCode, playerId).catch((err) =>
           this.logger.error("Lobby grace removal failed", err),
         );
-      }, LOBBY_DISCONNECT_GRACE_MS);
+      }, lobbyGraceMs);
       timer.unref();
       this.disconnectTimers.set(graceKey, timer);
     }
@@ -1117,12 +1336,35 @@ export class GameEngineService
     const roster = await this.store.roster(gameCode);
     const rosterById = new Map(roster.map((p) => [p.id, p]));
     const correctCounts = new Map<string, number>();
+    // Classic games keep how each question went (the host's report) —
+    // the questions that were reached, as they were played.
+    const questions =
+      meta.mode === "classic"
+        ? ((await this.store.loadState(gameCode, ["questions"]))?.questions ??
+          [])
+        : [];
+    const questionRows: Prisma.GameResultQuestionCreateWithoutResultInput[] =
+      [];
     for (let i = 0; i < meta.qCount; i++) {
       const answers = await this.store.getAnswers(gameCode, i);
       for (const [playerId, a] of Object.entries(answers)) {
         if (a.isCorrect) {
           correctCounts.set(playerId, (correctCounts.get(playerId) ?? 0) + 1);
         }
+      }
+      const question = questions[i];
+      if (question && i <= meta.qIndex) {
+        const stats = questionStats(
+          question,
+          i,
+          answerEntries(answers, roster),
+          Object.values(answers).map((a) => a.timeTakenMs),
+        );
+        questionRows.push({
+          ...stats,
+          options: stats.options as unknown as Prisma.InputJsonValue,
+          summary: stats.summary as unknown as Prisma.InputJsonValue,
+        });
       }
     }
 
@@ -1186,6 +1428,9 @@ export class GameEngineService
           outcome: outcomes.get(e.playerId) ?? null,
         })),
       },
+      ...(questionRows.length > 0
+        ? { questions: { create: questionRows } }
+        : {}),
     });
 
     try {
@@ -1393,7 +1638,10 @@ export class GameEngineService
     if (!meta || !entry || entry.connected) return;
     if (meta.phase !== "lobby") return;
     await this.store.removePlayer(gameCode, playerId);
-    this.emitRoom(gameCode).emit("player-removed", { id: playerId });
+    this.emitRoom(gameCode).emit("player-removed", {
+      id: playerId,
+      timedOut: true,
+    });
   }
 
   /**

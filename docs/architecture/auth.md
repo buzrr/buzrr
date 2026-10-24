@@ -109,6 +109,16 @@ state on `io server disconnect` (`useGameSocket.ts`).
   yourself; cannot touch superadmins; superadmin is **not grantable** via the
   API (`UpdateUserRoleDto` allows only `admin|user`). The first superadmin was
   bootstrapped in migration `20260714000001` by email.
+- User management (`/admin/superadmin/admins`): `GET /api/superadmin/users`
+  lists every user (search by name/email; the internal system user is
+  hidden). Creating a local user and resetting a password are **web server
+  actions** (`app/admin/(privileged)/superadmin/admins/actions.ts`), since
+  they need Better Auth's password hashing; each re-checks the superadmin
+  role in the DB. Create writes the `User` (role user or admin, email
+  verified) plus a `credential` `Account` — it works with
+  `AUTH_EMAIL_SIGNUP=OFF`. Reset sets the credential password (adding one to,
+  e.g., a Google-only account) and deletes the user's sessions; API JWTs
+  already minted stay valid until they expire.
 
 ## Plans, billing webhooks & AI tokens
 
@@ -162,8 +172,9 @@ reports, invites…), not globally. `TRUST_PROXY` in `main.ts` makes
   ability to accept a previously minted JWT (tokens are stateless).
 - `parse-cors-origin.ts`: unset/empty `WEB_ORIGIN` reflects **all** origins
   (dev convenience). Production must set `WEB_ORIGIN`.
-- Local accounts have no recovery path: a forgotten password can only be
-  reset by an operator in the database. Keep `AUTH_EMAIL_SIGNUP=OFF` on
+- Local accounts have no self-service recovery: a superadmin resets a
+  forgotten password in user management (an operator in the database, for
+  the superadmin's own). Keep `AUTH_EMAIL_SIGNUP=OFF` on
   internet-facing self-hosted installs unless open registration is intended.
 - The self-host compose file generates `BETTER_AUTH_SECRET` on first boot
   into the `buzrr-secrets` volume and every container reads it from there,

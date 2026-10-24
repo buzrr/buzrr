@@ -1,6 +1,6 @@
 import { createHash, createHmac } from "node:crypto";
 import { nanoid } from "nanoid";
-import { sniffImage } from "./image-sniff";
+import { sniffAudio, sniffImage } from "./image-sniff";
 import {
   MediaStorage,
   type StoredMedia,
@@ -155,8 +155,14 @@ export class S3Storage extends MediaStorage {
     });
   }
 
-  async upload(buffer: Buffer, _meta?: UploadMeta): Promise<StoredMedia> {
-    const { type, ext } = sniffImage(buffer);
+  async upload(buffer: Buffer, meta?: UploadMeta): Promise<StoredMedia> {
+    const audio = meta?.kind === "audio";
+    const { type, ext } =
+      meta?.kind === "encrypted"
+        ? { type: "application/octet-stream", ext: "bin" }
+        : audio
+          ? sniffAudio(buffer)
+          : sniffImage(buffer);
     const key = `${this.config.prefix}${nanoid(21)}.${ext}`;
     const res = await this.send("PUT", key, buffer, {
       "content-type": type,
@@ -167,7 +173,20 @@ export class S3Storage extends MediaStorage {
         `S3 upload failed: ${res.status} ${(await res.text()).slice(0, 200)}`,
       );
     }
-    return { url: `${this.publicUrl}/${key}`, mediaType: "image" };
+    return {
+      url: `${this.publicUrl}/${key}`,
+      mediaType:
+        meta?.kind === "encrypted" ? "encrypted" : audio ? "audio" : "image",
+    };
+  }
+
+  /** Objects are publicly readable, so a plain GET does. */
+  async read(url: string): Promise<Buffer | null> {
+    if (!url.startsWith(`${this.publicUrl}/`)) return null;
+    const res = await fetch(url, { signal: AbortSignal.timeout(30_000) }).catch(
+      () => null,
+    );
+    return res?.ok ? Buffer.from(await res.arrayBuffer()) : null;
   }
 
   async remove(url: string): Promise<void> {

@@ -10,6 +10,8 @@ import {
   LuBookText,
   LuCrown,
   LuHistory,
+  LuMusic,
+  LuSmile,
   LuLogOut,
   LuSettings,
   LuSwords,
@@ -21,19 +23,27 @@ import { NavToggle, setNavToggle } from "@/state/admin/navtoggleSlice";
 import { useCurrentRole } from "@/components/SessionProvider";
 import { LICENSE_LINK } from "@/components/Landing/links";
 import { isAiConfigured } from "@/lib/api/ai-client";
+import { useAiStatusQuery } from "@/lib/modules/quizzes/hooks";
+import { useInstance } from "@/lib/instance-context";
 import SignOutButton from "./SignOutButton";
 
-const NavLinks = [
-  { href: "/admin", label: "Quizzes", icon: LuBookText },
-  { href: "/admin/history", label: "History", icon: LuHistory },
-  { href: "/admin/billing", label: "Plan & Billing", icon: LuCrown },
-  { href: "/admin/settings", label: "Settings", icon: LuSettings },
-];
-
 export default function Navbar() {
+  const { billing: BILLING_ENABLED, duels: DUELS } = useInstance();
+  const NavLinks = [
+    { href: "/admin", label: "Quizzes", icon: LuBookText },
+    { href: "/admin/history", label: "History", icon: LuHistory },
+    ...(BILLING_ENABLED
+      ? [{ href: "/admin/billing", label: "Plan & Billing", icon: LuCrown }]
+      : []),
+    { href: "/admin/audio-skins", label: "Audio Skins", icon: LuMusic },
+    { href: "/admin/avatar-skins", label: "Avatar Skins", icon: LuSmile },
+    { href: "/admin/settings", label: "Settings", icon: LuSettings },
+  ];
+
   const { data: session } = authClient.useSession();
   const pathname = usePathname();
   const role = useCurrentRole();
+  const aiStatus = useAiStatusQuery();
 
   const toggle = useAppSelector((state) => state.navToggle.toggle);
   const dispatch = useAppDispatch();
@@ -47,11 +57,12 @@ export default function Navbar() {
   const navLinks = [
     ...NavLinks,
     // Hidden when NEXT_PUBLIC_AI_API_URL is unset, so a contributor running only
-    // web + server doesn't get a nav item that 500s on click.
-    ...(isAiConfigured()
+    // web + server doesn't get a nav item that 500s on click — and when the
+    // server has no model configured (nothing to generate questions with).
+    ...(isAiConfigured() && aiStatus.data?.available
       ? [{ href: "/admin/ai", label: "AI Spaces", icon: LuSparkles }]
       : []),
-    ...(role === "admin" || role === "superadmin"
+    ...(DUELS && (role === "admin" || role === "superadmin")
       ? [
           {
             href: "/admin/duel-portal",
@@ -64,7 +75,7 @@ export default function Navbar() {
       ? [
           {
             href: "/admin/superadmin/admins",
-            label: "Manage Admins",
+            label: "Manage Users",
             icon: LuUserCog,
           },
         ]

@@ -1,31 +1,20 @@
 "use client";
-import { useEffect } from "react";
-import { useAppSelector, useAppDispatch } from "@/state/hooks";
+import { useAppDispatch } from "@/state/hooks";
 import { PageTheme, setPageTheme } from "@/state/pageThemeSlice";
 import { Switch } from "@/components/ui/Switch";
 import { withThemeTransition } from "@/utils/themeTransition";
 import { useRenderedTheme } from "@/hooks/useRenderedTheme";
 
 const ThemeToggle = () => {
-  const theme = useAppSelector((state) => state.pageTheme.theme);
   const dispatch = useAppDispatch();
-  // What to draw; `theme` (the stored one) drives the class and the toggle.
+  // What to draw. A toggle by hand is a choice, stored from then on (the
+  // device's theme is followed until then).
   const shown = useRenderedTheme();
-
-  useEffect(() => {
-    if (theme === PageTheme.dark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, [theme]);
 
   const handler = () => {
     withThemeTransition();
     dispatch(
-      setPageTheme(
-        theme === PageTheme.light ? PageTheme.dark : PageTheme.light,
-      ),
+      setPageTheme(shown === PageTheme.dark ? PageTheme.light : PageTheme.dark),
     );
   };
 

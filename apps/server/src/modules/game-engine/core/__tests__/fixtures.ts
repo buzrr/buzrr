@@ -99,6 +99,7 @@ export function state(overrides: Partial<GameState> = {}): GameState {
     roster: [player("p1"), player("p2")],
     answers: {},
     scores: [],
+    preloads: {},
     ...overrides,
   };
 }

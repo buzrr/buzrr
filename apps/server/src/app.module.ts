@@ -1,6 +1,8 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
-import { APP_GUARD } from "@nestjs/core";
+import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
+import { SignAssetsInterceptor } from "./common/interceptors/sign-assets.interceptor";
+import { SoloModule } from "./modules/solo/solo.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { CommonModule } from "./common/common.module";
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
@@ -18,6 +20,7 @@ import { QuizzesModule } from "./modules/quizzes/quizzes.module";
 import { UsersModule } from "./modules/users/users.module";
 import { RealtimeModule } from "./modules/realtime/realtime.module";
 import { RedisModule } from "./redis/redis.module";
+import { SoundSkinsModule } from "./modules/sound-skins/sound-skins.module";
 
 @Module({
   imports: [
@@ -31,12 +34,14 @@ import { RedisModule } from "./redis/redis.module";
     GameSessionsModule,
     QuizzesModule,
     QuestionsModule,
+    SoundSkinsModule,
     ModerationModule,
     CategoriesModule,
     AdminUsersModule,
     BillingModule,
     DuelModule,
     UsersModule,
+    SoloModule,
     RealtimeModule,
   ],
   providers: [
@@ -44,6 +49,8 @@ import { RedisModule } from "./redis/redis.module";
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
+    // Uploaded media links in responses are signed for authenticated callers.
+    { provide: APP_INTERCEPTOR, useClass: SignAssetsInterceptor },
   ],
 })
 export class AppModule {}

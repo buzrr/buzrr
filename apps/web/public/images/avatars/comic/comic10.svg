@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+<defs><pattern id="dots" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="6" cy="6" r="2.2" fill="#fff" opacity="0.28"/></pattern>
+<clipPath id="c"><circle cx="128" cy="128" r="128"/></clipPath></defs>
+<g clip-path="url(#c)"><rect width="256" height="256" fill="#9ad0ff"/><rect width="256" height="256" fill="url(#dots)"/>
+<path d="M40 256 Q48 196 128 192 Q208 196 216 256 Z" fill="#2b2bd9" stroke="#1b1530" stroke-width="6"/>
+
+<ellipse cx="128" cy="134" rx="64" ry="70" fill="#e8b48a" stroke="#1b1530" stroke-width="6"/>
+<ellipse cx="62" cy="138" rx="10" ry="16" fill="#e8b48a" stroke="#1b1530" stroke-width="5"/><ellipse cx="194" cy="138" rx="10" ry="16" fill="#e8b48a" stroke="#1b1530" stroke-width="5"/>
+
+<circle cx="104" cy="128" r="14" fill="#fff" stroke="#1b1530" stroke-width="5"/><circle cx="106" cy="126" r="6.3" fill="#1b1530"/><circle cx="104" cy="123" r="2.1" fill="#fff"/><circle cx="152" cy="128" r="14" fill="#fff" stroke="#1b1530" stroke-width="5"/><circle cx="154" cy="126" r="6.3" fill="#1b1530"/><circle cx="152" cy="123" r="2.1" fill="#fff"/>
+<ellipse cx="86" cy="160" rx="12" ry="7" fill="#ff6b8a" opacity="0.45"/><ellipse cx="170" cy="160" rx="12" ry="7" fill="#ff6b8a" opacity="0.45"/>
+<path d="M124 140 Q118 156 128 158" fill="none" stroke="#1b1530" stroke-width="4" stroke-linecap="round"/>
+<path d="M100 170 Q128 198 156 170" fill="none" stroke="#1b1530" stroke-width="7" stroke-linecap="round"/>
+<path d="M66 116 Q72 60 128 58 Q184 60 190 116 Q128 96 66 116 Z" fill="#ffffff" stroke="#1b1530" stroke-width="6" stroke-linejoin="round"/><path d="M72 150 Q78 222 128 226 Q178 222 184 150 Q170 196 128 198 Q86 196 72 150 Z" fill="#ffffff" stroke="#1b1530" stroke-width="6" stroke-linejoin="round"/>
+<path d="M66 104 Q70 52 128 50 Q186 52 190 104 Z" fill="#e2352f" stroke="#1b1530" stroke-width="6"/><path d="M128 96 Q190 92 224 108 Q200 118 128 110 Z" fill="#c81f1f" stroke="#1b1530" stroke-width="6"/></g></svg>
