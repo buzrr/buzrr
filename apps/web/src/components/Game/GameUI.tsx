@@ -4,7 +4,7 @@ import clsx from "clsx";
 import { useId, type ReactNode } from "react";
 import ConnectionStatusPill from "@/components/ConnectionStatusPill";
 
-export const OPTION_KEYS = ["A", "B", "C", "D", "E", "F"];
+export const OPTION_KEYS = ["A", "B", "C", "D", "E", "F", "G", "H"];
 export const OPTION_COLORS = [
   "#7c4ddb",
   "#e5544e",
@@ -12,6 +12,8 @@ export const OPTION_COLORS = [
   "#e0a020",
   "#3b82f6",
   "#db2777",
+  "#0d9488",
+  "#64748b",
 ];
 
 export const panelClass =

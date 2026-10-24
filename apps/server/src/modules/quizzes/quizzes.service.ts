@@ -26,6 +26,7 @@ import {
 } from "../question-types";
 import { CreateAiQuizDto } from "./dto/create-ai-quiz.dto";
 import { CreateQuizDto } from "./dto/create-quiz.dto";
+import { inAuthoredOrder } from "../../common/utils/option-order";
 
 /**
  * Shape the model must return (sent to the provider as a JSON Schema for
@@ -273,10 +274,12 @@ export class QuizzesService {
               config: question.config,
               createdById: user.userId,
               options: {
-                create: question.options.map((option) => ({
-                  title: option.title,
-                  isCorrect: option.isCorrect,
-                })),
+                create: inAuthoredOrder(
+                  question.options.map((option) => ({
+                    title: option.title,
+                    isCorrect: option.isCorrect,
+                  })),
+                ),
               },
             })),
           },
@@ -395,7 +398,7 @@ Rules:
           questions: {
             create: questionsArray.slice(0, dto.questions).map((q, index) => ({
               title: q.question,
-              options: { create: q.options },
+              options: { create: inAuthoredOrder(q.options) },
               timeOut: dto.time,
               order: index + 1,
               createdById: user.userId,

@@ -68,6 +68,7 @@ import {
   RosterEntry,
 } from "./game-engine.types";
 import { GameStoreService, parseAnswer } from "./game-store.service";
+import { OPTION_ORDER } from "../../common/utils/option-order";
 
 /** How long a disconnected lobby player is kept before removal (default). */
 const LOBBY_DISCONNECT_GRACE_MS = HEARTBEAT_TIMEOUT_MS;
@@ -446,7 +447,7 @@ export class GameEngineService
           include: {
             questions: {
               orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-              include: { options: { orderBy: { createdAt: "asc" } } },
+              include: { options: { orderBy: OPTION_ORDER } },
             },
           },
         },

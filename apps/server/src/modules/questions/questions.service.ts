@@ -28,6 +28,7 @@ import {
 } from "../question-types";
 import { CategoriesService } from "../categories/categories.service";
 import { ReorderQuestionsDto } from "./dto/reorder-questions.dto";
+import { inAuthoredOrder, OPTION_ORDER } from "../../common/utils/option-order";
 
 type MultipartBody = Record<string, string | undefined>;
 
@@ -104,7 +105,7 @@ export class QuestionsService {
     await this.assertQuizOwned(quizId, user.userId);
     const questions = await this.prisma.db.question.findMany({
       where: { quizId },
-      include: { options: true },
+      include: { options: { orderBy: OPTION_ORDER } },
       orderBy: { order: "asc" },
     });
     return { status: 200, questions };
@@ -300,11 +301,13 @@ export class QuestionsService {
         });
         await tx.option.deleteMany({ where: { questionId: quesId } });
         await tx.option.createMany({
-          data: options.map((o) => ({
-            title: o.title,
-            isCorrect: o.isCorrect,
-            questionId: quesId,
-          })),
+          data: inAuthoredOrder(
+            options.map((o) => ({
+              title: o.title,
+              isCorrect: o.isCorrect,
+              questionId: quesId,
+            })),
+          ),
         });
         await tx.questionReport.deleteMany({ where: { questionId: quesId } });
       });
@@ -321,7 +324,7 @@ export class QuestionsService {
             title,
             type,
             config,
-            options: { create: options },
+            options: { create: inAuthoredOrder(options) },
             quizId,
             timeOut,
             media: fileLink || null,

@@ -21,7 +21,7 @@ import { z } from "zod";
 
 /** Authoring bounds shared by every option-based type. */
 export const MIN_OPTIONS = 2;
-export const MAX_OPTIONS = 6;
+export const MAX_OPTIONS = 8;
 export const MIN_TIME_OUT = 5;
 export const DEFAULT_TIME_OUT = 15;
 
