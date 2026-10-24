@@ -6,6 +6,7 @@ import type { GameState, StatePart } from "./core/state";
 import {
   GameMeta,
   LiveQuestion,
+  PreloadStatus,
   RosterEntry,
   ScoreEntry,
   StoredAnswer,
@@ -20,7 +21,10 @@ const keys = {
   lb: (c: string) => `game:${c}:lb`,
   players: (c: string) => `game:${c}:players`,
   banned: (c: string) => `game:${c}:banned`,
+  /** Scores of players who left or were removed, restored if they rejoin. */
+  departed: (c: string) => `game:${c}:departed`,
   owner: (c: string) => `game:${c}:owner`,
+  preloads: (c: string, q: number) => `game:${c}:preloads:${q}`,
   deadlines: () => `games:deadlines`,
 };
 
@@ -34,8 +38,24 @@ const NUMERIC_META = new Set([
   "botElo",
   "botAnswerAt",
   "pausedAt",
+  "preloadWaitSince",
+  "preloadWaitAll",
 ]);
 const BOOLEAN_META = new Set(["hostConnected", "rated"]);
+
+function parsePreloads(
+  raw: Record<string, string> | null,
+): Record<string, PreloadStatus> {
+  const out: Record<string, PreloadStatus> = {};
+  for (const [id, json] of Object.entries(raw ?? {})) {
+    try {
+      out[id] = JSON.parse(json) as PreloadStatus;
+    } catch {
+      // ignore a broken entry
+    }
+  }
+  return out;
+}
 
 function parseMeta(raw: Record<string, string>): GameMeta | null {
   if (!raw || Object.keys(raw).length === 0) return null;
@@ -111,13 +131,36 @@ return 0
 
 // Adds a roster entry unless the player is banned from the room, so a
 // connection racing a ban can never end up registered.
-// KEYS: [1]=players hash, [2]=banned set. ARGV: [1]=playerId, [2]=entry, [3]=TTL.
+// A player who left earlier gets their score back.
+// KEYS: [1]=players hash, [2]=banned set, [3]=leaderboard, [4]=departed hash.
+// ARGV: [1]=playerId, [2]=entry, [3]=TTL.
 const REGISTER_PLAYER_SCRIPT = `
 if redis.call('SISMEMBER', KEYS[2], ARGV[1]) == 1 then
   return 0
 end
 redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
 redis.call('EXPIRE', KEYS[1], ARGV[3])
+local score = redis.call('HGET', KEYS[4], ARGV[1])
+if score then
+  redis.call('ZADD', KEYS[3], score, ARGV[1])
+  redis.call('EXPIRE', KEYS[3], ARGV[3])
+  redis.call('HDEL', KEYS[4], ARGV[1])
+end
+return 1
+`;
+
+// Takes a player off the roster and the leaderboard, parking their score so
+// a rejoin picks up where they left (their answers stay where they are).
+// KEYS: [1]=players hash, [2]=leaderboard, [3]=departed hash.
+// ARGV: [1]=playerId, [2]=TTL.
+const REMOVE_PLAYER_SCRIPT = `
+local score = redis.call('ZSCORE', KEYS[2], ARGV[1])
+if score then
+  redis.call('HSET', KEYS[3], ARGV[1], score)
+  redis.call('EXPIRE', KEYS[3], ARGV[2])
+end
+redis.call('HDEL', KEYS[1], ARGV[1])
+redis.call('ZREM', KEYS[2], ARGV[1])
 return 1
 `;
 
@@ -235,6 +278,7 @@ export class GameStoreService {
       if (part === "scores") {
         pipe.zrevrange(keys.lb(code), 0, -1, "WITHSCORES");
       }
+      if (part === "preloads") pipe.hgetall(keys.preloads(code, answersOf));
     }
     const results = (await pipe.exec()) ?? [];
     for (const [err] of results) if (err) throw err;
@@ -248,6 +292,7 @@ export class GameStoreService {
       roster: [],
       answers: {},
       scores: [],
+      preloads: {},
     };
     parts.forEach((part, i) => {
       const value = results[i]?.[1] ?? null;
@@ -257,11 +302,27 @@ export class GameStoreService {
         state.roster = parseRoster(value as Record<string, string>);
       } else if (part === "answers") {
         state.answers = parseAnswers(value as Record<string, string>);
+      } else if (part === "preloads") {
+        state.preloads = parsePreloads(value as Record<string, string>);
       } else {
         state.scores = parseScores(value as string[]);
       }
     });
     return state;
+  }
+
+  /** A device's download progress for question `qIndex`'s sound. */
+  async setPreloadStatus(
+    code: string,
+    qIndex: number,
+    deviceId: string,
+    status: PreloadStatus,
+  ): Promise<void> {
+    await this.redis
+      .multi()
+      .hset(keys.preloads(code, qIndex), deviceId, JSON.stringify(status))
+      .expire(keys.preloads(code, qIndex), TTL_SECONDS)
+      .exec();
   }
 
   async patchMeta(code: string, patch: Partial<GameMeta>): Promise<void> {
@@ -468,9 +529,11 @@ export class GameStoreService {
   ): Promise<boolean> {
     const registered = await this.redis.eval(
       REGISTER_PLAYER_SCRIPT,
-      2,
+      4,
       keys.players(code),
       keys.banned(code),
+      keys.lb(code),
+      keys.departed(code),
       entry.id,
       JSON.stringify(entry),
       TTL_SECONDS,
@@ -484,16 +547,21 @@ export class GameStoreService {
   }
 
   /**
-   * Drops the roster entry *and* the score: a removed player must not linger
-   * on the leaderboard as a nameless row (buildLeaderboard resolves names from
-   * the roster). Someone who rejoins later starts from zero.
+   * Drops the roster entry and takes the score off the leaderboard: a removed
+   * player must not linger there as a nameless row (buildLeaderboard resolves
+   * names from the roster). The score is parked, though — someone who rejoins
+   * (`upsertPlayerUnlessBanned`) gets it back, and their answers never left.
    */
   async removePlayer(code: string, playerId: string): Promise<void> {
-    await this.redis
-      .multi()
-      .hdel(keys.players(code), playerId)
-      .zrem(keys.lb(code), playerId)
-      .exec();
+    await this.redis.eval(
+      REMOVE_PLAYER_SCRIPT,
+      3,
+      keys.players(code),
+      keys.lb(code),
+      keys.departed(code),
+      playerId,
+      TTL_SECONDS,
+    );
   }
 
   async roster(code: string): Promise<RosterEntry[]> {
@@ -591,6 +659,7 @@ export class GameStoreService {
       keys.lb(code),
       keys.players(code),
       keys.banned(code),
+      keys.departed(code),
       keys.owner(code),
     ];
     for (let i = 0; i < Math.max(qCount, 1); i++) {

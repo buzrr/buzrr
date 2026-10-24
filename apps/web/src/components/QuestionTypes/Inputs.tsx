@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { LuCheck } from "react-icons/lu";
 import {
   OptionKey,
@@ -11,6 +11,52 @@ import {
 
 // Player-side building blocks for the types that answer with a Submit
 // button rather than a single tap.
+
+/**
+ * A typed answer's field keeps the cursor: focused as the question opens,
+ * when the page comes back, once it is enabled again, and after a tap on
+ * nothing in particular — with the caret at the end. A tap on another
+ * control (a reaction, a toggle) leaves the focus there.
+ */
+export function useAnswerFocus<
+  T extends HTMLInputElement | HTMLTextAreaElement,
+>(disabled?: boolean) {
+  const ref = useRef<T>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || disabled) return;
+    const focus = () => {
+      if (el.disabled || document.visibilityState !== "visible") return;
+      if (document.activeElement !== el) el.focus({ preventScroll: true });
+      const end = el.value.length;
+      if (el.selectionStart !== end || el.selectionEnd !== end) {
+        el.setSelectionRange(end, end);
+      }
+    };
+    focus();
+    const onBlur = (e: Event) => {
+      // Focus moved to another control: leave it.
+      if ((e as globalThis.FocusEvent).relatedTarget) return;
+      setTimeout(() => {
+        if (
+          !document.activeElement ||
+          document.activeElement === document.body
+        ) {
+          focus();
+        }
+      }, 0);
+    };
+    el.addEventListener("blur", onBlur);
+    document.addEventListener("visibilitychange", focus);
+    window.addEventListener("pageshow", focus);
+    return () => {
+      el.removeEventListener("blur", onBlur);
+      document.removeEventListener("visibilitychange", focus);
+      window.removeEventListener("pageshow", focus);
+    };
+  }, [disabled]);
+  return ref;
+}
 
 export function SubmitButton({
   disabled,

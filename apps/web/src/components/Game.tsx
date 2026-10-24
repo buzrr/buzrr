@@ -59,8 +59,26 @@ interface Ring {
 
 const GRAVITY = 520; // px/s² pulling droplets down
 const MAX_BUBBLES = 18;
+/** Unchanged totals are sent again this often. */
+const STATS_REFRESH_MS = 15_000;
 
-const Game = () => {
+/** Hits and misses (taps that popped nothing). */
+export interface BubbleStats {
+  hits: number;
+  misses: number;
+}
+
+const Game = ({
+  onStats,
+  onPop,
+  reportEveryMs = 1000,
+}: {
+  onStats?: (stats: BubbleStats) => void;
+  /** A bubble popped (e.g. to play its sound). */
+  onPop?: () => void;
+  /** Changed totals go out at most this often. */
+  reportEveryMs?: number;
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const bubblesRef = useRef<Bubble[]>([]);
@@ -71,6 +89,39 @@ const Game = () => {
   const lastSpawnRef = useRef(0);
   const [score, setScore] = useState(0);
   const scoreRef = useRef(0);
+  const [misses, setMisses] = useState(0);
+  const missesRef = useRef(0);
+  const onStatsRef = useRef(onStats);
+  const onPopRef = useRef(onPop);
+  const reportEveryRef = useRef(reportEveryMs);
+  useEffect(() => {
+    onStatsRef.current = onStats;
+    onPopRef.current = onPop;
+    reportEveryRef.current = reportEveryMs;
+  });
+
+  // Report the running totals (the host's lobby shows them): at most every
+  // `reportEveryMs` and only when they changed — an idle phone sends nothing —
+  // plus a refresh every STATS_REFRESH_MS for a host or connection that
+  // missed one.
+  useEffect(() => {
+    let last = "";
+    let lastAt = 0;
+    const timer = setInterval(() => {
+      const key = `${scoreRef.current}:${missesRef.current}`;
+      const now = Date.now();
+      const since = now - lastAt;
+      if (since < reportEveryRef.current) return;
+      if (key === last && since < STATS_REFRESH_MS) return;
+      last = key;
+      lastAt = now;
+      onStatsRef.current?.({
+        hits: scoreRef.current,
+        misses: missesRef.current,
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const spawnBubble = useCallback(() => {
     const { w, h } = sizeRef.current;
@@ -279,9 +330,12 @@ const Game = () => {
           bubblesRef.current.splice(i, 1);
           scoreRef.current += 1;
           setScore(scoreRef.current);
-          break;
+          onPopRef.current?.();
+          return;
         }
       }
+      missesRef.current += 1;
+      setMisses(missesRef.current);
     },
     [burst],
   );
@@ -297,6 +351,11 @@ const Game = () => {
       <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-full bg-white/70 dark:bg-dark/70 px-3 py-1 text-sm font-bold text-lprimary dark:text-dprimary backdrop-blur">
         <span aria-hidden>🫧</span>
         {score}
+        {score + misses > 0 && (
+          <span className="font-medium opacity-70">
+            · {Math.round((score / (score + misses)) * 100)}%
+          </span>
+        )}
       </div>
 
       <p className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs font-medium text-dark/50 dark:text-white/40">

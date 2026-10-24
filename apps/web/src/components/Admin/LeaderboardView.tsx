@@ -1,6 +1,12 @@
 "use client";
 
 import Image from "next/image";
+import { useState } from "react";
+import { LuTrash2 } from "react-icons/lu";
+import { toast } from "react-toastify";
+import ConfirmationModal from "@/components/Admin/ConfirmationModal";
+import { getApiErrorMessage } from "@/lib/api/errors";
+import { useDeleteResultsMutation } from "@/lib/modules/quizzes/hooks";
 import { DEFAULT_AVATAR } from "@/constants";
 import Skeleton from "@/components/ui/Skeleton";
 import { useResultQuery } from "@/lib/modules/game-sessions/hooks";
@@ -16,12 +22,17 @@ export default function LeaderboardView({
   roomId,
   onBack,
   backLabel = "Back",
+  onDeleted,
 }: {
   roomId: string;
   onBack?: () => void;
   backLabel?: string;
+  /** Shows a delete button; called once this run is deleted. */
+  onDeleted?: () => void;
 }) {
   const { data: result, isPending, isError } = useResultQuery(roomId);
+  const del = useDeleteResultsMutation(result?.quizId ?? "");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const backButton = onBack ? (
     <button
@@ -63,7 +74,40 @@ export default function LeaderboardView({
 
   return (
     <div className="flex flex-col items-center w-full gap-4">
-      {backButton}
+      <div className="self-stretch flex items-center justify-between gap-3">
+        {backButton ?? <span />}
+        {onDeleted && (
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl border-[1.5px] border-red-light dark:border-red-dark px-3 py-1.5 text-sm font-semibold text-red-light dark:text-red-dark hover:bg-red-light hover:text-white dark:hover:bg-red-dark dark:hover:text-dark cursor-pointer transition-colors"
+          >
+            <LuTrash2 size={15} />
+            Delete
+          </button>
+        )}
+      </div>
+      <ConfirmationModal
+        open={confirmDelete}
+        setOpen={setConfirmDelete}
+        desc="Delete this game and its leaderboard? This can't be undone."
+        confirmLabel="Delete"
+        confirming={del.isPending}
+        confirmingLabel="Deleting…"
+        onClick={() =>
+          del.mutate(
+            { resultId: roomId },
+            {
+              onSuccess: () => {
+                setConfirmDelete(false);
+                toast.success("Game deleted");
+                onDeleted?.();
+              },
+              onError: (err) => toast.error(getApiErrorMessage(err)),
+            },
+          )
+        }
+      />
       <p className="text-2xl text-center font-black text-dark dark:text-white capitalize">
         {result.quizTitle} — Leaderboard
       </p>

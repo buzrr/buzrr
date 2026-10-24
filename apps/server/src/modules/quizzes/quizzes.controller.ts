@@ -40,6 +40,12 @@ export class QuizzesController {
     return this.quizzes.create(user, dto);
   }
 
+  /** Whether AI quiz generation is set up on this server (LLM configured). */
+  @Get("ai/status")
+  aiStatus() {
+    return { available: this.quizzes.aiAvailable() };
+  }
+
   @Post("ai")
   @UseGuards(RateLimitGuard)
   @RateLimitProfile("ai")
@@ -54,6 +60,12 @@ export class QuizzesController {
     @Body(new ZodValidationPipe(importQuizSchema)) body: ImportQuiz,
   ) {
     return this.quizzes.importQuestions(user, body);
+  }
+
+  /** A copy of the quiz with all its questions (not its past games). */
+  @Post(":id/duplicate")
+  duplicate(@CurrentAccountUser() user: AuthUser, @Param("id") id: string) {
+    return this.quizzes.duplicate(user, id);
   }
 
   @Patch(":id")

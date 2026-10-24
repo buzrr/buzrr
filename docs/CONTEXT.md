@@ -82,7 +82,9 @@ effects }` in `game-engine/core/`, unit-tested; `GameEngineService` is
 2. **Question types — follow-ups.** Six types ship (ADR-011 amendment);
    still missing from the design: "show results on players' screens", the
    word-cloud profanity filter and open-text host review. The spreadsheet
-   import and `POST /quizzes/ai` still produce multiple choice only.
+   import still produces multiple choice only; `POST /quizzes/ai` writes
+   multiple choice, true / false and type-answer in a host-chosen mix
+   (2026-10-20), and reviews and rewrites its own questions before saving.
    True / false moved its key from `Option` rows to `config.answer`
    (2026-10-18). Until migration `20261018000001` runs in production, the
    handler still accepts the old two-option rows. After that, the legacy
@@ -120,7 +122,7 @@ effects }` in `game-engine/core/`, unit-tested; `GameEngineService` is
    the server won't boot without it. No degraded mode. It now also carries
    Buzrr-AI's ingestion queue, so an outage degrades two subsystems (AI
    ingestion is async and retryable, so it degrades more gracefully).
-3. **In-memory grace timers** (lobby removal 60s, duel forfeit 30s) die with
+3. **In-memory grace timers** (lobby removal 35s, duel forfeit 30s) die with
    their instance. Duel forfeits are re-derived from the roster's `lastSeenAt`
    by the sweeper (`sweepDuelForfeits`) and classic has the host-abandon sweep,
    so a crash delays those by up to a sweep tick rather than skipping them.

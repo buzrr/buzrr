@@ -12,6 +12,7 @@ import { openTextRenderer } from "./OpenText";
 import { pollRenderer } from "./Poll";
 import { ratingRenderer } from "./Rating";
 import { trueFalseRenderer } from "./TrueFalse";
+import { typeAnswerRenderer } from "./TypeAnswer";
 import { wordCloudRenderer } from "./WordCloud";
 import type { QuestionRenderer } from "./types";
 
@@ -22,6 +23,7 @@ import type { QuestionRenderer } from "./types";
 const RENDERERS: { [K in QuestionType]: QuestionRenderer<K> } = {
   multiple_choice: multipleChoiceRenderer,
   true_false: trueFalseRenderer,
+  type_answer: typeAnswerRenderer,
   poll: pollRenderer,
   word_cloud: wordCloudRenderer,
   rating: ratingRenderer,
@@ -84,6 +86,7 @@ export function HostPrompt({
 export function RevealBreakdown(props: {
   question: PublicQuestion;
   summary: RevealSummary;
+  hideCorrect?: boolean;
 }) {
   // The reveal belongs to the question on screen; a mismatch can only be a
   // snapshot caught mid-transition, so render nothing rather than nonsense.

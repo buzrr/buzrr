@@ -44,7 +44,8 @@ export function usePlayerSocket({
       // A kick/ban only ends this room's membership — the player keeps their
       // profile and can enter another room code straight away.
       socket.on("player-removed", (player) => {
-        if (player.id === playerId) {
+        // A lobby timeout isn't a kick: no "the host removed you".
+        if (player.id === playerId && !player.timedOut) {
           callbacks.current.onRemoved?.({ banned: player.banned ?? false });
         }
       });
