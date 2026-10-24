@@ -34,6 +34,7 @@ interface QuizQuestionItem {
 interface QuizQuestion {
   id?: string;
   title?: string;
+  logo?: string | null;
   settings?: unknown;
   questions?: QuizQuestionItem[];
 }
@@ -145,6 +146,7 @@ const GameLobby = (params: {
           />
           <HostHeader
             title={title}
+            logo={params.quizQuestions?.logo}
             roomId={params.roomId}
             alreadyEnded={alreadyEnded}
             endRedirect={endRedirect}

@@ -57,7 +57,8 @@ model User {
   /// max(plan cap, hostSizeLimit) — see billing/entitlements.service.ts.
   hostSizeLimit       Int                  @default(50) @map("host_size_limit")
   role                Role                 @default(user)
-  /// `userPreferencesSchema` in @buzrr/contract: the default audio skin.
+  /// `userPreferencesSchema` in @buzrr/contract: default logo / audio skin /
+  /// avatar skin, own avatar pictures.
   preferences         Json                 @default("{}")
   /// Dodo Payments customer, set by the first verified billing webhook.
   dodoCustomerId      String?              @unique @map("dodo_customer_id")
@@ -115,6 +116,9 @@ model Quiz {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   thumbnail    String?
+  /// The quiz's own logo (an upload URL), shown on its game screens instead
+  /// of the site logo.
+  logo         String?
   /// Public quizzes feed the duel-mode question pool.
   isPublic     Boolean       @default(false)
   /// Quiz settings (`quizSettingsSchema` in @buzrr/contract), e.g. moderated mode.

@@ -101,6 +101,18 @@ export function useDuplicateQuizMutation() {
   });
 }
 
+export function useQuizLogoMutation(quizId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File | null) => quizzesApi.setLogo(quizId, file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.quizzes.detail(quizId),
+      });
+    },
+  });
+}
+
 export function useDeleteResultsMutation(quizId: string) {
   const queryClient = useQueryClient();
   return useMutation({

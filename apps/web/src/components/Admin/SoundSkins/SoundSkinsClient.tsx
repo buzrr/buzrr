@@ -269,7 +269,7 @@ export default function SoundSkinsClient() {
   );
 }
 
-/** The default skin's box: tinted and ringed. */
+/** The default skin's box: tinted and ringed, like on Avatar Skins. */
 export const defaultBoxClass =
   "ring-2 ring-dprimary !bg-dprimary/8 dark:!bg-dprimary/10";
 

@@ -1,4 +1,7 @@
+import { signAssetUrl } from "../../common/storage/asset-signing";
 import {
+  assignAvatar,
+  loadSharedAvatars,
   resolveGameLook,
   roomSettings,
 } from "../../common/game-look/game-look";
@@ -51,6 +54,15 @@ export class GameSessionsService {
   ): Promise<{ roomId: string; playerId: string }> {
     const game = await this.prisma.db.gameSession.findUnique({
       where: { gameCode: dto.gameCode },
+      include: {
+        quiz: {
+          select: {
+            settings: true,
+            logo: true,
+            user: { select: { preferences: true } },
+          },
+        },
+      },
     });
     if (!game) {
       throw new NotFoundException("Game not found");
@@ -67,12 +79,21 @@ export class GameSessionsService {
       );
     }
     // The cap follows the host's plan at join time (a host downgrading
-    // mid-game never evicts anyone already in the room); worked out before the
-    // lock, so the locked part stays short.
+    // mid-game never evicts anyone already in the room); worked out — like the
+    // avatar — before the lock, so the locked part stays short.
     const rejoin = player.gameId === game.id;
     const limit = rejoin
       ? 0
       : await this.entitlements.maxPlayersFor(game.creatorId);
+    const { avatars } = resolveGameLook(
+      { settings: roomSettings(game), logo: game.quiz.logo },
+      game.quiz.user?.preferences,
+      (await this.entitlements.resolvePlan(game.creatorId)) === "pro",
+      await loadSharedAvatars(this.prisma.db),
+    );
+    const profilePic = avatars.includes(player.profilePic ?? "")
+      ? undefined
+      : assignAvatar(avatars, playerId);
 
     // Concurrent joins must not both pass the count and overshoot the cap:
     // each join locks the room's row first (SELECT … FOR UPDATE), so joins to
@@ -98,7 +119,7 @@ export class GameSessionsService {
             }
             await tx.player.update({
               where: { id: playerId },
-              data: { gameId: game.id },
+              data: { gameId: game.id, ...(profilePic ? { profilePic } : {}) },
             });
           },
           {
@@ -390,17 +411,22 @@ export class GameSessionsService {
     if (!quiz) {
       throw new NotFoundException("Quiz not found");
     }
-    // The owner's defaults filled in (audio skin).
+    // The owner's defaults filled in (audio / avatar skin, logo).
     const { user: owner, ...rest } = quiz;
     const look = resolveGameLook(
-      { settings: roomSettings({ settings: room.settings, quiz }) },
+      {
+        settings: roomSettings({ settings: room.settings, quiz }),
+        logo: quiz.logo,
+      },
       owner?.preferences,
       plan === "pro",
+      await loadSharedAvatars(this.prisma.db),
     );
     return {
       room,
       players,
-      quiz: { ...rest, settings: look.settings },
+      quiz: { ...rest, settings: look.settings, logo: look.logo },
+      avatars: look.avatars,
       maxPlayers,
       plan,
     };
@@ -421,12 +447,22 @@ export class GameSessionsService {
     const { settings, ...session } = loaded;
     const { user: owner, ...quiz } = session.quiz;
     const look = resolveGameLook(
-      { settings: roomSettings({ settings, quiz }) },
+      { settings: roomSettings({ settings, quiz }), logo: quiz.logo },
       owner?.preferences,
       (await this.entitlements.resolvePlan(loaded.creatorId)) === "pro",
+      await loadSharedAvatars(this.prisma.db),
     );
-    const game = { ...session, quiz: { ...quiz, settings: look.settings } };
-    return { player, game };
+    // A public route: the logo gets its signature here (players of this room
+    // are the ones who may see it).
+    const game = {
+      ...session,
+      quiz: {
+        ...quiz,
+        settings: look.settings,
+        logo: look.logo ? signAssetUrl(look.logo) : null,
+      },
+    };
+    return { player, game, avatars: look.avatars };
   }
 
   private async loadGameForPlay(gameSessionId: string) {
@@ -441,6 +477,7 @@ export class GameSessionsService {
             id: true,
             title: true,
             settings: true,
+            logo: true,
             questions: { where: { disabled: false }, select: { id: true } },
             user: { select: { preferences: true } },
           },

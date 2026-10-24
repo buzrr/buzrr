@@ -17,6 +17,11 @@ import {
   TextGenerator,
 } from "../../common/llm/text-generator";
 import { PrismaService } from "../../prisma/prisma.service";
+import {
+  MediaStorage,
+  MediaUnavailableError,
+  UnsupportedMediaError,
+} from "../../common/storage/media-storage";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
 import { EntitlementsService } from "../billing/entitlements.service";
 import {
@@ -51,6 +56,11 @@ import {
   type AiType,
 } from "./ai-mix";
 import { CreateQuizDto } from "./dto/create-quiz.dto";
+import {
+  LOGO_MAX,
+  imageType,
+  shrinkImage,
+} from "../../common/storage/image-resize";
 import { inAuthoredOrder, OPTION_ORDER } from "../../common/utils/option-order";
 
 /** Review rounds for AI questions: review all, then review the rewrites. */
@@ -64,10 +74,55 @@ export class QuizzesService {
     private readonly prisma: PrismaService,
     private readonly llm: TextGenerator,
     private readonly entitlements: EntitlementsService,
+    private readonly storage: MediaStorage,
   ) {}
 
   aiAvailable(): boolean {
     return this.llm.configured;
+  }
+
+  async setLogo(
+    user: AuthUser,
+    quizId: string,
+    file: Express.Multer.File | null,
+  ): Promise<{ logo: string | null }> {
+    const quiz = await this.prisma.db.quiz.findFirst({
+      where: { id: quizId, userId: user.userId },
+      select: { logo: true },
+    });
+    if (!quiz) throw new NotFoundException("Unauthorized or quiz not found");
+    let logo: string | null = null;
+    if (file) {
+      if (!file.mimetype.startsWith("image/")) {
+        throw new BadRequestException("The logo must be an image");
+      }
+      try {
+        // Every device in a room loads it: stored scaled down.
+        const small = await shrinkImage(file.buffer, LOGO_MAX);
+        ({ url: logo } = await this.storage.upload(small, {
+          contentType: small === file.buffer ? file.mimetype : imageType(small),
+          filename: file.originalname,
+          kind: "image",
+        }));
+      } catch (err) {
+        if (err instanceof UnsupportedMediaError) {
+          throw new BadRequestException(err.message);
+        }
+        if (err instanceof MediaUnavailableError) {
+          throw new ServiceUnavailableException(err.message);
+        }
+        throw err;
+      }
+    }
+    await this.prisma.db.quiz.update({ where: { id: quizId }, data: { logo } });
+    // The old file goes unless a copy of this quiz still shows it.
+    if (quiz.logo && quiz.logo !== logo) {
+      const users = await this.prisma.db.quiz.count({
+        where: { logo: quiz.logo },
+      });
+      if (users === 0) await this.storage.remove(quiz.logo);
+    }
+    return { logo };
   }
 
   async create(
@@ -88,7 +143,7 @@ export class QuizzesService {
   }
 
   /**
-   * Copies a quiz the user owns: settings and every question with its
+   * Copies a quiz the user owns: settings, logo and every question with its
    * options and media (uploads are shared, not copied — they are never
    * deleted while referenced). Duel moderation starts over (draft).
    */
@@ -113,6 +168,7 @@ export class QuizzesService {
           description: source.description,
           userId: user.userId,
           thumbnail: source.thumbnail,
+          logo: source.logo,
           settings: source.settings ?? {},
           questions: {
             create: source.questions.map((q) => ({

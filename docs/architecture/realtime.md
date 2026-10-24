@@ -64,7 +64,7 @@ in meta as `pacing` (games from before the field fall back by mode):
   close once every **connected** rostered player has answered.
 - A host-paced reveal whose parked deadline comes due is re-parked, not
   advanced.
-- A room's settings (moderated mode, sounds, reactions) come from
+- A room's settings (moderated mode, sounds, reactions, avatars) come from
   `roomSettings` (`common/game-look/game-look.ts`): the game's own
   `GameSession.settings` (the "Host quiz" dialog), else `Quiz.settings`.
   Every server read for a live room goes through it; moderation is copied

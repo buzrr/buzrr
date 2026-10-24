@@ -1,8 +1,33 @@
 import { runFfmpeg } from "./audio-transcode";
 import { sniffImage } from "./image-sniff";
 
+/** Avatar pictures are stored square at this size (PNG). */
+export const AVATAR_SIZE = 256;
+
+/**
+ * Any picture ffmpeg reads (PNG, JPEG, WebP, GIF, …) as a square PNG avatar:
+ * scaled to cover, centre-cropped, first frame only.
+ */
+export function toAvatarPng(input: Buffer): Promise<Buffer> {
+  return runFfmpeg(input, [
+    "-i",
+    "pipe:0",
+    "-vf",
+    `scale=${AVATAR_SIZE}:${AVATAR_SIZE}:force_original_aspect_ratio=increase,crop=${AVATAR_SIZE}:${AVATAR_SIZE}`,
+    "-frames:v",
+    "1",
+    "-f",
+    "image2pipe",
+    "-vcodec",
+    "png",
+    "pipe:1",
+  ]);
+}
+
 /** Question pictures: longest side as every device loads them. */
 export const QUESTION_IMAGE_MAX = 1600;
+/** Logos: shown a few hundred pixels wide at most. */
+export const LOGO_MAX = 512;
 
 /**
  * A JPEG's EXIF orientation (1 = as stored), so the picture can be turned

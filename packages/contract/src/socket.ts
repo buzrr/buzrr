@@ -266,9 +266,63 @@ export const soundSkinSchema = z.object({
   finalClipUrl: z.string().nullable().optional(),
 });
 
+// -- avatar skins ---------------------------------------------------------------
+// The pictures players pick from. Four built-in sets (files under the web
+// app's /images) and "custom": the quiz owner's own uploads (up to 20).
+
+export const AVATAR_SKINS = [
+  "original",
+  "comic",
+  "crazy",
+  "faces",
+  "custom",
+  /** The superadmin's own skin, shared with everyone (if they share it). */
+  "shared",
+] as const;
+export const avatarSkinSchema = z.enum(AVATAR_SKINS);
+export type AvatarSkin = z.infer<typeof avatarSkinSchema>;
+export const MAX_CUSTOM_AVATARS = 20;
+
+const numbered = (dir: string, prefix: string, n: number) =>
+  Array.from(
+    { length: n },
+    (_, i) =>
+      `/images/avatars/${dir}/${prefix}${String(i + 1).padStart(2, "0")}.svg`,
+  );
+
+/** The built-in sets' files (web public paths). */
+export const BUILTIN_AVATARS: Record<
+  Exclude<AvatarSkin, "custom" | "shared">,
+  string[]
+> = {
+  original: [
+    "/images/player_profile/profile1.png",
+    "/images/player_profile/profile2.png",
+    "/images/player_profile/profile3.png",
+    "/images/player_profile/profile4.png",
+    "/images/player_profile/profile5.jpg",
+    "/images/player_profile/profile6.png",
+    "/images/player_profile/profile7.jpg",
+    "/images/player_profile/profile9.jpg",
+    "/images/player_profile/profile10.jpg",
+    "/images/player_profile/profile11.jpg",
+    "/images/player_profile/profile12.png",
+  ],
+  comic: numbered("comic", "comic", 12),
+  crazy: numbered("crazy", "crazy", 12),
+  faces: numbered("faces", "faces", 15),
+};
+
 /** A user's defaults for their quizzes (Settings page). */
 export const userPreferencesSchema = z.object({
+  /** Shown on game screens of quizzes without a logo of their own. */
+  defaultLogo: z.string().nullable().default(null),
   defaultSoundSkin: z.string().min(1).max(64).default("builtin:show"),
+  defaultAvatarSkin: avatarSkinSchema.default("original"),
+  /** The "custom" avatar skin: own uploads, square, resized on upload. */
+  customAvatars: z.array(z.string()).max(MAX_CUSTOM_AVATARS).default([]),
+  /** Superadmin only: offer "Your skin" to every user (as "shared"). */
+  shareCustomAvatars: z.boolean().default(false),
 });
 export type UserPreferences = z.infer<typeof userPreferencesSchema>;
 
@@ -278,7 +332,12 @@ export const quizSettingsSchema = z.object({
   moderation: moderationSettingsSchema.prefault({}),
   /** Players can send live reactions (👍 ❤️ 😂) that fly across the host screen. */
   reactions: z.boolean().default(true),
+  /** The avatars players pick from; "default" = the owner's default. */
+  avatarSkin: z.enum(["default", ...AVATAR_SKINS]).default("default"),
 });
+
+/** Player in a room's lobby: switch to another of the room's avatars. */
+export const setAvatarSchema = z.object({ profilePic: z.string().max(500) });
 
 /**
  * A live reaction: one emoji (the player picks their three; defaults
@@ -853,6 +912,8 @@ export interface ClientToServerEvents {
   "bubble-stats": (payload: BubbleStatsPayload) => void;
   /** One tap on a reaction button (rate limited server-side). */
   reaction: (payload: ReactionPayload) => void;
+  /** Lobby only: pick another of this room's avatars. */
+  "set-avatar": (payload: { profilePic: string }) => void;
   /** Download progress of the next question's sound (see `preload`). */
   "preload-status": (payload: PreloadStatusPayload) => void;
   /** Progress on `preload-all`. */

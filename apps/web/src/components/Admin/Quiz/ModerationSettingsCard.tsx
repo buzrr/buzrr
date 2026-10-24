@@ -9,8 +9,8 @@ import { useUpdateQuizMutation } from "@/lib/modules/quizzes/hooks";
 import type { QuizDetail } from "@/lib/modules/quizzes/api";
 
 /**
- * The quiz's settings in the editor (sounds, reactions, moderated mode),
- * saved to `Quiz.settings` on every change. They are also what the
+ * The quiz's settings in the editor (avatars, sounds, reactions, moderated
+ * mode), saved to `Quiz.settings` on every change. They are also what the
  * "Host quiz" dialog starts from.
  */
 export default function ModerationSettingsCard({ quiz }: { quiz: QuizDetail }) {

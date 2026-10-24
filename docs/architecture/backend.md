@@ -15,10 +15,10 @@ whitelist: true, forbidNonWhitelisted: false })` → global
 `AllExceptionsFilter` (HttpExceptions pass through with status; everything
 else becomes a logged 500) → with `STORAGE_DRIVER=local`, static serving of
 `/uploads/*` from the upload directory — only with a valid signature (403
-otherwise; see `MediaStorage` below), except built-in skin files
-(`builtin-*`), which are public (`Cache-Control: public, max-age=31536000,
-immutable`); signed files get `private, max-age=21600, immutable`; all
-`nosniff`. Port:
+otherwise; see `MediaStorage` below), except avatar pictures and built-in skin
+files (`avatar-*`, `builtin-*`), which are public (`Cache-Control: public,
+max-age=31536000, immutable`); signed files get `private, max-age=21600,
+immutable`; all `nosniff`. Port:
 `API_PORT` ?? `PORT` ?? 3001.
 
 ## Module map (`src/app.module.ts`)
@@ -162,11 +162,11 @@ services.
 - `createRoom`: quiz owner only; body = contract `createGameSessionSchema`.
   Optional `settings` (the "Host quiz" dialog) are stored on the room
   (`GameSession.settings`), and with `saveAsDefault` on the quiz too. The
-  plan's limits (own sound skins are Pro) apply when settings
+  plan's limits (own sound / avatar skins, logo are Pro) apply when settings
   are read (`resolveGameLook`), for a room's own as for the quiz's. Spec:
   `game-sessions/__tests__/create-room.spec.ts`.
 - `join`: banned-check first; the cap (`maxPlayersFor`: per plan, `MAX_PLAYERS_FREE` /
-  `_PRO` / `_NOBILLING`, or a higher `hostSizeLimit` override) is worked out,
+  `_PRO` / `_NOBILLING`, or a higher `hostSizeLimit` override) and the avatar are worked out,
   then a short transaction takes the room row's lock (`SELECT … FOR UPDATE`, ReadCommitted),
   counts and attaches the player. Concurrent joins of one room queue on that lock for a few
   ms each instead of aborting each other (SERIALIZABLE did, and at 510 players the retries

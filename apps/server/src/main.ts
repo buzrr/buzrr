@@ -5,7 +5,7 @@ import { AppModule } from "./app.module";
 import { AllExceptionsFilter } from "./common/filters/http-exception.filter";
 import { LOCAL_UPLOADS_ROUTE } from "./common/storage/local.storage";
 import {
-  isPublicAssetKey,
+  isPublicAvatarKey,
   verifyAssetSignature,
 } from "./common/storage/asset-signing";
 import {
@@ -66,7 +66,7 @@ async function bootstrap() {
       ) => {
         const key = req.path.replace(/^\/+/, "");
         if (
-          !isPublicAssetKey(key) &&
+          !isPublicAvatarKey(key) &&
           !verifyAssetSignature(key, req.query.sig)
         ) {
           res.status(403).end();
@@ -82,12 +82,12 @@ async function bootstrap() {
       setHeaders: (res, path) => {
         // Keys are content ids (a file never changes): `immutable` spares
         // the revalidation on every reload. Signed links expire, so shared
-        // caches must not keep them; built-in skin files may be cached
-        // anywhere for a year.
+        // caches must not keep them; public avatars / built-in skin files
+        // may be cached anywhere for a year.
         const name = path.split(/[\\/]/).pop() ?? "";
         res.setHeader(
           "Cache-Control",
-          isPublicAssetKey(name)
+          isPublicAvatarKey(name)
             ? "public, max-age=31536000, immutable"
             : "private, max-age=21600, immutable",
         );

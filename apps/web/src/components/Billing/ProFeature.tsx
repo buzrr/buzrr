@@ -5,8 +5,8 @@ import { LuLock } from "react-icons/lu";
 import { useEntitlementsQuery } from "@/lib/modules/billing/hooks";
 
 /**
- * Own audio skins are a Pro feature; without billing every account has
- * them. Undefined while loading (show nothing yet).
+ * Own audio skins, own avatar skins and logos are Pro features; without
+ * billing every account has them. Undefined while loading (show nothing yet).
  */
 export function useHasPro(): boolean | undefined {
   const { data } = useEntitlementsQuery();

@@ -19,9 +19,10 @@ describe("roomSettings", () => {
   it("falls back to the quiz's settings when the game has none", () => {
     const s = roomSettings({
       settings: null,
-      quiz: { settings: { sound: { playOn: "off" } } },
+      quiz: { settings: { sound: { playOn: "off" }, avatarSkin: "comic" } },
     });
     expect(s.sound.playOn).toBe("off");
+    expect(s.avatarSkin).toBe("comic");
   });
 
   it("reads invalid settings as the defaults", () => {
@@ -40,13 +41,15 @@ describe("roomSettings", () => {
     const look = resolveGameLook(
       {
         settings: roomSettings({
-          settings: { sound: { skin: "user-skin" } },
+          settings: { sound: { skin: "user-skin" }, avatarSkin: "custom" },
           quiz: { settings: {} },
         }),
+        logo: null,
       },
       {},
       false,
     );
     expect(look.settings.sound.skin).toMatch(/^builtin:/);
+    expect(look.settings.avatarSkin).toBe("original");
   });
 });

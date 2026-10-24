@@ -133,6 +133,8 @@ export type PlayerPlayGame = GameSession & {
 export type PlayerPlayPayload = {
   player: Player;
   game: PlayerPlayGame | null;
+  /** The room's avatar skin: pictures the player may switch to. */
+  avatars?: string[];
 };
 
 export async function getPlayerPlay(client: AxiosInstance, playerId: string) {

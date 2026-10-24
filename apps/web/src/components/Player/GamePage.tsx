@@ -46,6 +46,8 @@ const FINAL_BLINK_TOP = 15;
 const GamePage = (params: {
   player: { id: string };
   game: GameSessionWithQuiz;
+  /** This room's avatar skin (the lobby lets the player switch). */
+  avatars?: string[];
 }) => {
   const game = params.game;
   const router = useRouter();
@@ -221,6 +223,10 @@ const GamePage = (params: {
           reactionBar={
             reactionsOn ? <ReactionBar socket={socket} inline /> : undefined
           }
+          avatars={params.avatars}
+          onPickAvatar={(profilePic) => {
+            if (socket?.connected) socket.emit("set-avatar", { profilePic });
+          }}
         />
       ) : phase === "question" ? (
         question && socket ? (

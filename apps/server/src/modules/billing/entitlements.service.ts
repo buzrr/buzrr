@@ -13,7 +13,7 @@ import type { PlanId, PlanLimits } from "./plans";
 /** Either the root client or an interactive-transaction client. */
 type Db = Prisma.TransactionClient;
 
-/** "feature": a Pro-only feature (own audio skins). */
+/** "feature": a Pro-only feature (own audio / avatar skins, logos). */
 export type PlanLimitKind = "quizzes" | "ai_tokens" | "feature";
 
 export type Entitlements = {
@@ -115,8 +115,8 @@ export class EntitlementsService {
   ) {}
 
   /**
-   * Own audio skins are a Pro feature (every account has them without
-   * billing). Refuses with a PLAN_LIMIT otherwise.
+   * Own audio skins, own avatar skins and logos are Pro features (every
+   * account has them without billing). Refuses with a PLAN_LIMIT otherwise.
    */
   async assertPro(userId: string, feature: string): Promise<void> {
     if ((await this.resolvePlan(userId)) !== "pro") {

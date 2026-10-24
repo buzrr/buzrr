@@ -1,11 +1,14 @@
 "use client";
 
+import { ProLock, useHasPro } from "@/components/Billing/ProFeature";
 import clsx from "clsx";
+import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   LuCheck,
   LuChevronRight,
+  LuImagePlus,
   LuPencil,
   LuTrash2,
   LuX,
@@ -17,10 +20,12 @@ import Switch from "@/components/ui/Switch";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import {
   useDeleteResultsMutation,
+  useQuizLogoMutation,
   useUpdateQuizMutation,
 } from "@/lib/modules/quizzes/hooks";
 import type { QuizDetail } from "@/lib/modules/quizzes/api";
 import ModerationSettingsCard from "@/components/Admin/Quiz/ModerationSettingsCard";
+import { dropTargetClass, useFileDrop } from "@/hooks/useFileDrop";
 
 function formatSessionDate(createdAt: string | Date) {
   const d = typeof createdAt === "string" ? new Date(createdAt) : createdAt;
@@ -122,6 +127,92 @@ function EditableHeader({ quiz }: { quiz: QuizDetail }) {
   );
 }
 
+/** The quiz's own logo: shown on its game screens instead of the site logo. */
+function LogoSetting({ quiz }: { quiz: QuizDetail }) {
+  const logoMutation = useQuizLogoMutation(quiz.id);
+  const input = useRef<HTMLInputElement>(null);
+  const logo = (quiz as QuizDetail & { logo?: string | null }).logo ?? null;
+  const upload = (file: File | null) =>
+    logoMutation.mutate(file, {
+      onSuccess: () => toast.success(file ? "Logo saved" : "Logo removed"),
+      onError: (err) => toast.error(getApiErrorMessage(err)),
+    });
+  const hasPro = useHasPro();
+  // A picture dropped onto the row becomes the logo.
+  const { over, dropProps } = useFileDrop((file) => {
+    if (file.type.startsWith("image/")) upload(file);
+    else toast.error("Drop a picture");
+  }, logoMutation.isPending);
+  if (hasPro === false && !logo) {
+    // A Pro feature (an existing logo can still be removed).
+    return (
+      <div className="flex items-center gap-3 mt-3 mb-1">
+        <span className="text-sm font-semibold">Quiz logo</span>
+        <ProLock what="A quiz logo" />
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-3 mt-3 mb-1" {...dropProps}>
+      <button
+        type="button"
+        onClick={() => input.current?.click()}
+        disabled={logoMutation.isPending}
+        title={logo ? "Change logo" : "Upload a logo"}
+        className={clsx(
+          "relative size-14 shrink-0 rounded-xl border-[1.5px] border-dashed border-lprimary/25 dark:border-white/15 bg-light-bg dark:bg-card-dark flex items-center justify-center overflow-hidden cursor-pointer hover:border-dprimary",
+          over && dropTargetClass,
+        )}
+      >
+        {logo ? (
+          <Image
+            src={logo}
+            alt="Quiz logo"
+            fill
+            sizes="56px"
+            className="object-contain p-1"
+            unoptimized
+          />
+        ) : (
+          <LuImagePlus size={22} className="text-lprimary dark:text-dprimary" />
+        )}
+      </button>
+      <div className="flex flex-col min-w-0">
+        <span className="text-sm font-semibold">Quiz logo</span>
+        <span className="text-xs text-off-dark dark:text-muted-dark">
+          {logoMutation.isPending
+            ? "Uploading…"
+            : logo
+              ? "Shown in the game instead of the site logo"
+              : "Optional · PNG, JPG, SVG or WebP"}
+        </span>
+      </div>
+      {logo && !logoMutation.isPending && (
+        <button
+          type="button"
+          aria-label="Remove logo"
+          title="Remove logo"
+          onClick={() => upload(null)}
+          className="ml-auto size-8 rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] cursor-pointer"
+        >
+          <LuTrash2 size={16} />
+        </button>
+      )}
+      <input
+        ref={input}
+        type="file"
+        accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif"
+        className="sr-only"
+        onChange={(e) => {
+          const f = e.target.files?.[0] ?? null;
+          e.target.value = "";
+          if (f) upload(f);
+        }}
+      />
+    </div>
+  );
+}
+
 /**
  * The quiz info panel body: breadcrumb, description, public toggle and past
  * sessions. Rendered in the fixed desktop panel and inside the mobile drawer
@@ -193,6 +284,7 @@ export function QuizInfoContent(props: {
             appearing in 1v1 duels
           </span>
         </div>
+        <LogoSetting quiz={props.quiz} />
         <ModerationSettingsCard quiz={props.quiz} />
       </div>
       <div className="flex flex-col w-[90%] mx-auto text-dark dark:text-white">

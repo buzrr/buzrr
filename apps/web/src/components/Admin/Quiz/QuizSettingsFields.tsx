@@ -3,11 +3,13 @@
 import {
   BUILTIN_SOUND_SKINS,
   quizSettingsSchema,
+  type AvatarSkin,
   type ModerationSettings,
   type QuizSettings,
   type SoundSettings,
 } from "@buzrr/contract";
 import { useSoundSkinsQuery } from "@/lib/modules/sound-skins/hooks";
+import { AVATAR_SKIN_NAMES } from "@/components/Admin/AvatarSkins/AvatarSkinsClient";
 import { BUILTIN_SKINS, type BuiltinSkinId } from "@/lib/sound/synth";
 import Switch from "@/components/ui/Switch";
 
@@ -37,9 +39,9 @@ export function quizSettingsOf(raw: unknown): QuizSettings {
 }
 
 /**
- * The quiz settings controls: sounds, live reactions, moderated mode.
- * Controlled — the quiz editor saves every change, the "Host quiz" dialog
- * keeps them for the game it opens.
+ * The quiz settings controls: avatars, sounds, live reactions, moderated
+ * mode. Controlled — the quiz editor saves every change, the "Host quiz"
+ * dialog keeps them for the game it opens.
  */
 export default function QuizSettingsFields({
   settings,
@@ -62,6 +64,28 @@ export default function QuizSettingsFields({
 
   return (
     <div className="flex flex-col gap-2">
+      <label className="flex items-center gap-2 text-sm">
+        <span className="w-20 shrink-0 text-[13px] font-semibold">Avatars</span>
+        <select
+          aria-label="Avatar skin"
+          value={settings.avatarSkin}
+          disabled={disabled}
+          onChange={(e) =>
+            onChange({
+              ...settings,
+              avatarSkin: e.target.value as QuizSettings["avatarSkin"],
+            })
+          }
+          className={selectClass}
+        >
+          <option value="default">Default (your settings)</option>
+          {(Object.keys(AVATAR_SKIN_NAMES) as AvatarSkin[]).map((k) => (
+            <option key={k} value={k}>
+              {AVATAR_SKIN_NAMES[k]}
+            </option>
+          ))}
+        </select>
+      </label>
       <div className="flex flex-col gap-1.5 text-sm">
         <span className="font-semibold">Sounds</span>
         <label className="flex items-center gap-2">

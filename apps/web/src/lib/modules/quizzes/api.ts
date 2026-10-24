@@ -135,6 +135,17 @@ export const quizzesApi = {
         `/quizzes/${quizId}/duplicate`,
       )
     ).data,
+  /** Uploads (file) or removes (null) the quiz logo. */
+  setLogo: async (quizId: string, file: File | null) => {
+    const fd = new FormData();
+    if (file) fd.append("file", file);
+    return (
+      await getAuthApiClient().post<{ logo: string | null }>(
+        `/quizzes/${quizId}/logo`,
+        fd,
+      )
+    ).data;
+  },
   /** Deletes one past run (`resultId`) or every past run of the quiz. */
   deleteResults: async (target: { resultId: string } | { quizId: string }) => {
     await getAuthApiClient().delete(

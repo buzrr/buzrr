@@ -48,6 +48,7 @@ const Lobby = (params: {
   players: PlayerPayload[];
   gameStarted: boolean;
   quizTitle: string;
+  quizLogo?: string | null;
   quizId: string;
   maxPlayers?: number;
   plan?: "free" | "pro";
@@ -366,6 +367,7 @@ const Lobby = (params: {
       <div className="w-full flex flex-col px-4 sm:px-6 lg:px-8 -mb-12 pb-4 md:pb-0 md:h-[100dvh] text-dark dark:text-white">
         <HostHeader
           title={params.quizTitle}
+          logo={params.quizLogo}
           roomId={params.roomId}
           endRedirect={`/admin/quiz/${params.quizId}`}
         />

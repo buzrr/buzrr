@@ -13,6 +13,7 @@ import {
   slotDoneSchema,
   reactionSchema,
   submitAnswerSchema,
+  setAvatarSchema,
 } from "@buzrr/contract";
 import { Logger } from "@nestjs/common";
 import {
@@ -846,6 +847,28 @@ export class RealtimeGateway
       const parsed = bubbleStatsSchema.safeParse(payload);
       if (!parsed.success) return;
       this.queueBubbleStats(gameCode, playerId, parsed.data);
+    });
+
+    // Lobby only: switch to another of the room's avatars.
+    socket.on("set-avatar", async (payload) => {
+      const playerId = socket.data.playerId;
+      const sessionId = socket.data.gameSessionId;
+      const parsed = setAvatarSchema.safeParse(payload);
+      if (!playerId || !sessionId || !parsed.success) return;
+      const meta = await this.store.getMeta(gameCode);
+      if (meta && meta.phase !== "lobby") return;
+      const player = await this.realtimeService.setAvatar(
+        playerId,
+        sessionId,
+        parsed.data.profilePic,
+      );
+      if (!player) return;
+      await this.engine.playerConnected(gameCode, {
+        id: player.id,
+        name: player.name,
+        profilePic: player.profilePic,
+      });
+      this.server.to(gameCode).emit("player-joined", player);
     });
 
     socket.on("leave-room", async () => {

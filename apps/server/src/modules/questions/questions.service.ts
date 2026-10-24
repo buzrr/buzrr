@@ -760,21 +760,24 @@ export class QuestionsService implements OnApplicationBootstrap {
   }
 
   /**
-   * Removes an upload unless another question still uses it — duplicated
-   * quizzes share their files with the original.
+   * Removes an upload unless another question (or a quiz logo) still uses
+   * it — duplicated quizzes share their files with the original.
    */
   private async removeUnused(url: string): Promise<void> {
-    const questions = await this.prisma.db.question.count({
-      where: {
-        OR: [
-          { media: url },
-          { audio: url },
-          { audioClip: url },
-          { mediaClip: url },
-          { audioRevealClip: url },
-        ],
-      },
-    });
-    if (questions === 0) await this.storage.remove(url);
+    const [questions, quizzes] = await Promise.all([
+      this.prisma.db.question.count({
+        where: {
+          OR: [
+            { media: url },
+            { audio: url },
+            { audioClip: url },
+            { mediaClip: url },
+            { audioRevealClip: url },
+          ],
+        },
+      }),
+      this.prisma.db.quiz.count({ where: { logo: url } }),
+    ]);
+    if (questions + quizzes === 0) await this.storage.remove(url);
   }
 }
