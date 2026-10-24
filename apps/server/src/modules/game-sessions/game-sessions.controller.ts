@@ -17,9 +17,13 @@ import type {
   AuthUser,
   PlayerAuthUser,
 } from "../../common/decorators/current-user.decorator";
+import {
+  createGameSessionSchema,
+  type CreateGameSession,
+} from "@buzrr/contract";
 import { Public } from "../../common/decorators/public.decorator";
 import { RateLimitGuard } from "../../common/guards/rate-limit.guard";
-import { CreateRoomDto } from "./dto/create-room.dto";
+import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { JoinRoomDto } from "./dto/join-room.dto";
 import { GameSessionsService } from "./game-sessions.service";
 
@@ -53,6 +57,26 @@ export class GameSessionsController {
     return this.gameSessions.getResult(user, resultId);
   }
 
+  /** Host deletes one past run of their quiz (its leaderboard). */
+  @Delete("results/:resultId")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteResult(
+    @CurrentAccountUser() user: AuthUser,
+    @Param("resultId") resultId: string,
+  ) {
+    await this.gameSessions.deleteResults(user, { resultId });
+  }
+
+  /** Host deletes every past run of one quiz. */
+  @Delete("results/by-quiz/:quizId")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteQuizResults(
+    @CurrentAccountUser() user: AuthUser,
+    @Param("quizId") quizId: string,
+  ) {
+    await this.gameSessions.deleteResults(user, { quizId });
+  }
+
   @Get(":roomId/lobby")
   adminLobby(
     @CurrentAccountUser() user: AuthUser,
@@ -62,7 +86,11 @@ export class GameSessionsController {
   }
 
   @Post()
-  create(@CurrentAccountUser() user: AuthUser, @Body() dto: CreateRoomDto) {
+  create(
+    @CurrentAccountUser() user: AuthUser,
+    @Body(new ZodValidationPipe(createGameSessionSchema))
+    dto: CreateGameSession,
+  ) {
     return this.gameSessions.createRoom(user, dto);
   }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import clsx from "clsx";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { isAxiosError } from "axios";
@@ -24,15 +25,21 @@ export default function EndQuizButton({
   redirectTo = "/admin/history",
   alreadyEnded = false,
   inline = false,
+  pill = false,
   primaryLabel,
+  danger = false,
 }: {
   roomId: string;
   redirectTo?: string;
   /** True on the final leaderboard: the game already ended, so just exit. */
   alreadyEnded?: boolean;
   inline?: boolean;
+  /** Header pill, styled like the "Live" status. */
+  pill?: boolean;
   /** Render as the gameplay primary button with this label instead. */
   primaryLabel?: string;
+  /** The primary button in red: it ends the game. */
+  danger?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -62,13 +69,31 @@ export default function EndQuizButton({
       {primaryLabel ? (
         <button
           type="button"
-          className={primaryButtonClass}
+          className={
+            danger
+              ? clsx(
+                  primaryButtonClass,
+                  "!bg-none !bg-red-light dark:!bg-red-dark dark:!text-dark !shadow-[0_10px_24px_-10px_#e5544e]",
+                )
+              : primaryButtonClass
+          }
           disabled={ending}
           onClick={() =>
             alreadyEnded ? router.push(redirectTo) : void confirmEnd()
           }
         >
           {ending ? "Saving results…" : primaryLabel}
+        </button>
+      ) : pill ? (
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 rounded-full border border-red-light/40 dark:border-red-dark/40 bg-white dark:bg-white/5 px-3 py-1.5 text-[13px] font-semibold text-red-light dark:text-red-dark cursor-pointer hover:bg-red-light hover:text-white dark:hover:bg-red-dark dark:hover:text-dark transition-colors"
+          onClick={() =>
+            alreadyEnded ? router.push(redirectTo) : setOpen(true)
+          }
+        >
+          <span className="h-2 w-2 rounded-full bg-current" />
+          {alreadyEnded ? "Exit" : "End"}
         </button>
       ) : inline ? (
         <button

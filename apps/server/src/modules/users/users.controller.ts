@@ -1,11 +1,35 @@
-import { Controller, Get } from "@nestjs/common";
+import { Body, Controller, Get, Patch } from "@nestjs/common";
+import { z } from "zod";
+import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
+import { PreferencesService } from "./preferences.service";
 import { CurrentAccountUser } from "../../common/decorators/current-user.decorator";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
 import { PrismaService } from "../../prisma/prisma.service";
 
+const preferencesPatchSchema = z.object({
+  defaultSoundSkin: z.string().max(64).optional(),
+});
+
 @Controller("users")
 export class UsersController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly preferences: PreferencesService,
+  ) {}
+
+  @Get("me/preferences")
+  myPreferences(@CurrentAccountUser() user: AuthUser) {
+    return this.preferences.get(user.userId);
+  }
+
+  @Patch("me/preferences")
+  updatePreferences(
+    @CurrentAccountUser() user: AuthUser,
+    @Body(new ZodValidationPipe(preferencesPatchSchema))
+    body: z.infer<typeof preferencesPatchSchema>,
+  ) {
+    return this.preferences.update(user.userId, body);
+  }
 
   @Get("me/stats")
   async myStats(@CurrentAccountUser() user: AuthUser) {
