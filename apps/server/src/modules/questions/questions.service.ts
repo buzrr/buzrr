@@ -18,6 +18,7 @@ import {
   MediaUnavailableError,
   UnsupportedMediaError,
 } from "../../common/storage/media-storage";
+import { stripAssetSignature } from "../../common/storage/asset-signing";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
 import {
@@ -27,6 +28,7 @@ import {
 } from "../question-types";
 import { CategoriesService } from "../categories/categories.service";
 import { ReorderQuestionsDto } from "./dto/reorder-questions.dto";
+import { inAuthoredOrder, OPTION_ORDER } from "../../common/utils/option-order";
 
 type MultipartBody = Record<string, string | undefined>;
 
@@ -103,7 +105,7 @@ export class QuestionsService {
     await this.assertQuizOwned(quizId, user.userId);
     const questions = await this.prisma.db.question.findMany({
       where: { quizId },
-      include: { options: true },
+      include: { options: { orderBy: OPTION_ORDER } },
       orderBy: { order: "asc" },
     });
     return { status: 200, questions };
@@ -158,6 +160,30 @@ export class QuestionsService {
     return { status: 200, message: "Success" };
   }
 
+  /** Disables (skipped in games and counts) or re-enables a question. */
+  async setDisabled(
+    user: AuthUser,
+    quesId: string,
+    disabled: boolean,
+  ): Promise<{ id: string; disabled: boolean }> {
+    const question = await this.prisma.db.question.findUnique({
+      where: { id: quesId },
+      include: { quiz: true },
+    });
+    if (!question) {
+      throw new NotFoundException("Question not found");
+    }
+    if (!ownsQuestion(question, user.userId)) {
+      throw new ForbiddenException("Unauthorized");
+    }
+    await this.prisma.db.question.update({
+      where: { id: quesId },
+      data: { disabled },
+    });
+    await this.touchQuiz(question.quizId);
+    return { id: quesId, disabled };
+  }
+
   async delete(user: AuthUser, quesId: string): Promise<void> {
     const question = await this.prisma.db.question.findUnique({
       where: { id: quesId },
@@ -182,6 +208,15 @@ export class QuestionsService {
         data: { order: { decrement: 1 } },
       }),
     ]);
+    await this.touchQuiz(quizId);
+  }
+
+  /** A question changed: the quiz counts as updated (quiz list order). */
+  async touchQuiz(quizId: string | null | undefined): Promise<void> {
+    if (!quizId) return;
+    await this.prisma.db.quiz
+      .update({ where: { id: quizId }, data: { updatedAt: new Date() } })
+      .catch(() => undefined);
   }
 
   async upsertFromMultipart(
@@ -195,7 +230,10 @@ export class QuestionsService {
     const title = body.title?.trim();
     const time = body.time;
     const quesId = body.ques_id?.trim() || undefined;
-    const file_link = body.file_link;
+    // Links sent back by the editor are signed; the database keeps them bare.
+    const file_link = body.file_link
+      ? stripAssetSignature(body.file_link)
+      : body.file_link;
     const file_type = body.media_type;
     const type = body.type?.trim() || DEFAULT_QUESTION_TYPE;
 
@@ -296,18 +334,20 @@ export class QuestionsService {
         });
         await tx.option.deleteMany({ where: { questionId: quesId } });
         await tx.option.createMany({
-          data: options.map((o) => ({
-            title: o.title,
-            isCorrect: o.isCorrect,
-            questionId: quesId,
-          })),
+          data: inAuthoredOrder(
+            options.map((o) => ({
+              title: o.title,
+              isCorrect: o.isCorrect,
+              questionId: quesId,
+            })),
+          ),
         });
         await tx.questionReport.deleteMany({ where: { questionId: quesId } });
       });
       // Only now, and only the question's own stored media — never a URL
       // the client sent (`file_link`), which could name anyone's upload.
       if (existing?.media && existing.media !== fileLink) {
-        await this.storage.remove(existing.media);
+        await this.removeUnused(existing.media);
       }
     } else {
       await this.prisma.db.$transaction(async (tx) => {
@@ -317,7 +357,7 @@ export class QuestionsService {
             title,
             type,
             config,
-            options: { create: options },
+            options: { create: inAuthoredOrder(options) },
             quizId,
             timeOut,
             media: fileLink || null,
@@ -406,5 +446,16 @@ export class QuestionsService {
     ]);
     const ids = rows.map((question) => question.id);
     return { created: ids.length, ids };
+  }
+
+  /**
+   * Removes an upload unless another question still uses it — duplicated
+   * quizzes share their files with the original.
+   */
+  private async removeUnused(url: string): Promise<void> {
+    const questions = await this.prisma.db.question.count({
+      where: { media: url },
+    });
+    if (questions === 0) await this.storage.remove(url);
   }
 }

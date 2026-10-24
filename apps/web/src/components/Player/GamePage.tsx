@@ -8,14 +8,22 @@ import type { GameSession } from "@/types/db";
 import { WaitGameStart, Question, Result, LeaderBoard } from "./GameScreens";
 import ConnectionBanner from "@/components/ConnectionBanner";
 import GetReady from "@/components/Game/GetReady";
+import {
+  ClosedSlide,
+  PlayerScores,
+  ReadySlide,
+} from "@/components/Game/ModeratedSteps";
 import ConnectionStatusPill from "@/components/ConnectionStatusPill";
 import ConfirmationModal from "@/components/Admin/ConfirmationModal";
 import { usePlayerSocket } from "@/hooks/usePlayerSocket";
+import { ReactionBar } from "@/components/Game/Flyers";
+import { SCORES_EMOJI_TOP, quizSettingsSchema } from "@buzrr/contract";
 import { playersApi } from "@/lib/modules/players/api";
 
 interface GameSessionWithQuiz extends GameSession {
   quiz: {
     title?: string;
+    settings?: unknown;
     questions: {
       id: string;
       title?: string;
@@ -41,6 +49,12 @@ const GamePage = (params: {
   const phase = useAppSelector((state) => state.game.phase);
   const question = useAppSelector((state) => state.game.question);
   const you = useAppSelector((state) => state.game.you);
+  const qIndex = useAppSelector((state) => state.game.qIndex);
+  // The question whose board got this player's emoji: the bar stays away
+  // while that board (reveal, scores) is on screen.
+  const [boardEmojiQ, setBoardEmojiQ] = useState<number | null>(null);
+  const sentToBoard =
+    (phase === "reveal" || phase === "scores") && boardEmojiQ === qIndex;
 
   const { socket } = usePlayerSocket({
     playerId: params.player.id,
@@ -85,10 +99,40 @@ const GamePage = (params: {
     router.replace(`/player/joinRoom/${params.player.id}`);
   };
 
+  const settings = quizSettingsSchema.safeParse(game.quiz.settings ?? {});
+  const reactionsOn = settings.success ? settings.data.reactions : true;
+
   return (
     <>
       <ConnectionBanner />
-      {phase !== "question" && phase !== "reveal" && (
+      {reactionsOn &&
+        phase !== "ended" &&
+        phase !== "idle" &&
+        phase !== "lobby" &&
+        (sentToBoard ? null : phase === "scores" ? (
+          // The scores step: the top SCORES_EMOJI_TOP send one emoji each,
+          // shown on their row of the host's board.
+          you?.rank != null &&
+          you.rank <= SCORES_EMOJI_TOP && (
+            <ReactionBar
+              key={`scores-${qIndex}`}
+              socket={socket}
+              oneShot
+              onSent={() => setBoardEmojiQ(qIndex)}
+            />
+          )
+        ) : phase === "reveal" && you?.isCorrect ? (
+          // "Right!": the first emoji goes onto their row of the board.
+          <ReactionBar
+            key={`reveal-${qIndex}`}
+            socket={socket}
+            oneShot
+            onSent={() => setBoardEmojiQ(qIndex)}
+          />
+        ) : (
+          <ReactionBar socket={socket} />
+        ))}
+      {phase !== "question" && phase !== "reveal" && phase !== "closed" && (
         <ConnectionStatusPill className="fixed left-3 bottom-3 z-40" />
       )}
       <ConfirmationModal
@@ -103,6 +147,12 @@ const GamePage = (params: {
           player={params.player}
           game={params.game}
           onLeave={() => setShowLeaveModal(true)}
+          onBubbleStats={(stats) => {
+            if (socket?.connected) socket.emit("bubble-stats", stats);
+          }}
+          reactionBar={
+            reactionsOn ? <ReactionBar socket={socket} inline /> : undefined
+          }
         />
       ) : phase === "question" ? (
         question && socket ? (
@@ -117,6 +167,12 @@ const GamePage = (params: {
         ) : (
           <GetReady title={game.quiz.title ?? undefined} />
         )
+      ) : phase === "ready" ? (
+        <ReadySlide />
+      ) : phase === "closed" ? (
+        <ClosedSlide />
+      ) : phase === "scores" ? (
+        <PlayerScores playerId={params.player.id} />
       ) : phase === "reveal" ? (
         <Result
           you={you}

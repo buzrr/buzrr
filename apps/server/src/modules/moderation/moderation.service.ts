@@ -14,6 +14,7 @@ import { Prisma } from "@buzrr/prisma";
 import { CategoriesService } from "../categories/categories.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { isDuelEligible } from "../question-types";
+import { OPTION_ORDER } from "../../common/utils/option-order";
 
 const REPORT_THRESHOLD = 5; // the 6th distinct reporter triggers auto-unapprove
 const DEFAULT_LIMIT = 20;
@@ -56,7 +57,7 @@ export class ModerationService {
       take: limit + 1,
       ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
       include: {
-        options: true,
+        options: { orderBy: OPTION_ORDER },
         quiz: {
           select: {
             id: true,

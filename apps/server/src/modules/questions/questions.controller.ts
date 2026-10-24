@@ -13,6 +13,7 @@ import {
   createStandaloneQuestionsSchema,
   type CreateStandaloneQuestions,
 } from "@buzrr/contract";
+import { z } from "zod";
 import { CurrentAccountUser } from "../../common/decorators/current-user.decorator";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
 import { RateLimitProfile } from "../../common/decorators/rate-limit-profile.decorator";
@@ -23,6 +24,8 @@ import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { ModerationService } from "../moderation/moderation.service";
 import { ReorderQuestionsDto } from "./dto/reorder-questions.dto";
 import { QuestionsService } from "./questions.service";
+
+const setDisabledSchema = z.object({ disabled: z.boolean() });
 
 @Controller("questions")
 export class QuestionsController {
@@ -52,6 +55,16 @@ export class QuestionsController {
     @Body() dto: ReorderQuestionsDto,
   ) {
     return this.questions.reorder(user, dto);
+  }
+
+  @Patch(":id/disabled")
+  setDisabled(
+    @CurrentAccountUser() user: AuthUser,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(setDisabledSchema))
+    body: z.infer<typeof setDisabledSchema>,
+  ) {
+    return this.questions.setDisabled(user, id, body.disabled);
   }
 
   @Delete(":id")

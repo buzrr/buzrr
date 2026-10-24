@@ -31,7 +31,7 @@ ReduxProvider → QueryProvider → Vercel Analytics and the SEO metadata.
 
 Classic-mode navigation sequences (duel flow: [duels.md](duels.md#client-side-flow-web)):
 
-- **Host**: `/admin` (quiz list) → quiz detail → host → `POST /game-sessions`
+- **Host**: `/admin` (quiz list) → quiz detail → "Host quiz" (settings dialog) → `POST /game-sessions`
   → `/admin/play/[roomId]` (lobby; `roomId` = GameSession id) → start-game →
   `/admin/game/[roomId]` (live; the final leaderboard renders here in place —
   no auto-navigation on game over). The durable result is reached later from
@@ -118,7 +118,9 @@ disconnect`), emits `request-sync` on connect as a safety net and when the
 - Guest screen: `Player/PlayPageClient` → `Player/GamePage` →
   `Player/GameScreens/*` (`Question` submits with ack + rollback toast,
   `Result`, `WaitGameStart` with the canvas bubble mini-game in `Game.tsx`,
-  `Leaderboard`).
+  `Leaderboard`). Reactions: `Game/Flyers` — `ReactionBar` on the phone
+  (👍 ❤️ 😂 plus up to 4 own emojis kept in the browser,
+  `lib/player-prefs.ts`), `ReactionOverlay` flyers on the host screen.
 - Duel screen: `Duel/DuelGameClient` (score bar, countdown with category and
   streak chip, reuses `GameScreens/Question`/`Result`, rating + daily-streak
   result panel, `DuelAudio`). Duel home: `CategoryPicker`, `DuelProfileCard`,

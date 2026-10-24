@@ -60,6 +60,14 @@ export class MemoryStore {
   async roster() {
     return [...this.players.values()];
   }
+  /** Like the real store: the score is parked for a rejoin. */
+  departed = new Map<string, number>();
+  async removePlayer(_code: string, id: string) {
+    this.players.delete(id);
+    const score = this.scores.get(id);
+    if (score !== undefined) this.departed.set(id, score);
+    this.scores.delete(id);
+  }
   async recordAnswer(
     _code: string,
     qIndex: number,
@@ -118,6 +126,8 @@ export class FakeServer {
       emit: (event: string, payload: unknown) => {
         this.emitted.push({ room, event, payload });
       },
+      // Recorded as "room!except", e.g. "ROOM01!host:ROOM01".
+      except: (other: string) => this.to(`${room}!${other}`),
     };
   }
   events(event: string) {

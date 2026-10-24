@@ -1,3 +1,4 @@
+import type { QuizSettings } from "@buzrr/contract";
 import type { AxiosInstance } from "axios";
 import type { QuestionType } from "@buzrr/contract";
 import type { GameSession, Quiz } from "@/types/db";
@@ -55,7 +56,12 @@ export async function deleteQuiz(client: AxiosInstance, quizId: string) {
 export async function updateQuiz(
   client: AxiosInstance,
   quizId: string,
-  body: { title?: string; description?: string; isPublic?: boolean },
+  body: {
+    title?: string;
+    description?: string;
+    isPublic?: boolean;
+    settings?: QuizSettings;
+  },
 ) {
   const { data } = await client.patch<Quiz>(`/quizzes/${quizId}`, body);
   return data;
@@ -93,4 +99,19 @@ export const quizzesApi = {
   update: (quizId: string, body: Parameters<typeof updateQuiz>[2]) =>
     updateQuiz(getAuthApiClient(), quizId, body),
   delete: (quizId: string) => deleteQuiz(getAuthApiClient(), quizId),
+  /** A copy with all questions; returns the new quiz's id. */
+  duplicate: async (quizId: string) =>
+    (
+      await getAuthApiClient().post<{ quizId: string }>(
+        `/quizzes/${quizId}/duplicate`,
+      )
+    ).data,
+  /** Deletes one past run (`resultId`) or every past run of the quiz. */
+  deleteResults: async (target: { resultId: string } | { quizId: string }) => {
+    await getAuthApiClient().delete(
+      "resultId" in target
+        ? `/game-sessions/results/${target.resultId}`
+        : `/game-sessions/results/by-quiz/${target.quizId}`,
+    );
+  },
 };

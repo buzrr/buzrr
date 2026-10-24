@@ -24,6 +24,7 @@ export default function EndQuizButton({
   redirectTo = "/admin/history",
   alreadyEnded = false,
   inline = false,
+  pill = false,
   primaryLabel,
 }: {
   roomId: string;
@@ -31,6 +32,8 @@ export default function EndQuizButton({
   /** True on the final leaderboard: the game already ended, so just exit. */
   alreadyEnded?: boolean;
   inline?: boolean;
+  /** Header pill, styled like the "Live" status. */
+  pill?: boolean;
   /** Render as the gameplay primary button with this label instead. */
   primaryLabel?: string;
 }) {
@@ -69,6 +72,17 @@ export default function EndQuizButton({
           }
         >
           {ending ? "Saving results…" : primaryLabel}
+        </button>
+      ) : pill ? (
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 rounded-full border border-red-light/40 dark:border-red-dark/40 bg-white dark:bg-white/5 px-3 py-1.5 text-[13px] font-semibold text-red-light dark:text-red-dark cursor-pointer hover:bg-red-light hover:text-white dark:hover:bg-red-dark dark:hover:text-dark transition-colors"
+          onClick={() =>
+            alreadyEnded ? router.push(redirectTo) : setOpen(true)
+          }
+        >
+          <span className="h-2 w-2 rounded-full bg-current" />
+          {alreadyEnded ? "Exit" : "End"}
         </button>
       ) : inline ? (
         <button

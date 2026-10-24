@@ -4,6 +4,7 @@ import { NestExpressApplication } from "@nestjs/platform-express";
 import { AppModule } from "./app.module";
 import { AllExceptionsFilter } from "./common/filters/http-exception.filter";
 import { LOCAL_UPLOADS_ROUTE } from "./common/storage/local.storage";
+import { verifyAssetSignature } from "./common/storage/asset-signing";
 import {
   localStorageConfig,
   resolveStorageDriver,
@@ -48,13 +49,33 @@ async function bootstrap() {
   // keeps a browser from second-guessing their type.
   const env = (key: string) => process.env[key];
   if (resolveStorageDriver(env) === "local") {
+    // Uploads are not public: only a signed link (see asset-signing.ts) is
+    // served — no download for anyone who isn't in the game or signed in.
+    app.use(
+      `${LOCAL_UPLOADS_ROUTE}/`,
+      (
+        req: { path: string; query: Record<string, unknown> },
+        res: {
+          status: (c: number) => { end: () => void };
+          setHeader: (k: string, v: string) => void;
+        },
+        next: () => void,
+      ) => {
+        const key = req.path.replace(/^\/+/, "");
+        if (!verifyAssetSignature(key, req.query.sig)) {
+          res.status(403).end();
+          return;
+        }
+        next();
+      },
+    );
     app.useStaticAssets(localStorageConfig(env).dir, {
       prefix: `${LOCAL_UPLOADS_ROUTE}/`,
-      immutable: true,
-      maxAge: "365d",
       index: false,
       dotfiles: "deny",
       setHeaders: (res) => {
+        // Private: signed links expire, shared caches must not keep them.
+        res.setHeader("Cache-Control", "private, max-age=21600");
         res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
       },
