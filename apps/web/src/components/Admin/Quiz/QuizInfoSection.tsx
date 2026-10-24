@@ -24,6 +24,7 @@ import {
   useUpdateQuizMutation,
 } from "@/lib/modules/quizzes/hooks";
 import type { QuizDetail } from "@/lib/modules/quizzes/api";
+import { useInstance } from "@/lib/instance-context";
 import ModerationSettingsCard from "@/components/Admin/Quiz/ModerationSettingsCard";
 import { dropTargetClass, useFileDrop } from "@/hooks/useFileDrop";
 import SoloTestsPanel from "@/components/Solo/SoloTestsPanel";
@@ -230,6 +231,7 @@ export function QuizInfoContent(props: {
   const questionCount = props.quiz._count?.questions ?? 0;
   const updateQuiz = useUpdateQuizMutation();
   const deleteResults = useDeleteResultsMutation(props.quiz.id);
+  const { duels } = useInstance();
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
   return (
@@ -267,25 +269,27 @@ export function QuizInfoContent(props: {
         <p className="w-fit my-1 inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-[7px] text-[13px] font-semibold bg-[#c4ee4f] text-[#2c3a08] dark:bg-[#b8e94a] dark:text-[#15200a]">
           Questions: <b className="font-extrabold">{questionCount}</b>
         </p>
-        <div className="flex items-center gap-2 mt-3 mb-1">
-          <Switch
-            aria-label="Make quiz public for duels"
-            checked={Boolean(props.quiz.isPublic)}
-            disabled={updateQuiz.isPending}
-            onCheckedChange={(checked) =>
-              updateQuiz.mutate(
-                { quizId: props.quiz.id, isPublic: checked },
-                {
-                  onError: (err) => toast.error(getApiErrorMessage(err)),
-                },
-              )
-            }
-          />
-          <span className="text-sm max-w-[250px]">
-            Public — scored questions are submitted for admin review before
-            appearing in 1v1 duels
-          </span>
-        </div>
+        {duels && (
+          <div className="flex items-center gap-2 mt-3 mb-1">
+            <Switch
+              aria-label="Make quiz public for duels"
+              checked={Boolean(props.quiz.isPublic)}
+              disabled={updateQuiz.isPending}
+              onCheckedChange={(checked) =>
+                updateQuiz.mutate(
+                  { quizId: props.quiz.id, isPublic: checked },
+                  {
+                    onError: (err) => toast.error(getApiErrorMessage(err)),
+                  },
+                )
+              }
+            />
+            <span className="text-sm max-w-[250px]">
+              Public — scored questions are submitted for admin review before
+              appearing in 1v1 duels
+            </span>
+          </div>
+        )}
         <LogoSetting quiz={props.quiz} />
         <ModerationSettingsCard quiz={props.quiz} />
       </div>

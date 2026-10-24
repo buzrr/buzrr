@@ -20,7 +20,9 @@ COPY package.json yarn.lock .yarnrc.yml tsconfig.json prisma.config.ts ./
 COPY .yarn/releases ./.yarn/releases
 COPY packages ./packages
 COPY apps/server/package.json ./apps/server/
-RUN yarn workspaces focus server @buzrr/prisma @buzrr/contract
+# The package cache survives between builds (BuildKit cache mount).
+RUN --mount=type=cache,target=/root/.yarn/berry/cache \
+    yarn workspaces focus server @buzrr/prisma @buzrr/contract
 
 COPY apps/server ./apps/server
 RUN yarn workspace @buzrr/contract build \

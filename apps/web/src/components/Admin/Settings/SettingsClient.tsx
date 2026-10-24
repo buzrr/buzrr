@@ -20,6 +20,7 @@ import TextInput from "@/components/ui/TextInput";
 import { DEFAULT_AVATAR } from "@/constants";
 import { authClient } from "@/lib/auth-client";
 import { useEntitlementsQuery } from "@/lib/modules/billing/hooks";
+import { useInstance } from "@/lib/instance-context";
 import { LuImagePlus, LuTrash2 } from "react-icons/lu";
 import clsx from "clsx";
 import { dropTargetClass, useFileDrop } from "@/hooks/useFileDrop";
@@ -400,6 +401,7 @@ function DangerZoneCard() {
 }
 
 export default function SettingsClient() {
+  const { billing } = useInstance();
   return (
     <div className="w-full p-4 md:p-6">
       <div className="flex items-center gap-2 mb-4">
@@ -414,7 +416,7 @@ export default function SettingsClient() {
         <PreferencesCard />
         <GameDefaultsCard />
         <AccountCard />
-        <PlanCard />
+        {billing && <PlanCard />}
         <DangerZoneCard />
       </div>
     </div>

@@ -24,18 +24,22 @@ import { useCurrentRole } from "@/components/SessionProvider";
 import { LICENSE_LINK } from "@/components/Landing/links";
 import { isAiConfigured } from "@/lib/api/ai-client";
 import { useAiStatusQuery } from "@/lib/modules/quizzes/hooks";
+import { useInstance } from "@/lib/instance-context";
 import SignOutButton from "./SignOutButton";
 
-const NavLinks = [
-  { href: "/admin", label: "Quizzes", icon: LuBookText },
-  { href: "/admin/history", label: "History", icon: LuHistory },
-  { href: "/admin/billing", label: "Plan & Billing", icon: LuCrown },
-  { href: "/admin/audio-skins", label: "Audio Skins", icon: LuMusic },
-  { href: "/admin/avatar-skins", label: "Avatar Skins", icon: LuSmile },
-  { href: "/admin/settings", label: "Settings", icon: LuSettings },
-];
-
 export default function Navbar() {
+  const { billing: BILLING_ENABLED, duels: DUELS } = useInstance();
+  const NavLinks = [
+    { href: "/admin", label: "Quizzes", icon: LuBookText },
+    { href: "/admin/history", label: "History", icon: LuHistory },
+    ...(BILLING_ENABLED
+      ? [{ href: "/admin/billing", label: "Plan & Billing", icon: LuCrown }]
+      : []),
+    { href: "/admin/audio-skins", label: "Audio Skins", icon: LuMusic },
+    { href: "/admin/avatar-skins", label: "Avatar Skins", icon: LuSmile },
+    { href: "/admin/settings", label: "Settings", icon: LuSettings },
+  ];
+
   const { data: session } = authClient.useSession();
   const pathname = usePathname();
   const role = useCurrentRole();
@@ -58,7 +62,7 @@ export default function Navbar() {
     ...(isAiConfigured() && aiStatus.data?.available
       ? [{ href: "/admin/ai", label: "AI Spaces", icon: LuSparkles }]
       : []),
-    ...(role === "admin" || role === "superadmin"
+    ...(DUELS && (role === "admin" || role === "superadmin")
       ? [
           {
             href: "/admin/duel-portal",

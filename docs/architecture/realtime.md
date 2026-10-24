@@ -94,6 +94,17 @@ instanceId)` — a `SET NX PX 20000` owner lock with renew-if-held Lua — so
 - On boot, `recoverTimers()` re-arms everything in `games:deadlines` and
   re-arms a mid-flight bot answer from meta (`recoverBotAnswer`) — a process
   restart resumes live games.
+- Rolling deploys drain instead of restarting under a game: the old
+  instance's preStop hook (`apps/server/scripts/drain.mjs`) calls
+  `POST /health/drain` (loopback only), which turns `GET /health/ready` to 503
+  and returns `GameEngineService.runningHere()` — games past the lobby and
+  before `final` with a timer armed or a socket connected here. The hook
+  polls until that is empty (cap `DRAIN_MAX_SECONDS`, default 3h), so running
+  games finish on the instance they run on. The web `VersionWatcher`
+  (`components/VersionWatcher.tsx`: checks `/build-id` when the tab becomes
+  visible and every 2 min, reloads once a new build is live) holds that
+  reload during those phases too, so open tabs don't move their socket to the
+  new instance mid-question.
 - The sweeper and the matchmaking worker are **lazy**: they run only while
   deadlines/queue entries exist. This is a deliberate Upstash cost decision
   (comment in `ensureSweeper`: an unconditional 15s poll ≈ 350K Redis

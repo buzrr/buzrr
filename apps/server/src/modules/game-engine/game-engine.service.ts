@@ -72,6 +72,7 @@ import {
 import { DuelBotService } from "./duel-bot.service";
 import {
   GameMeta,
+  GamePhase,
   LeaderboardEntry,
   LiveQuestion,
   RosterEntry,
@@ -87,6 +88,18 @@ const SWEEP_INTERVAL_MS = 15_000;
  * question. A trailing timer per game, so a burst of answers costs one read.
  */
 const LIVE_SUMMARY_MS = 1_000;
+/**
+ * Phases of a game in progress — past the lobby, before the final standings.
+ * A draining instance waits for these (see runningHere).
+ */
+const RUNNING_PHASES: ReadonlySet<GamePhase> = new Set<GamePhase>([
+  "starting",
+  "ready",
+  "question",
+  "closed",
+  "reveal",
+  "scores",
+]);
 
 /**
  * The shell around the engine's pure core (`./core`). The rules of the game —
@@ -151,6 +164,26 @@ export class GameEngineService
     for (const t of this.timers.values()) clearTimeout(t);
     for (const t of this.disconnectTimers.values()) clearTimeout(t);
     for (const t of this.liveSummaryTimers.values()) clearTimeout(t);
+  }
+
+  /**
+   * Games in progress that still run on this instance: a timer of theirs is
+   * armed here, or a host/player socket of theirs is connected here. A
+   * draining instance (rolling deploy, see HealthController.drain) keeps
+   * serving until this is empty, so games finish where they run instead of
+   * losing their timers and in-memory room state mid-question.
+   */
+  async runningHere(): Promise<string[]> {
+    const codes = new Set(this.timers.keys());
+    for (const socket of this.io?.sockets.sockets.values() ?? []) {
+      if (socket.data.gameCode) codes.add(socket.data.gameCode);
+    }
+    const running: string[] = [];
+    for (const code of codes) {
+      const meta = await this.store.getMeta(code);
+      if (meta && RUNNING_PHASES.has(meta.phase)) running.push(code);
+    }
+    return running;
   }
 
   // -- core plumbing -----------------------------------------------------------

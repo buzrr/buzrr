@@ -136,6 +136,20 @@ one); the service refuses others with a message saying so. Local models are
 slower and less reliable than hosted ones at following the quiz format — if a
 generation fails, try again or use a larger model.
 
+### Instance options
+
+Read by the web app on every request — `docker compose up -d` applies them, no
+rebuild:
+
+- `PRIVATE_BUZZ=ON` — a private instance: no marketing pages, a bare landing
+  page (1v1, join room, admin login), no donation prompts, footer links only
+  for signed-in users.
+- `TITLE` — the site name (browser title, app manifest); default Buzrr.
+- `CONTACT_EMAIL` — where "Contact us" points on a private instance (hidden
+  when unset).
+- `DUELS=OFF` — no 1v1 duels: no "Start 1v1", no public (duel pool) option on
+  quizzes, no duel stats; duel pages redirect home. Only the web app reads it.
+
 ### Big rooms
 
 How many players fit in a room is set on the **server**:

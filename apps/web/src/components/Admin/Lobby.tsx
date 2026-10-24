@@ -40,6 +40,7 @@ import type { LobbyReadyPayload, PlayerPayload } from "@buzrr/contract";
 import ConfirmationModal from "@/components/Admin/ConfirmationModal";
 import { buildJoinUrl } from "@/lib/join-link";
 import EndQuizButton from "@/components/Admin/EndQuizButton";
+import { useInstance } from "@/lib/instance-context";
 
 const Lobby = (params: {
   roomId: string;
@@ -56,6 +57,7 @@ const Lobby = (params: {
   quizSettings?: unknown;
 }) => {
   const dispatch = useAppDispatch();
+  const { billing } = useInstance();
   const players = useAppSelector((state) => state.player.players);
   const maxPlayers = params.maxPlayers ?? 50;
   const [load, setLoad] = useState(false);
@@ -514,7 +516,7 @@ const Lobby = (params: {
               )}
               <p className="text-[12.5px] text-off-dark dark:text-muted-dark">
                 This room can hold up to {maxPlayers} players.
-                {params.plan === "free" && (
+                {billing && params.plan === "free" && (
                   <>
                     {" "}
                     <Link

@@ -10,6 +10,7 @@ import { useCurrentRole } from "@/components/SessionProvider";
 import { useDuelProfileQuery } from "@/lib/modules/duel/hooks";
 import { useMyStatsQuery } from "@/lib/modules/users/hooks";
 import DuelHistoryList from "./DuelHistoryList";
+import { useInstance } from "@/lib/instance-context";
 
 function StatTile({ label, value }: { label: string; value: string | number }) {
   return (
@@ -148,27 +149,32 @@ function RecentDuels() {
 
 /** Full profile content (identity + stats + recent duels), reusable outside the admin shell. */
 export default function ProfileDetails() {
+  const { duels } = useInstance();
   return (
     <div className="flex flex-col gap-6">
       <IdentityCard />
-      <section>
-        <h2 className="text-lg font-black text-dark dark:text-white mb-3">
-          Duel stats
-        </h2>
-        <DuelStats />
-      </section>
+      {duels && (
+        <section>
+          <h2 className="text-lg font-black text-dark dark:text-white mb-3">
+            Duel stats
+          </h2>
+          <DuelStats />
+        </section>
+      )}
       <section>
         <h2 className="text-lg font-black text-dark dark:text-white mb-3">
           Activity
         </h2>
         <ActivityStats />
       </section>
-      <section>
-        <h2 className="text-lg font-black text-dark dark:text-white mb-3">
-          Recent duels
-        </h2>
-        <RecentDuels />
-      </section>
+      {duels && (
+        <section>
+          <h2 className="text-lg font-black text-dark dark:text-white mb-3">
+            Recent duels
+          </h2>
+          <RecentDuels />
+        </section>
+      )}
     </div>
   );
 }
