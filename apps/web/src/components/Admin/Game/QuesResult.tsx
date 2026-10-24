@@ -28,7 +28,11 @@ import {
   primaryButtonClass,
 } from "@/components/Game/GameUI";
 import { AnimatedNumber, useFlipReorder } from "@/components/Game/motion";
-import { denseRanks, type LeaderboardEntry } from "@buzrr/contract";
+import {
+  HOST_LEADERBOARD_TOP,
+  denseRanks,
+  type LeaderboardEntry,
+} from "@buzrr/contract";
 import type { GameSocket } from "@/types/socket";
 
 /** Hold the old standings until the answer bars have mostly filled. */
@@ -80,6 +84,9 @@ export default function QuesResult(props: QuesResultProps) {
   const question = useAppSelector((state) => state.game.question);
   const reveal = useAppSelector((state) => state.game.reveal);
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
+  const leaderboardTotal = useAppSelector(
+    (state) => state.game.leaderboardTotal,
+  );
   const players = useAppSelector((state) => state.game.players);
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const qCount = useAppSelector((state) => state.game.qCount);
@@ -112,17 +119,22 @@ export default function QuesResult(props: QuesResultProps) {
     const t = setTimeout(() => setSettled(true), SETTLE_DELAY_MS);
     return () => clearTimeout(t);
   }, []);
+  // The server sends the host the top HOST_LEADERBOARD_TOP before and after
+  // the question: the old top shows first, then the new one.
   const rows = useMemo(
     () =>
-      settled
+      (settled
         ? leaderboard.map((e) => ({
             ...e,
             shownScore: e.score,
             shownRank: e.rank,
           }))
-        : previousStandings(leaderboard),
+        : previousStandings(leaderboard)
+      ).slice(0, HOST_LEADERBOARD_TOP),
     [leaderboard, settled],
   );
+  const playerCount = leaderboardTotal ?? leaderboard.length;
+
   const listRef = useRef<HTMLDivElement>(null);
   useFlipReorder(listRef, rows.map((r) => r.playerId).join());
   const connectedById = new Map(players.map((p) => [p.id, p.connected]));
@@ -184,7 +196,7 @@ export default function QuesResult(props: QuesResultProps) {
         >
           <StatTile
             value={responses}
-            suffix={` /${players.length}`}
+            suffix={` /${Math.max(players.filter((p) => p.connected).length, responses)}`}
             label="Responses"
           />
           {scored && <StatTile value={`${correctPct}%`} label="Got it right" />}
@@ -204,7 +216,9 @@ export default function QuesResult(props: QuesResultProps) {
         <div className="flex items-center justify-between px-5 md:px-[26px] pt-5 md:pt-6 pb-3.5">
           <h3 className="text-xl md:text-[22px] font-bold">Leaderboard</h3>
           <span className={clsx("text-[13.5px]", mutedText)}>
-            {leaderboard.length} player{leaderboard.length === 1 ? "" : "s"}
+            {playerCount === 1
+              ? `${playerCount} player`
+              : `${playerCount} players`}
           </span>
         </div>
         <div

@@ -15,6 +15,7 @@ import type {
   ScoreEntry,
   StoredAnswer,
 } from "../game-engine.types";
+import { HOST_LEADERBOARD_TOP, PLAYER_LEADERBOARD_TOP } from "@buzrr/contract";
 import type { GameState } from "./state";
 
 // Pure projections of a game's state into what clients are sent.
@@ -27,6 +28,43 @@ export function averageAnswerMs(
   return Math.round(
     list.reduce((sum, a) => sum + a.timeTakenMs, 0) / list.length,
   );
+}
+
+/**
+ * What a player is sent of the leaderboard: the top `PLAYER_LEADERBOARD_TOP`,
+ * plus their own row (snapshots only — a room broadcast has no "own").
+ */
+export function topOfLeaderboard(
+  entries: LeaderboardEntry[],
+  playerId?: string,
+): LeaderboardEntry[] {
+  const top = entries.slice(0, PLAYER_LEADERBOARD_TOP);
+  const own = playerId
+    ? entries.slice(PLAYER_LEADERBOARD_TOP).find((e) => e.playerId === playerId)
+    : undefined;
+  return own ? [...top, own] : top;
+}
+
+/**
+ * What the host is sent of the leaderboard: the top `HOST_LEADERBOARD_TOP`,
+ * plus — when the entries carry this question's `delta` — whoever was in
+ * the top before it. Order and ranks stay the full board's.
+ */
+export function hostOfLeaderboard(
+  entries: LeaderboardEntry[],
+): LeaderboardEntry[] {
+  if (entries.length <= HOST_LEADERBOARD_TOP) return entries;
+  const keep = new Set(
+    entries.slice(0, HOST_LEADERBOARD_TOP).map((e) => e.playerId),
+  );
+  if (entries.some((e) => e.delta !== undefined)) {
+    entries
+      .map((e, i) => ({ id: e.playerId, i, before: e.score - (e.delta ?? 0) }))
+      .sort((a, b) => b.before - a.before || a.i - b.i)
+      .slice(0, HOST_LEADERBOARD_TOP)
+      .forEach((e) => keep.add(e.id));
+  }
+  return entries.filter((e) => keep.has(e.playerId));
 }
 
 /**
@@ -187,11 +225,20 @@ export function buildSnapshot(
   }
 
   if (inReveal || meta.phase === "final" || meta.phase === "ended") {
-    payload.leaderboard = buildLeaderboard(
+    const board = buildLeaderboard(
       scores,
       roster,
       inReveal ? answers : undefined,
     );
+    if (playerId && board.length > PLAYER_LEADERBOARD_TOP) {
+      payload.leaderboard = topOfLeaderboard(board, playerId);
+      payload.leaderboardTotal = board.length;
+    } else if (!playerId && board.length > HOST_LEADERBOARD_TOP) {
+      payload.leaderboard = hostOfLeaderboard(board);
+      payload.leaderboardTotal = board.length;
+    } else {
+      payload.leaderboard = board;
+    }
   }
 
   if (playerId) {
