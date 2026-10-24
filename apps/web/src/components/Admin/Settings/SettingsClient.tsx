@@ -1,12 +1,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import { ProLock, useHasPro } from "@/components/Billing/ProFeature";
 import { toast } from "react-toastify";
 import { z } from "zod";
 import GridListToggle from "@/components/Admin/GridListToggle";
@@ -19,6 +20,19 @@ import TextInput from "@/components/ui/TextInput";
 import { DEFAULT_AVATAR } from "@/constants";
 import { authClient } from "@/lib/auth-client";
 import { useEntitlementsQuery } from "@/lib/modules/billing/hooks";
+import { LuImagePlus, LuTrash2 } from "react-icons/lu";
+import clsx from "clsx";
+import { dropTargetClass, useFileDrop } from "@/hooks/useFileDrop";
+import { BUILTIN_SOUND_SKINS } from "@buzrr/contract";
+import { getApiErrorMessage } from "@/lib/api/errors";
+import { BUILTIN_SKINS, type BuiltinSkinId } from "@/lib/sound/synth";
+import { useSoundSkinsQuery } from "@/lib/modules/sound-skins/hooks";
+import {
+  usePreferencesQuery,
+  useSetDefaultLogo,
+  useUpdatePreferences,
+} from "@/lib/modules/preferences/hooks";
+import { AVATAR_SKIN_NAMES } from "@/components/Admin/AvatarSkins/AvatarSkinsClient";
 
 const accountSchema = z.object({
   name: z
@@ -102,7 +116,143 @@ function PreferencesCard() {
   );
 }
 
+/** Defaults for all the user's games: logo, audio skin, avatar skin. */
+function GameDefaultsCard() {
+  const prefs = usePreferencesQuery();
+  const update = useUpdatePreferences();
+  const setLogo = useSetDefaultLogo();
+  const skins = useSoundSkinsQuery();
+  const logoInput = useRef<HTMLInputElement>(null);
+  const logo = prefs.data?.defaultLogo ?? null;
+  const onErr = (err: unknown) => toast.error(getApiErrorMessage(err));
+  const hasPro = useHasPro();
+  // A picture dropped onto the logo field becomes the default logo.
+  const { over, dropProps } = useFileDrop((file) => {
+    if (file.type.startsWith("image/"))
+      setLogo.mutate(file, { onError: onErr });
+    else toast.error("Drop a picture");
+  }, setLogo.isPending);
+  const defaultSkin = prefs.data?.defaultSoundSkin ?? "builtin:show";
+  const defaultSkinName = (BUILTIN_SOUND_SKINS as readonly string[]).includes(
+    defaultSkin,
+  )
+    ? BUILTIN_SKINS[defaultSkin as BuiltinSkinId].name
+    : ((skins.data ?? []).find((sk) => sk.id === defaultSkin)?.name ??
+      "Audio skin");
+  return (
+    <SettingsCard
+      title="Game defaults"
+      description="Used by all your quizzes unless a quiz sets its own."
+    >
+      <PreferenceRow
+        label="Default logo"
+        description="Shown on game screens instead of the site logo."
+        control={
+          hasPro === false && !logo ? (
+            <ProLock what="Your own logo" />
+          ) : (
+            <div className="flex items-center gap-2" {...dropProps}>
+              <button
+                type="button"
+                onClick={() => logoInput.current?.click()}
+                disabled={setLogo.isPending}
+                title={logo ? "Change logo" : "Upload a logo"}
+                className={clsx(
+                  "size-14 shrink-0 rounded-xl border-[1.5px] border-dashed border-lprimary/25 dark:border-white/15 flex items-center justify-center overflow-hidden cursor-pointer hover:border-dprimary",
+                  over && dropTargetClass,
+                )}
+              >
+                {logo ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- signed upload URL
+                  <img
+                    src={logo}
+                    alt="Default logo"
+                    className="max-h-full max-w-full object-contain p-1"
+                  />
+                ) : (
+                  <LuImagePlus
+                    size={22}
+                    className="text-lprimary dark:text-dprimary"
+                  />
+                )}
+              </button>
+              {logo && (
+                <button
+                  type="button"
+                  aria-label="Remove default logo"
+                  onClick={() => setLogo.mutate(null, { onError: onErr })}
+                  className="size-8 rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:text-[#e5544e] cursor-pointer"
+                >
+                  <LuTrash2 size={16} />
+                </button>
+              )}
+              <input
+                ref={logoInput}
+                type="file"
+                accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif"
+                className="sr-only"
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  e.target.value = "";
+                  if (f) setLogo.mutate(f, { onError: onErr });
+                }}
+              />
+            </div>
+          )
+        }
+      />
+      <PreferenceRow
+        label="Default audio skin"
+        description="Music and effects of quizzes set to “Default”."
+        control={
+          // Like the avatar skin: a link to the page where it is picked.
+          <Link
+            href="/admin/audio-skins"
+            className="text-sm font-semibold text-lprimary dark:text-dprimary hover:underline whitespace-nowrap"
+          >
+            {defaultSkinName} →
+          </Link>
+        }
+      />
+      <PreferenceRow
+        label="Default avatar skin"
+        description="The pictures players pick from."
+        control={
+          <Link
+            href="/admin/avatar-skins"
+            className="text-sm font-semibold text-lprimary dark:text-dprimary hover:underline whitespace-nowrap"
+          >
+            {AVATAR_SKIN_NAMES[prefs.data?.defaultAvatarSkin ?? "original"]} →
+          </Link>
+        }
+      />
+    </SettingsCard>
+  );
+}
+
 function AccountCard() {
+  // How this account signs in (Google, or email + password), not assumed.
+  const [signInMethod, setSignInMethod] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void authClient
+      .listAccounts()
+      .then((res) => {
+        if (!alive) return;
+        const ids = (res.data ?? []).map((a) => a.providerId);
+        setSignInMethod(
+          ids.includes("google")
+            ? "Google"
+            : ids.includes("credential")
+              ? "email and password"
+              : null,
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
   const { data: session } = authClient.useSession();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -181,8 +331,9 @@ function AccountCard() {
         <div>
           <p className="text-sm font-bold text-dark dark:text-white">Email</p>
           <p className="text-sm text-off-dark dark:text-off-white">
-            {session?.user.email} · Signed in with Google — email can&apos;t be
-            changed here.
+            {session?.user.email}
+            {signInMethod ? ` · Signed in with ${signInMethod}` : ""} — email
+            can&apos;t be changed here.
           </p>
         </div>
         <Button
@@ -261,6 +412,7 @@ export default function SettingsClient() {
       </div>
       <div className="flex flex-col gap-6">
         <PreferencesCard />
+        <GameDefaultsCard />
         <AccountCard />
         <PlanCard />
         <DangerZoneCard />

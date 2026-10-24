@@ -11,9 +11,9 @@ import type { GameMeta, PacingMode } from "../game-engine.types";
  * answered. What varies is who advances past the reveal and what the final
  * leaderboard means.
  *
- * A self-paced mode (each player moving through the quiz on their own clock)
- * slots in here too, but needs per-player question state the shared phase
- * machine doesn't model yet; see docs/architecture/realtime.md § Pacing.
+ * Self-paced play (each player on their own clock) is not a strategy here:
+ * it is "Play alone" (`modules/solo`), a REST mode that reuses the pure
+ * rules without the room engine — see ADR-016.
  */
 export interface PacingStrategy {
   readonly mode: PacingMode;

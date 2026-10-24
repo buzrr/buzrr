@@ -5,6 +5,7 @@ import { store, persistor } from "../state/store";
 import React from "react";
 import { PersistGate } from "redux-persist/integration/react";
 import { isPublicContentPath } from "@/lib/seo/public-routes";
+import ThemeSync from "@/components/ThemeSync";
 
 export default function ReduxProvider({
   children,
@@ -21,6 +22,7 @@ export default function ReduxProvider({
   if (isPublicContentPath(pathname)) {
     return (
       <Provider store={store}>
+        <ThemeSync />
         <PersistGate persistor={persistor}>{() => children}</PersistGate>
       </Provider>
     );
@@ -28,6 +30,7 @@ export default function ReduxProvider({
 
   return (
     <Provider store={store}>
+      <ThemeSync />
       <PersistGate loading={null} persistor={persistor}>
         {children}
       </PersistGate>

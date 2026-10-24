@@ -9,7 +9,10 @@ import { EmptyState } from "@/components/ui/Card";
 import { useAppSelector } from "@/state/hooks";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import type { QuizListItem } from "@/lib/modules/quizzes/api";
-import { useDeleteQuizMutation } from "@/lib/modules/quizzes/hooks";
+import {
+  useDeleteQuizMutation,
+  useDuplicateQuizMutation,
+} from "@/lib/modules/quizzes/hooks";
 
 export function quizGridClass(view: "grid" | "list") {
   return clsx(
@@ -20,6 +23,7 @@ export function quizGridClass(view: "grid" | "list") {
 
 export default function ClientBuzrrs({ quizzes }: { quizzes: QuizListItem[] }) {
   const deleteQuizMutation = useDeleteQuizMutation();
+  const duplicateQuizMutation = useDuplicateQuizMutation();
   const view = useAppSelector((state) => state.gridListToggle.view);
 
   const [delModalOpen, setDelModalOpen] = useState(false);
@@ -56,6 +60,12 @@ export default function ClientBuzrrs({ quizzes }: { quizzes: QuizListItem[] }) {
             quiz={quiz}
             view={view}
             onEdit={() => setEditQuiz(quiz)}
+            onDuplicate={() =>
+              duplicateQuizMutation.mutate(quiz.id, {
+                onSuccess: () => toast.success(`Duplicated "${quiz.title}"`),
+                onError: (err) => toast.error(getApiErrorMessage(err)),
+              })
+            }
             onDelete={() => {
               setQuizId(quiz.id);
               setDelModalOpen(true);

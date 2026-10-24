@@ -3,6 +3,8 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 export enum PageTheme {
   dark,
   light,
+  /** Follow the device (prefers-color-scheme) until toggled by hand. */
+  system,
 }
 
 interface PageThemeState {
@@ -10,7 +12,7 @@ interface PageThemeState {
 }
 
 const initialState: PageThemeState = {
-  theme: PageTheme.light,
+  theme: PageTheme.system,
 };
 
 const pageThemeSlice = createSlice({
