@@ -46,6 +46,7 @@ import { DEFAULT_SONG_VOLUME, fadeInOf, playSong } from "@/lib/sound/song";
 import { fetchClip } from "@/lib/sound/preload";
 import { SkinTestBench, type SlotPlayer } from "./SkinTestBench";
 import { SlotRow, usePlayback, type SlotStarter } from "./SlotRow";
+import { useT } from "@/lib/i18n/context";
 import {
   useClearSoundSlot,
   useCreateSoundSkin,
@@ -157,6 +158,7 @@ const previewUntilEnd = (slot: SoundSlot, questionMs: number) =>
 
 /** "Test" toggle: a question round played like in a game. */
 function TestToggle({ open, onClick }: { open: boolean; onClick: () => void }) {
+  const t = useT();
   return (
     <button
       type="button"
@@ -168,7 +170,7 @@ function TestToggle({ open, onClick }: { open: boolean; onClick: () => void }) {
       )}
     >
       <LuFlaskConical size={11} />
-      Test bench
+      {t("Test bench")}
     </button>
   );
 }
@@ -193,6 +195,7 @@ function countdownTail(skin: SoundSkin, slot: "countdown" | "lastCountdown") {
  * have no uploads, and only the superadmin changes their options.
  */
 export default function SoundSkinsClient() {
+  const t = useT();
   const role = useCurrentRole();
   // Only the superadmin shares a skin with everyone.
   const isAdmin = role === "superadmin";
@@ -206,8 +209,9 @@ export default function SoundSkinsClient() {
   return (
     <div className="mt-4 flex flex-col gap-5 text-dark dark:text-white max-w-5xl">
       <p className={clsx("text-sm", mutedText)}>
-        Music and effects for your games. Your default applies to all your
-        quizzes; each quiz can pick another skin in its settings.
+        {t(
+          "Music and effects for your games. Your default applies to all your quizzes; each quiz can pick another skin in its settings.",
+        )}
       </p>
       {BUILTIN_SOUND_SKINS.map((id) => (
         <BuiltinSkinCard
@@ -219,11 +223,11 @@ export default function SoundSkinsClient() {
       ))}
 
       {query.isPending ? (
-        <p className={mutedText}>Loading…</p>
+        <p className={mutedText}>{t("Loading…")}</p>
       ) : (
         (query.data ?? []).length > 0 && (
           <section className={clsx(panelClass, "p-5 flex flex-col gap-3")}>
-            <h2 className="text-lg font-bold">Your audio skins</h2>
+            <h2 className="text-lg font-bold">{t("Your audio skins")}</h2>
             {(query.data ?? []).map((skin) => (
               <SkinCard
                 key={skin.id}
@@ -238,8 +242,8 @@ export default function SoundSkinsClient() {
 
       <section className={clsx(panelClass, "p-5 flex flex-col gap-3")}>
         <h2 className="text-lg font-bold flex items-center gap-2">
-          New audio skin
-          {hasPro === false && <ProLock what="Your own audio skins" />}
+          {t("New audio skin")}
+          {hasPro === false && <ProLock what={t("Your own audio skins")} />}
         </h2>
         {hasPro !== false && (
           <form
@@ -253,14 +257,14 @@ export default function SoundSkinsClient() {
             }}
           >
             <TextInput
-              placeholder="New audio skin name"
+              placeholder={t("New audio skin name")}
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={60}
               containerClassName="flex-1"
             />
             <Button size="sm" type="submit" disabled={create.isPending}>
-              Create
+              {t("Create")}
             </Button>
           </form>
         )}
@@ -275,12 +279,13 @@ export const defaultBoxClass =
 
 /** "Default" badge, or the button that makes this skin the default. */
 export function DefaultSkinButton({ id }: { id: string }) {
+  const t = useT();
   const prefs = usePreferencesQuery();
   const update = useUpdatePreferences();
   if ((prefs.data?.defaultSoundSkin ?? "builtin:show") === id) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-dprimary/15 px-3 py-1 text-xs font-bold text-lprimary dark:text-dprimary">
-        <LuCheck size={13} /> Default
+        <LuCheck size={13} /> {t("Default")}
       </span>
     );
   }
@@ -292,14 +297,14 @@ export function DefaultSkinButton({ id }: { id: string }) {
         update.mutate(
           { defaultSoundSkin: id },
           {
-            onSuccess: () => toast.success("Default audio skin set"),
+            onSuccess: () => toast.success(t("Default audio skin set")),
             onError: (err) => toast.error(getApiErrorMessage(err)),
           },
         )
       }
       className="rounded-xl bg-lprimary dark:bg-dprimary px-3 py-1 text-xs font-bold text-white dark:text-dark cursor-pointer disabled:opacity-50"
     >
-      Make default
+      {t("Make default")}
     </button>
   );
 }
@@ -313,6 +318,7 @@ function BuiltinSkinCard({
   isSuperadmin: boolean;
   isDefault: boolean;
 }) {
+  const t = useT();
   const builtinOptions = useBuiltinOptionsQuery();
   const setBuiltin = useSetBuiltinOptions();
   const reset = useResetBuiltinOptions();
@@ -352,12 +358,13 @@ function BuiltinSkinCard({
     >
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-bold">{BUILTIN_SKINS[id].name}</h2>
+          <h2 className="text-lg font-bold">{t(BUILTIN_SKINS[id].name)}</h2>
           <p className={clsx("text-xs", mutedText)}>
             {id === "builtin:show"
-              ? "Built in · recordings"
-              : "Built in · synthesized in the browser"}
-            {isSuperadmin && ` · Playback options (superadmin, for all users)`}
+              ? t("Built in · recordings")
+              : t("Built in · synthesized in the browser")}
+            {isSuperadmin &&
+              ` · ${t("Playback options (superadmin, for all users)")}`}
           </p>
         </div>
         <DefaultSkinButton id={id} />
@@ -369,7 +376,7 @@ function BuiltinSkinCard({
           }}
         />
         {hasPro === false ? (
-          <ProLock what="Your own audio skins" />
+          <ProLock what={t("Your own audio skins")} />
         ) : (
           <button
             type="button"
@@ -378,10 +385,11 @@ function BuiltinSkinCard({
               clone.mutate(
                 {
                   skinId: id,
-                  name: `${BUILTIN_SKINS[id].name} (copy)`,
+                  name: t("{name} (copy)", { name: t(BUILTIN_SKINS[id].name) }),
                 },
                 {
-                  onSuccess: () => toast.success("Copied to your audio skins"),
+                  onSuccess: () =>
+                    toast.success(t("Copied to your audio skins")),
                   onError: (err) => toast.error(getApiErrorMessage(err)),
                 },
               )
@@ -389,7 +397,7 @@ function BuiltinSkinCard({
             className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold bg-lprimary/10 dark:bg-white/5 cursor-pointer disabled:opacity-50"
           >
             <LuCopy size={11} />
-            Clone to own
+            {t("Clone to own")}
           </button>
         )}
         {isSuperadmin && (
@@ -398,7 +406,9 @@ function BuiltinSkinCard({
             disabled={reset.isPending}
             onClick={() => {
               if (
-                window.confirm("Reset this skin's options to their defaults?")
+                window.confirm(
+                  t("Reset this skin's options to their defaults?"),
+                )
               ) {
                 reset.mutate(id, {
                   onError: (err) => toast.error(getApiErrorMessage(err)),
@@ -408,7 +418,7 @@ function BuiltinSkinCard({
             className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold bg-lprimary/10 dark:bg-white/5 cursor-pointer disabled:opacity-50"
           >
             <LuRotateCcw size={11} />
-            Reset options
+            {t("Reset options")}
           </button>
         )}
       </div>
@@ -436,7 +446,7 @@ function BuiltinSkinCard({
           <SlotRow
             key={slot}
             slot={slot}
-            label={SLOT_LABELS[slot]}
+            label={t(SLOT_LABELS[slot])}
             playback={playback}
             starter={(questionMs) =>
               starterFor(slot, {
@@ -472,6 +482,7 @@ function SkinCard({
   isAdmin: boolean;
   isDefault: boolean;
 }) {
+  const t = useT();
   const update = useUpdateSoundSkin();
   const setSlot = useSetSoundSlot();
   const clearSlot = useClearSoundSlot();
@@ -516,7 +527,7 @@ function SkinCard({
         <input
           defaultValue={skin.name}
           maxLength={60}
-          aria-label="Audio skin name"
+          aria-label={t("Audio skin name")}
           onBlur={(e) =>
             e.target.value !== skin.name &&
             update.mutate({ id: skin.id, name: e.target.value }, { onError })
@@ -526,18 +537,18 @@ function SkinCard({
         {isAdmin ? (
           <label className="flex items-center gap-2 text-sm">
             <Switch
-              aria-label="For all users"
+              aria-label={t("For all users")}
               checked={skin.isGlobal}
               onCheckedChange={(checked) =>
                 update.mutate({ id: skin.id, isGlobal: checked }, { onError })
               }
             />
-            For all users
+            {t("For all users")}
           </label>
         ) : (
           skin.isGlobal && (
             <span className="text-xs rounded-full px-2 py-0.5 bg-lprimary/10">
-              For all users
+              {t("For all users")}
             </span>
           )
         )}
@@ -551,7 +562,7 @@ function SkinCard({
         />
         <button
           type="button"
-          aria-label="Delete audio skin"
+          aria-label={t("Delete audio skin")}
           onClick={() => {
             if (window.confirm(`Delete "${skin.name}"?`)) {
               del.mutate(skin.id, { onError });
@@ -605,7 +616,7 @@ function SkinCard({
           <SlotRow
             key={slot}
             slot={slot}
-            label={SLOT_LABELS[slot]}
+            label={t(SLOT_LABELS[slot])}
             playback={playback}
             starter={starter}
             wave={wave}
@@ -618,7 +629,7 @@ function SkinCard({
                 {cue && (
                   <select
                     value={source!}
-                    aria-label={SLOT_LABELS[slot]}
+                    aria-label={t(SLOT_LABELS[slot])}
                     onChange={(e) =>
                       saveOptions(slot, {
                         ...o,
@@ -629,15 +640,17 @@ function SkinCard({
                   >
                     {BUILTIN_SOUND_SKINS.map((id) => (
                       <option key={id} value={id}>
-                        {BUILTIN_SKINS[id as BuiltinSkinId].name}
+                        {t(BUILTIN_SKINS[id as BuiltinSkinId].name)}
                       </option>
                     ))}
-                    <option value="off">Off</option>
-                    <option value="custom">Own file</option>
+                    <option value="off">{t("Off")}</option>
+                    <option value="custom">{t("Own file")}</option>
                   </select>
                 )}
                 {ownFile && !url && (
-                  <span className={clsx("text-xs", mutedText)}>silent</span>
+                  <span className={clsx("text-xs", mutedText)}>
+                    {t("silent")}
+                  </span>
                 )}
                 {ownFile && url && (
                   <button
@@ -648,13 +661,13 @@ function SkinCard({
                     }}
                     className="text-xs underline cursor-pointer"
                   >
-                    remove
+                    {t("remove")}
                   </button>
                 )}
                 {ownFile && (
                   <label className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold border border-dashed border-lprimary/30 cursor-pointer">
                     <LuUpload size={11} />
-                    {url ? "Replace" : "Upload"}
+                    {url ? t("Replace") : t("Upload")}
                     <input
                       type="file"
                       accept="audio/*,.mp3,.wav,.ogg,.oga,.opus,.flac,.m4a,.aac,.webm"
@@ -666,7 +679,8 @@ function SkinCard({
                           setSlot.mutate(
                             { id: skin.id, slot, file },
                             {
-                              onSuccess: () => toast.success("Sound uploaded"),
+                              onSuccess: () =>
+                                toast.success(t("Sound uploaded")),
                               onError,
                             },
                           );

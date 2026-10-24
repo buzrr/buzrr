@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/Card";
 import { useAppSelector } from "@/state/hooks";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import type { QuizListItem } from "@/lib/modules/quizzes/api";
+import { useT } from "@/lib/i18n/context";
 import {
   useDeleteQuizMutation,
   useDuplicateQuizMutation,
@@ -22,6 +23,7 @@ export function quizGridClass(view: "grid" | "list") {
 }
 
 export default function ClientBuzrrs({ quizzes }: { quizzes: QuizListItem[] }) {
+  const t = useT();
   const deleteQuizMutation = useDeleteQuizMutation();
   const duplicateQuizMutation = useDuplicateQuizMutation();
   const view = useAppSelector((state) => state.gridListToggle.view);
@@ -33,7 +35,7 @@ export default function ClientBuzrrs({ quizzes }: { quizzes: QuizListItem[] }) {
   function deleteQuiz(id: string) {
     deleteQuizMutation.mutate(id, {
       onSuccess: () => {
-        toast.success("Successfully deleted quiz");
+        toast.success(t("Successfully deleted quiz"));
         setDelModalOpen(false);
       },
       onError: (err) => {
@@ -45,8 +47,8 @@ export default function ClientBuzrrs({ quizzes }: { quizzes: QuizListItem[] }) {
   if (quizzes.length === 0) {
     return (
       <EmptyState
-        title="No quizzes yet"
-        hint="Create one from scratch or let AI draft it for you."
+        title={t("No quizzes yet")}
+        hint={t("Create one from scratch or let AI draft it for you.")}
       />
     );
   }
@@ -79,7 +81,7 @@ export default function ClientBuzrrs({ quizzes }: { quizzes: QuizListItem[] }) {
         onClick={() => {
           deleteQuiz(quizId);
         }}
-        desc="Are you sure you want to delete this quiz?"
+        desc={t("Are you sure you want to delete this quiz?")}
       />
       <EditQuizModal
         quiz={editQuiz}

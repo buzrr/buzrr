@@ -9,6 +9,7 @@ import {
   type SoundSlot,
   type SoundSlotOptions,
 } from "@buzrr/contract";
+import { useT } from "@/lib/i18n/context";
 import type { Timeline } from "@/lib/sound/song";
 import { audioContext, type SoundHandle } from "@/lib/sound/synth";
 import { SongWaveform, type WaveSource } from "./SongWaveform";
@@ -142,6 +143,7 @@ export function SlotRow({
   /** Upload / replace / remove / source picker. */
   controls?: ReactNode;
 }) {
+  const t = useT();
   const now = playback.playing[slot];
   const isOpen = playback.open.has(slot);
   // End-aligned question music: preview it for this long a question.
@@ -166,14 +168,14 @@ export function SlotRow({
             className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold bg-lprimary/10 dark:bg-white/5 cursor-pointer"
           >
             {now ? <LuSquare size={11} /> : <LuPlay size={11} />}
-            {now ? "Stop" : "Play"}
+            {now ? t("Stop") : t("Play")}
           </button>
         )}
         {wave && (
           <button
             type="button"
             aria-expanded={isOpen}
-            aria-label="Options"
+            aria-label={t("Options")}
             onClick={() => playback.toggleOpen(slot)}
             className={clsx(
               "flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold cursor-pointer",
@@ -184,7 +186,7 @@ export function SlotRow({
               size={12}
               className={clsx("transition-transform", isOpen && "rotate-180")}
             />
-            Options
+            {t("Options")}
           </button>
         )}
       </div>
@@ -192,7 +194,7 @@ export function SlotRow({
         <div className="flex flex-col gap-1.5">
           {showQuestionTime && (
             <label className="flex items-center gap-1 text-xs">
-              Preview question time
+              {t("Preview question time")}
               <QuestionSecondsInput
                 value={questionSec}
                 onChange={setQuestionSec}

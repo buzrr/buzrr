@@ -11,6 +11,7 @@ import {
 } from "@buzrr/contract";
 import { Switch } from "@/components/ui/Switch";
 import { mutedText } from "@/components/Game/GameUI";
+import { useT } from "@/lib/i18n/context";
 import {
   DEFAULT_SONG_VOLUME,
   REPEATABLE_SLOTS,
@@ -51,6 +52,7 @@ export function SlotOptionsEditor({
   builtin: boolean;
   onSave: (next: SoundSlotOptions) => void;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState<SoundSlotOptions>(value ?? {});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveRef = useRef(onSave);
@@ -85,7 +87,7 @@ export function SlotOptionsEditor({
   return (
     <div className="flex flex-col gap-2.5 rounded-xl bg-lprimary/5 dark:bg-white/3 p-3 text-sm">
       <label className="flex flex-wrap items-center gap-3">
-        <span className="w-40">Volume</span>
+        <span className="w-40">{t("Volume")}</span>
         <input
           type="range"
           min={0}
@@ -99,15 +101,15 @@ export function SlotOptionsEditor({
 
       {!cue && (
         <div className="flex flex-wrap items-center gap-3">
-          <span className="w-40">Fade in at the start</span>
+          <span className="w-40">{t("Fade in at the start")}</span>
           <Switch
-            aria-label="Fade in at the start"
+            aria-label={t("Fade in at the start")}
             checked={fadeInOf(slot, draft) > 0}
             onCheckedChange={(on) => change({ fadeIn: on })}
           />
           {fadeInOf(slot, draft) > 0 && (
             <SecondsInput
-              label="Fade time"
+              label={t("Fade time")}
               value={fadeInOf(slot, draft)}
               min={0.1}
               max={30}
@@ -119,9 +121,9 @@ export function SlotOptionsEditor({
 
       {REPEATABLE_SLOTS.includes(slot) && !endAligned && (
         <div className="flex flex-wrap items-center gap-3">
-          <span className="w-40">Repeat</span>
+          <span className="w-40">{t("Repeat")}</span>
           <Switch
-            aria-label="Repeat"
+            aria-label={t("Repeat")}
             checked={
               builtin
                 ? draft.repeat !== false // synth loops run on unless set off
@@ -134,7 +136,7 @@ export function SlotOptionsEditor({
 
       {alignable && (
         <div className="flex flex-wrap items-center gap-3">
-          <span className="w-40">Song starts</span>
+          <span className="w-40">{t("Song starts")}</span>
           <select
             value={draft.align ?? "start"}
             onChange={(e) =>
@@ -142,11 +144,11 @@ export function SlotOptionsEditor({
             }
             className="rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent px-2 py-1"
           >
-            <option value="start">At the beginning</option>
+            <option value="start">{t("At the beginning")}</option>
             <option value="end">
               {isCountdownSlot(slot)
-                ? "End − 5 s (the countdown)"
-                : "End − the question's time"}
+                ? t("End − 5 s (the countdown)")
+                : t("End − the question's time")}
             </option>
           </select>
         </div>
@@ -154,11 +156,11 @@ export function SlotOptionsEditor({
 
       {wave && countdown && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
-          <span className={mutedText}>A click sets:</span>
+          <span className={mutedText}>{t("A click sets:")}</span>
           {(
             [
-              ["main", endAligned ? "Zero point (0)" : "Start point"],
-              ["next", "Question music starts"],
+              ["main", endAligned ? t("Zero point (0)") : t("Start point")],
+              ["next", t("Question music starts")],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -194,10 +196,10 @@ export function SlotOptionsEditor({
       )}
       {countdown && (
         <div className="flex flex-wrap items-center gap-3">
-          <span className="w-40">Question music starts</span>
+          <span className="w-40">{t("Question music starts")}</span>
           {draft.nextAtMs === undefined ? (
             <span className={clsx("text-xs", mutedText)}>
-              when the countdown song is over
+              {t("when the countdown song is over")}
             </span>
           ) : (
             <TimeField
@@ -216,7 +218,7 @@ export function SlotOptionsEditor({
               }}
               className="text-xs underline cursor-pointer"
             >
-              set
+              {t("set")}
             </button>
           ) : (
             <button
@@ -224,7 +226,7 @@ export function SlotOptionsEditor({
               onClick={() => change({ nextAtMs: undefined })}
               className="text-xs underline cursor-pointer"
             >
-              automatic
+              {t("automatic")}
             </button>
           )}
         </div>
@@ -232,7 +234,7 @@ export function SlotOptionsEditor({
 
       {tusch && !builtin && (
         <TimeField
-          label="Zero point (0) at"
+          label={t("Zero point (0) at")}
           value={draft.endMs ?? 0}
           onChange={(endMs) => change({ endMs })}
         />
@@ -240,7 +242,7 @@ export function SlotOptionsEditor({
 
       {!builtin && !endAligned && !cue && !tusch && (
         <TimeField
-          label="Start at"
+          label={t("Start at")}
           value={draft.startMs ?? 0}
           onChange={(startMs) => change({ startMs })}
           onFocus={() => setCueKey("main")}
@@ -250,24 +252,28 @@ export function SlotOptionsEditor({
       {endAligned && (
         <>
           <TimeField
-            label={isCountdownSlot(slot) ? "Zero point (0) at" : "End point at"}
+            label={
+              isCountdownSlot(slot) ? t("Zero point (0) at") : t("End point at")
+            }
             value={draft.endMs ?? 0}
             onChange={(endMs) => change({ endMs })}
             onFocus={() => setCueKey("main")}
           />
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-40">
-              {isCountdownSlot(slot) ? "Plays on after 0" : "Extend by"}
+              {isCountdownSlot(slot) ? t("Plays on after 0") : t("Extend by")}
             </span>
             <SecondsInput
-              label={isCountdownSlot(slot) ? "Plays on after 0" : "Extend by"}
+              label={
+                isCountdownSlot(slot) ? t("Plays on after 0") : t("Extend by")
+              }
               value={draft.extendSec ?? 0}
               min={0}
               max={5}
               onChange={(extendSec) => change({ extendSec })}
             />
             <span className={clsx("text-xs", mutedText)}>
-              The song plays on this long after the end, then fades out.
+              {t("The song plays on this long after the end, then fades out.")}
             </span>
           </div>
         </>

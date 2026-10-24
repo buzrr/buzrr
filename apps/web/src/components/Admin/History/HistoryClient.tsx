@@ -11,6 +11,7 @@ import { getApiErrorMessage } from "@/lib/api/errors";
 import NavbarToggle from "@/components/Admin/NavbarToggle";
 import LeaderboardView from "@/components/Admin/LeaderboardView";
 import Skeleton from "@/components/ui/Skeleton";
+import { useT, pl } from "@/lib/i18n/context";
 import { useHistoryQuery } from "@/lib/modules/game-sessions/hooks";
 
 function HistoryBody({
@@ -18,6 +19,7 @@ function HistoryBody({
 }: {
   onShowLeaderboard: (resultId: string) => void;
 }) {
+  const t = useT();
   const { data: results, isPending, isError } = useHistoryQuery();
   const qc = useQueryClient();
   const del = useMutation({
@@ -45,7 +47,7 @@ function HistoryBody({
   if (isError) {
     return (
       <p className="text-dark dark:text-white">
-        Could not load your game history. Try again later.
+        {t("Could not load your game history. Try again later.")}
       </p>
     );
   }
@@ -53,9 +55,9 @@ function HistoryBody({
   if (!results || results.length === 0) {
     return (
       <div className="border border-gray border-dashed rounded-lg p-6 text-center text-dark dark:text-white">
-        <p className="text-lg font-black">No games played yet</p>
+        <p className="text-lg font-black">{t("No games played yet")}</p>
         <p className="text-sm mt-2">
-          Host a quiz and the final results will show up here.
+          {t("Host a quiz and the final results will show up here.")}
         </p>
       </div>
     );
@@ -78,24 +80,26 @@ function HistoryBody({
                 {result.quizTitle}
               </p>
               <p className="text-xs text-off-dark dark:text-off-white mt-1">
-                {new Date(result.endedAt).toLocaleString()} · Room{" "}
-                {result.gameCode}
+                {t("{date} · Room {code}", {
+                  date: new Date(result.endedAt).toLocaleString(),
+                  code: result.gameCode,
+                })}
               </p>
             </div>
             <div className="flex gap-4 text-sm text-dark dark:text-white">
               <span>
-                {result.playerCount === 1
-                  ? `${result.playerCount} player`
-                  : `${result.playerCount} players`}
+                {t(pl(result.playerCount, "{n} player", "{n} players"), {
+                  n: result.playerCount,
+                })}
               </span>
               <span>
-                {result.questionCount === 1
-                  ? `${result.questionCount} question`
-                  : `${result.questionCount} questions`}
+                {t(pl(result.questionCount, "{n} question", "{n} questions"), {
+                  n: result.questionCount,
+                })}
               </span>
               {result.mode === "duel" && (
                 <span className="font-bold text-lprimary dark:text-dprimary">
-                  Duel
+                  {t("Duel")}
                 </span>
               )}
             </div>
@@ -107,17 +111,17 @@ function HistoryBody({
                   href={`/admin/quiz/${result.quizId}`}
                   className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-lprimary dark:text-dprimary hover:bg-lprimary/10"
                 >
-                  Go to quiz
+                  {t("Go to quiz")}
                   <LuArrowRight size={15} />
                 </Link>
               )}
               <button
                 type="button"
                 disabled={del.isPending}
-                aria-label="Delete this game"
-                title="Delete this game"
+                aria-label={t("Delete this game")}
+                title={t("Delete this game")}
                 onClick={() => {
-                  if (window.confirm("Delete this game and its results?")) {
+                  if (window.confirm(t("Delete this game and its results?"))) {
                     del.mutate(result.id);
                   }
                 }}
@@ -134,6 +138,7 @@ function HistoryBody({
 }
 
 export default function HistoryClient() {
+  const t = useT();
   const [leaderboardId, setLeaderboardId] = useState<string | null>(null);
 
   return (
@@ -143,14 +148,14 @@ export default function HistoryClient() {
           <NavbarToggle />
         </span>
         <h1 className="text-2xl font-black text-dark dark:text-white">
-          Game History
+          {t("Game History")}
         </h1>
       </div>
       {leaderboardId ? (
         <LeaderboardView
           roomId={leaderboardId}
           onBack={() => setLeaderboardId(null)}
-          backLabel="Back to history"
+          backLabel={t("Back to history")}
         />
       ) : (
         <HistoryBody onShowLeaderboard={setLeaderboardId} />

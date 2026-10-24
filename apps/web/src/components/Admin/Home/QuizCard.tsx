@@ -12,6 +12,7 @@ import {
   LuTrash2,
   LuUsers,
 } from "react-icons/lu";
+import { useT, pl } from "@/lib/i18n/context";
 import type { QuizListItem } from "@/lib/modules/quizzes/api";
 
 function quizHue(id: string) {
@@ -51,6 +52,7 @@ function QuizMenu({
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
+  const t = useT();
   const [open, setOpenState] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -94,7 +96,7 @@ function QuizMenu({
     >
       <button
         type="button"
-        aria-label="More options"
+        aria-label={t("More options")}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
@@ -122,7 +124,7 @@ function QuizMenu({
             onClick={() => setOpen(false)}
           >
             <LuExternalLink />
-            Open
+            {t("Open")}
           </Link>
           <button
             type="button"
@@ -137,7 +139,7 @@ function QuizMenu({
             }}
           >
             <LuPencil />
-            Edit
+            {t("Edit")}
           </button>
           <button
             type="button"
@@ -152,7 +154,7 @@ function QuizMenu({
             }}
           >
             <LuCopy />
-            Duplicate
+            {t("Duplicate")}
           </button>
           <div className="h-px mx-2 my-0.5 bg-lprimary/15 dark:bg-white/10" />
           <button
@@ -168,7 +170,7 @@ function QuizMenu({
             }}
           >
             <LuTrash2 />
-            Delete
+            {t("Delete")}
           </button>
         </div>
       )}
@@ -189,6 +191,7 @@ export default function QuizCard({
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
+  const t = useT();
   const [menuOpen, setMenuOpen] = useState(false);
   const href = `/admin/quiz/${quiz.id}`;
   const questions = quiz._count?.questions ?? 0;
@@ -205,11 +208,11 @@ export default function QuizCard({
     >
       <span>
         <LuLayers size={14} />
-        {questions} question{questions === 1 ? "" : "s"}
+        {t(pl(questions, "{n} question", "{n} questions"), { n: questions })}
       </span>
       <span>
         <LuUsers size={14} />
-        {plays} play{plays === 1 ? "" : "s"}
+        {t(pl(plays, "{n} play", "{n} plays"), { n: plays })}
       </span>
     </div>
   );

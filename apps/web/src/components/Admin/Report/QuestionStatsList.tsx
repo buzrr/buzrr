@@ -7,6 +7,7 @@ import { LuCheck, LuClock, LuUsers } from "react-icons/lu";
 import type { QuestionStats } from "@buzrr/contract";
 import { QuestionTypePill } from "@/components/QuestionTypes";
 import Segmented from "@/components/ui/Segmented";
+import { useT, pl } from "@/lib/i18n/context";
 import { commonWrongAnswer, correctRate, ratingAverage } from "./stats";
 
 type Order = "quiz" | "hardest";
@@ -17,6 +18,7 @@ export default function QuestionStatsList({
 }: {
   questions: QuestionStats[];
 }) {
+  const t = useT();
   const [order, setOrder] = useState<Order>("quiz");
   const sorted = useMemo(() => {
     if (order === "quiz") return questions;
@@ -29,7 +31,7 @@ export default function QuestionStatsList({
   if (questions.length === 0) {
     return (
       <div className="border border-gray border-dashed rounded-lg p-6 text-center text-dark dark:text-white">
-        Question statistics are kept for games from now on.
+        {t("Question statistics are kept for games from now on.")}
       </div>
     );
   }
@@ -38,12 +40,12 @@ export default function QuestionStatsList({
     <div className="flex flex-col gap-3 w-full">
       <div className="self-end">
         <Segmented<Order>
-          label="Order"
+          label={t("Order")}
           value={order}
           onChange={setOrder}
           options={[
-            { value: "quiz", label: "Quiz order" },
-            { value: "hardest", label: "Hardest first" },
+            { value: "quiz", label: t("Quiz order") },
+            { value: "hardest", label: t("Hardest first") },
           ]}
         />
       </div>
@@ -55,6 +57,7 @@ export default function QuestionStatsList({
 }
 
 function QuestionCard({ q }: { q: QuestionStats }) {
+  const t = useT();
   const rate = correctRate(q);
   const wrong = commonWrongAnswer(q);
   return (
@@ -93,18 +96,17 @@ function QuestionCard({ q }: { q: QuestionStats }) {
                   : "text-red-light dark:text-red-dark",
             )}
           >
-            {Math.round(rate * 100)}% right
+            {t("{n}% right", { n: Math.round(rate * 100) })}
           </span>
         )}
         <span className="inline-flex items-center gap-1">
           <LuUsers size={14} />
-          {q.responses === 1
-            ? `${q.responses} answer`
-            : `${q.responses} answers`}
+          {t(pl(q.responses, "{n} answer", "{n} answers"), { n: q.responses })}
         </span>
         {q.avgTimeMs !== null && (
           <span className="inline-flex items-center gap-1">
-            <LuClock size={14} />Ø {(q.avgTimeMs / 1000).toFixed(1)} s
+            <LuClock size={14} />
+            {t("Ø {s} s", { s: (q.avgTimeMs / 1000).toFixed(1) })}
           </span>
         )}
       </div>
@@ -123,7 +125,7 @@ function QuestionCard({ q }: { q: QuestionStats }) {
       {wrong && (
         <p className="text-sm">
           <span className="text-off-dark dark:text-off-white">
-            Most common wrong answer:
+            {t("Most common wrong answer:")}
           </span>{" "}
           <strong>{wrong.text}</strong> ({wrong.count})
         </p>
@@ -134,6 +136,7 @@ function QuestionCard({ q }: { q: QuestionStats }) {
 
 /** Bars for what was picked (options, true / false, ratings, words…). */
 function Breakdown({ q }: { q: QuestionStats }) {
+  const t = useT();
   const s = q.summary;
   let rows: { label: string; count: number; correct?: boolean }[] = [];
   if (s.type === "multiple_choice" || s.type === "poll") {
@@ -144,14 +147,17 @@ function Breakdown({ q }: { q: QuestionStats }) {
     }));
   } else if (s.type === "true_false") {
     rows = [
-      { label: "True", count: s.trueCount, correct: s.answer },
-      { label: "False", count: s.falseCount, correct: !s.answer },
+      { label: t("True"), count: s.trueCount, correct: s.answer },
+      { label: t("False"), count: s.falseCount, correct: !s.answer },
     ];
   } else if (s.type === "rating") {
     const avg = ratingAverage(s.counts);
     return avg === null ? null : (
       <p className="text-sm">
-        Average rating: {avg.toFixed(1)} of {s.counts.length}
+        {t("Average rating: {avg} of {max}", {
+          avg: avg.toFixed(1),
+          max: s.counts.length,
+        })}
       </p>
     );
   } else if (s.type === "word_cloud") {
@@ -195,7 +201,7 @@ function Breakdown({ q }: { q: QuestionStats }) {
                 <LuCheck
                   size={14}
                   className="shrink-0 text-green-600 dark:text-green-400"
-                  aria-label="Correct answer"
+                  aria-label={t("Correct answer")}
                 />
               )}
               <span className="truncate">{r.label}</span>

@@ -55,6 +55,7 @@ import {
   QUESTION_TYPE_ORDER,
   QuestionTypeIcon,
 } from "@/components/QuestionTypes";
+import { useT, tx, pl } from "@/lib/i18n/context";
 import { dropTargetClass } from "@/hooks/useFileDrop";
 import {
   OPTION_KEYS,
@@ -308,8 +309,8 @@ function configFor(v: FormValues): Record<string, unknown> {
 /** The one-line recap in the footer. */
 function summaryOf(v: FormValues): ReactNode {
   const secs = isUnlimitedTime(Number(v.time))
-    ? "no time limit"
-    : `${Number(v.time) || DEFAULT_QUESTION_TIMEOUT}s to answer`;
+    ? tx("no time limit")
+    : tx("{n}s to answer", { n: Number(v.time) || DEFAULT_QUESTION_TIMEOUT });
   const strong = (text: string) => (
     <b className="text-dark dark:text-white">{text}</b>
   );
@@ -320,7 +321,7 @@ function summaryOf(v: FormValues): ReactNode {
       );
       return (
         <>
-          {keys.length > 1 ? "Correct answers" : "Correct answer"}:{" "}
+          {keys.length > 1 ? tx("Correct answers") : tx("Correct answer")}:{" "}
           {strong(keys.join(", ") || "—")} · {secs}
         </>
       );
@@ -328,51 +329,57 @@ function summaryOf(v: FormValues): ReactNode {
     case "true_false":
       return (
         <>
-          Correct answer:{" "}
-          {strong(v.options.find((o) => o.isCorrect)?.title ?? "—")} · {secs}
+          {tx("Correct answer:")}{" "}
+          {strong(tx(v.options.find((o) => o.isCorrect)?.title ?? "—"))} ·{" "}
+          {secs}
         </>
       );
     case "type_answer": {
       const n = v.options.filter((o) => o.title.trim()).length;
       return (
         <>
-          {strong(n === 1 ? `${n} accepted answer` : `${n} accepted answers`)}
-          {v.fixedLength ? ` · fixed length` : ""}
-          {v.ignoreTypos ? ` · typos forgiven` : ` · exact match`} · {secs}
+          {strong(
+            tx(pl(n, "{n} accepted answer", "{n} accepted answers"), { n }),
+          )}
+          {v.fixedLength ? ` · ${tx("fixed length")}` : ""}
+          {v.ignoreTypos
+            ? ` · ${tx("typos forgiven")}`
+            : ` · ${tx("exact match")}`}{" "}
+          · {secs}
         </>
       );
     }
     case "poll":
       return (
         <>
-          {strong("Poll")} · not scored · {secs}
+          {strong(tx("Poll"))} · {tx("not scored")} · {secs}
         </>
       );
     case "word_cloud":
       return (
         <>
-          {strong("Word cloud")} · not scored ·{" "}
+          {strong(tx("Word cloud"))} · {tx("not scored")} ·{" "}
           {v.multipleSubmissions
-            ? "multiple submissions"
-            : v.cloudMaxAnswers === 1
-              ? `${v.cloudMaxAnswers} answer each`
-              : `${v.cloudMaxAnswers} answers each`}
+            ? tx("multiple submissions")
+            : tx(pl(v.cloudMaxAnswers, "{n} answer each", "{n} answers each"), {
+                n: v.cloudMaxAnswers,
+              })}
         </>
       );
     case "rating":
       return (
         <>
-          {strong("Rating scale")} ·{" "}
-          {v.ratingScale === "stars" ? "5 stars" : `1–${v.ratingScale}`} · not
-          scored
+          {strong(tx("Rating scale"))} ·{" "}
+          {v.ratingScale === "stars" ? tx("5 stars") : `1–${v.ratingScale}`} ·{" "}
+          {tx("not scored")}
         </>
       );
     case "open_text":
       return (
         <>
-          {strong("Open text")} · not scored · up to {v.textMaxLength}{" "}
-          characters
-          {v.multipleSubmissions ? ` · multiple submissions` : ""}
+          {strong(tx("Open text"))} · {tx("not scored")} ·{" "}
+          {tx("up to {n} characters", { n: v.textMaxLength })}
+          {v.multipleSubmissions ? ` · ${tx("multiple submissions")}` : ""}
         </>
       );
   }
@@ -422,6 +429,7 @@ const AddQuesForm = (props: {
    *  "Done" on a new one (closes the dialog). */
   onDone?: () => void;
 }) => {
+  const t = useT();
   const { question } = props;
   const initialType = props.type ?? DEFAULT_QUESTION_TYPE;
   const mutation = useUpsertQuestionMutation(props.quizId);
@@ -547,7 +555,7 @@ const AddQuesForm = (props: {
       setAudioFile(f);
       setAudioCues({ startMs: 0, revealMs: null });
     } else {
-      toast.error("Drop a picture or an audio file");
+      toast.error(t("Drop a picture or an audio file"));
     }
   }
 
@@ -580,8 +588,8 @@ const AddQuesForm = (props: {
   const meta = QUESTION_TYPE_META[type];
   const multipleSubmissionsRow = (
     <SettingRow
-      label="Allow multiple submissions"
-      hint="Players can keep answering until time runs out"
+      label={t("Allow multiple submissions")}
+      hint={t("Players can keep answering until time runs out")}
     >
       <Controller
         name="multipleSubmissions"
@@ -590,7 +598,7 @@ const AddQuesForm = (props: {
           <Switch
             checked={field.value}
             onCheckedChange={field.onChange}
-            aria-label="Allow multiple submissions"
+            aria-label={t("Allow multiple submissions")}
           />
         )}
       />
@@ -601,8 +609,8 @@ const AddQuesForm = (props: {
   const toggle =
     type === "multiple_choice" ? (
       <SettingRow
-        label="Multiple correct answers"
-        hint="Players select every correct option"
+        label={t("Multiple correct answers")}
+        hint={t("Players select every correct option")}
       >
         <Controller
           name="mcqMulti"
@@ -616,15 +624,15 @@ const AddQuesForm = (props: {
                 if (!on)
                   setValue("options", singleCorrect(getValues("options")));
               }}
-              aria-label="Multiple correct answers"
+              aria-label={t("Multiple correct answers")}
             />
           )}
         />
       </SettingRow>
     ) : type === "poll" ? (
       <SettingRow
-        label="Allow multiple choices"
-        hint="Players can pick more than one"
+        label={t("Allow multiple choices")}
+        hint={t("Players can pick more than one")}
       >
         <Controller
           name="pollMulti"
@@ -633,7 +641,7 @@ const AddQuesForm = (props: {
             <Switch
               checked={field.value}
               onCheckedChange={field.onChange}
-              aria-label="Allow multiple choices"
+              aria-label={t("Allow multiple choices")}
             />
           )}
         />
@@ -691,7 +699,9 @@ const AddQuesForm = (props: {
 
     mutation.mutate(fd, {
       onSuccess: () => {
-        toast.success(question?.id ? "Question updated" : "Question added");
+        toast.success(
+          question?.id ? t("Question updated") : t("Question added"),
+        );
         if (question?.id || !addNextRef.current) {
           props.onDone?.();
         } else {
@@ -738,14 +748,14 @@ const AddQuesForm = (props: {
       <div className="flex flex-col gap-4 px-5 pt-[18px] md:px-7 md:pt-4">
         <div className="flex flex-col gap-2">
           <span className={fieldLabelClass}>
-            Question type
+            {t("Question type")}
             <span className={counterClass}>
-              {meta.scored ? "Scored" : "Not scored"}
+              {meta.scored ? t("Scored") : t("Not scored")}
             </span>
           </span>
           <div
             role="radiogroup"
-            aria-label="Question type"
+            aria-label={t("Question type")}
             className="flex gap-2 overflow-x-auto md:flex-wrap md:overflow-visible pb-1 md:pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {QUESTION_TYPE_ORDER.map((t) => {
@@ -765,7 +775,7 @@ const AddQuesForm = (props: {
                   )}
                 >
                   <QuestionTypeIcon type={t} size={15} />
-                  {QUESTION_TYPE_META[t].name}
+                  {tx(QUESTION_TYPE_META[t].name)}
                 </button>
               );
             })}
@@ -783,7 +793,7 @@ const AddQuesForm = (props: {
               render={({ field, fieldState }) => (
                 <label className="flex flex-col gap-2">
                   <span className={fieldLabelClass}>
-                    Question
+                    {t("Question")}
                     <span className={counterClass}>
                       {field.value.length}/{TITLE_MAX}
                     </span>
@@ -794,7 +804,7 @@ const AddQuesForm = (props: {
                     maxLength={TITLE_MAX}
                     required
                     autoComplete="off"
-                    placeholder="What do you want to ask?"
+                    placeholder={t("What do you want to ask?")}
                     aria-invalid={!!fieldState.error}
                     className={clsx(inputClass, "resize-none")}
                   />
@@ -805,8 +815,8 @@ const AddQuesForm = (props: {
           <div className="min-w-0 md:[grid-area:image]">
             <div className="flex flex-col gap-2">
               <span className={fieldLabelClass}>
-                Image
-                <span className={counterClass}>Optional</span>
+                {t("Image")}
+                <span className={counterClass}>{t("Optional")}</span>
               </span>
               {mediaSrc ? (
                 <div
@@ -817,7 +827,7 @@ const AddQuesForm = (props: {
                 >
                   <Image
                     src={mediaSrc}
-                    alt="Question media"
+                    alt={t("Question media")}
                     width={160}
                     height={96}
                     className="h-12 w-20 rounded-lg object-cover"
@@ -828,11 +838,11 @@ const AddQuesForm = (props: {
                       mutedText,
                     )}
                   >
-                    {file?.name ?? "Current image"}
+                    {file?.name ?? t("Current image")}
                   </span>
                   <button
                     type="button"
-                    aria-label="Remove image"
+                    aria-label={t("Remove image")}
                     onClick={deleteFile}
                     className="size-9 shrink-0 rounded-[10px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
                   >
@@ -852,10 +862,10 @@ const AddQuesForm = (props: {
                   </span>
                   <span className="flex flex-col">
                     <span className="text-sm font-semibold">
-                      Upload an image
+                      {t("Upload an image")}
                     </span>
                     <span className={clsx("text-[12.5px]", mutedText)}>
-                      PNG, JPG or GIF under 10MB
+                      {t("PNG, JPG or GIF under 10MB")}
                     </span>
                   </span>
                   <input
@@ -871,15 +881,15 @@ const AddQuesForm = (props: {
             </div>
             <div className="mt-3 flex flex-col gap-2">
               <span className={fieldLabelClass}>
-                Sound
+                {t("Sound")}
                 <span className={counterClass}>
-                  Optional · plays on the host&apos;s screen
+                  {t("Optional · plays on the host's screen")}
                 </span>
               </span>
               {audioPreview || audioLink ? (
                 <AudioCueEditor
                   src={audioPreview ?? audioLink}
-                  name={audioFile?.name ?? "Current sound"}
+                  name={audioFile?.name ?? t("Current sound")}
                   questionMs={
                     (Number(values.time) || DEFAULT_QUESTION_TIMEOUT) * 1000
                   }
@@ -891,18 +901,18 @@ const AddQuesForm = (props: {
               ) : null}
               {audioPreview || audioLink ? (
                 <label className="flex items-center gap-2 text-[13px]">
-                  Plays on
+                  {t("Plays on")}
                   <select
-                    aria-label="Where the sound plays"
+                    aria-label={t("Where the sound plays")}
                     value={audioPlayOn}
                     onChange={(e) => setAudioPlayOn(e.target.value)}
                     className="w-44 rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent dark:bg-dark px-2 py-1"
                   >
-                    <option value="quiz">Like the quiz</option>
-                    <option value="host">Host&apos;s screen</option>
-                    <option value="players">Players&apos; devices</option>
-                    <option value="both">Both</option>
-                    <option value="off">Off</option>
+                    <option value="quiz">{t("Like the quiz")}</option>
+                    <option value="host">{t("Host's screen")}</option>
+                    <option value="players">{t("Players' devices")}</option>
+                    <option value="both">{t("Both")}</option>
+                    <option value="off">{t("Off")}</option>
                   </select>
                 </label>
               ) : (
@@ -918,10 +928,10 @@ const AddQuesForm = (props: {
                   </span>
                   <span className="flex flex-col">
                     <span className="text-sm font-semibold">
-                      Upload a sound
+                      {t("Upload a sound")}
                     </span>
                     <span className={clsx("text-[12.5px]", mutedText)}>
-                      MP3, WAV, OGG, FLAC or M4A under 20MB
+                      {t("MP3, WAV, OGG, FLAC or M4A under 20MB")}
                     </span>
                   </span>
                   <input
@@ -964,14 +974,14 @@ const AddQuesForm = (props: {
                     return (
                       <div className="flex flex-col gap-2">
                         <span className={fieldLabelClass}>
-                          Answer
+                          {t("Answer")}
                           <span className={counterClass}>
-                            Tap to mark it correct
+                            {t("Tap to mark it correct")}
                           </span>
                         </span>
                         <div
                           role="radiogroup"
-                          aria-label="Correct answer"
+                          aria-label={t("Correct answer")}
                           className="grid grid-cols-2 gap-2.5"
                         >
                           {opts.map((o, i) => (
@@ -1033,23 +1043,23 @@ const AddQuesForm = (props: {
                   return (
                     <div className="flex flex-col gap-2">
                       <span className={fieldLabelClass}>
-                        Options
+                        {t("Options")}
                         <span className="flex items-center gap-2">
                           <span className={counterClass}>
                             {isPoll
-                              ? "No correct answer"
+                              ? t("No correct answer")
                               : multi
-                                ? "Tap letters to mark the correct ones"
-                                : "Tap a letter to mark it correct"}
+                                ? t("Tap letters to mark the correct ones")
+                                : t("Tap a letter to mark it correct")}
                           </span>
                           <button
                             type="button"
                             onClick={() => field.onChange(shuffled(opts))}
-                            title="Put the options in a random order"
+                            title={t("Put the options in a random order")}
                             className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-bold text-lprimary dark:text-dprimary hover:bg-lprimary/10 dark:hover:bg-dprimary/10 cursor-pointer"
                           >
                             <LuShuffle size={14} />
-                            Shuffle
+                            {t("Shuffle")}
                           </button>
                         </span>
                       </span>
@@ -1073,7 +1083,7 @@ const AddQuesForm = (props: {
                                     : "radiogroup"
                               }
                               aria-label={
-                                isPoll ? undefined : "Correct answers"
+                                isPoll ? undefined : t("Correct answers")
                               }
                               // Rows carry their gap as a margin (the drag
                               // measures it); the last one's is taken back.
@@ -1107,7 +1117,9 @@ const AddQuesForm = (props: {
                                       >
                                         <span
                                           {...drag.dragHandleProps}
-                                          aria-label={`Move option ${OPTION_KEYS[i]!}`}
+                                          aria-label={t("Move option {key}", {
+                                            key: OPTION_KEYS[i]!,
+                                          })}
                                           className="shrink-0 -mr-1 cursor-grab text-[#8a8896] dark:text-muted-dark"
                                         >
                                           <LuGripVertical size={18} />
@@ -1122,7 +1134,12 @@ const AddQuesForm = (props: {
                                             type="button"
                                             role={multi ? "checkbox" : "radio"}
                                             aria-checked={isCorrect}
-                                            aria-label={`Mark option ${OPTION_KEYS[i]!} correct`}
+                                            aria-label={t(
+                                              "Mark option {key} correct",
+                                              {
+                                                key: OPTION_KEYS[i]!,
+                                              },
+                                            )}
                                             onClick={() =>
                                               multi
                                                 ? update(i, {
@@ -1164,14 +1181,23 @@ const AddQuesForm = (props: {
                                           required
                                           maxLength={500}
                                           autoComplete="off"
-                                          placeholder={`Option ${OPTION_KEYS[i]!}`}
-                                          aria-label={`Option ${OPTION_KEYS[i]!}`}
+                                          placeholder={t("Option {key}", {
+                                            key: OPTION_KEYS[i]!,
+                                          })}
+                                          aria-label={t("Option {key}", {
+                                            key: OPTION_KEYS[i]!,
+                                          })}
                                           className="flex-1 min-w-0 bg-transparent outline-none py-1.5 text-[15px] font-medium placeholder:text-[#8a8896] dark:placeholder:text-muted-dark"
                                         />
                                         {resizable && opts.length > minOpts && (
                                           <button
                                             type="button"
-                                            aria-label={`Remove option ${OPTION_KEYS[i]!}`}
+                                            aria-label={t(
+                                              "Remove option {key}",
+                                              {
+                                                key: OPTION_KEYS[i]!,
+                                              },
+                                            )}
                                             onClick={() => {
                                               const rest = opts.filter(
                                                 (_, j) => j !== i,
@@ -1210,7 +1236,7 @@ const AddQuesForm = (props: {
                           className="flex items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-lprimary/25 dark:border-white/15 p-2.5 text-sm font-bold text-lprimary dark:text-dprimary cursor-pointer hover:border-dprimary"
                         >
                           <LuPlus size={16} />
-                          Add option
+                          {t("Add option")}
                         </button>
                       )}
                       {optionsError && (
@@ -1245,11 +1271,17 @@ const AddQuesForm = (props: {
                   return (
                     <div className="flex flex-col gap-2">
                       <span className={fieldLabelClass}>
-                        Accepted answers
+                        {t("Accepted answers")}
                         <span className={counterClass}>
                           {fixed
-                            ? `${rows.length} / ${MAX_ACCEPTED_ANSWERS} · same length each, players see one box per letter`
-                            : `${rows.length} / ${MAX_ACCEPTED_ANSWERS} · case and accents don't matter`}
+                            ? t(
+                                "{n} / {max} · same length each, players see one box per letter",
+                                { n: rows.length, max: MAX_ACCEPTED_ANSWERS },
+                              )
+                            : t("{n} / {max} · case and accents don't matter", {
+                                n: rows.length,
+                                max: MAX_ACCEPTED_ANSWERS,
+                              })}
                         </span>
                       </span>
                       {rows.map((o, i) => (
@@ -1277,15 +1309,17 @@ const AddQuesForm = (props: {
                             maxLength={TYPE_ANSWER_MAX_LENGTH}
                             autoComplete="off"
                             placeholder={
-                              i === 0 ? "The answer" : "Also accepted"
+                              i === 0 ? t("The answer") : t("Also accepted")
                             }
-                            aria-label={`Accepted answer ${i + 1}`}
+                            aria-label={t("Accepted answer {n}", { n: i + 1 })}
                             className="flex-1 min-w-0 bg-transparent outline-none py-1.5 text-[15px] font-medium placeholder:text-[#8a8896] dark:placeholder:text-muted-dark"
                           />
                           {rows.length > 1 && (
                             <button
                               type="button"
-                              aria-label={`Remove accepted answer ${i + 1}`}
+                              aria-label={t("Remove accepted answer {n}", {
+                                n: i + 1,
+                              })}
                               onClick={() =>
                                 set(rows.filter((_, j) => j !== i))
                               }
@@ -1298,7 +1332,7 @@ const AddQuesForm = (props: {
                       ))}
                       {pattern && (
                         <p
-                          aria-label="What players see"
+                          aria-label={t("What players see")}
                           className="font-mono text-lg font-bold tracking-[0.25em] text-center py-1"
                         >
                           {pattern.map((n) => "_".repeat(n)).join(" ")}
@@ -1306,8 +1340,10 @@ const AddQuesForm = (props: {
                       )}
                       {misfit && (
                         <span className="text-xs text-red-light dark:text-red-dark">
-                          All answers need the same length per word as the first
-                          ({pattern!.join(" + ")} letters).
+                          {t(
+                            "All answers need the same length per word as the first ({n} letters).",
+                            { n: pattern!.join(" + ") },
+                          )}
                         </span>
                       )}
                       {rows.length < MAX_ACCEPTED_ANSWERS && (
@@ -1319,7 +1355,7 @@ const AddQuesForm = (props: {
                           className="flex items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-lprimary/25 dark:border-white/15 p-2.5 text-sm font-bold text-lprimary dark:text-dprimary cursor-pointer hover:border-dprimary"
                         >
                           <LuPlus size={16} />
-                          Add accepted answer
+                          {t("Add accepted answer")}
                         </button>
                       )}
                       {optionsError && (
@@ -1329,8 +1365,8 @@ const AddQuesForm = (props: {
                       )}
                       <div className={settingsBoxClass}>
                         <SettingRow
-                          label="Fixed length"
-                          hint="Players see the answer's letters as boxes"
+                          label={t("Fixed length")}
+                          hint={t("Players see the answer's letters as boxes")}
                         >
                           <Controller
                             name="fixedLength"
@@ -1339,14 +1375,14 @@ const AddQuesForm = (props: {
                               <Switch
                                 checked={f.value}
                                 onCheckedChange={f.onChange}
-                                aria-label="Fixed length"
+                                aria-label={t("Fixed length")}
                               />
                             )}
                           />
                         </SettingRow>
                         <SettingRow
-                          label="Ignore typos"
-                          hint="Close answers count, but score less"
+                          label={t("Ignore typos")}
+                          hint={t("Close answers count, but score less")}
                         >
                           <Controller
                             name="ignoreTypos"
@@ -1355,7 +1391,7 @@ const AddQuesForm = (props: {
                               <Switch
                                 checked={f.value}
                                 onCheckedChange={f.onChange}
-                                aria-label="Ignore typos"
+                                aria-label={t("Ignore typos")}
                               />
                             )}
                           />
@@ -1371,18 +1407,21 @@ const AddQuesForm = (props: {
               <div className={settingsBoxClass}>
                 {multipleSubmissionsRow}
                 {!values.multipleSubmissions && (
-                  <SettingRow label="Answers per player">
+                  <SettingRow label={t("Answers per player")}>
                     <Segmented
-                      label="Answers per player"
+                      label={t("Answers per player")}
                       value={values.cloudMaxAnswers}
                       options={[1, 2, 3].map((n) => ({ value: n, label: n }))}
                       onChange={(n) => setValue("cloudMaxAnswers", n)}
                     />
                   </SettingRow>
                 )}
-                <SettingRow label="Max length" hint="Characters per answer">
+                <SettingRow
+                  label={t("Max length")}
+                  hint={t("Characters per answer")}
+                >
                   <Segmented
-                    label="Max length"
+                    label={t("Max length")}
                     value={values.cloudMaxLength}
                     options={[20, 40].map((n) => ({
                       value: n as 20 | 40,
@@ -1396,9 +1435,9 @@ const AddQuesForm = (props: {
 
             {type === "rating" && (
               <div className={settingsBoxClass}>
-                <SettingRow label="Scale">
+                <SettingRow label={t("Scale")}>
                   <Segmented
-                    label="Scale"
+                    label={t("Scale")}
                     value={values.ratingScale}
                     options={[
                       { value: "5", label: "1–5" },
@@ -1411,8 +1450,8 @@ const AddQuesForm = (props: {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {(
                     [
-                      ["lowLabel", "Low label", "Not at all"],
-                      ["highLabel", "High label", "Very"],
+                      ["lowLabel", t("Low label"), t("Not at all")],
+                      ["highLabel", t("High label"), "Very"],
                     ] as const
                   ).map(([name, label, placeholder]) => (
                     <Controller
@@ -1444,9 +1483,9 @@ const AddQuesForm = (props: {
 
             {type === "open_text" && (
               <div className={settingsBoxClass}>
-                <SettingRow label="Max length">
+                <SettingRow label={t("Max length")}>
                   <Segmented
-                    label="Max length"
+                    label={t("Max length")}
                     value={values.textMaxLength}
                     options={[100, 200, 500].map((n) => ({
                       value: n as 100 | 200 | 500,
@@ -1456,7 +1495,7 @@ const AddQuesForm = (props: {
                   />
                 </SettingRow>
                 {multipleSubmissionsRow}
-                <SettingRow label="Allow anonymous answers">
+                <SettingRow label={t("Allow anonymous answers")}>
                   <Controller
                     name="allowAnonymous"
                     control={control}
@@ -1464,7 +1503,7 @@ const AddQuesForm = (props: {
                       <Switch
                         checked={field.value}
                         onCheckedChange={field.onChange}
-                        aria-label="Allow anonymous answers"
+                        aria-label={t("Allow anonymous answers")}
                       />
                     )}
                   />
@@ -1490,9 +1529,9 @@ const AddQuesForm = (props: {
                     )}
                   >
                     <div className={fieldLabelClass}>
-                      Time to answer
+                      {t("Time to answer")}
                       <Segmented
-                        label="Time input"
+                        label={t("Time input")}
                         value={customTime ? "Custom" : "Slider"}
                         options={[
                           { value: "Slider", label: "Slider" },
@@ -1514,7 +1553,7 @@ const AddQuesForm = (props: {
                           type="number"
                           min={1}
                           value={field.value ?? ""}
-                          aria-label="Seconds to answer"
+                          aria-label={t("Seconds to answer")}
                           onChange={(e) =>
                             field.onChange(
                               e.target.value === ""
@@ -1533,7 +1572,7 @@ const AddQuesForm = (props: {
                             mutedText,
                           )}
                         >
-                          seconds
+                          {t("seconds")}
                         </span>
                       </div>
                     ) : (
@@ -1547,13 +1586,13 @@ const AddQuesForm = (props: {
                                 mutedText,
                               )}
                             >
-                              sec
+                              {t("sec")}
                             </small>
                           )}
                         </span>
                         <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                           <RangeSlider
-                            label="Seconds to answer"
+                            label={t("Seconds to answer")}
                             min={range.min}
                             max={range.max + SLIDER_UNLIMITED_STEP}
                             value={
@@ -1574,8 +1613,9 @@ const AddQuesForm = (props: {
                           />
                           {isUnlimitedTime(secs) && (
                             <span className={clsx("text-xs", mutedText)}>
-                              No time limit and no countdown: the question stays
-                              open until everyone answered or you move on.
+                              {t(
+                                "No time limit and no countdown: the question stays open until everyone answered or you move on.",
+                              )}
                             </span>
                           )}
                         </div>
@@ -1604,7 +1644,7 @@ const AddQuesForm = (props: {
             disabled={mutation.isPending}
             className={clsx(primaryButtonClass, "px-[26px]")}
           >
-            {mutation.isPending ? "Saving..." : "Save changes"}
+            {mutation.isPending ? "Saving..." : t("Save changes")}
           </button>
         ) : (
           <>
@@ -1631,7 +1671,7 @@ const AddQuesForm = (props: {
               }}
               className="rounded-[14px] border-2 border-lprimary dark:border-dprimary px-[22px] py-3 font-bold text-lprimary dark:text-dprimary cursor-pointer hover:bg-lprimary/10 dark:hover:bg-dprimary/10 disabled:opacity-60"
             >
-              Done
+              {t("Done")}
             </button>
             <button
               type="submit"
@@ -1639,7 +1679,7 @@ const AddQuesForm = (props: {
               onClick={() => (addNextRef.current = true)}
               className={clsx(primaryButtonClass, "px-[26px]")}
             >
-              {mutation.isPending ? "Saving…" : "Done + Next"}
+              {mutation.isPending ? t("Saving…") : t("Done + Next")}
             </button>
           </>
         )}

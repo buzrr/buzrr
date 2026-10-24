@@ -10,6 +10,7 @@ import {
   type SoundSlotOptions,
 } from "@buzrr/contract";
 import { mutedText } from "@/components/Game/GameUI";
+import { useT } from "@/lib/i18n/context";
 import { builtinPeaks, decodePeaks, type Wave } from "@/lib/sound/peaks";
 import { fadeInOf, formatMs, headAt, type Timeline } from "@/lib/sound/song";
 import type { BuiltinSkinId } from "@/lib/sound/synth";
@@ -91,6 +92,7 @@ export function SongWaveform({
   /** What a click sets: the slot's cue, or (countdowns) the question music's start. */
   cueKey?: "main" | "next";
 }) {
+  const t = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [wave, setWave] = useState<Wave | null>(null);
   const [error, setError] = useState(false);
@@ -262,7 +264,7 @@ export function SongWaveform({
   if (error) {
     return (
       <p className="text-xs text-red-light dark:text-red-dark">
-        Could not read this audio file
+        {t("Could not read this audio file")}
       </p>
     );
   }
@@ -280,10 +282,10 @@ export function SongWaveform({
         )}
         aria-label={
           !editable
-            ? "Waveform"
+            ? t("Waveform")
             : endAligned
-              ? "Waveform — click or drag to set the end point"
-              : "Waveform — click or drag to set the start point"
+              ? t("Waveform — click or drag to set the end point")
+              : t("Waveform — click or drag to set the start point")
         }
       />
       <div
@@ -292,8 +294,8 @@ export function SongWaveform({
         {timed && (
           <span>
             {endAligned
-              ? `End point ${formatMs(cueMs)}`
-              : `Start ${formatMs(cueMs)}`}
+              ? t("End point {t}", { t: formatMs(cueMs) })
+              : t("Start {t}", { t: formatMs(cueMs) })}
           </span>
         )}
         {wave && <span>{formatMs(wave.durationMs)}</span>}

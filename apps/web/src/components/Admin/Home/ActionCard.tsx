@@ -2,6 +2,7 @@
 
 import clsx from "clsx";
 import Link from "next/link";
+import { useT } from "@/lib/i18n/context";
 import type { ReactNode } from "react";
 
 type ActionCardVariant = "default" | "ai" | "soon";
@@ -25,6 +26,7 @@ export default function ActionCard({
   onClick?: () => void;
   className?: string;
 }) {
+  const t = useT();
   const classes = clsx(
     "relative overflow-hidden rounded-[18px] border text-left flex gap-3.5 transition-[transform,box-shadow,background-color] duration-150 ease-out",
     view === "grid"
@@ -43,7 +45,7 @@ export default function ActionCard({
     <>
       {variant === "soon" && (
         <span className="absolute top-3 right-3 md:top-4 md:right-4 text-[10.5px] font-semibold tracking-[0.04em] uppercase rounded-full px-2.5 py-1 bg-lprimary/10 dark:bg-white/5 text-off-dark dark:text-muted-dark">
-          Soon
+          {t("Soon")}
         </span>
       )}
       <span

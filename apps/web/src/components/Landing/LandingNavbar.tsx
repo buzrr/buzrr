@@ -7,8 +7,10 @@ import ClientImage from "@/components/ClientImage";
 import ThemeIconToggle from "./ThemeIconToggle";
 import { useInstance } from "@/lib/instance-context";
 import { GITHUB_LINK } from "./links";
+import { useT } from "@/lib/i18n/context";
 
 const LandingNavbar = () => {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const { billing: BILLING_ENABLED, privateBuzz: PRIVATE_BUZZ } = useInstance();
   // A private instance shows only a login link; the hosted site's pages are gone.
@@ -43,7 +45,7 @@ const LandingNavbar = () => {
               href={link.href}
               className="text-sm font-medium text-dark dark:text-gray hover:text-lprimary dark:hover:text-dprimary transition-colors"
             >
-              {link.name}
+              {t(link.name)}
             </Link>
           ))}
           {!PRIVATE_BUZZ && (
@@ -83,7 +85,7 @@ const LandingNavbar = () => {
               onClick={() => setOpen(false)}
               className="block py-3 text-sm font-medium text-dark dark:text-gray border-b border-card-light dark:border-card-dark"
             >
-              {link.name}
+              {t(link.name)}
             </Link>
           ))}
           {!PRIVATE_BUZZ && (

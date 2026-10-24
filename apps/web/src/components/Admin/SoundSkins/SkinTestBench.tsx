@@ -7,6 +7,7 @@ import { LuPlay, LuSquare } from "react-icons/lu";
 import type { SoundSlot } from "@buzrr/contract";
 import { Switch } from "@/components/ui/Switch";
 import { mutedText } from "@/components/Game/GameUI";
+import { useT } from "@/lib/i18n/context";
 import { audioContext, type SoundHandle } from "@/lib/sound/synth";
 
 /** Like the game: the countdown before a question, the tusch → reveal gap. */
@@ -48,6 +49,7 @@ export function SkinTestBench({
   /** The skin has a song for the last question: offer to test that one. */
   hasLastQuestion?: boolean;
 }) {
+  const t = useT();
   const [seconds, setSeconds] = useState(20);
   const [withReveal, setWithReveal] = useState(true);
   const [withScores, setWithScores] = useState(true);
@@ -152,17 +154,17 @@ export function SkinTestBench({
 
   const left = Math.max(0, Math.ceil((endsAt - now) / 1000));
   const labels: Record<Stage, string> = {
-    countdown: "Countdown",
-    question: "Question",
-    reveal: "Reveal",
-    scores: "Scores",
+    countdown: t("Countdown"),
+    question: t("Question"),
+    reveal: t("Reveal"),
+    scores: t("Scores"),
   };
 
   return (
     <div className="flex flex-col gap-2.5 rounded-xl bg-lprimary/5 dark:bg-white/3 p-3 text-sm">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <label className="flex items-center gap-1.5">
-          Question time
+          {t("Question time")}
           <QuestionSecondsInput
             value={seconds}
             onChange={setSeconds}
@@ -173,28 +175,28 @@ export function SkinTestBench({
         {hasLastQuestion && (
           <label className="flex items-center gap-2">
             <Switch
-              aria-label="Last question"
+              aria-label={t("Last question")}
               checked={lastQuestion}
               onCheckedChange={setLastQuestion}
             />
-            Last question
+            {t("Last question")}
           </label>
         )}
         <label className="flex items-center gap-2">
           <Switch
-            aria-label="Reveal"
+            aria-label={t("Reveal")}
             checked={withReveal}
             onCheckedChange={setWithReveal}
           />
-          Reveal
+          {t("Reveal")}
         </label>
         <label className="flex items-center gap-2">
           <Switch
-            aria-label="Scores"
+            aria-label={t("Scores")}
             checked={withScores}
             onCheckedChange={setWithScores}
           />
-          Scores
+          {t("Scores")}
         </label>
         <button
           type="button"
@@ -202,7 +204,7 @@ export function SkinTestBench({
           className="ml-auto flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white bg-lprimary dark:bg-dprimary dark:text-dark cursor-pointer"
         >
           {stage ? <LuSquare size={12} /> : <LuPlay size={12} />}
-          {stage ? "Stop" : "Start test"}
+          {stage ? t("Stop") : t("Start test")}
         </button>
       </div>
       {stage && (
@@ -216,7 +218,9 @@ export function SkinTestBench({
           >
             {left}
           </span>
-          <span className={clsx("text-xs", mutedText)}>seconds left</span>
+          <span className={clsx("text-xs", mutedText)}>
+            {t("seconds left")}
+          </span>
         </div>
       )}
     </div>

@@ -35,6 +35,7 @@ import {
   preloadClips,
 } from "./preload";
 import { DEFAULT_SONG_VOLUME, fadeInOf, playSong, type Timeline } from "./song";
+import { useT } from "@/lib/i18n/context";
 import {
   audioContext,
   builtinTuschZeroMs,
@@ -882,14 +883,15 @@ export function SoundToggle({
   /** Header pill with a label, styled like the "Live" status. */
   pill?: boolean;
 }) {
+  const t = useT();
   const s = useGameSound();
   if (!s?.allowed) return null;
   if (pill) {
     return (
       <button
         type="button"
-        aria-label={s.on ? "Mute sounds" : "Turn sounds on"}
-        title={s.on ? "Mute sounds" : "Turn sounds on"}
+        aria-label={s.on ? t("Mute sounds") : t("Turn sounds on")}
+        title={s.on ? t("Mute sounds") : t("Turn sounds on")}
         onClick={() => s.setOn(!s.on)}
         className="inline-flex items-center justify-center rounded-full border border-lprimary/15 dark:border-white/10 bg-white dark:bg-white/5 h-[34px] w-[38px] text-dark dark:text-white cursor-pointer hover:border-dprimary"
       >
@@ -900,8 +902,8 @@ export function SoundToggle({
   return (
     <button
       type="button"
-      aria-label={s.on ? "Mute sounds" : "Turn sounds on"}
-      title={s.on ? "Mute sounds" : "Turn sounds on"}
+      aria-label={s.on ? t("Mute sounds") : t("Turn sounds on")}
+      title={s.on ? t("Mute sounds") : t("Turn sounds on")}
       onClick={() => s.setOn(!s.on)}
       className={
         className ??

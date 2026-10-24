@@ -25,9 +25,11 @@ import { LICENSE_LINK } from "@/components/Landing/links";
 import { isAiConfigured } from "@/lib/api/ai-client";
 import { useAiStatusQuery } from "@/lib/modules/quizzes/hooks";
 import { useInstance } from "@/lib/instance-context";
+import { useT } from "@/lib/i18n/context";
 import SignOutButton from "./SignOutButton";
 
 export default function Navbar() {
+  const t = useT();
   const { billing: BILLING_ENABLED, duels: DUELS } = useInstance();
   const NavLinks = [
     { href: "/admin", label: "Quizzes", icon: LuBookText },
@@ -102,7 +104,7 @@ export default function Navbar() {
             props={{
               src: "/images/logo.svg",
               darksrc: "/images/logo-dark.svg",
-              alt: "Buzrr Logo",
+              alt: t("Buzrr Logo"),
               width: 90,
               height: 90,
             }}
@@ -128,7 +130,7 @@ export default function Navbar() {
                 }}
               >
                 <link.icon size={18} className="shrink-0" />
-                {link.label}
+                {t(link.label)}
               </Link>
             ))}
           </div>
@@ -150,7 +152,7 @@ export default function Navbar() {
             <Image
               src={session?.user?.image || DEFAULT_AVATAR}
               className="rounded-full mr-2"
-              alt="Profile Picture"
+              alt={t("Profile Picture")}
               width={40}
               height={40}
             />
@@ -166,30 +168,31 @@ export default function Navbar() {
             </span>
           </Link>
           <SignOutButton
-            btnTitle="Logout"
-            confirmText="Are you sure you want to log out?"
+            btnTitle={t("Logout")}
+            confirmText={t("Are you sure you want to log out?")}
             btnContent={
               <span className="flex items-center gap-3">
                 <LuLogOut size={18} className="shrink-0" />
-                Logout
+                {t("Logout")}
               </span>
             }
             btnStyle="my-1 py-2 px-4 rounded-lg flex items-center w-full text-dark dark:text-white hover:bg-card-light hover:dark:bg-card-dark transition-colors duration-200 ease-in-out hover:cursor-pointer"
           />
           <div className="p-2 px-4">
             <div className="text-xs text-off-dark dark:text-off-white mt-2">
-              Licensed under{" "}
+              {t("Licensed under")}{" "}
               <a
                 href={LICENSE_LINK}
                 target="_blank"
                 rel="noreferrer"
                 className="underline underline-offset-1"
               >
-                AGPL-3.0
+                {t("AGPL-3.0")}
               </a>
               <br />
               <br />
-              Buzrr v{process.env.NEXT_PUBLIC_VERSION || "0.0.1"}
+              {t("Buzrr v")}
+              {process.env.NEXT_PUBLIC_VERSION || "0.0.1"}
             </div>
           </div>
         </div>

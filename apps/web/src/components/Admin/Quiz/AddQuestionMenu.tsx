@@ -11,6 +11,7 @@ import {
   QUESTION_TYPE_ORDER,
   QuestionTypeIcon,
 } from "@/components/QuestionTypes";
+import { useT } from "@/lib/i18n/context";
 import { mutedText } from "@/components/Game/GameUI";
 
 const SUBTITLES: Record<QuestionType, string> = {
@@ -27,6 +28,7 @@ const SUBTITLES: Record<QuestionType, string> = {
 
 /** "Add Question" opens a menu of types; picking one opens the editor. */
 export default function AddQuestionMenu({ quizId }: { quizId: string }) {
+  const t = useT();
   const [menuOpen, setMenuOpen] = useState(false);
   const [type, setType] = useState<QuestionType | null>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -57,7 +59,7 @@ export default function AddQuestionMenu({ quizId }: { quizId: string }) {
         className="w-full flex items-center justify-center gap-2 rounded-[14px] p-3.5 md:p-4 text-[15px] md:text-base font-bold text-white bg-[#1c1b22] dark:bg-dark-bg transition-[filter] hover:brightness-125 cursor-pointer"
       >
         <LuPlus size={20} strokeWidth={2.4} />
-        Add Question
+        {t("Add Question")}
         <LuChevronDown
           size={16}
           className={clsx(
@@ -71,28 +73,28 @@ export default function AddQuestionMenu({ quizId }: { quizId: string }) {
           role="menu"
           className="absolute left-0 top-[calc(100%+8px)] z-20 w-[min(560px,calc(100vw-2rem))] md:w-[min(560px,100%)] flex flex-col gap-0.5 rounded-[18px] border p-2.5 bg-white dark:bg-dark border-lprimary/15 dark:border-white/5 shadow-[0_24px_60px_-20px_rgba(20,10,60,0.45)] text-dark dark:text-white animate-[fade-up_120ms_ease-out_both] motion-reduce:animate-none"
         >
-          {QUESTION_TYPE_ORDER.map((t) => {
-            const meta = QUESTION_TYPE_META[t];
+          {QUESTION_TYPE_ORDER.map((qt) => {
+            const meta = QUESTION_TYPE_META[qt];
             return (
               <button
-                key={t}
+                key={qt}
                 type="button"
                 role="menuitem"
                 onClick={() => {
                   setMenuOpen(false);
-                  setType(t);
+                  setType(qt);
                 }}
                 className="flex items-center gap-3 rounded-xl p-3 text-left cursor-pointer hover:bg-lprimary/8 dark:hover:bg-white/5 focus-visible:bg-lprimary/8 outline-none"
               >
                 <span className="size-10 shrink-0 rounded-[11px] flex items-center justify-center bg-lprimary/8 dark:bg-white/5 text-lprimary dark:text-dprimary">
-                  <QuestionTypeIcon type={t} size={19} />
+                  <QuestionTypeIcon type={qt} size={19} />
                 </span>
                 <span className="min-w-0">
                   <b className="flex items-center gap-2 text-[15px]">
-                    {meta.name}
+                    {t(meta.name)}
                     {meta.scored && (
                       <span className="text-[10px] font-extrabold tracking-[0.06em] rounded-full px-[7px] py-0.5 text-green-600 dark:text-green-500 bg-green-500/12">
-                        SCORED
+                        {t("SCORED")}
                       </span>
                     )}
                   </b>
@@ -102,7 +104,7 @@ export default function AddQuestionMenu({ quizId }: { quizId: string }) {
                       mutedText,
                     )}
                   >
-                    {meta.description}
+                    {t(meta.description)}
                   </small>
                 </span>
               </button>
@@ -111,10 +113,10 @@ export default function AddQuestionMenu({ quizId }: { quizId: string }) {
         </div>
       )}
       <BasicModal
-        btnTitle="Add Question"
+        btnTitle={t("Add Question")}
         wide
         confirmDismiss
-        subtitle={type ? SUBTITLES[type] : undefined}
+        subtitle={type ? t(SUBTITLES[type]) : undefined}
         open={type !== null}
         onClose={() => setType(null)}
       >

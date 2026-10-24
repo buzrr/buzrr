@@ -8,6 +8,7 @@ import { LuMail } from "react-icons/lu";
 import ThemeToggle from "./ThemeToggle";
 import supportLinks from "@/data/support-links.json";
 import { useInstance } from "@/lib/instance-context";
+import { tx } from "@/lib/i18n/context";
 import { authClient } from "@/lib/auth-client";
 
 // Routes that render their own full footer + theme toggle (landing & co).
@@ -77,7 +78,7 @@ const Links = [
 function footerLinks(PRIVATE_BUZZ: boolean, CONTACT_EMAIL: string) {
   if (!PRIVATE_BUZZ) return Links;
   return Links.flatMap((l) =>
-    l.name !== "Contact us"
+    l.name !== tx("Contact us")
       ? [l]
       : CONTACT_EMAIL
         ? [{ ...l, link: `mailto:${CONTACT_EMAIL}` }]

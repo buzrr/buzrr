@@ -3,6 +3,7 @@ import * as React from "react";
 import clsx from "clsx";
 import Modal from "@mui/material/Modal";
 import { LuPencil, LuPlus, LuX } from "react-icons/lu";
+import { useT } from "@/lib/i18n/context";
 import { mutedText } from "@/components/Game/GameUI";
 
 /**
@@ -30,6 +31,7 @@ export default function BasicModal(props: {
    *  that would lose what was typed. */
   confirmDismiss?: boolean;
 }) {
+  const t = useT();
   const [ownOpen, setOwnOpen] = React.useState(false);
   const controlled = props.open !== undefined;
   const open = controlled ? Boolean(props.open) : ownOpen;
@@ -89,12 +91,14 @@ export default function BasicModal(props: {
             >
               <div
                 role="alertdialog"
-                aria-label="Close without saving?"
+                aria-label={t("Close without saving?")}
                 className="w-full max-w-sm rounded-[20px] border bg-white dark:bg-dark border-lprimary/15 dark:border-white/10 p-5 shadow-xl text-dark dark:text-white"
               >
-                <p className="text-lg font-bold">Close without saving?</p>
+                <p className="text-lg font-bold">
+                  {t("Close without saving?")}
+                </p>
                 <p className={clsx("mt-1 text-sm", mutedText)}>
-                  Your changes to this question will be lost.
+                  {t("Your changes to this question will be lost.")}
                 </p>
                 <div className="mt-4 flex justify-end gap-2">
                   <button
@@ -103,14 +107,14 @@ export default function BasicModal(props: {
                     onClick={() => setAsking(false)}
                     className="rounded-xl border-2 border-lprimary dark:border-dprimary px-4 py-2 text-sm font-bold text-lprimary dark:text-dprimary cursor-pointer hover:bg-lprimary/10 dark:hover:bg-dprimary/10"
                   >
-                    Keep editing
+                    {t("Keep editing")}
                   </button>
                   <button
                     type="button"
                     onClick={handleClose}
                     className="rounded-xl bg-red-light dark:bg-red-dark px-4 py-2 text-sm font-bold text-white dark:text-dark cursor-pointer hover:opacity-90"
                   >
-                    Close without saving
+                    {t("Close without saving")}
                   </button>
                 </div>
               </div>
@@ -152,7 +156,7 @@ export default function BasicModal(props: {
               </div>
               <button
                 type="button"
-                aria-label="Close"
+                aria-label={t("Close")}
                 onClick={handleClose}
                 className={clsx(
                   "ml-auto size-9 shrink-0 rounded-[10px] flex items-center justify-center hover:bg-lprimary/8 dark:hover:bg-white/5 hover:text-dark dark:hover:text-white transition-colors cursor-pointer",

@@ -21,6 +21,7 @@ import {
   useRemoveAvatar,
   useUpdatePreferences,
 } from "@/lib/modules/preferences/hooks";
+import { useT } from "@/lib/i18n/context";
 import { mutedText, panelClass } from "@/components/Game/GameUI";
 
 export const AVATAR_SKIN_NAMES: Record<AvatarSkin, string> = {
@@ -59,6 +60,7 @@ function Avatar({ src }: { src: string }) {
  * each quiz can choose another.
  */
 export default function AvatarSkinsClient() {
+  const t = useT();
   const hasPro = useHasPro();
   const prefs = usePreferencesQuery();
   const update = useUpdatePreferences();
@@ -78,7 +80,9 @@ export default function AvatarSkinsClient() {
       { defaultAvatarSkin: skin },
       {
         onSuccess: () =>
-          toast.success(`${AVATAR_SKIN_NAMES[skin]} is your default`),
+          toast.success(
+            t("{name} is your default", { name: t(AVATAR_SKIN_NAMES[skin]) }),
+          ),
         onError: (err) => toast.error(getApiErrorMessage(err)),
       },
     );
@@ -89,7 +93,9 @@ export default function AvatarSkinsClient() {
     const list = Array.from(files).slice(0, Math.max(0, room));
     if (files.length > list.length) {
       toast.info(
-        `Only ${MAX_CUSTOM_AVATARS} pictures fit — the rest were skipped`,
+        t("Only {n} pictures fit — the rest were skipped", {
+          n: MAX_CUSTOM_AVATARS,
+        }),
       );
     }
     for (const f of list) {
@@ -116,8 +122,9 @@ export default function AvatarSkinsClient() {
   return (
     <div className="mt-4 flex flex-col gap-5 max-w-5xl">
       <p className={clsx("text-sm", mutedText)}>
-        The pictures players choose from when they join. Your default applies to
-        all your quizzes; each quiz can pick another skin in its settings.
+        {t(
+          "The pictures players choose from when they join. Your default applies to all your quizzes; each quiz can pick another skin in its settings.",
+        )}
       </p>
       {skins.map((skin) => {
         const pics =
@@ -139,19 +146,18 @@ export default function AvatarSkinsClient() {
           >
             <div className="flex flex-wrap items-center gap-3">
               <div className="min-w-0">
-                <h2 className="text-lg font-bold">{AVATAR_SKIN_NAMES[skin]}</h2>
+                <h2 className="text-lg font-bold">
+                  {t(AVATAR_SKIN_NAMES[skin])}
+                </h2>
                 <p className={clsx("text-xs", mutedText)}>
-                  {DESCRIPTIONS[skin].replace(
-                    "{n}",
-                    String(MAX_CUSTOM_AVATARS),
-                  )}
+                  {t(DESCRIPTIONS[skin], { n: MAX_CUSTOM_AVATARS })}
                 </p>
               </div>
               <div className="ml-auto flex items-center gap-2">
                 {skin === "custom" && isSuperadmin && (
                   <label className="flex items-center gap-2 text-sm">
                     <Switch
-                      aria-label="For all users"
+                      aria-label={t("For all users")}
                       checked={sharing}
                       onCheckedChange={(on) =>
                         update.mutate(
@@ -167,11 +173,11 @@ export default function AvatarSkinsClient() {
                         )
                       }
                     />
-                    For all users
+                    {t("For all users")}
                   </label>
                 )}
                 {skin === "custom" && hasPro === false && (
-                  <ProLock what="Your own avatar skin" />
+                  <ProLock what={t("Your own avatar skin")} />
                 )}
                 {skin === "custom" && hasPro !== false && (
                   <>
@@ -187,7 +193,7 @@ export default function AvatarSkinsClient() {
                       className="inline-flex items-center gap-1.5 rounded-xl border-[1.5px] border-lprimary dark:border-dprimary px-3 py-1.5 text-sm font-semibold text-lprimary dark:text-dprimary cursor-pointer hover:bg-lprimary/10 disabled:opacity-50 disabled:cursor-default"
                     >
                       <LuImagePlus size={16} />
-                      {add.isPending ? "Uploading…" : "Add pictures"}
+                      {add.isPending ? "Uploading…" : t("Add pictures")}
                     </button>
                     <input
                       ref={input}
@@ -204,7 +210,7 @@ export default function AvatarSkinsClient() {
                 )}
                 {isDefault ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-dprimary/15 px-3 py-1.5 text-sm font-bold text-lprimary dark:text-dprimary">
-                    <LuCheck size={15} /> Default
+                    <LuCheck size={15} /> {t("Default")}
                   </span>
                 ) : (
                   <button
@@ -216,15 +222,17 @@ export default function AvatarSkinsClient() {
                     onClick={() => makeDefault(skin)}
                     className="rounded-xl bg-lprimary dark:bg-dprimary px-3 py-1.5 text-sm font-bold text-white dark:text-dark cursor-pointer disabled:opacity-50 disabled:cursor-default"
                   >
-                    Make default
+                    {t("Make default")}
                   </button>
                 )}
               </div>
             </div>
             {pics.length === 0 ? (
               <p className={clsx("text-sm py-4 text-center", mutedText)}>
-                No pictures yet. Add up to {MAX_CUSTOM_AVATARS} — any size, they
-                are cropped to a square.
+                {t(
+                  "No pictures yet. Add up to {n} — any size, they are cropped to a square.",
+                  { n: MAX_CUSTOM_AVATARS },
+                )}
               </p>
             ) : (
               <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2.5">
@@ -234,7 +242,7 @@ export default function AvatarSkinsClient() {
                     {skin === "custom" && (
                       <button
                         type="button"
-                        aria-label="Remove picture"
+                        aria-label={t("Remove picture")}
                         onClick={() =>
                           remove.mutate(src, {
                             onError: (err) =>

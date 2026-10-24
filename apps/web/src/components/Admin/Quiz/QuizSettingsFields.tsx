@@ -12,6 +12,7 @@ import { useSoundSkinsQuery } from "@/lib/modules/sound-skins/hooks";
 import { AVATAR_SKIN_NAMES } from "@/components/Admin/AvatarSkins/AvatarSkinsClient";
 import { BUILTIN_SKINS, type BuiltinSkinId } from "@/lib/sound/synth";
 import Switch from "@/components/ui/Switch";
+import { useT } from "@/lib/i18n/context";
 
 type SubKey = Exclude<keyof ModerationSettings, "enabled">;
 
@@ -52,6 +53,7 @@ export default function QuizSettingsFields({
   onChange: (next: QuizSettings) => void;
   disabled?: boolean;
 }) {
+  const t = useT();
   const mod = settings.moderation;
   const skins = useSoundSkinsQuery();
   const setSound = (patch: Partial<SoundSettings>) =>
@@ -65,9 +67,11 @@ export default function QuizSettingsFields({
   return (
     <div className="flex flex-col gap-2">
       <label className="flex items-center gap-2 text-sm">
-        <span className="w-20 shrink-0 text-[13px] font-semibold">Avatars</span>
+        <span className="w-20 shrink-0 text-[13px] font-semibold">
+          {t("Avatars")}
+        </span>
         <select
-          aria-label="Avatar skin"
+          aria-label={t("Avatar skin")}
           value={settings.avatarSkin}
           disabled={disabled}
           onChange={(e) =>
@@ -78,20 +82,20 @@ export default function QuizSettingsFields({
           }
           className={selectClass}
         >
-          <option value="default">Default (your settings)</option>
+          <option value="default">{t("Default (your settings)")}</option>
           {(Object.keys(AVATAR_SKIN_NAMES) as AvatarSkin[]).map((k) => (
             <option key={k} value={k}>
-              {AVATAR_SKIN_NAMES[k]}
+              {t(AVATAR_SKIN_NAMES[k])}
             </option>
           ))}
         </select>
       </label>
       <div className="flex flex-col gap-1.5 text-sm">
-        <span className="font-semibold">Sounds</span>
+        <span className="font-semibold">{t("Sounds")}</span>
         <label className="flex items-center gap-2">
-          <span className="w-20 shrink-0 text-[13px]">Play on</span>
+          <span className="w-20 shrink-0 text-[13px]">{t("Play on")}</span>
           <select
-            aria-label="Where sounds play"
+            aria-label={t("Where sounds play")}
             value={settings.sound.playOn}
             disabled={disabled}
             onChange={(e) =>
@@ -99,26 +103,26 @@ export default function QuizSettingsFields({
             }
             className={selectClass}
           >
-            <option value="host">Host&apos;s screen</option>
-            <option value="players">Players&apos; devices</option>
-            <option value="both">Both</option>
-            <option value="off">Off</option>
+            <option value="host">{t("Host's screen")}</option>
+            <option value="players">{t("Players' devices")}</option>
+            <option value="both">{t("Both")}</option>
+            <option value="off">{t("Off")}</option>
           </select>
         </label>
         {settings.sound.playOn !== "off" && (
           <label className="flex items-center gap-2">
-            <span className="w-20 shrink-0 text-[13px]">Audio skin</span>
+            <span className="w-20 shrink-0 text-[13px]">{t("Audio skin")}</span>
             <select
-              aria-label="Audio skin"
+              aria-label={t("Audio skin")}
               value={settings.sound.skin}
               disabled={disabled}
               onChange={(e) => setSound({ skin: e.target.value })}
               className={selectClass}
             >
-              <option value="default">Default (your settings)</option>
+              <option value="default">{t("Default (your settings)")}</option>
               {BUILTIN_SOUND_SKINS.map((id) => (
                 <option key={id} value={id}>
-                  {BUILTIN_SKINS[id as BuiltinSkinId].name}
+                  {t(BUILTIN_SKINS[id as BuiltinSkinId].name)}
                 </option>
               ))}
               {(skins.data ?? []).map((s) => (
@@ -132,37 +136,37 @@ export default function QuizSettingsFields({
         )}
         {settings.sound.playOn !== "off" && (
           <label className="flex items-center gap-2">
-            <span className="w-20 shrink-0 text-[13px]">Music</span>
+            <span className="w-20 shrink-0 text-[13px]">{t("Music")}</span>
             <select
-              aria-label="Music"
+              aria-label={t("Music")}
               value={settings.sound.music ? "on" : "off"}
               disabled={disabled}
               onChange={(e) => setSound({ music: e.target.value === "on" })}
               className={selectClass}
             >
-              <option value="on">Music</option>
-              <option value="off">No music (effects only)</option>
+              <option value="on">{t("Music")}</option>
+              <option value="off">{t("No music (effects only)")}</option>
             </select>
           </label>
         )}
         {settings.sound.playOn === "host" && (
           <label className="flex items-center gap-2">
             <Switch
-              aria-label="Players can turn sound on"
+              aria-label={t("Players can turn sound on")}
               checked={settings.sound.playerOptIn}
               disabled={disabled}
               onCheckedChange={(checked) => setSound({ playerOptIn: checked })}
             />
             <span className="text-[13px] max-w-[230px]">
-              Players can turn sound on for themselves
+              {t("Players can turn sound on for themselves")}
             </span>
           </label>
         )}
       </div>
-      <span className="mt-1 text-sm font-semibold">Quiz settings</span>
+      <span className="mt-1 text-sm font-semibold">{t("Quiz settings")}</span>
       <div className="flex items-center gap-2">
         <Switch
-          aria-label="Live reactions"
+          aria-label={t("Live reactions")}
           checked={settings.reactions}
           disabled={disabled}
           onCheckedChange={(checked) =>
@@ -170,18 +174,18 @@ export default function QuizSettingsFields({
           }
         />
         <span className="text-sm max-w-[250px]">
-          Live reactions — players can send 👍 ❤️ 😂 to your screen
+          {t("Live reactions — players can send 👍 ❤️ 😂 to your screen")}
         </span>
       </div>
       <div className="flex items-center gap-2">
         <Switch
-          aria-label="Moderated mode"
+          aria-label={t("Moderated mode")}
           checked={mod.enabled}
           disabled={disabled}
           onCheckedChange={(checked) => setModeration({ enabled: checked })}
         />
         <span className="text-sm max-w-[250px]">
-          Moderated mode — you step the room through every question
+          {t("Moderated mode — you step the room through every question")}
         </span>
       </div>
       {mod.enabled && (
@@ -194,14 +198,14 @@ export default function QuizSettingsFields({
                 className={`flex items-center gap-2 ${o.parent ? "ml-4" : ""} ${off && o.parent ? "opacity-50" : ""}`}
               >
                 <Switch
-                  aria-label={o.label}
+                  aria-label={t(o.label)}
                   checked={mod[o.key]}
                   disabled={off}
                   onCheckedChange={(checked) =>
                     setModeration({ [o.key]: checked })
                   }
                 />
-                <span className="text-[13px] max-w-[230px]">{o.label}</span>
+                <span className="text-[13px] max-w-[230px]">{t(o.label)}</span>
               </label>
             );
           })}

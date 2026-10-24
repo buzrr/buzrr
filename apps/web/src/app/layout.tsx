@@ -16,6 +16,8 @@ import {
 } from "@/lib/seo/site";
 import { getInstanceConfig } from "@/lib/instance";
 import { InstanceProvider } from "@/lib/instance-context";
+import { I18nProvider } from "@/lib/i18n/context";
+import { getLocale } from "@/lib/i18n/server";
 import { THEME_INIT_SCRIPT } from "@/lib/theme-init";
 
 // Instance options (TITLE, PRIVATE_BUZZ, …) come from the environment at
@@ -92,9 +94,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
   return (
     // The theme script sets `dark` on <html> before React hydrates.
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
@@ -104,19 +107,21 @@ export default async function RootLayout({
           "bg-light-bg dark:bg-dark-bg h-fit overflow-x-hidden",
         )}
       >
-        <InstanceProvider config={getInstanceConfig()}>
-          <ReduxProvider>
-            <QueryProvider>
-              {children}
-              <ReactQueryDevtools
-                initialIsOpen={false}
-                buttonPosition="top-right"
-              />
-              <Footer />
-              <VersionWatcher />
-            </QueryProvider>
-          </ReduxProvider>
-        </InstanceProvider>
+        <I18nProvider locale={locale}>
+          <InstanceProvider config={getInstanceConfig()}>
+            <ReduxProvider>
+              <QueryProvider>
+                {children}
+                <ReactQueryDevtools
+                  initialIsOpen={false}
+                  buttonPosition="top-right"
+                />
+                <Footer />
+                <VersionWatcher />
+              </QueryProvider>
+            </ReduxProvider>
+          </InstanceProvider>
+        </I18nProvider>
         {/* Vercel serves its script only to apps it hosts: elsewhere (self-
             hosting) it would be a 404 on every page. */}
         {process.env.VERCEL && <Analytics />}

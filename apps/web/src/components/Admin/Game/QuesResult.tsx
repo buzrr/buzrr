@@ -39,6 +39,7 @@ import {
   nextQuestionLabel,
   scoresStepPending,
 } from "@/lib/moderation";
+import { useT, pl, currentLocale } from "@/lib/i18n/context";
 import type { GameSocket } from "@/types/socket";
 import {
   RANK_STAGGER_MS,
@@ -72,6 +73,7 @@ export const rankBadgeClass = (rank: number) =>
  * banned (removed and blocked from rejoining this room).
  */
 export default function QuesResult(props: QuesResultProps) {
+  const t = useT();
   const { socket, roomId } = props;
   const dispatch = useAppDispatch();
   const question = useAppSelector((state) => state.game.question);
@@ -147,7 +149,7 @@ export default function QuesResult(props: QuesResultProps) {
     responses > 0 ? Math.round((correctResponses / responses) * 100) : 0;
   const avgTime =
     reveal?.avgTimeMs != null
-      ? `${(reveal.avgTimeMs / 1000).toFixed(1)}s`
+      ? `${(reveal.avgTimeMs / 1000).toLocaleString(currentLocale(), { maximumFractionDigits: 1, minimumFractionDigits: 1 })} s`
       : "—";
   const isLastQuestion = qIndex === qCount - 1;
   // Many options: a tighter panel, so all of them fit without scrolling.
@@ -232,10 +234,10 @@ export default function QuesResult(props: QuesResultProps) {
       {
         onSuccess: () => {
           dispatch(playerRemoved({ playerId }));
-          toast.success(`You have removed ${name}`);
+          toast.success(t("You have removed {name}", { name }));
         },
         onError: () =>
-          toast.error("Could not remove player. Please try again."),
+          toast.error(t("Could not remove player. Please try again.")),
       },
     );
   }
@@ -249,9 +251,10 @@ export default function QuesResult(props: QuesResultProps) {
         onSuccess: () => {
           dispatch(playerRemoved({ playerId }));
           setPlayerToBan(null);
-          toast.success(`You have banned ${name}`);
+          toast.success(t("You have banned {name}", { name }));
         },
-        onError: () => toast.error("Could not ban player. Please try again."),
+        onError: () =>
+          toast.error(t("Could not ban player. Please try again.")),
       },
     );
   }
@@ -289,7 +292,7 @@ export default function QuesResult(props: QuesResultProps) {
             <div>
               <div className="flex flex-wrap items-center gap-2.5">
                 <span className={labelClass}>
-                  Question {qIndex + 1} results
+                  {t("Question {n} results", { n: qIndex + 1 })}
                 </span>
                 {question && !scored && (
                   <QuestionTypePill type={question.type} />
@@ -313,12 +316,12 @@ export default function QuesResult(props: QuesResultProps) {
               <StatTile
                 value={responses}
                 suffix={` /${Math.max(players.filter((p) => p.connected).length, responses)}`}
-                label="Responses"
+                label={t("Responses")}
               />
               {scored && !closed && (
-                <StatTile value={`${correctPct}%`} label="Got it right" />
+                <StatTile value={`${correctPct}%`} label={t("Got it right")} />
               )}
-              <StatTile value={avgTime} label="Avg. answer time" />
+              <StatTile value={avgTime} label={t("Avg. answer time")} />
             </div>
             {question && reveal && (
               <RevealDensity.Provider value={density}>
@@ -331,7 +334,7 @@ export default function QuesResult(props: QuesResultProps) {
             )}
             {!closed && reveal?.fastest && reveal.fastest.length > 0 && (
               <div className="mt-auto pt-3 border-t border-lprimary/15 dark:border-white/10">
-                <span className={labelClass}>Fastest right answers</span>
+                <span className={labelClass}>{t("Fastest right answers")}</span>
                 <div className="mt-2 grid grid-cols-3 gap-2">
                   {reveal.fastest.map((f, i) => (
                     <div
@@ -373,11 +376,13 @@ export default function QuesResult(props: QuesResultProps) {
             )}
           >
             <div className="flex items-center justify-between px-5 md:px-[26px] pt-5 md:pt-6 pb-3.5">
-              <h3 className="text-xl md:text-[22px] font-bold">Leaderboard</h3>
+              <h3 className="text-xl md:text-[22px] font-bold">
+                {t("Leaderboard")}
+              </h3>
               <span className={clsx("text-[13.5px]", mutedText)}>
-                {playerCount === 1
-                  ? `${playerCount} player`
-                  : `${playerCount} players`}
+                {t(pl(playerCount, "{n} player", "{n} players"), {
+                  n: playerCount,
+                })}
               </span>
             </div>
             <div
@@ -462,8 +467,10 @@ export default function QuesResult(props: QuesResultProps) {
                     <span className="flex gap-0.5 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
                       <button
                         type="button"
-                        aria-label={`Remove ${lead.name} from this game`}
-                        title="Kick — can rejoin with the room code"
+                        aria-label={t("Remove {name} from this game", {
+                          name: lead.name,
+                        })}
+                        title={t("Kick — can rejoin with the room code")}
                         disabled={removePlayerMutation.isPending}
                         onClick={() => handleKick(lead.playerId, lead.name)}
                         className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
@@ -472,8 +479,10 @@ export default function QuesResult(props: QuesResultProps) {
                       </button>
                       <button
                         type="button"
-                        aria-label={`Ban ${lead.name} from this room`}
-                        title="Ban — blocked from rejoining this room"
+                        aria-label={t("Ban {name} from this room", {
+                          name: lead.name,
+                        })}
+                        title={t("Ban — blocked from rejoining this room")}
                         onClick={() =>
                           setPlayerToBan({
                             playerId: lead.playerId,
@@ -497,7 +506,7 @@ export default function QuesResult(props: QuesResultProps) {
         <button
           type="button"
           data-host-key="next"
-          title={'You can also press "Space"'}
+          title={t('You can also press "Space"')}
           disabled={advancing}
           onClick={() => {
             setAdvancing(true);
@@ -514,9 +523,9 @@ export default function QuesResult(props: QuesResultProps) {
                 question ? revealHasPoint(question) : true,
               )
             : nextIsScores
-              ? "Show standings"
+              ? t("Show standings")
               : isLastQuestion
-                ? "Final leaderboard"
+                ? t("Final leaderboard")
                 : nextQuestionLabel(qIndex, qCount)}
           <LuPlay size={17} className="fill-current" />
         </button>
@@ -528,10 +537,13 @@ export default function QuesResult(props: QuesResultProps) {
           if (!open) setPlayerToBan(null);
         }}
         onClick={handleBan}
-        desc={`${playerToBan?.name ?? "This player"} will be removed and blocked from rejoining this room. The ban lasts until this room ends.`}
-        confirmLabel="Ban Player"
+        desc={t(
+          "{name} will be removed and blocked from rejoining this room. The ban lasts until this room ends.",
+          { name: playerToBan?.name ?? t("This player") },
+        )}
+        confirmLabel={t("Ban Player")}
         confirming={banPlayerMutation.isPending}
-        confirmingLabel="Banning…"
+        confirmingLabel={t("Banning…")}
       />
     </div>
   );

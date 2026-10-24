@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import Switch from "@/components/ui/Switch";
 import { authClient } from "@/lib/auth-client";
 import { useCurrentRole } from "@/components/SessionProvider";
+import { useT } from "@/lib/i18n/context";
 import AllQuizzesAdmin from "./AllQuizzesAdmin";
 
 const ALL_KEY = "buzrr:admin-all-quizzes";
@@ -36,6 +37,7 @@ function SectionLabel({
 }
 
 const Buzrrs = () => {
+  const t = useT();
   const { data: quizzes, isPending, isError } = useQuizzesQuery();
   const role = useCurrentRole();
   const isAdmin = role === "admin" || role === "superadmin";
@@ -60,21 +62,21 @@ const Buzrrs = () => {
 
   return (
     <>
-      <SectionLabel className="mb-3.5">Start something new</SectionLabel>
+      <SectionLabel className="mb-3.5">{t("Start something new")}</SectionLabel>
       <QuizActionCards />
 
       <div className="mt-7 md:mt-[30px] mb-3.5 flex flex-wrap items-center gap-4">
         <SectionLabel count={showAll && isAdmin ? undefined : quizzes?.length}>
-          {showAll && isAdmin ? "All quizzes" : "Your quizzes"}
+          {showAll && isAdmin ? t("All quizzes") : t("Your quizzes")}
         </SectionLabel>
         {isAdmin && (
           <label className="ml-auto flex items-center gap-2 text-sm text-dark dark:text-white">
             <Switch
-              aria-label="Show all quizzes"
+              aria-label={t("Show all quizzes")}
               checked={showAll}
               onCheckedChange={toggleAll}
             />
-            Show all quizzes
+            {t("Show all quizzes")}
           </label>
         )}
       </div>
@@ -90,7 +92,9 @@ const Buzrrs = () => {
         <LoaderBuzrrs cardCount={3} />
       ) : isError || !quizzes ? (
         <p className="text-dark dark:text-white text-sm">
-          Could not load quizzes. Check your connection and API configuration.
+          {t(
+            "Could not load quizzes. Check your connection and API configuration.",
+          )}
         </p>
       ) : (
         <ClientBuzrrs quizzes={quizzes} />

@@ -1,4 +1,5 @@
 import type { ModerationSettings } from "@buzrr/contract";
+import { tx } from "@/lib/i18n/context";
 
 // Mirrors apps/server/src/modules/game-engine/core/moderation.ts: what the
 // host's "next" does in each moderated step, so buttons can say so.
@@ -24,8 +25,8 @@ export function leaderboardWithReveal(
 /** Label for the host's button that leaves the current question for good. */
 export function nextQuestionLabel(qIndex: number, qCount: number): string {
   return qIndex >= qCount - 1
-    ? "Final leaderboard"
-    : `Next question · ${qIndex + 2} of ${qCount}`;
+    ? tx("Final leaderboard")
+    : tx("Next question · {n} of {total}", { n: qIndex + 2, total: qCount });
 }
 
 /** Host button on the "closed" (time's up) step. */
@@ -38,8 +39,8 @@ export function closedNextLabel(
   /** Nothing to reveal (`revealHasPoint`): the host goes straight on. */
   reveals = true,
 ): string {
-  if (mod?.showAnswer && reveals) return "Show answer";
+  if (mod?.showAnswer && reveals) return tx("Show answer");
   if (!reveals) return nextQuestionLabel(qIndex, qCount);
-  if (mod?.showScores && scored) return "Show standings";
+  if (mod?.showScores && scored) return tx("Show standings");
   return nextQuestionLabel(qIndex, qCount);
 }

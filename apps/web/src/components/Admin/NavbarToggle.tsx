@@ -1,16 +1,18 @@
 "use client";
 import { useAppSelector, useAppDispatch } from "@/state/hooks";
 import { NavToggle, setNavToggle } from "@/state/admin/navtoggleSlice";
+import { useT } from "@/lib/i18n/context";
 import { IconButton } from "@/components/ui/IconButton";
 
 const NavbarToggle = () => {
+  const t = useT();
   const toggle = useAppSelector((state) => state.navToggle.toggle);
   const dispatch = useAppDispatch();
 
   return (
     <>
       <IconButton
-        aria-label="Toggle navigation"
+        aria-label={t("Toggle navigation")}
         className="text-dark dark:text-white"
         onClick={() => {
           dispatch(

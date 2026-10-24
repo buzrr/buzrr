@@ -24,6 +24,7 @@ import {
   dangerButtonClass,
   subtleCardClass,
 } from "@/components/Game/GameUI";
+import { useT } from "@/lib/i18n/context";
 import type { GameSocket } from "@/types/socket";
 
 interface QuestionScreenProps {
@@ -40,6 +41,7 @@ interface QuestionScreenProps {
 const SKIP_AFTER_S = 15;
 
 export default function QuestionScreen(props: QuestionScreenProps) {
+  const t = useT();
   const { gameCode, socket } = props;
   const question = useAppSelector((state) => state.game.question);
   const deadline = useAppSelector((state) => state.game.deadline);
@@ -124,7 +126,7 @@ export default function QuestionScreen(props: QuestionScreenProps) {
               valueClassName="text-4xl md:text-[58px]"
             />
             <div className="flex-1 min-w-0 flex flex-col gap-2">
-              <span className={labelClass}>Answers in</span>
+              <span className={labelClass}>{t("Answers in")}</span>
               <span className={clsx("text-[13.5px]", mutedText)}>
                 <b className="text-[22px] font-bold text-dark dark:text-white">
                   {answered}
@@ -138,14 +140,14 @@ export default function QuestionScreen(props: QuestionScreenProps) {
                 />
               </div>
               <span className={clsx("text-[13px]", mutedText)}>
-                {Math.max(0, total - answered)} still thinking
+                {t("{n} still thinking", { n: Math.max(0, total - answered) })}
               </span>
             </div>
           </div>
 
           {/* Phones: no room for it — the code is at the page's end. */}
           <div className="hidden md:flex flex-col gap-2.5">
-            <span className={labelClass}>Late joiners</span>
+            <span className={labelClass}>{t("Late joiners")}</span>
             <div
               className={clsx(
                 "flex items-center gap-4 rounded-[18px] p-4",
@@ -170,10 +172,10 @@ export default function QuestionScreen(props: QuestionScreenProps) {
                     onClick={() =>
                       (
                         navigator.clipboard?.writeText(joinUrl) ??
-                        Promise.reject(new Error("Clipboard unavailable"))
+                        Promise.reject(new Error(t("Clipboard unavailable")))
                       )
                         .then(() => setCopied(true))
-                        .catch(() => toast.error("Failed to copy link"))
+                        .catch(() => toast.error(t("Failed to copy link")))
                     }
                     className={clsx(
                       "flex-1 flex items-center justify-center gap-1.5 rounded-xl border-[1.5px] bg-white dark:bg-dark px-3 py-2 text-[13px] font-semibold whitespace-nowrap cursor-pointer transition-colors",
@@ -183,7 +185,7 @@ export default function QuestionScreen(props: QuestionScreenProps) {
                     )}
                   >
                     {copied ? <LuCheck size={15} /> : <LuCopy size={15} />}
-                    {copied ? "Copied" : "Copy link"}
+                    {copied ? "Copied" : t("Copy link")}
                   </button>
                   {canShare && (
                     <button
@@ -194,7 +196,7 @@ export default function QuestionScreen(props: QuestionScreenProps) {
                       className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border-[1.5px] bg-white dark:bg-dark border-lprimary/15 dark:border-white/5 hover:border-dprimary px-3 py-2 text-[13px] font-semibold cursor-pointer transition-colors"
                     >
                       <LuShare2 size={15} />
-                      Share
+                      {t("Share")}
                     </button>
                   )}
                 </div>
@@ -212,7 +214,7 @@ export default function QuestionScreen(props: QuestionScreenProps) {
         >
           <div className="flex flex-wrap items-center gap-2.5">
             <span className="text-[12.5px] font-bold tracking-[0.06em] uppercase rounded-full px-3 py-1.5 text-lprimary dark:text-dprimary bg-lprimary/8 dark:bg-white/5">
-              Question {qIndex + 1} of {qCount}
+              {t("Question {n} of {total}", { n: qIndex + 1, total: qCount })}
             </span>
             {question.type !== "multiple_choice" && (
               <QuestionTypePill type={question.type} />
@@ -220,7 +222,7 @@ export default function QuestionScreen(props: QuestionScreenProps) {
             <span className={clsx("text-[13px]", mutedText)}>
               {scored
                 ? `${question.timeOut}s to answer`
-                : "Not scored · results update live"}
+                : t("Not scored · results update live")}
             </span>
           </div>
           {question.mediaType === "image" && question.media && (
@@ -228,7 +230,7 @@ export default function QuestionScreen(props: QuestionScreenProps) {
               media={question.media}
               mediaKey={question.mediaKey}
               className="mt-5 mx-auto max-h-[26dvh] w-auto rounded-2xl"
-              alt="Question image"
+              alt={t("Question image")}
               height={300}
               width={500}
             />
@@ -248,7 +250,7 @@ export default function QuestionScreen(props: QuestionScreenProps) {
           <p className={clsx("mt-[22px] text-sm", mutedText)}>
             {left > 0
               ? `${left} question${left === 1 ? "" : "s"} left after this one`
-              : "This is the last question"}
+              : t("This is the last question")}
           </p>
         </section>
       </div>
@@ -260,18 +262,18 @@ export default function QuestionScreen(props: QuestionScreenProps) {
           <button
             type="button"
             data-host-key="skip"
-            title={'You can also press "Esc"'}
+            title={t('You can also press "Esc"')}
             onClick={() => socket.emit("host-next")}
             className={clsx(dangerButtonClass, "animate-fade-up")}
           >
             <LuSkipForward size={17} />
-            Skip
+            {t("Skip")}
           </button>
         ) : (
           <span />
         )}
         <span className={clsx("text-sm", mutedText)}>
-          {answered} of {total} answered
+          {t("{n} of {total} answered", { n: answered, total })}
         </span>
       </div>
     </div>

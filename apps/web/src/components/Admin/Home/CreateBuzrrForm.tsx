@@ -12,6 +12,7 @@ import { getApiErrorMessage } from "@/lib/api/errors";
 import { createQuizSchema } from "@/lib/modules/forms/schemas";
 import { useCreateQuizMutation } from "@/lib/modules/quizzes/hooks";
 import { usePlanLimitPrompt } from "@/components/Billing/UpgradePrompt";
+import { useT } from "@/lib/i18n/context";
 import {
   counterClass,
   fieldLabelClass,
@@ -28,6 +29,7 @@ export const DESCRIPTION_MAX = 200;
 const CreateBuzrrForm = (params: {
   onChange: (values: { title: string; description: string }) => void;
 }) => {
+  const t = useT();
   const router = useRouter();
   const mutation = useCreateQuizMutation();
   const { handlePlanLimit, upgradePrompt } = usePlanLimitPrompt();
@@ -69,14 +71,14 @@ const CreateBuzrrForm = (params: {
         )}
       >
         <LuArrowLeft size={18} />
-        Back to home
+        {t("Back to home")}
       </button>
       <div>
         <h1 className="text-[30px] md:text-[42px] font-extrabold tracking-[-0.03em] leading-[1.08] text-balance">
-          Give your quiz a title and description
+          {t("Give your quiz a title and description")}
         </h1>
         <p className={clsx("mt-2.5 text-[15.5px]", mutedText)}>
-          You&apos;ll add questions in the next step.
+          {t("You'll add questions in the next step.")}
         </p>
       </div>
 
@@ -86,7 +88,7 @@ const CreateBuzrrForm = (params: {
         render={({ field, fieldState }) => (
           <label className="flex flex-col gap-2">
             <span className={fieldLabelClass}>
-              Quiz title
+              {t("Quiz title")}
               <span className={counterClass}>
                 {field.value.length}/{TITLE_MAX}
               </span>
@@ -95,7 +97,7 @@ const CreateBuzrrForm = (params: {
               {...field}
               type="text"
               maxLength={TITLE_MAX}
-              placeholder="Enter quiz title"
+              placeholder={t("Enter quiz title")}
               autoComplete="off"
               autoFocus
               aria-invalid={!!fieldState.error}
@@ -123,15 +125,15 @@ const CreateBuzrrForm = (params: {
         render={({ field }) => (
           <label className="flex flex-col gap-2">
             <span className={fieldLabelClass}>
-              Description
-              <span className={counterClass}>Optional</span>
+              {t("Description")}
+              <span className={counterClass}>{t("Optional")}</span>
             </span>
             <textarea
               {...field}
               value={field.value ?? ""}
               rows={4}
               maxLength={DESCRIPTION_MAX}
-              placeholder="What's this quiz about?"
+              placeholder={t("What's this quiz about?")}
               className={clsx(inputClass, "resize-none")}
               onChange={(e) => {
                 field.onChange(e.target.value);
@@ -147,7 +149,7 @@ const CreateBuzrrForm = (params: {
 
       <div className="md:mt-auto flex flex-col md:flex-row items-stretch md:items-center gap-3">
         <p className={clsx("flex-1 text-[13.5px]", mutedText)}>
-          Next: add questions
+          {t("Next: add questions")}
         </p>
         <button
           type="submit"

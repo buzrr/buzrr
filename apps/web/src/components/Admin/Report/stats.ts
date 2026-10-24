@@ -1,4 +1,5 @@
 import type { QuestionStats } from "@buzrr/contract";
+import { tx } from "@/lib/i18n/context";
 
 /** Share of right answers (0–1); null for unscored types or no answers. */
 export function correctRate(q: QuestionStats): number | null {
@@ -26,7 +27,7 @@ export function commonWrongAnswer(
   }
   if (s.type === "true_false") {
     const count = s.answer ? s.falseCount : s.trueCount;
-    return count > 0 ? { text: s.answer ? "False" : "True", count } : null;
+    return count > 0 ? { text: tx(s.answer ? "False" : "True"), count } : null;
   }
   if (s.type === "type_answer") {
     const wrong = s.answers.find((a) => !a.correct);

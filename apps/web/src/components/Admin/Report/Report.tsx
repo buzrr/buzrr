@@ -6,6 +6,7 @@ import { LuDownload } from "react-icons/lu";
 import type { QuestionStats } from "@buzrr/contract";
 import { DEFAULT_AVATAR } from "@/constants";
 import Segmented from "@/components/ui/Segmented";
+import { useLocale, useT } from "@/lib/i18n/context";
 import {
   downloadPlayersCsv,
   downloadQuestionsCsv,
@@ -41,6 +42,8 @@ export default function Report({
   questions: QuestionStats[];
   emptyText: string;
 }) {
+  const t = useT();
+  const de = useLocale() === "de";
   const [tab, setTab] = useState<Tab>("standings");
   const slug = fileSlug(title);
 
@@ -59,22 +62,22 @@ export default function Report({
     <div className="flex flex-col gap-3 my-4 w-full max-w-2xl">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Segmented<Tab>
-          label="Report"
+          label={t("Report")}
           value={tab}
           onChange={setTab}
           options={[
-            { value: "standings", label: "Standings" },
-            { value: "questions", label: "Questions" },
+            { value: "standings", label: t("Standings") },
+            { value: "questions", label: t("Questions") },
           ]}
         />
         <span className="flex flex-wrap gap-1">
           {entries.length > 0 &&
-            csvButton("Players (CSV)", () =>
-              downloadPlayersCsv(`${slug}-players`, entries),
+            csvButton(t("Players (CSV)"), () =>
+              downloadPlayersCsv(`${slug}-${t("players")}`, entries, de),
             )}
           {questions.length > 0 &&
-            csvButton("Questions (CSV)", () =>
-              downloadQuestionsCsv(`${slug}-questions`, questions),
+            csvButton(t("Questions (CSV)"), () =>
+              downloadQuestionsCsv(`${slug}-${t("questions")}`, questions, de),
             )}
         </span>
       </div>
@@ -94,12 +97,12 @@ export default function Report({
                 className="w-12 h-12 rounded-full shrink-0"
                 width={50}
                 height={50}
-                alt="profile pic"
+                alt={t("profile pic")}
               />
               <div className="min-w-0">
                 <p className="truncate">{entry.name}</p>
                 <p className="text-xs text-off-dark dark:text-off-white">
-                  {entry.correctCount} correct
+                  {t("{n} correct", { n: entry.correctCount })}
                 </p>
               </div>
             </div>

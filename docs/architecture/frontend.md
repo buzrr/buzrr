@@ -151,6 +151,28 @@ disconnect`), emits `request-sync` on connect as a safety net and when the
   `JoinViaLinkClient` for `/join/[gameCode]` links/QR (`lib/join-link.ts`
   builds the URLs from `NEXT_PUBLIC_APP_URL`).
 
+## UI language (`src/lib/i18n/`)
+
+English is the source language: every UI text is written in English in the
+code and wrapped — `t("Text {n}", { n })` from `useT()` in client components,
+`await getT()` in server components, `tx()` in helpers outside React, and
+`pl(n, "one", "many")` for plurals. `translate()` looks the English text up in
+`de.ts` (German, keyed by the English original); a text without an entry
+stays English, so a missing translation never breaks a screen.
+
+- The language comes from the `buzrr-lang` cookie (set by the selector in
+  Settings → Account, per device), else the browser's `Accept-Language`, else
+  English (`pickLocale`). The root layout reads it once per request and
+  provides it via `I18nProvider`; changing it reloads the page.
+- Dates and decimals follow the locale (`useLocale()` / `currentLocale()`),
+  the report's CSV uses `;` and decimal commas in German.
+- AI quizzes are written in the host's UI language (`language` in the
+  create-AI-quiz body; the server defaults to English).
+- Adding a language: add it to `LOCALES` / `LANGUAGE_NAMES` in `locale.ts`, a
+  dictionary next to `de.ts`, and a branch in `translate()`.
+- New UI text: write it in English inside `t()`, and add the German entry to
+  `de.ts`.
+
 ## Styling & UI conventions
 
 - **Design tokens live in `src/app/globals.css`** (Tailwind v4 `@theme`

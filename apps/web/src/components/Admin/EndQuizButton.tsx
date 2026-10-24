@@ -9,6 +9,7 @@ import "react-toastify/dist/ReactToastify.css";
 import ConfirmationModal from "@/components/Admin/ConfirmationModal";
 import { Button } from "@/components/ui/Button";
 import { useEndRoomMutation } from "@/lib/modules/game-sessions/hooks";
+import { useT } from "@/lib/i18n/context";
 import { primaryButtonClass } from "@/components/Game/GameUI";
 
 /**
@@ -41,6 +42,7 @@ export default function EndQuizButton({
   /** The primary button in red: it ends the game. */
   danger?: boolean;
 }) {
+  const t = useT();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [ending, setEnding] = useState(false);
@@ -59,7 +61,7 @@ export default function EndQuizButton({
         router.push(redirectTo);
         return;
       }
-      toast.error("Could not end the quiz. Please try again.");
+      toast.error(t("Could not end the quiz. Please try again."));
       setEnding(false);
     }
   }
@@ -82,7 +84,7 @@ export default function EndQuizButton({
             alreadyEnded ? router.push(redirectTo) : void confirmEnd()
           }
         >
-          {ending ? "Saving results…" : primaryLabel}
+          {ending ? t("Saving results…") : primaryLabel}
         </button>
       ) : pill ? (
         <button
@@ -93,7 +95,7 @@ export default function EndQuizButton({
           }
         >
           <span className="h-2 w-2 rounded-full bg-current" />
-          {alreadyEnded ? "Exit" : "End"}
+          {alreadyEnded ? t("Exit") : t("End")}
         </button>
       ) : inline ? (
         <button
@@ -103,7 +105,7 @@ export default function EndQuizButton({
             alreadyEnded ? router.push(redirectTo) : setOpen(true)
           }
         >
-          {alreadyEnded ? "Exit" : "End Quiz"}
+          {alreadyEnded ? "Exit" : t("End Quiz")}
         </button>
       ) : (
         <Button
@@ -113,7 +115,7 @@ export default function EndQuizButton({
             alreadyEnded ? router.push(redirectTo) : setOpen(true)
           }
         >
-          {alreadyEnded ? "Exit" : "End Quiz"}
+          {alreadyEnded ? "Exit" : t("End Quiz")}
         </Button>
       )}
       <ConfirmationModal
@@ -121,9 +123,11 @@ export default function EndQuizButton({
         setOpen={setOpen}
         onClick={confirmEnd}
         confirming={ending}
-        confirmLabel="End Quiz"
-        confirmingLabel="Saving results…"
-        desc="This ends the quiz for everyone and saves the current results. This can't be undone."
+        confirmLabel={t("End Quiz")}
+        confirmingLabel={t("Saving results…")}
+        desc={t(
+          "This ends the quiz for everyone and saves the current results. This can't be undone.",
+        )}
       />
     </>
   );

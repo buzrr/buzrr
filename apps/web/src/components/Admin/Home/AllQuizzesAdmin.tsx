@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { quizzesApi } from "@/lib/modules/quizzes/api";
 import { queryKeys } from "@/lib/modules/query-keys";
+import { useT, pl } from "@/lib/i18n/context";
 import { mutedText, panelClass } from "@/components/Game/GameUI";
 
 /**
@@ -20,6 +21,7 @@ export default function AllQuizzesAdmin({
 }: {
   me?: { id: string; email: string } | null;
 }) {
+  const t = useT();
   const myUserId = me?.id;
   const qc = useQueryClient();
   const all = useQuery({
@@ -30,7 +32,7 @@ export default function AllQuizzesAdmin({
     mutationFn: (v: { quizId: string; email: string }) =>
       quizzesApi.changeOwner(v.quizId, v.email),
     onSuccess: (res) => {
-      toast.success(`Moved to ${res.owner.email}`);
+      toast.success(t("Moved to {email}", { email: res.owner.email }));
       void qc.invalidateQueries({ queryKey: ["quizzes", "all-admin"] });
       void qc.invalidateQueries({ queryKey: queryKeys.quizzes.all });
     },
@@ -39,9 +41,10 @@ export default function AllQuizzesAdmin({
   const [movingId, setMovingId] = useState<string | null>(null);
   const [email, setEmail] = useState("");
 
-  if (all.isPending) return <p className={mutedText}>Loading all quizzes…</p>;
+  if (all.isPending)
+    return <p className={mutedText}>{t("Loading all quizzes…")}</p>;
   if (all.isError)
-    return <p className="text-red-light">Could not load quizzes.</p>;
+    return <p className="text-red-light">{t("Could not load quizzes.")}</p>;
 
   return (
     <div
@@ -71,9 +74,12 @@ export default function AllQuizzesAdmin({
               <span className={clsx("block text-xs", mutedText)}>
                 {q.user.name ? `${q.user.name} · ` : ""}
                 {q.user.email} ·{" "}
-                {(q._count?.questions ?? 0) === 1
-                  ? `${q._count?.questions ?? 0} question`
-                  : `${q._count?.questions ?? 0} questions`}
+                {t(
+                  pl(q._count?.questions ?? 0, "{n} question", "{n} questions"),
+                  {
+                    n: q._count?.questions ?? 0,
+                  },
+                )}
               </span>
             </span>
             {movingId === q.id ? (
@@ -91,7 +97,7 @@ export default function AllQuizzesAdmin({
                   type="email"
                   required
                   autoFocus
-                  placeholder="new owner's email"
+                  placeholder={t("new owner's email")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-56 rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent px-2 py-1 text-sm placeholder:text-[#8a8896] dark:placeholder:text-muted-dark"
@@ -101,14 +107,14 @@ export default function AllQuizzesAdmin({
                   disabled={move.isPending}
                   className="rounded-lg px-2.5 py-1 text-sm font-bold bg-lprimary dark:bg-dprimary text-white dark:text-dark cursor-pointer"
                 >
-                  Move
+                  {t("Move")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setMovingId(null)}
                   className="text-sm underline cursor-pointer"
                 >
-                  cancel
+                  {t("cancel")}
                 </button>
               </form>
             ) : (
@@ -122,7 +128,7 @@ export default function AllQuizzesAdmin({
                     }
                     className="rounded-lg px-2.5 py-1 text-sm font-bold bg-lprimary/10 dark:bg-white/5 cursor-pointer"
                   >
-                    Move to me
+                    {t("Move to me")}
                   </button>
                 )}
                 <button
@@ -133,7 +139,7 @@ export default function AllQuizzesAdmin({
                   }}
                   className="rounded-lg px-2.5 py-1 text-sm font-bold bg-lprimary/10 dark:bg-white/5 cursor-pointer"
                 >
-                  Move to…
+                  {t("Move to…")}
                 </button>
               </span>
             )}

@@ -25,6 +25,7 @@ import {
 } from "@/lib/modules/quizzes/hooks";
 import type { QuizDetail } from "@/lib/modules/quizzes/api";
 import { useInstance } from "@/lib/instance-context";
+import { useT, pl } from "@/lib/i18n/context";
 import ModerationSettingsCard from "@/components/Admin/Quiz/ModerationSettingsCard";
 import { dropTargetClass, useFileDrop } from "@/hooks/useFileDrop";
 import SoloTestsPanel from "@/components/Solo/SoloTestsPanel";
@@ -36,6 +37,7 @@ function formatSessionDate(createdAt: string | Date) {
 
 /** Title and description, editable in place (pencil → fields → save). */
 function EditableHeader({ quiz }: { quiz: QuizDetail }) {
+  const t = useT();
   const updateQuiz = useUpdateQuizMutation();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(quiz.title);
@@ -48,7 +50,7 @@ function EditableHeader({ quiz }: { quiz: QuizDetail }) {
   const save = () => {
     const trimmed = title.trim();
     if (!trimmed) {
-      toast.error("The quiz needs a title");
+      toast.error(t("The quiz needs a title"));
       return;
     }
     updateQuiz.mutate(
@@ -72,8 +74,8 @@ function EditableHeader({ quiz }: { quiz: QuizDetail }) {
         )}
         <button
           type="button"
-          aria-label="Edit title and description"
-          title="Edit title and description"
+          aria-label={t("Edit title and description")}
+          title={t("Edit title and description")}
           onClick={start}
           className="absolute top-0 right-0 size-9 rounded-[10px] flex items-center justify-center text-lprimary dark:text-dprimary hover:bg-lprimary/10 dark:hover:bg-white/5 cursor-pointer"
         >
@@ -95,7 +97,7 @@ function EditableHeader({ quiz }: { quiz: QuizDetail }) {
         value={title}
         maxLength={200}
         onChange={(e) => setTitle(e.target.value)}
-        aria-label="Quiz title"
+        aria-label={t("Quiz title")}
         className={clsx(inputClass, "!py-2.5 text-lg font-bold")}
       />
       <textarea
@@ -103,8 +105,8 @@ function EditableHeader({ quiz }: { quiz: QuizDetail }) {
         maxLength={1000}
         rows={3}
         onChange={(e) => setDescription(e.target.value)}
-        aria-label="Quiz description"
-        placeholder="Description (optional)"
+        aria-label={t("Quiz description")}
+        placeholder={t("Description (optional)")}
         className={clsx(inputClass, "!py-2.5 text-[15px] resize-none")}
       />
       <div className="flex justify-end gap-2">
@@ -114,7 +116,7 @@ function EditableHeader({ quiz }: { quiz: QuizDetail }) {
           className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-semibold text-off-dark dark:text-muted-dark hover:bg-lprimary/8 dark:hover:bg-white/5 cursor-pointer"
         >
           <LuX size={15} />
-          Cancel
+          {t("Cancel")}
         </button>
         <button
           type="submit"
@@ -131,26 +133,28 @@ function EditableHeader({ quiz }: { quiz: QuizDetail }) {
 
 /** The quiz's own logo: shown on its game screens instead of the site logo. */
 function LogoSetting({ quiz }: { quiz: QuizDetail }) {
+  const t = useT();
   const logoMutation = useQuizLogoMutation(quiz.id);
   const input = useRef<HTMLInputElement>(null);
   const logo = (quiz as QuizDetail & { logo?: string | null }).logo ?? null;
   const upload = (file: File | null) =>
     logoMutation.mutate(file, {
-      onSuccess: () => toast.success(file ? "Logo saved" : "Logo removed"),
+      onSuccess: () =>
+        toast.success(file ? t("Logo saved") : t("Logo removed")),
       onError: (err) => toast.error(getApiErrorMessage(err)),
     });
   const hasPro = useHasPro();
   // A picture dropped onto the row becomes the logo.
   const { over, dropProps } = useFileDrop((file) => {
     if (file.type.startsWith("image/")) upload(file);
-    else toast.error("Drop a picture");
+    else toast.error(t("Drop a picture"));
   }, logoMutation.isPending);
   if (hasPro === false && !logo) {
     // A Pro feature (an existing logo can still be removed).
     return (
       <div className="flex items-center gap-3 mt-3 mb-1">
-        <span className="text-sm font-semibold">Quiz logo</span>
-        <ProLock what="A quiz logo" />
+        <span className="text-sm font-semibold">{t("Quiz logo")}</span>
+        <ProLock what={t("A quiz logo")} />
       </div>
     );
   }
@@ -160,7 +164,7 @@ function LogoSetting({ quiz }: { quiz: QuizDetail }) {
         type="button"
         onClick={() => input.current?.click()}
         disabled={logoMutation.isPending}
-        title={logo ? "Change logo" : "Upload a logo"}
+        title={logo ? t("Change logo") : t("Upload a logo")}
         className={clsx(
           "relative size-14 shrink-0 rounded-xl border-[1.5px] border-dashed border-lprimary/25 dark:border-white/15 bg-light-bg dark:bg-card-dark flex items-center justify-center overflow-hidden cursor-pointer hover:border-dprimary",
           over && dropTargetClass,
@@ -169,7 +173,7 @@ function LogoSetting({ quiz }: { quiz: QuizDetail }) {
         {logo ? (
           <Image
             src={logo}
-            alt="Quiz logo"
+            alt={t("Quiz logo")}
             fill
             sizes="56px"
             className="object-contain p-1"
@@ -180,20 +184,20 @@ function LogoSetting({ quiz }: { quiz: QuizDetail }) {
         )}
       </button>
       <div className="flex flex-col min-w-0">
-        <span className="text-sm font-semibold">Quiz logo</span>
+        <span className="text-sm font-semibold">{t("Quiz logo")}</span>
         <span className="text-xs text-off-dark dark:text-muted-dark">
           {logoMutation.isPending
             ? "Uploading…"
             : logo
-              ? "Shown in the game instead of the site logo"
-              : "Optional · PNG, JPG, SVG or WebP"}
+              ? t("Shown in the game instead of the site logo")
+              : t("Optional · PNG, JPG, SVG or WebP")}
         </span>
       </div>
       {logo && !logoMutation.isPending && (
         <button
           type="button"
-          aria-label="Remove logo"
-          title="Remove logo"
+          aria-label={t("Remove logo")}
+          title={t("Remove logo")}
           onClick={() => upload(null)}
           className="ml-auto size-8 rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] cursor-pointer"
         >
@@ -227,6 +231,7 @@ export function QuizInfoContent(props: {
   onShowLeaderboard?: (resultId: string) => void;
   onShowSoloReport?: (testId: string) => void;
 }) {
+  const t = useT();
   const pastGames = props.quiz.gameResults ?? [];
   const questionCount = props.quiz._count?.questions ?? 0;
   const updateQuiz = useUpdateQuizMutation();
@@ -238,21 +243,21 @@ export function QuizInfoContent(props: {
     <>
       <div className="flex flex-col w-[90%] mx-auto text-dark dark:text-white">
         <nav
-          aria-label="Breadcrumb"
+          aria-label={t("Breadcrumb")}
           className="flex items-center gap-2 text-[13.5px] font-medium text-off-dark dark:text-muted-dark"
         >
           <Link
             href={"/admin"}
             className="hover:underline hover:text-dark dark:hover:text-white"
           >
-            Home
+            {t("Home")}
           </Link>
           <LuChevronRight size={14} />
           <Link
             href={"/admin"}
             className="font-semibold text-dark dark:text-white hover:underline"
           >
-            Quizzes
+            {t("Quizzes")}
           </Link>
           <LuChevronRight size={14} className="shrink-0" />
           <span
@@ -267,12 +272,12 @@ export function QuizInfoContent(props: {
         </nav>
         <EditableHeader quiz={props.quiz} />
         <p className="w-fit my-1 inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-[7px] text-[13px] font-semibold bg-[#c4ee4f] text-[#2c3a08] dark:bg-[#b8e94a] dark:text-[#15200a]">
-          Questions: <b className="font-extrabold">{questionCount}</b>
+          {t("Questions:")} <b className="font-extrabold">{questionCount}</b>
         </p>
         {duels && (
           <div className="flex items-center gap-2 mt-3 mb-1">
             <Switch
-              aria-label="Make quiz public for duels"
+              aria-label={t("Make quiz public for duels")}
               checked={Boolean(props.quiz.isPublic)}
               disabled={updateQuiz.isPending}
               onCheckedChange={(checked) =>
@@ -285,8 +290,9 @@ export function QuizInfoContent(props: {
               }
             />
             <span className="text-sm max-w-[250px]">
-              Public — scored questions are submitted for admin review before
-              appearing in 1v1 duels
+              {t(
+                "Public — scored questions are submitted for admin review before appearing in 1v1 duels",
+              )}
             </span>
           </div>
         )}
@@ -301,7 +307,7 @@ export function QuizInfoContent(props: {
       <div className="flex flex-col w-[90%] mx-auto text-dark dark:text-white">
         <div className="flex items-center justify-between mt-6 mb-3">
           <h4 className="text-sm font-bold tracking-[0.04em] uppercase text-[#8a8896] dark:text-muted-dark">
-            Previously played
+            {t("Previously played")}
           </h4>
           <span className="rounded-full px-2.5 py-0.5 text-xs bg-lprimary/10 dark:bg-white/5 text-off-dark dark:text-muted-dark">
             {pastGames.length}
@@ -329,13 +335,18 @@ export function QuizInfoContent(props: {
                       </span>
                     </div>
                     <div className="text-xs mt-2 mb-[11px] text-off-dark dark:text-muted-dark">
-                      {result.playerCount === 1
-                        ? `${result.playerCount} player`
-                        : `${result.playerCount} players`}{" "}
+                      {t(pl(result.playerCount, "{n} player", "{n} players"), {
+                        n: result.playerCount,
+                      })}{" "}
                       ·{" "}
-                      {result.questionCount === 1
-                        ? `${result.questionCount} question`
-                        : `${result.questionCount} questions`}
+                      {t(
+                        pl(
+                          result.questionCount,
+                          "{n} question",
+                          "{n} questions",
+                        ),
+                        { n: result.questionCount },
+                      )}
                     </div>
                     <div className="flex gap-2">
                       {props.onShowLeaderboard ? (
@@ -344,14 +355,14 @@ export function QuizInfoContent(props: {
                           className={leaderboardClass}
                           onClick={() => props.onShowLeaderboard?.(result.id)}
                         >
-                          See leaderboard
+                          {t("See leaderboard")}
                         </button>
                       ) : (
                         <Link
                           href={`/admin/quiz/leaderboard/${result.id}`}
                           className={leaderboardClass}
                         >
-                          See leaderboard
+                          {t("See leaderboard")}
                         </Link>
                       )}
                     </div>
@@ -364,26 +375,29 @@ export function QuizInfoContent(props: {
                 className="mt-1 self-center inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[13px] font-semibold text-red-light dark:text-red-dark hover:bg-red-light/10 dark:hover:bg-red-dark/10 cursor-pointer"
               >
                 <LuTrash2 size={14} />
-                Delete all
+                {t("Delete all")}
               </button>
               <ConfirmationModal
                 open={confirmDeleteAll}
                 setOpen={setConfirmDeleteAll}
-                desc={
-                  pastGames.length === 1
-                    ? "Delete the played game of this quiz and its leaderboard? This can't be undone."
-                    : `Delete all ${pastGames.length} played games of this quiz and their leaderboards? This can't be undone.`
-                }
-                confirmLabel="Delete all"
+                desc={t(
+                  pl(
+                    pastGames.length,
+                    "Delete the played game of this quiz and its leaderboard? This can't be undone.",
+                    "Delete all {n} played games of this quiz and their leaderboards? This can't be undone.",
+                  ),
+                  { n: pastGames.length },
+                )}
+                confirmLabel={t("Delete all")}
                 confirming={deleteResults.isPending}
-                confirmingLabel="Deleting…"
+                confirmingLabel={t("Deleting…")}
                 onClick={() =>
                   deleteResults.mutate(
                     { quizId: props.quiz.id },
                     {
                       onSuccess: () => {
                         setConfirmDeleteAll(false);
-                        toast.success("Played games deleted");
+                        toast.success(t("Played games deleted"));
                       },
                       onError: (err) => toast.error(getApiErrorMessage(err)),
                     },
@@ -394,12 +408,12 @@ export function QuizInfoContent(props: {
           ) : (
             <div className="h-fit border border-lprimary/25 dark:border-white/15 border-dashed rounded-[14px] p-4 text-dark dark:text-white">
               <div className="p-2 text-lg font-black text-center">
-                No Previously Used Quizzes
+                {t("No Previously Used Quizzes")}
               </div>
               <p className="p-2 text-sm text-center">
-                It looks like there are no previously used quizzes for this
-                session. Start adding questions to create an engaging quiz for
-                your students.
+                {t(
+                  "It looks like there are no previously used quizzes for this session. Start adding questions to create an engaging quiz for your students.",
+                )}
               </p>
             </div>
           )}

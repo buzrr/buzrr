@@ -23,6 +23,7 @@ import {
 } from "@/lib/modules/admin-users/hooks";
 import type { AdminUserItem } from "@/lib/modules/admin-users/api";
 import { TextInput } from "@/components/ui/TextInput";
+import { useT, tx } from "@/lib/i18n/context";
 import { Button } from "@/components/ui/Button";
 
 /** A first guess; rows are measured (taller on phones, actions wrap). */
@@ -30,6 +31,7 @@ const ROW_HEIGHT = 76;
 const DEBOUNCE_MS = 300;
 
 export default function AdminsListClient() {
+  const t = useT();
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const promote = usePromoteUserMutation();
@@ -87,15 +89,15 @@ export default function AdminsListClient() {
     <div className="mt-4">
       <AddUserForm />
       <TextInput
-        placeholder="Search by name or email…"
+        placeholder={t("Search by name or email…")}
         value={searchInput}
         onChange={(e) => setSearchInput(e.target.value)}
         containerClassName="max-w-md mt-6"
       />
       <p className="mt-1 text-xs text-off-dark dark:text-off-white">
         {search
-          ? "Showing search results across all users."
-          : "Showing all users."}
+          ? t("Showing search results across all users.")
+          : t("Showing all users.")}
       </p>
 
       {query.isPending ? (
@@ -169,6 +171,7 @@ function AdminRow({
   onDemote: () => void;
   onResetPassword: () => void;
 }) {
+  const t = useT();
   // One grid for every row, so avatar, name, role and actions line up
   // down the list. Phones: the actions go under the name.
   return (
@@ -182,7 +185,7 @@ function AdminRow({
       />
       <div className="min-w-0">
         <p className="truncate font-bold text-dark dark:text-white">
-          {item.name ?? "Unnamed"}
+          {item.name ?? t("Unnamed")}
         </p>
         <p
           className="truncate text-sm text-off-dark dark:text-off-white"
@@ -201,7 +204,7 @@ function AdminRow({
           className="flex-1 md:flex-none whitespace-nowrap !border !py-1.5"
           onClick={onResetPassword}
         >
-          Reset password
+          {t("Reset password")}
         </Button>
         {/* Same width whether it promotes, demotes or (superadmin) is
             empty, so "Reset password" stays in one column. */}
@@ -213,7 +216,7 @@ function AdminRow({
               className="w-full whitespace-nowrap !py-1.5"
               onClick={onPromote}
             >
-              Promote to admin
+              {t("Promote to admin")}
             </Button>
           )}
           {item.role === "admin" && (
@@ -224,7 +227,7 @@ function AdminRow({
               className="w-full whitespace-nowrap !border !py-1.5"
               onClick={onDemote}
             >
-              Demote to user
+              {t("Demote to user")}
             </Button>
           )}
         </span>
@@ -235,6 +238,7 @@ function AdminRow({
 
 /** Creates a local email + password account (works with sign-up closed). */
 function AddUserForm() {
+  const t = useT();
   const queryClient = useQueryClient();
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState("");
@@ -250,7 +254,9 @@ function AddUserForm() {
         toast.error(res.error);
         return;
       }
-      toast.success(`User ${email.trim().toLowerCase()} created`);
+      toast.success(
+        tx("User {email} created", { email: email.trim().toLowerCase() }),
+      );
       setName("");
       setEmail("");
       setPassword("");
@@ -300,7 +306,7 @@ function AddUserForm() {
       </div>
       <div>
         <Button size="sm" type="submit" disabled={pending}>
-          {pending ? "Creating…" : "Create user"}
+          {pending ? "Creating…" : t("Create user")}
         </Button>
       </div>
     </form>
@@ -315,6 +321,7 @@ function ResetPasswordModal({
   user: AdminUserItem | null;
   onClose: () => void;
 }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [password, setPassword] = useState("");
 
@@ -332,7 +339,7 @@ function ResetPasswordModal({
         toast.error(res.error);
         return;
       }
-      toast.success(`Password for ${user.email} reset`);
+      toast.success(tx("Password for {email} reset", { email: user.email }));
       close();
     });
   }
@@ -360,7 +367,7 @@ function ResetPasswordModal({
           </p>
           <TextInput
             type="password"
-            placeholder="New password (min. 8)"
+            placeholder={t("New password (min. 8)")}
             autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -373,7 +380,7 @@ function ResetPasswordModal({
               Cancel
             </Button>
             <Button size="sm" type="submit" disabled={pending}>
-              {pending ? "Saving…" : "Set password"}
+              {pending ? "Saving…" : t("Set password")}
             </Button>
           </div>
         </form>

@@ -4,6 +4,7 @@ import { Box, Modal } from "@mui/material";
 import clsx from "clsx";
 import Image from "next/image";
 import { useState } from "react";
+import { useT } from "@/lib/i18n/context";
 import ModalCloseButton from "@/components/ModalCloseButton";
 
 const style = {
@@ -28,6 +29,7 @@ export default function ShowMedia(props: {
   /** Also opens it: e.g. the picture icon next to the button. */
   icon?: React.ReactNode;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   function handleOpen() {
     setOpen(true);
@@ -44,8 +46,8 @@ export default function ShowMedia(props: {
       {props.icon && (
         <button
           type="button"
-          aria-label="View image"
-          title="View image"
+          aria-label={t("View image")}
+          title={t("View image")}
           onClick={handleOpen}
           className="cursor-pointer hover:text-lprimary dark:hover:text-dprimary"
         >
@@ -60,7 +62,7 @@ export default function ShowMedia(props: {
         )}
         onClick={handleOpen}
       >
-        View image
+        {t("View image")}
       </button>
 
       <Modal
@@ -78,7 +80,7 @@ export default function ShowMedia(props: {
             <Image
               src={props.media}
               className="w-full h-full object-cover"
-              alt="media Image"
+              alt={t("media Image")}
               height={200}
               width={200}
             />

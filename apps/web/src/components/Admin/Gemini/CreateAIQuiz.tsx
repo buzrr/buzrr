@@ -27,6 +27,8 @@ import {
   QUESTION_TYPE_META,
   QuestionTypeIcon,
 } from "@/components/QuestionTypes/meta";
+import { useT, tx, pl, useLocale } from "@/lib/i18n/context";
+import { LANGUAGE_NAMES } from "@/lib/i18n/locale";
 import {
   fieldLabelClass,
   inputClass,
@@ -65,6 +67,8 @@ const DIFFICULTY_NAMES = [
 ] as const;
 
 export default function CreateAIQuiz({ className }: { className?: string }) {
+  const t = useT();
+  const locale = useLocale();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [customTime, setCustomTime] = useState(false);
@@ -110,6 +114,7 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
         multipleChoice: data.multipleChoice,
         trueFalse: data.trueFalse,
         typeAnswer: data.typeAnswer,
+        language: LANGUAGE_NAMES[locale],
       },
       {
         onSuccess: (res) => {
@@ -136,8 +141,8 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
         variant="ai"
         onClick={() => setOpen(true)}
         icon={<LuSparkles />}
-        title="Create a quiz with AI"
-        subtitle="Let's get your quiz ready"
+        title={t("Create a quiz with AI")}
+        subtitle={t("Let's get your quiz ready")}
         className={className}
       />
 
@@ -175,7 +180,7 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                     id="ai-quiz-title"
                     className="text-xl md:text-[22px] font-bold tracking-[-0.01em]"
                   >
-                    Hey there! I&apos;m your AI quiz buddy.
+                    {t("Hey there! I'm your AI quiz buddy.")}
                   </h2>
                   <p
                     className={clsx(
@@ -183,13 +188,14 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                       mutedText,
                     )}
                   >
-                    Describe what you want and I&apos;ll draft the questions.
-                    You can edit everything afterwards.
+                    {t(
+                      "Describe what you want and I'll draft the questions. You can edit everything afterwards.",
+                    )}
                   </p>
                 </div>
                 <button
                   type="button"
-                  aria-label="Close"
+                  aria-label={t("Close")}
                   onClick={close}
                   className={clsx(
                     "ml-auto size-9 shrink-0 rounded-[10px] flex items-center justify-center hover:bg-lprimary/8 dark:hover:bg-white/5 hover:text-dark dark:hover:text-white transition-colors cursor-pointer",
@@ -208,13 +214,15 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                   control={control}
                   render={({ field }) => (
                     <label className="flex flex-col gap-2">
-                      <span className={fieldLabelClass}>Name your quiz</span>
+                      <span className={fieldLabelClass}>
+                        {t("Name your quiz")}
+                      </span>
                       <input
                         {...field}
                         type="text"
                         maxLength={60}
                         autoComplete="off"
-                        placeholder={'Example: "My 20th Bday Quiz"'}
+                        placeholder={t('Example: "My 20th Bday Quiz"')}
                         className={inputClass}
                       />
                     </label>
@@ -226,12 +234,14 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                   render={({ field }) => (
                     <label className="flex flex-col gap-2">
                       <span className={fieldLabelClass}>
-                        What should the questions be about?
+                        {t("What should the questions be about?")}
                       </span>
                       <textarea
                         {...field}
                         rows={3}
-                        placeholder="Example: quiz on gravitational forces."
+                        placeholder={t(
+                          "Example: quiz on gravitational forces.",
+                        )}
                         className={clsx(inputClass, "resize-none")}
                       />
                     </label>
@@ -250,13 +260,13 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                         )}
                       >
                         <div className={fieldLabelClass}>
-                          Questions
+                          {t("Questions")}
                           <span className="text-[22px] font-extrabold tracking-[-0.02em] leading-none text-lprimary dark:text-dprimary">
                             {n}
                           </span>
                         </div>
                         <RangeSlider
-                          label="Number of questions"
+                          label={t("Number of questions")}
                           min={1}
                           max={MAX_QUESTIONS}
                           value={n}
@@ -277,7 +287,7 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                         )}
                       >
                         <div className={fieldLabelClass}>
-                          Time per question
+                          {t("Time per question")}
                           <span className="flex gap-1 rounded-[10px] p-[3px] bg-lprimary/8 dark:bg-white/5">
                             {(["Slider", "Custom"] as const).map((mode) => {
                               const on = (mode === "Custom") === customTime;
@@ -315,7 +325,7 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                                 min={5}
                                 max={600}
                                 value={field.value ?? ""}
-                                aria-label="Seconds per question"
+                                aria-label={t("Seconds per question")}
                                 onChange={(e) =>
                                   field.onChange(
                                     e.target.value === ""
@@ -334,7 +344,7 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                                   mutedText,
                                 )}
                               >
-                                seconds
+                                {t("seconds")}
                               </span>
                             </div>
                             {formState.errors.time?.message && (
@@ -353,11 +363,11 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                                   mutedText,
                                 )}
                               >
-                                sec
+                                {t("sec")}
                               </small>
                             </span>
                             <RangeSlider
-                              label="Seconds per question"
+                              label={t("Seconds per question")}
                               min={5}
                               max={60}
                               value={Math.min(60, Math.max(5, secs))}
@@ -383,14 +393,14 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                         )}
                       >
                         <div className={fieldLabelClass}>
-                          Difficulty
+                          {t("Difficulty")}
                           <span className="text-[15px] font-extrabold text-lprimary dark:text-dprimary">
-                            {DIFFICULTY_NAMES[level - 1]!}
+                            {tx(DIFFICULTY_NAMES[level - 1]!)}
                           </span>
                         </div>
                         <div
                           role="radiogroup"
-                          aria-label="Difficulty"
+                          aria-label={t("Difficulty")}
                           className="grid grid-cols-5 gap-1 rounded-xl p-[3px] bg-lprimary/8 dark:bg-white/5"
                         >
                           {DIFFICULTY_NAMES.map((name, i) => {
@@ -401,8 +411,8 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                                 type="button"
                                 role="radio"
                                 aria-checked={on}
-                                aria-label={name}
-                                title={name}
+                                aria-label={tx(name)}
+                                title={tx(name)}
                                 onClick={() => field.onChange(i + 1)}
                                 className={clsx(
                                   "rounded-[9px] py-2 text-sm font-bold tabular-nums cursor-pointer transition-colors",
@@ -425,8 +435,8 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                             mutedText,
                           )}
                         >
-                          <span>Easy</span>
-                          <span>Hard</span>
+                          <span>{t("Easy")}</span>
+                          <span>{t("Hard")}</span>
                         </div>
                       </div>
                     );
@@ -438,7 +448,7 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                     subtleCardClass,
                   )}
                 >
-                  <div className={fieldLabelClass}>Question types</div>
+                  <div className={fieldLabelClass}>{t("Question types")}</div>
                   {AI_TYPES.map(({ field: name, type }) => (
                     <Controller
                       key={name}
@@ -448,15 +458,15 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
                           <span className="inline-flex items-center gap-2 text-sm font-semibold">
                             <QuestionTypeIcon type={type} size={16} />
-                            {QUESTION_TYPE_META[type].name}
+                            {tx(QUESTION_TYPE_META[type].name)}
                           </span>
                           <Segmented<number>
-                            label={QUESTION_TYPE_META[type].name}
+                            label={tx(QUESTION_TYPE_META[type].name)}
                             value={field.value}
                             onChange={field.onChange}
                             options={AMOUNT_NAMES.map((amount, i) => ({
                               value: i,
-                              label: amount,
+                              label: tx(amount),
                             }))}
                           />
                         </div>
@@ -465,17 +475,18 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
                   ))}
                   {ta > 0 && secs > 0 && (
                     <span className={clsx("text-xs", mutedText)}>
-                      Typed answers get more time:{" "}
-                      {Math.min(
-                        600,
-                        Math.max(Math.round(secs * 1.5), secs + 10),
-                      )}{" "}
-                      s.
+                      {t("Typed answers get more time: {s} s.", {
+                        // As the server sets it (typedTimeOut).
+                        s: Math.min(
+                          600,
+                          Math.max(Math.round(secs * 1.5), secs + 10),
+                        ),
+                      })}
                     </span>
                   )}
                   {mc + tf + ta === 0 && (
                     <span className="text-xs text-red-light dark:text-red-dark">
-                      Pick at least one question type.
+                      {t("Pick at least one question type.")}
                     </span>
                   )}
                 </div>
@@ -483,9 +494,11 @@ export default function CreateAIQuiz({ className }: { className?: string }) {
 
               <div className="mt-[22px] flex flex-col md:flex-row items-stretch md:items-center gap-3.5 border-t border-lprimary/15 dark:border-white/10 px-5 pt-[18px] pb-6 md:px-7 md:pt-[22px] md:pb-[26px]">
                 <p className={clsx("flex-1 text-[13px]", mutedText)}>
-                  {n === 1 ? `${n} question` : `${n} questions`} · {secs || "—"}
-                  s each · about {Math.max(1, Math.round((n * secs) / 60))} min
-                  to play
+                  {t(pl(n, "{n} question", "{n} questions"), { n })} ·{" "}
+                  {t("{s}s each · about {m} min to play", {
+                    s: secs || "—",
+                    m: Math.max(1, Math.round((n * secs) / 60)),
+                  })}
                 </p>
                 <button
                   type="submit"

@@ -14,6 +14,7 @@ import { primaryButtonClass } from "@/components/Game/GameUI";
 import { useAppDispatch } from "@/state/hooks";
 import { setPlayers } from "@/state/admin/playersSlice";
 import { getApiErrorMessage } from "@/lib/api/errors";
+import { useT } from "@/lib/i18n/context";
 import { useCreateGameSessionMutation } from "@/lib/modules/game-sessions/hooks";
 
 /**
@@ -28,6 +29,7 @@ export default function HostQuizForm(props: {
   disabled?: boolean;
   className?: string;
 }) {
+  const t = useT();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const mutation = useCreateGameSessionMutation();
@@ -72,11 +74,11 @@ export default function HostQuizForm(props: {
         className="w-full flex items-center justify-center gap-2.5 rounded-[15px] p-4 text-[17px] font-bold text-white bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep shadow-[0_10px_26px_-10px_#8b5cf6] transition-[filter,transform] hover:brightness-107 active:translate-y-px cursor-pointer disabled:cursor-default disabled:bg-none disabled:bg-gray disabled:shadow-none disabled:hover:brightness-100"
       >
         <LuPlay size={18} className="fill-current" />
-        Host quiz
+        {t("Host quiz")}
       </button>
       <BasicModal
-        btnTitle="Host quiz"
-        subtitle="Settings for this game. Change them before you start."
+        btnTitle={t("Host quiz")}
+        subtitle={t("Settings for this game. Change them before you start.")}
         icon={<LuPlay size={22} className="fill-current" />}
         open={open}
         onClose={close}
@@ -98,7 +100,7 @@ export default function HostQuizForm(props: {
                 onChange={(e) => setSaveAsDefault(e.target.checked)}
                 className="size-4 accent-lprimary dark:accent-dprimary"
               />
-              Save as this quiz&apos;s default
+              {t("Save as this quiz's default")}
             </label>
             <button
               type="button"
@@ -106,7 +108,7 @@ export default function HostQuizForm(props: {
               disabled={mutation.isPending}
               className="rounded-[14px] border-2 border-lprimary dark:border-dprimary px-[22px] py-3 font-bold text-lprimary dark:text-dprimary cursor-pointer hover:bg-lprimary/10 dark:hover:bg-dprimary/10 disabled:opacity-60"
             >
-              Cancel
+              {t("Cancel")}
             </button>
             <button
               type="submit"
@@ -115,7 +117,7 @@ export default function HostQuizForm(props: {
               className={clsx(primaryButtonClass, "px-[26px]")}
             >
               <LuPlay size={16} className="fill-current" />
-              {mutation.isPending ? "Starting…" : "Start"}
+              {mutation.isPending ? t("Starting…") : t("Start")}
             </button>
           </div>
         </form>
