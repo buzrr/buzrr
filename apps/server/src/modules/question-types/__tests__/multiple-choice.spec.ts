@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { MAX_OPTIONS } from "@buzrr/contract";
 import { QuestionDefinitionError } from "../question-type";
 import {
   checkAnswer,
@@ -54,7 +55,7 @@ describe("multiple choice: validateDefinition", () => {
 
   it.each([
     ["too few options", options(0, 1)],
-    ["too many options", options(0, 7)],
+    ["too many options", options(0, MAX_OPTIONS + 1)],
     ["no correct option", options(-1)],
     [
       "an empty option",

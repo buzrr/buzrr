@@ -23,6 +23,56 @@ export const gamePhaseSchema = z.enum([
   "final",
   "ended",
 ]);
+
+/** `Quiz.settings`. Unknown/missing keys fall back to the defaults. */
+export const quizSettingsSchema = z.object({
+  /** Players can send live reactions (👍 ❤️ 😂) that fly across the host screen. */
+  reactions: z.boolean().default(true),
+});
+
+/**
+ * A live reaction: one emoji (the player picks their three; defaults
+ * 👍 ❤️ 😂). Only emoji characters (incl. ZWJ sequences, skin tones,
+ * variation selectors) are accepted, so it can't carry text.
+ */
+export const reactionSchema = z.object({
+  emoji: z
+    .string()
+    .min(1)
+    .max(16)
+    .regex(/^[\p{Extended_Pictographic}\p{Emoji_Component}\u200d\ufe0f]+$/u)
+    .refine((s) => /\p{Extended_Pictographic}/u.test(s), "Not an emoji"),
+  /**
+   * Meant for the player's row on the host's board (a right answer at the
+   * reveal): shown there, not only flown.
+   */
+  board: z.boolean().optional(),
+});
+/**
+ * Reactions: a player may send `reactionLimitFor(players in the room)`
+ * within REACTION_WINDOW_MS, then waits. The budget is per player and starts
+ * afresh with every question and at the final standings.
+ */
+export const REACTION_WINDOW_MS = 60_000;
+export function reactionLimitFor(players: number): number {
+  if (players < 50) return 30;
+  if (players < 150) return 10;
+  if (players < 500) return 5;
+  return 2;
+}
+/** The room's current reaction budget; `reset`: start counting afresh. */
+export interface ReactionLimitPayload {
+  limit: number;
+  windowMs: number;
+  reset?: boolean;
+  /** How many are in the room (its reaction limit follows it). */
+  players?: number;
+}
+
+export const playerReactionSchema = reactionSchema.extend({
+  playerId: z.string(),
+});
+
 export const gameModeSchema = z.enum(["classic", "duel"]);
 
 /**
@@ -97,8 +147,25 @@ export const answerResultSchema = z.object({
   rank: z.number().int().nullable(),
 });
 
+/**
+ * Players are sent only the top of a room's leaderboard (the host all of it):
+ * the whole board to everyone grows with the room twice over — entries times
+ * recipients — and held up the events behind it. A player's own standing
+ * comes with `answer-result`.
+ */
+export const PLAYER_LEADERBOARD_TOP = 10;
+
+/**
+ * The host is sent the top this many — after a question also whoever was
+ * up there before it, so their move down can be shown. A room of hundreds
+ * renders no more rows than that.
+ */
+export const HOST_LEADERBOARD_TOP = 50;
+
 export const leaderboardSchema = z.object({
   entries: z.array(leaderboardEntrySchema),
+  /** How many players there are, when `entries` is only the top. */
+  total: z.number().int().optional(),
   isFinal: z.boolean(),
 });
 
@@ -196,6 +263,8 @@ export const stateSyncSchema = z.object({
   reveal: questionEndSchema.optional(),
   /** Present while phase is "reveal", "final" or "ended". */
   leaderboard: z.array(leaderboardEntrySchema).optional(),
+  /** Players: how many are on the board when `leaderboard` is only the top (and their own row). */
+  leaderboardTotal: z.number().int().optional(),
   players: z.array(rosterPlayerSchema),
   /** Present for player connections only. */
   you: answerResultSchema.optional(),
@@ -226,6 +295,38 @@ export const playerRefSchema = z.object({
 export const playerRemovedSchema = playerRefSchema.extend({
   /** True when the host banned the player instead of just kicking them. */
   banned: z.boolean().optional(),
+  /** Not the host's doing: the player's device went quiet in the lobby. */
+  timedOut: z.boolean().optional(),
+});
+
+/**
+ * Players' devices send `heartbeat` this often. A socket that has sent one
+ * and then stays quiet for `HEARTBEAT_TIMEOUT_MS` (three missed beats) is
+ * dropped and the player shows as offline; in the lobby, a player gone that
+ * long after their last beat leaves the list (and is back if they return).
+ */
+export const HEARTBEAT_INTERVAL_MS = 10_000;
+export const HEARTBEAT_TIMEOUT_MS = 35_000;
+
+/**
+ * The lobby's bubble mini-game: a player's running totals, sent about once a
+ * second while they wait; relayed to the host only (`host:{gameCode}`).
+ */
+/**
+ * Lobby bubble totals: a device reports at most once a second, and only
+ * when they changed — in a room of BUBBLE_CROWD or more at most every
+ * BUBBLE_CROWD_EVERY_MS. The same boundary as a reaction-limit step, so
+ * devices hear the room size when it is crossed.
+ */
+export const BUBBLE_CROWD = 150;
+export const BUBBLE_CROWD_EVERY_MS = 10_000;
+
+export const bubbleStatsSchema = z.object({
+  hits: z.number().int().min(0).max(1_000_000),
+  misses: z.number().int().min(0).max(1_000_000),
+});
+export const playerBubbleStatsSchema = bubbleStatsSchema.extend({
+  playerId: z.string(),
 });
 
 export const duelInviteAcceptSchema = z.object({ code: z.string().min(1) });
@@ -234,6 +335,14 @@ export const removePlayerSchema = z.object({ id: z.string().min(1) });
 // -- inferred types -----------------------------------------------------------
 
 export type GamePhase = z.infer<typeof gamePhaseSchema>;
+export type QuizSettings = z.infer<typeof quizSettingsSchema>;
+export type BubbleStatsPayload = z.infer<typeof bubbleStatsSchema>;
+export type ReactionPayload = z.infer<typeof reactionSchema>;
+export type PlayerReactionPayload = z.infer<typeof playerReactionSchema>;
+export type PlayerBubbleStatsPayload = z.infer<typeof playerBubbleStatsSchema>;
+export type BubbleStatsBatchPayload = {
+  players: Record<string, BubbleStatsPayload>;
+};
 export type GameMode = z.infer<typeof gameModeSchema>;
 export type LeaderboardEntry = z.infer<typeof leaderboardEntrySchema>;
 export type QuestionStartPayload = z.infer<typeof questionStartSchema>;
@@ -268,6 +377,18 @@ export interface ServerToClientEvents {
   leaderboard: (payload: LeaderboardPayload) => void;
   "game-over": (payload: GameOverPayload) => void;
   "state-sync": (payload: StateSyncPayload) => void;
+  /** Host only: a waiting player's bubble mini-game totals. */
+  /**
+   * Host only: the bubble totals of every player that changed since the
+   * last batch — at most one event a second per room.
+   */
+  "bubble-stats-batch": (payload: BubbleStatsBatchPayload) => void;
+  /** Host only: one live reaction from a player (one per tap). */
+  reaction: (payload: PlayerReactionPayload) => void;
+  /** Players: the room's reaction budget (on join, and afresh per question). */
+  "reaction-limit": (payload: ReactionLimitPayload) => void;
+  /** Players: that reaction was over the budget; try again in `retryInMs`. */
+  "reaction-limited": (payload: { retryInMs: number }) => void;
   "player-connection": (payload: PlayerConnectionPayload) => void;
   // -- duel matchmaking --
   "duel:matched": (payload: DuelMatchedPayload) => void;
@@ -304,8 +425,14 @@ export interface ClientToServerEvents {
     ack: (result: SubmitAnswerAck) => void,
   ) => void;
   "request-sync": () => void;
+  /** A player's device is still here (every `HEARTBEAT_INTERVAL_MS`). */
+  heartbeat: () => void;
   /** A player voluntarily leaves the room (back / leave-game confirmation). */
   "leave-room": () => void;
+  /** A waiting player's bubble mini-game totals (about once a second). */
+  "bubble-stats": (payload: BubbleStatsPayload) => void;
+  /** One tap on a reaction button (rate limited server-side). */
+  reaction: (payload: ReactionPayload) => void;
   // -- host intents (the server decides what each one means) --
   "remove-player": (player: { id: string }, gameCode?: string) => void;
   "start-game": (gameCode?: string) => void;

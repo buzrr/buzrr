@@ -12,6 +12,7 @@ import GetReady from "@/components/Game/GetReady";
 import QuestionScreen from "./QuestionScreen";
 import QuesResult from "./QuesResult";
 import LeaderBoard from "./Leaderboard";
+import { ReactionOverlay } from "@/components/Game/Flyers";
 
 interface QuizQuestionItem {
   title?: string;
@@ -42,6 +43,7 @@ const GameLobby = (params: {
   const phase = useAppSelector((state) => state.game.phase);
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const qCount = useAppSelector((state) => state.game.qCount);
+  const roster = useAppSelector((state) => state.game.players);
 
   useEffect(() => {
     dispatch(setPlayers(params.players));
@@ -61,11 +63,24 @@ const GameLobby = (params: {
 
   if (!socket) return null;
 
+  // Fewer than two players: a try-out — "End" goes back to editing the quiz.
+  const endRedirect =
+    roster.length < 2 && params.quizQuestions?.id
+      ? `/admin/quiz/${params.quizQuestions.id}`
+      : undefined;
+  const reactions = (
+    <ReactionOverlay
+      socket={socket}
+      nameOf={(id) => roster.find((p) => p.id === id)?.name}
+    />
+  );
+
   if (!inGame) {
     // idle / lobby / starting — the pre-question countdown
     return (
       <>
         <ConnectionBanner />
+        {reactions}
         <GetReady title={title} />
       </>
     );
@@ -74,6 +89,7 @@ const GameLobby = (params: {
   return (
     <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 pb-4 md:pb-0 md:h-[calc(100dvh-10rem)] text-dark dark:text-white">
       <ConnectionBanner />
+      {reactions}
       <GameTopBar
         title={title}
         qIndex={qIndex}
@@ -85,6 +101,7 @@ const GameLobby = (params: {
             inline
             roomId={params.roomId}
             alreadyEnded={alreadyEnded}
+            {...(endRedirect ? { redirectTo: endRedirect } : {})}
           />
         }
       />
@@ -97,6 +114,7 @@ const GameLobby = (params: {
           roomId={params.roomId}
           quizTitle={title}
           alreadyEnded={alreadyEnded}
+          quizId={params.quizQuestions?.id}
         />
       )}
     </div>

@@ -68,8 +68,20 @@ export const addQuestionSchema = z
     textMaxLength: z.union([z.literal(100), z.literal(200), z.literal(500)]),
     allowAnonymous: z.boolean(),
     multipleSubmissions: z.boolean(),
+    ignoreTypos: z.boolean(),
+    fixedLength: z.boolean(),
   })
   .superRefine((v, ctx) => {
+    if (
+      v.type === "type_answer" &&
+      !v.options.some((o) => o.title.trim() !== "")
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["options"],
+        message: "Add at least one accepted answer",
+      });
+    }
     if (!["multiple_choice", "true_false", "poll"].includes(v.type)) return;
     v.options.forEach((o, i) => {
       if (o.title.trim() === "") {
