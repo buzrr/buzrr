@@ -69,7 +69,7 @@ export default function Navbar() {
       ? [
           {
             href: "/admin/superadmin/admins",
-            label: "Manage Admins",
+            label: "Manage Users",
             icon: LuUserCog,
           },
         ]

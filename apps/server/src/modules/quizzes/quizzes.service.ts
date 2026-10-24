@@ -274,6 +274,51 @@ export class QuizzesService {
       .map(({ gameSessions: _s, gameResults: _r, ...q }) => q);
   }
 
+  /** Every quiz with its owner (admin overview). */
+  async findAll() {
+    return this.prisma.db.quiz.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        _count: {
+          select: {
+            questions: { where: { disabled: false } },
+            gameResults: true,
+          },
+        },
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+  }
+
+  /**
+   * Moves a quiz to the user with `email`, together with the questions its
+   * previous owner wrote (so they lose edit rights on them too).
+   */
+  async changeOwner(quizId: string, email: string) {
+    const target = await this.prisma.db.user.findUnique({
+      where: { email: email.toLowerCase() },
+      select: { id: true, name: true, email: true },
+    });
+    if (!target) throw new NotFoundException("No user with this email");
+    const quiz = await this.prisma.db.quiz.findUnique({
+      where: { id: quizId },
+      select: { id: true, userId: true },
+    });
+    if (!quiz) throw new NotFoundException("Quiz not found");
+    if (quiz.userId === target.id) return { quizId, owner: target };
+    await this.prisma.db.$transaction([
+      this.prisma.db.quiz.update({
+        where: { id: quizId },
+        data: { userId: target.id },
+      }),
+      this.prisma.db.question.updateMany({
+        where: { quizId, createdById: quiz.userId },
+        data: { createdById: target.id },
+      }),
+    ]);
+    return { quizId, owner: target };
+  }
+
   async findOneForUser(user: AuthUser, quizId: string) {
     const quiz = await this.prisma.db.quiz.findFirst({
       where: { id: quizId, userId: user.userId },

@@ -68,8 +68,9 @@ Traefik) in front of both ports and use `https://` URLs here.
   registration: `AUTH_EMAIL_SIGNUP=OFF`.
 - Want Google sign-in as well? Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
   (redirect URI: `<PUBLIC_WEB_URL>/api/auth/callback/google`).
-- There is no email, so there is no "forgot password" yet — choose passwords
-  you'll keep. (A self-service reset for operators is future work.)
+- There is no email, so there is no "forgot password": a superadmin sets a new
+  password under user management (`/admin/superadmin/admins`), where they can
+  also create accounts while sign-up is closed.
 
 ### Making yourself an admin
 
