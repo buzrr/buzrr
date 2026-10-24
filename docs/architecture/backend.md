@@ -14,7 +14,11 @@ CORS (`WEB_ORIGIN` via `parseCorsOrigin`, credentials on) → global prefix
 whitelist: true, forbidNonWhitelisted: false })` → global
 `AllExceptionsFilter` (HttpExceptions pass through with status; everything
 else becomes a logged 500) → with `STORAGE_DRIVER=local`, static serving of
-`/uploads/*` from the upload directory (`nosniff`, immutable caching). Port:
+`/uploads/*` from the upload directory — only with a valid signature (403
+otherwise; see `MediaStorage` below), except avatar pictures and built-in skin
+files (`avatar-*`, `builtin-*`), which are public (`Cache-Control: public,
+max-age=31536000, immutable`); signed files get `private, max-age=21600,
+immutable`; all `nosniff`. Port:
 `API_PORT` ?? `PORT` ?? 3001.
 
 ## Module map (`src/app.module.ts`)
@@ -26,12 +30,12 @@ Global modules: `ConfigModule`, `RedisModule` (3 ioredis clients),
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | `health`         | `GET /health` (no prefix) — pings Postgres + Redis with 2s timeouts; 503 if either is down                                                                                                                                                                                                                                                                                                                       | Prisma, REDIS                            |
 | `players`        | `POST /players` (mint guest + player JWT), `PATCH /players/name`, `GET /players/:id`, `PATCH /players/:id/clear-game` — all `@Public()` + rate-limited                                                                                                                                                                                                                                                           | own JwtModule                            |
-| `game-sessions`  | `POST /game-sessions` (create room), `POST /join`, `GET /player-play/:playerId` (public), `GET /history`, `GET /results/:resultId`, `GET /:roomId/lobby`, `POST /:roomId/end`, `DELETE /:roomId/players/:playerId` (kick), `POST /:roomId/players/:playerId/ban`                                                                                                                                                 | GameEngine, Billing                      |
-| `quizzes`        | CRUD `/quizzes`, `POST /quizzes/ai` (`TextGenerator`; `ai` rate profile; spends an AI token), `POST /quizzes/import` (batch import from Buzrr-AI; body = contract `importQuizSchema`)                                                                                                                                                                                                                            | TextGenerator, question types, Billing   |
-| `questions`      | `POST /questions` (standalone/bulk, no quiz; admin-only; body = contract `createStandaloneQuestionsSchema`), `PATCH /questions/reorder`, `DELETE /questions/:id`, `POST /questions/:id/report`; plus `QuizQuestionsController`: `GET/POST /quizzes/:quizId/questions` (multipart upsert; media via `MediaStorage`)                                                                                               | MediaStorage, question types, Moderation |
+| `game-sessions`  | `POST /game-sessions` (create room, optional per-game settings), `POST /join`, `GET /player-play/:playerId` (public; no question texts, options or media — only what the waiting screen needs), `GET /history`, `GET /results/:resultId`, `DELETE /results/…` (one, or by quiz), `GET /:roomId/lobby`, `POST /:roomId/end`, `DELETE /:roomId/players/:playerId` (kick), `POST /:roomId/players/:playerId/ban`    | GameEngine, Billing                      |
+| `quizzes`        | CRUD `/quizzes`, `POST /quizzes/ai` (`TextGenerator`; `ai` rate profile; spends an AI token), `POST /quizzes/import` (batch import from Buzrr-AI; body = contract `importQuizSchema`), `POST /quizzes/:id/duplicate`; admins: `GET /quizzes/all`, `PATCH /quizzes/:id/owner`                                                                                                                                     | TextGenerator, question types, Billing   |
+| `questions`      | `POST /questions` (standalone/bulk, no quiz; admin-only; body = contract `createStandaloneQuestionsSchema`), `PATCH /questions/reorder`, `PATCH /questions/:id/disabled`, `DELETE /questions/:id`, `POST /questions/:id/report`; plus `QuizQuestionsController`: `GET/POST /quizzes/:quizId/questions` (multipart upsert; media via `MediaStorage`)                                                              | MediaStorage, question types, Moderation |
 | `moderation`     | `GET /moderation/questions?status=pending\|approved\|unapproved`, `GET .../counts`, `PATCH .../approve` · `.../unapprove` · `.../pending` · `.../categories` (bulk, `{ ids }` ≤100; skipped ids reported back), `PATCH .../:id/approve`, `PATCH .../:id/unapprove`, `PATCH .../:id/pending` (back to review), `PATCH .../:id/categories` (retag; no re-moderation) — `@Roles("admin","superadmin")`              | Categories                               |
 | `categories`     | `GET /categories` (any account — the list with question counts), `POST`/`PATCH`/`DELETE /categories[/:id]` (`@Roles("admin","superadmin")`; delete cascades tags + per-category ratings); `CategoriesService.assertExist` validates `categoryIds` on admin writes. **Only admins tag questions** (standalone create + moderation endpoints); quiz question saves and `POST /quizzes/import` ignore `categoryIds` | —                                        |
-| `admin-users`    | `GET /superadmin/users`, `PATCH /superadmin/users/:id/role` — `@Roles("superadmin")`                                                                                                                                                                                                                                                                                                                             | —                                        |
+| `admin-users`    | `GET /superadmin/users` (every user; `search` on name/email, cursor-paged), `PATCH /superadmin/users/:id/role` — `@Roles("superadmin")`                                                                                                                                                                                                                                                                          | —                                        |
 | `users`          | `GET /users/me/stats` (aggregates over GameResultEntry)                                                                                                                                                                                                                                                                                                                                                          | —                                        |
 | `billing`        | `GET /billing/me`, `POST /billing/checkout`, `POST /billing/portal`, `POST /billing/sync` (`report` rate profile), `POST /billing/ai-tokens/reserve` + `/release` (called by Buzrr-AI with the caller's JWT), `POST /billing/webhooks/dodo` (`@Public()`, Dodo signature) — see [Billing](#billing--entitlements-srcmodulesbilling)                                                                              | Dodo SDK                                 |
 | `duel`           | see [duels.md](duels.md)                                                                                                                                                                                                                                                                                                                                                                                         | GameEngine                               |
@@ -54,6 +58,20 @@ services.
   `update()` runs in a transaction: flipping `isPublic: true` also moves every
   duel-eligible `draft` question to `pending` (submits them for moderation)
   and every other draft to `unapproved`; already-decided ones are untouched.
+  `findAllForUser` sorts by last activity: an edit (`updatedAt`; question
+  writes touch the quiz) or the latest game hosted or finished.
+  `findOneForUser` includes the quiz's last 50 results, whoever hosted them.
+  `duplicate` copies an owned quiz — settings, questions (with `disabled`),
+  options in authored order — as "<title> (copy)" under the same capacity
+  check; media URLs are shared, not copied, and moderation restarts at `draft`.
+- Admins (`@Roles("admin","superadmin")`): `GET /quizzes/all` lists every
+  quiz with its owner and counts (the admin home's all-quizzes list);
+  `PATCH /quizzes/:id/owner { email }` moves a quiz to the user with that
+  email, together with the questions its previous owner wrote (they lose edit
+  rights on those too).
+- Disabling a question (`PATCH /questions/:id/disabled`, owner only) keeps it
+  in the quiz and editor; games (engine load, player context) and question
+  counts skip it.
 - `questions.service.ts` — the multipart upsert (`upsertFromMultipart`) is the
   single write path for questions from the UI (create and edit). Fields:
   `type` (default `multiple_choice`), optional `config` (JSON), and options
@@ -71,16 +89,35 @@ services.
 - `POST /quizzes/import` (`importQuestions`): the contract's `importQuizSchema`
   fixes the envelope; each question (no `type` → multiple choice) is checked
   by its type's handler, and a failure names the question (`Question 3: …`).
-- `POST /quizzes/ai` (`createWithAi`): prompt → the configured
-  `TextGenerator.generateJson` (Gemini `responseSchema`, or OpenAI-compatible
-  `response_format: json_schema`) with a JSON Schema derived from the zod
-  `aiQuizOutputSchema` (`question`, `correctAnswer`, three `wrongAnswers`);
-  the reply is re-validated with the same schema, blank/duplicate-option
-  questions are dropped, options shuffled. The prompt asks for short options
-  (≈1–5 words, ≤60 chars) so players can read them in time. Timeouts → 503,
-  other failures or off-schema output → 502, under-generation → 400,
-  no model configured → 400. Whole quiz insert is one transaction. Reserves
-  one AI token before generating; any failure refunds it.
+- `POST /quizzes/ai` (`createWithAi`, `ai-quiz.ts`, `ai-mix.ts`,
+  `ai-leak.ts`): the host picks a difficulty (1–5) and how much multiple
+  choice, true / false and type-answer (none / few / medium / many,
+  `allocateTypes`). The prompt carries the quiz title and topic; the
+  configured `TextGenerator.generateJson` (Gemini `responseSchema`, or
+  OpenAI-compatible `response_format: json_schema`) returns one list per type
+  (`aiQuizOutputSchema`), re-validated with the same schema.
+  - **Write:** about 25% spare questions are asked for. Blank / duplicate
+    ones and questions that **give their answer away** (the answer, or a
+    telling word of it — or its stem: "Zugspitze" gives away
+    "Zugspitzbahn" — that no wrong option shares, in the question; the
+    answer in the quiz title — `choiceLeaks` / `typedLeaks`) are dropped.
+  - **Variety** (`dedupe`, also after the review): no fact or answer twice,
+    no question naming another's answer (`givesAway`), and no subject
+    (a capitalized word of 5+ letters outside the quiz's title and
+    description) in more than `MAX_PER_SUBJECT` = 2 questions.
+  - **Review (agentic):** a second call reviews every picked question against
+    the rules (leaks, facts, a single right answer, ambiguity, weak
+    distractors, difficulty) and rewrites the weak ones
+    (`aiReviewOutputSchema`); rewrites pass the same checks or are dropped
+    (`applyReview`), and the rewrites are reviewed once more
+    (`AI_REVIEW_ROUNDS` = 2). A failed review keeps the questions.
+  - **Fill:** if too few remain, one more write + review for the rest
+    (avoiding the questions already taken); then each question is checked by
+    its type's handler, as on import, and the order mixed.
+  - Timeouts → 503, other failures or off-schema output → 502,
+    under-generation → 400, no model configured → 400. Whole quiz insert is
+    one transaction. Reserves one AI token before generating; any failure
+    refunds it.
 
 ## Moderation
 
@@ -122,17 +159,29 @@ services.
 `game-sessions.service.ts` — read alongside the socket paths in
 [realtime.md](realtime.md#kick--ban-semantics):
 
-- `join`: banned-check first, then a **serializable transaction** so
-  concurrent joins can't overshoot the host's plan cap (`maxPlayersFor`: 50 Free / 250 Pro, or a
-  higher `hostSizeLimit` override); rejoining the
-  same room bypasses the cap.
+- `createRoom`: quiz owner only; body = contract `createGameSessionSchema`.
+  Optional `settings` (the "Host quiz" dialog) are stored on the room
+  (`GameSession.settings`), and with `saveAsDefault` on the quiz too. The
+  plan's limits (own sound / avatar skins, logo are Pro) apply when settings
+  are read (`resolveGameLook`), for a room's own as for the quiz's. Spec:
+  `game-sessions/__tests__/create-room.spec.ts`.
+- `join`: banned-check first; the cap (`maxPlayersFor`: per plan, `MAX_PLAYERS_FREE` /
+  `_PRO` / `_NOBILLING`, or a higher `hostSizeLimit` override) and the avatar are worked out,
+  then a short transaction takes the room row's lock (`SELECT … FOR UPDATE`, ReadCommitted),
+  counts and attaches the player. Concurrent joins of one room queue on that lock for a few
+  ms each instead of aborting each other (SERIALIZABLE did, and at 510 players the retries
+  exhausted the pool — `TransactionWriteConflict`, P2028). Rejoining the same room bypasses the
+  cap. `DB_POOL_MAX` sizes the pg pool. Spec: `game-sessions/__tests__/join-cap.spec.ts`.
 - `endRoom` / `removePlayerFromRoom` / `banPlayerFromRoom`: host-only; they
   drive the engine (broadcasts included) and then reconcile Postgres. Ban
   order (Redis ban **before** Postgres detach) is deliberate — a join between
   the two would otherwise readmit the player. A detached-but-not-cleaned
   player is still kickable so retries can finish a partial failure.
-- `getResult`: hosted results visible to the host; hostless (duel) results
-  only to participants.
+- `getResult`: hosted results visible to the host and the quiz's owner;
+  hostless (duel) results only to participants. `deleteResults` (`DELETE`
+  `/results/:resultId` or `/results/by-quiz/:quizId`) removes classic results
+  the user hosted or whose quiz they own (entries cascade); duel results are
+  never deleted.
 
 Answers have **no REST surface** — `submit-answer` over the socket (with an
 ack) is the only way in, because scoring needs the server-measured time
@@ -214,7 +263,13 @@ max, resetsAt? }`; the web client's upgrade prompt keys on that body.
   also bound when `CLOUDINARY_*` or `S3_BUCKET`/`S3_ACCESS_KEY_ID`/
   `S3_SECRET_ACCESS_KEY` are incomplete. `s3`/`local` accept only
   magic-byte-sniffed PNG/JPEG/GIF/WebP/AVIF (no SVG — they serve bytes as-is).
-  Only an unknown `STORAGE_DRIVER` fails at boot.
+  Only an unknown `STORAGE_DRIVER` fails at boot. `local` uploads are not
+  public: `storage/asset-signing.ts` signs their URLs (`?sig=<expiry>.<hmac>`,
+  HMAC-SHA256 keyed from `BETTER_AUTH_SECRET`, valid 6 h); the database keeps
+  the bare URL. Signed links go out with a question as it opens
+  (`question-start`, `state-sync`) and, through the global
+  `SignAssetsInterceptor`, in REST responses to authenticated requests only.
+  S3/Cloudinary URLs stay public and unsigned.
 - `TextGenerator` (`llm/`) — prompt in, text out: `GeminiGenerator` or
   `OpenAICompatibleGenerator` (plain `fetch` to `/chat/completions`). Chosen
   by `LLM_PROVIDER` / `LLM_BASE_URL`; `configured` is false with nothing set,

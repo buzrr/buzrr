@@ -14,6 +14,7 @@ import { createPlayerSchema } from "@/lib/modules/forms/schemas";
 import { useCreatePlayerMutation } from "@/lib/modules/players/hooks";
 import { useJoinRoomMutation } from "@/lib/modules/game-sessions/hooks";
 import { clearPlayerLocalSession } from "@/lib/player-session";
+import { loadPlayerProfile, savePlayerProfile } from "@/lib/player-prefs";
 import { isAxiosError } from "axios";
 import { mutedText, primaryButtonClass } from "@/components/Game/GameUI";
 import {
@@ -53,6 +54,16 @@ const CreatePlayerForm = (props: {
       profile: props.data.image,
     },
   });
+
+  // Start from the name and avatar used last time (if the form is still empty).
+  useEffect(() => {
+    const saved = loadPlayerProfile();
+    if (saved && !props.data.name) {
+      props.setData({ name: sanitizeName(saved.name), image: saved.image });
+    }
+    // Once, on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     reset({
@@ -110,6 +121,7 @@ const CreatePlayerForm = (props: {
           if (typeof window !== "undefined") {
             window.localStorage.setItem("playerToken", res.accessToken);
           }
+          savePlayerProfile({ name: data.username, image: data.profile });
           if (props.joinGameCode) {
             autoJoin(props.joinGameCode);
             return;

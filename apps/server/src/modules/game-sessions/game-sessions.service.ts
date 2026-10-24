@@ -1,3 +1,10 @@
+import { signAssetUrl } from "../../common/storage/asset-signing";
+import {
+  assignAvatar,
+  loadSharedAvatars,
+  resolveGameLook,
+  roomSettings,
+} from "../../common/game-look/game-look";
 import {
   ForbiddenException,
   Injectable,
@@ -5,15 +12,33 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { Prisma } from "@buzrr/prisma";
+import type { CreateGameSession } from "@buzrr/contract";
 import { customAlphabet } from "nanoid";
 import { EntitlementsService } from "../billing/entitlements.service";
 import { GameEngineService } from "../game-engine/game-engine.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
-import { CreateRoomDto } from "./dto/create-room.dto";
 import { JoinRoomDto } from "./dto/join-room.dto";
+import { OPTION_ORDER } from "../../common/utils/option-order";
 
 const generateGameCode = customAlphabet("ABCDEFGHJKMNPQRSTUVWXYZ23456789", 6);
+
+/** Tries per join when concurrent joins collide (serialization conflict). */
+const JOIN_ATTEMPTS = 8;
+
+/** Postgres aborted a serializable transaction that raced another (40001). */
+function isSerializationConflict(e: unknown): boolean {
+  if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2034") {
+    return true;
+  }
+  // Driver-adapter errors that weren't mapped to P2034.
+  return (
+    e instanceof Error &&
+    /could not serialize access|40001|deadlock detected|TransactionWriteConflict/i.test(
+      e.message + e.name,
+    )
+  );
+}
 
 @Injectable()
 export class GameSessionsService {
@@ -29,6 +54,15 @@ export class GameSessionsService {
   ): Promise<{ roomId: string; playerId: string }> {
     const game = await this.prisma.db.gameSession.findUnique({
       where: { gameCode: dto.gameCode },
+      include: {
+        quiz: {
+          select: {
+            settings: true,
+            logo: true,
+            user: { select: { preferences: true } },
+          },
+        },
+      },
     });
     if (!game) {
       throw new NotFoundException("Game not found");
@@ -44,46 +78,91 @@ export class GameSessionsService {
         "The host has banned you from this room. You can still join other rooms.",
       );
     }
-    // Serializable so concurrent joins can't both pass the count and
-    // overshoot the cap.
-    await this.prisma.db.$transaction(
-      async (tx) => {
-        // Re-joining the same room (e.g. after a refresh) must never hit the cap.
-        if (player.gameId !== game.id) {
-          // The cap follows the host's plan at join time; a host downgrading
-          // mid-game never evicts anyone already in the room.
-          const limit = await this.entitlements.maxPlayersFor(
-            game.creatorId,
-            tx,
-          );
-          const playerCount = await tx.player.count({
-            where: { gameId: game.id },
-          });
-          if (playerCount >= limit) {
-            throw new ForbiddenException(
-              `This room is full — it can hold up to ${limit} players.`,
-            );
-          }
-        }
-        await tx.player.update({
-          where: { id: playerId },
-          data: { gameId: game.id },
-        });
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    // The cap follows the host's plan at join time (a host downgrading
+    // mid-game never evicts anyone already in the room); worked out — like the
+    // avatar — before the lock, so the locked part stays short.
+    const rejoin = player.gameId === game.id;
+    const limit = rejoin
+      ? 0
+      : await this.entitlements.maxPlayersFor(game.creatorId);
+    const { avatars } = resolveGameLook(
+      { settings: roomSettings(game), logo: game.quiz.logo },
+      game.quiz.user?.preferences,
+      (await this.entitlements.resolvePlan(game.creatorId)) === "pro",
+      await loadSharedAvatars(this.prisma.db),
     );
+    const profilePic = avatars.includes(player.profilePic ?? "")
+      ? undefined
+      : assignAvatar(avatars, playerId);
+
+    // Concurrent joins must not both pass the count and overshoot the cap:
+    // each join locks the room's row first (SELECT … FOR UPDATE), so joins to
+    // one room queue up for a few milliseconds instead of conflicting. (Under
+    // SERIALIZABLE a crowd joining at once — a QR code on the screen — kept
+    // aborting each other and piled up retries on the connection pool.) The
+    // retry below stays for the odd deadlock.
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await this.prisma.db.$transaction(
+          async (tx) => {
+            await tx.$queryRaw`SELECT id FROM "GameSession" WHERE id = ${game.id} FOR UPDATE`;
+            // Re-joining the same room (e.g. after a refresh) never hits the cap.
+            if (!rejoin) {
+              const playerCount = await tx.player.count({
+                where: { gameId: game.id },
+              });
+              if (playerCount >= limit) {
+                throw new ForbiddenException(
+                  `This room is full — it can hold up to ${limit} players.`,
+                );
+              }
+            }
+            await tx.player.update({
+              where: { id: playerId },
+              data: { gameId: game.id, ...(profilePic ? { profilePic } : {}) },
+            });
+          },
+          {
+            isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+            // A crowd queues on the room's lock and for pool connections.
+            maxWait: 20_000,
+            timeout: 20_000,
+          },
+        );
+        break;
+      } catch (err) {
+        if (!isSerializationConflict(err) || attempt >= JOIN_ATTEMPTS) {
+          throw err;
+        }
+        await new Promise((r) =>
+          setTimeout(r, 20 + Math.random() * 80 * attempt),
+        );
+      }
+    }
     return { roomId: game.id, playerId };
   }
 
+  /**
+   * Opens a room for a quiz the user owns. `settings` (already validated by
+   * `createGameSessionSchema`) are this game's own; the plan's limits apply
+   * when they are read (`resolveGameLook`), as for the quiz's.
+   */
   async createRoom(
     user: AuthUser,
-    dto: CreateRoomDto,
+    dto: CreateGameSession,
   ): Promise<{ id: string }> {
     const quiz = await this.prisma.db.quiz.findFirst({
       where: { id: dto.quizId, userId: user.userId },
     });
     if (!quiz) {
       throw new NotFoundException("Unauthorized or quiz not found");
+    }
+    // Only the owner gets this far, so they may also make them the default.
+    if (dto.settings && dto.saveAsDefault) {
+      await this.prisma.db.quiz.update({
+        where: { id: quiz.id },
+        data: { settings: dto.settings },
+      });
     }
     const maxAttempts = 5;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -94,6 +173,7 @@ export class GameSessionsService {
             gameCode,
             quizId: dto.quizId,
             creatorId: user.userId,
+            ...(dto.settings ? { settings: dto.settings } : {}),
           },
         });
         return { id: room.id };
@@ -126,13 +206,19 @@ export class GameSessionsService {
   async getResult(user: AuthUser, resultId: string) {
     const result = await this.prisma.db.gameResult.findUnique({
       where: { id: resultId },
-      include: { entries: { orderBy: { rank: "asc" } } },
+      include: {
+        entries: { orderBy: { rank: "asc" } },
+        quiz: { select: { userId: true } },
+      },
     });
     if (!result) {
       throw new NotFoundException("Result not found");
     }
     if (result.hostId) {
-      if (result.hostId !== user.userId) {
+      if (
+        result.hostId !== user.userId &&
+        result.quiz?.userId !== user.userId
+      ) {
         throw new ForbiddenException("Unauthorized");
       }
     } else if (!result.entries.some((e) => e.userId === user.userId)) {
@@ -140,6 +226,32 @@ export class GameSessionsService {
       throw new ForbiddenException("Unauthorized");
     }
     return result;
+  }
+
+  /**
+   * Deletes past runs the user hosted or whose quiz they own: one (`resultId`) or all of a quiz's
+   * (`quizId`). Entries go with them (cascade). Only classic games — duel
+   * results belong to their players' ratings.
+   */
+  async deleteResults(
+    user: AuthUser,
+    where: { resultId: string } | { quizId: string },
+  ): Promise<void> {
+    // The host's own runs, and every run of a quiz the user owns (the quiz
+    // page lists those too — e.g. hosted by someone else before a move).
+    const scope = {
+      mode: "classic" as const,
+      OR: [{ hostId: user.userId }, { quiz: { userId: user.userId } }],
+      ...("resultId" in where
+        ? { id: where.resultId }
+        : { quizId: where.quizId }),
+    };
+    const { count } = await this.prisma.db.gameResult.deleteMany({
+      where: scope,
+    });
+    if ("resultId" in where && count === 0) {
+      throw new NotFoundException("Result not found");
+    }
   }
 
   /**
@@ -287,8 +399,10 @@ export class GameSessionsService {
         where: { id: room.quizId },
         include: {
           questions: {
-            include: { options: true },
+            where: { disabled: false },
+            include: { options: { orderBy: OPTION_ORDER } },
           },
+          user: { select: { preferences: true } },
         },
       }),
       this.entitlements.maxPlayersFor(room.creatorId),
@@ -297,7 +411,25 @@ export class GameSessionsService {
     if (!quiz) {
       throw new NotFoundException("Quiz not found");
     }
-    return { room, players, quiz, maxPlayers, plan };
+    // The owner's defaults filled in (audio / avatar skin, logo).
+    const { user: owner, ...rest } = quiz;
+    const look = resolveGameLook(
+      {
+        settings: roomSettings({ settings: room.settings, quiz }),
+        logo: quiz.logo,
+      },
+      owner?.preferences,
+      plan === "pro",
+      await loadSharedAvatars(this.prisma.db),
+    );
+    return {
+      room,
+      players,
+      quiz: { ...rest, settings: look.settings, logo: look.logo },
+      avatars: look.avatars,
+      maxPlayers,
+      plan,
+    };
   }
 
   async getPlayerPlayContext(playerId: string) {
@@ -310,23 +442,44 @@ export class GameSessionsService {
     if (!player.gameId) {
       return { player, game: null };
     }
-    const game = await this.loadGameForPlay(player.gameId);
-    return { player, game };
+    const loaded = await this.loadGameForPlay(player.gameId);
+    if (!loaded) return { player, game: null };
+    const { settings, ...session } = loaded;
+    const { user: owner, ...quiz } = session.quiz;
+    const look = resolveGameLook(
+      { settings: roomSettings({ settings, quiz }), logo: quiz.logo },
+      owner?.preferences,
+      (await this.entitlements.resolvePlan(loaded.creatorId)) === "pro",
+      await loadSharedAvatars(this.prisma.db),
+    );
+    // A public route: the logo gets its signature here (players of this room
+    // are the ones who may see it).
+    const game = {
+      ...session,
+      quiz: {
+        ...quiz,
+        settings: look.settings,
+        logo: look.logo ? signAssetUrl(look.logo) : null,
+      },
+    };
+    return { player, game, avatars: look.avatars };
   }
 
   private async loadGameForPlay(gameSessionId: string) {
     return this.prisma.db.gameSession.findUnique({
       where: { id: gameSessionId },
       include: {
+        // Players get each question over the socket as it opens; this public
+        // context must not hand out question texts, options or media before
+        // the game shows them — only what the waiting screen needs.
         quiz: {
-          include: {
-            questions: {
-              include: {
-                options: {
-                  select: { id: true, title: true },
-                },
-              },
-            },
+          select: {
+            id: true,
+            title: true,
+            settings: true,
+            logo: true,
+            questions: { where: { disabled: false }, select: { id: true } },
+            user: { select: { preferences: true } },
           },
         },
         creator: {

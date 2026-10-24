@@ -6,10 +6,10 @@ import {
   HttpStatus,
   Param,
   Post,
-  UploadedFile,
+  UploadedFiles,
   UseInterceptors,
 } from "@nestjs/common";
-import { FileInterceptor } from "@nestjs/platform-express";
+import { FileFieldsInterceptor } from "@nestjs/platform-express";
 import type { Express } from "express";
 import { CurrentAccountUser } from "../../common/decorators/current-user.decorator";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
@@ -26,13 +26,29 @@ export class QuizQuestionsController {
 
   @Post(":quizId/questions")
   @HttpCode(HttpStatus.NO_CONTENT)
-  @UseInterceptors(FileInterceptor("file"))
-  upsert(
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: "file", maxCount: 1 },
+        { name: "audio", maxCount: 1 },
+      ],
+      { limits: { fileSize: 20 * 1024 * 1024 } },
+    ),
+  )
+  async upsert(
     @CurrentAccountUser() user: AuthUser,
     @Param("quizId") quizId: string,
     @Body() body: Record<string, string>,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFiles()
+    files?: { file?: Express.Multer.File[]; audio?: Express.Multer.File[] },
   ) {
-    return this.questions.upsertFromMultipart(user, quizId, body, file);
+    await this.questions.upsertFromMultipart(
+      user,
+      quizId,
+      body,
+      files?.file?.[0],
+      files?.audio?.[0],
+    );
+    await this.questions.touchQuiz(quizId);
   }
 }

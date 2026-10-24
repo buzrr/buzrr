@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+<defs><pattern id="dots" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="6" cy="6" r="2.2" fill="#fff" opacity="0.28"/></pattern>
+<clipPath id="c"><circle cx="128" cy="128" r="128"/></clipPath></defs>
+<g clip-path="url(#c)"><rect width="256" height="256" fill="#ffcf3f"/><rect width="256" height="256" fill="url(#dots)"/>
+<path d="M128 22 Q196 60 202 150 Q206 232 128 234 Q50 232 54 150 Q60 60 128 22 Z" fill="#3d7b2e" stroke="#1b1530" stroke-width="7"/>
+<path d="M128 40 Q184 74 188 150 Q190 218 128 220 Q66 218 68 150 Q72 74 128 40 Z" fill="#c6e48b"/>
+<circle cx="128" cy="168" r="38" fill="#8a5a2b" stroke="#1b1530" stroke-width="6"/>
+<path d="M68 104 H188" stroke="#1b1530" stroke-width="7"/>
+<path d="M74 92 H120 L116 116 Q108 126 92 122 Q78 118 76 104 Z M136 92 H182 L180 104 Q178 118 164 122 Q148 126 140 116 Z" fill="#1b1530"/>
+<path d="M104 140 Q128 152 152 140" fill="none" stroke="#1b1530" stroke-width="6" stroke-linecap="round"/></g></svg>

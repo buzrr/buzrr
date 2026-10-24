@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useAppDispatch } from "@/state/hooks";
-import { addPlayer, removePlayer } from "@/state/admin/playersSlice";
+import { addPlayers, removePlayer } from "@/state/admin/playersSlice";
+import type { PlayerPayload } from "@buzrr/contract";
 import { fetchApiAccessToken } from "@/lib/api/get-access-token";
 import type { PlayerRemovedPayload } from "@buzrr/contract";
 import type { GameSocket } from "@/types/socket";
@@ -50,8 +51,19 @@ export function useAdminSocket({
     token: auth?.token,
     ready: auth !== null,
     bind: (socket) => {
+      // A crowd joining at once (a QR code on the screen): one update per
+      // 250 ms instead of a re-render per player.
+      let joined: PlayerPayload[] = [];
+      let flushTimer: ReturnType<typeof setTimeout> | null = null;
       socket.on("player-joined", (player) => {
-        dispatch(addPlayer(player));
+        joined.push(player);
+        if (flushTimer) return;
+        flushTimer = setTimeout(() => {
+          flushTimer = null;
+          const batch = joined;
+          joined = [];
+          dispatch(addPlayers(batch));
+        }, 250);
       });
       socket.on("player-removed", (player) => {
         dispatch(removePlayer(player));
