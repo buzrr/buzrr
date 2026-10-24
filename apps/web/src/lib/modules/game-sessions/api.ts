@@ -1,5 +1,5 @@
 import type { AxiosInstance } from "axios";
-import type { CreateGameSessionBody } from "@buzrr/contract";
+import type { CreateGameSessionBody, QuestionStats } from "@buzrr/contract";
 import type {
   GameSession,
   Option,
@@ -59,7 +59,11 @@ export type GameResult = {
   endedAt: string;
 };
 
-export type GameResultWithEntries = GameResult & { entries: GameResultEntry[] };
+export type GameResultWithEntries = GameResult & {
+  entries: GameResultEntry[];
+  /** How each question went; empty for games before the report existed. */
+  questions?: QuestionStats[];
+};
 
 export type AdminLobbyPayload = {
   room: GameSession;

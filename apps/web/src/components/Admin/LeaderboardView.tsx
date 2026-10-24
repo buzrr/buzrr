@@ -1,22 +1,14 @@
 "use client";
 
-import Image from "next/image";
 import { useState } from "react";
 import { LuTrash2 } from "react-icons/lu";
 import { toast } from "react-toastify";
 import ConfirmationModal from "@/components/Admin/ConfirmationModal";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { useDeleteResultsMutation } from "@/lib/modules/quizzes/hooks";
-import { DEFAULT_AVATAR } from "@/constants";
 import Skeleton from "@/components/ui/Skeleton";
 import { useResultQuery } from "@/lib/modules/game-sessions/hooks";
-
-function rankBadge(rank: number) {
-  if (rank === 1) return <span className="text-3xl overflow-hidden">🥇</span>;
-  if (rank === 2) return <span className="text-3xl overflow-hidden">🥈</span>;
-  if (rank === 3) return <span className="text-3xl overflow-hidden">🥉</span>;
-  return <span className="font-bold">#{rank}</span>;
-}
+import Report from "@/components/Admin/Report/Report";
 
 export default function LeaderboardView({
   roomId,
@@ -116,33 +108,18 @@ export default function LeaderboardView({
         {result.gameCode}
       </p>
 
-      <div className="flex flex-col gap-3 my-4 w-full max-w-2xl">
-        {result.entries.length > 0 ? (
-          result.entries.map((entry) => (
-            <div
-              key={entry.id}
-              className="flex justify-between items-center px-4 py-2 w-full rounded-xl shadow bg-white dark:bg-card-dark text-dark dark:text-white"
-            >
-              {rankBadge(entry.rank)}
-              <div className="flex flex-row items-center gap-x-2 min-w-0">
-                <Image
-                  src={entry.profilePic || DEFAULT_AVATAR}
-                  className="w-12 h-12 rounded-full shrink-0"
-                  width={50}
-                  height={50}
-                  alt="profile pic"
-                />
-                <p className="truncate">{entry.playerName}</p>
-              </div>
-              <p className="font-bold">{entry.score}</p>
-            </div>
-          ))
-        ) : (
-          <div className="border border-gray border-dashed rounded-lg p-6 text-center text-dark dark:text-white">
-            No players in this game.
-          </div>
-        )}
-      </div>
+      <Report
+        title={result.quizTitle}
+        entries={result.entries.map((e) => ({
+          rank: e.rank,
+          name: e.playerName,
+          profilePic: e.profilePic,
+          score: e.score,
+          correctCount: e.correctCount,
+        }))}
+        questions={result.questions ?? []}
+        emptyText="No players in this game."
+      />
     </div>
   );
 }

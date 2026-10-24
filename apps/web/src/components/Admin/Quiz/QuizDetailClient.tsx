@@ -12,6 +12,7 @@ import HideQuestions from "@/components/Admin/Quiz/HideQuestions";
 import HiddenQuestionsOverlay from "@/components/Admin/Quiz/HiddenQuestionsOverlay";
 import HostQuizForm from "@/components/Admin/Quiz/HostQuizForm";
 import LeaderboardView from "@/components/Admin/LeaderboardView";
+import SoloReportView from "@/components/Solo/SoloReportView";
 import Skeleton from "@/components/ui/Skeleton";
 import { IconButton } from "@/components/ui/IconButton";
 import { useQuizDetailQuery } from "@/lib/modules/quizzes/hooks";
@@ -21,6 +22,15 @@ import { notFound } from "next/navigation";
 export default function QuizDetailClient({ quizId }: { quizId: string }) {
   const { data: quiz, isPending, isError, error } = useQuizDetailQuery(quizId);
   const [leaderboardId, setLeaderboardId] = useState<string | null>(null);
+  const [soloReportId, setSoloReportId] = useState<string | null>(null);
+  const showLeaderboard = (id: string) => {
+    setSoloReportId(null);
+    setLeaderboardId(id);
+  };
+  const showSoloReport = (id: string) => {
+    setLeaderboardId(null);
+    setSoloReportId(id);
+  };
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (isError) {
@@ -58,7 +68,11 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
   return (
     <div className="w-full max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-2 md:py-4">
       <div className="text-dark dark:text-white w-full flex flex-col md:flex-row gap-3 md:h-[calc(100dvh-8.5rem)]">
-        <QuizInfoSection quiz={quiz} onShowLeaderboard={setLeaderboardId} />
+        <QuizInfoSection
+          quiz={quiz}
+          onShowLeaderboard={showLeaderboard}
+          onShowSoloReport={showSoloReport}
+        />
 
         {/* Mobile drawer: the quiz info the top bar has no room for
             (description, public toggle, past sessions). */}
@@ -88,14 +102,26 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
             quiz={quiz}
             showHostForm={false}
             onShowLeaderboard={(resultId) => {
-              setLeaderboardId(resultId);
+              showLeaderboard(resultId);
+              setSidebarOpen(false);
+            }}
+            onShowSoloReport={(testId) => {
+              showSoloReport(testId);
               setSidebarOpen(false);
             }}
           />
         </div>
 
         <div className="bg-white dark:bg-dark rounded-xl w-full flex-1 flex flex-col min-h-0">
-          {leaderboardId ? (
+          {soloReportId ? (
+            <div className="flex-1 min-h-0 overflow-y-auto p-4">
+              <SoloReportView
+                testId={soloReportId}
+                onBack={() => setSoloReportId(null)}
+                backLabel="Back to quiz details"
+              />
+            </div>
+          ) : leaderboardId ? (
             <div className="flex-1 min-h-0 overflow-y-auto p-4">
               <LeaderboardView
                 roomId={leaderboardId}

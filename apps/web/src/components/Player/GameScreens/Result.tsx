@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { type ReactNode } from "react";
 import QuestionAndResult from "./QuesAndResult";
 import { useAppSelector } from "@/state/hooks";
 import { useAudioSegment } from "@/lib/audio-cues";
@@ -24,6 +24,8 @@ const Result = (params: {
   hideRoomCode?: boolean;
   hostName?: string | null;
   hostImage?: string | null;
+  /** What moves on (playing alone), instead of waiting for the host. */
+  next?: ReactNode;
 }) => {
   const you = params.you;
   const sound = useGameSound();
@@ -85,6 +87,7 @@ const Result = (params: {
       points={you.score}
       yourAnswer={you.answered ? yourAnswer : null}
       correctAnswers={correct}
+      next={params.next}
     />
   );
 };

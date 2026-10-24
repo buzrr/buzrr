@@ -90,8 +90,9 @@ export class SoundSkinsController {
   }
 
   /**
-   * A signed-in user (own, global or as admin) or a player whose current game
-   * uses this skin; the files' links are signed for them.
+   * A signed-in user (own, global or as admin), a player whose current game
+   * uses this skin, or one playing a test of its owner ("Play alone"); the
+   * files' links are signed for them.
    */
   @UseGuards(RateLimitGuard)
   @Get(":id")

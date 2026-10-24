@@ -242,6 +242,8 @@ const QuestionAndResult = (params: {
   /** Host of the quiz — shown as "Quiz by". Omitted for duels (no host). */
   hostName?: string | null;
   hostImage?: string | null;
+  /** Result screen: what moves on (playing alone), instead of waiting. */
+  next?: ReactNode;
 }) => {
   const deadline = useAppSelector((state) => state.game.deadline);
   const connection = useAppSelector((state) => state.game.connection);
@@ -526,15 +528,17 @@ const QuestionAndResult = (params: {
               <StandingCard standing={standing} playerCount={players.length} />
             )}
             <div className="mt-4 md:mt-[26px]">
-              <WaitingDots>
-                {params.hideRoomCode
-                  ? isLast
-                    ? "Final results coming up"
-                    : "Next question coming up"
-                  : isLast
-                    ? "Waiting for the final results"
-                    : `Waiting for the host to start question ${qIndex + 2}`}
-              </WaitingDots>
+              {params.next ?? (
+                <WaitingDots>
+                  {params.hideRoomCode
+                    ? isLast
+                      ? "Final results coming up"
+                      : "Next question coming up"
+                    : isLast
+                      ? "Waiting for the final results"
+                      : `Waiting for the host to start question ${qIndex + 2}`}
+                </WaitingDots>
+              )}
             </div>
           </section>
         )}

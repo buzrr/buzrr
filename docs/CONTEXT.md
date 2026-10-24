@@ -89,8 +89,9 @@ effects }` in `game-engine/core/`, unit-tested; `GameEngineService` is
    (2026-10-18). Until migration `20261018000001` runs in production, the
    handler still accepts the old two-option rows. After that, the legacy
    path in `true-false.ts` / `normalizeLiveQuestion` can be removed.
-3. **Self-paced pacing** — planned; needs per-player question state the
-   phase machine doesn't model yet (ADR-012).
+3. **"Play alone" tests are new** (2026-10-20, ADR-016): REST on Postgres,
+   outside the room engine; migration `20261020000002` needs
+   `migrate:deploy`. No sound, reactions or live leaderboard in tests yet.
 4. **REST validation is half on the contract** — `POST /quizzes/import` uses
    the zod contract; other endpoints still use class-validator DTOs and
    hand-mirrored web response types.

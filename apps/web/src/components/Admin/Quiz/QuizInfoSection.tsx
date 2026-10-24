@@ -26,6 +26,7 @@ import {
 import type { QuizDetail } from "@/lib/modules/quizzes/api";
 import ModerationSettingsCard from "@/components/Admin/Quiz/ModerationSettingsCard";
 import { dropTargetClass, useFileDrop } from "@/hooks/useFileDrop";
+import SoloTestsPanel from "@/components/Solo/SoloTestsPanel";
 
 function formatSessionDate(createdAt: string | Date) {
   const d = typeof createdAt === "string" ? new Date(createdAt) : createdAt;
@@ -223,6 +224,7 @@ export function QuizInfoContent(props: {
   /** Unused: "Host quiz" is a floating button on the quiz page now. */
   showHostForm?: boolean;
   onShowLeaderboard?: (resultId: string) => void;
+  onShowSoloReport?: (testId: string) => void;
 }) {
   const pastGames = props.quiz.gameResults ?? [];
   const questionCount = props.quiz._count?.questions ?? 0;
@@ -287,6 +289,11 @@ export function QuizInfoContent(props: {
         <LogoSetting quiz={props.quiz} />
         <ModerationSettingsCard quiz={props.quiz} />
       </div>
+      <SoloTestsPanel
+        quizId={props.quiz.id}
+        questionCount={questionCount}
+        onShowReport={props.onShowSoloReport}
+      />
       <div className="flex flex-col w-[90%] mx-auto text-dark dark:text-white">
         <div className="flex items-center justify-between mt-6 mb-3">
           <h4 className="text-sm font-bold tracking-[0.04em] uppercase text-[#8a8896] dark:text-muted-dark">
@@ -401,12 +408,14 @@ export function QuizInfoContent(props: {
 export default function QuizInfoSection(props: {
   quiz: QuizDetail;
   onShowLeaderboard?: (resultId: string) => void;
+  onShowSoloReport?: (testId: string) => void;
 }) {
   return (
     <div className="md:w-2/5 lg:w-1/3 shrink-0 h-full bg-white dark:bg-dark rounded-xl p-4 hidden md:flex flex-col min-h-0 overflow-y-auto">
       <QuizInfoContent
         quiz={props.quiz}
         onShowLeaderboard={props.onShowLeaderboard}
+        onShowSoloReport={props.onShowSoloReport}
       />
     </div>
   );

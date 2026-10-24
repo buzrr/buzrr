@@ -202,12 +202,16 @@ export class GameSessionsService {
     });
   }
 
-  /** A single finished game with its final standings. */
+  /** A single finished game with its final standings and how each question went. */
   async getResult(user: AuthUser, resultId: string) {
     const result = await this.prisma.db.gameResult.findUnique({
       where: { id: resultId },
       include: {
         entries: { orderBy: { rank: "asc" } },
+        questions: {
+          orderBy: { index: "asc" },
+          omit: { id: true, gameResultId: true },
+        },
         quiz: { select: { userId: true } },
       },
     });
