@@ -82,7 +82,9 @@ effects }` in `game-engine/core/`, unit-tested; `GameEngineService` is
 2. **Question types — follow-ups.** Six types ship (ADR-011 amendment);
    still missing from the design: "show results on players' screens", the
    word-cloud profanity filter and open-text host review. The spreadsheet
-   import and `POST /quizzes/ai` still produce multiple choice only.
+   import still produces multiple choice only; `POST /quizzes/ai` writes
+   multiple choice, true / false and type-answer in a host-chosen mix
+   (2026-10-20), and reviews and rewrites its own questions before saving.
    True / false moved its key from `Option` rows to `config.answer`
    (2026-10-18). Until migration `20261018000001` runs in production, the
    handler still accepts the old two-option rows. After that, the legacy

@@ -40,6 +40,12 @@ export class QuizzesController {
     return this.quizzes.create(user, dto);
   }
 
+  /** Whether AI quiz generation is set up on this server (LLM configured). */
+  @Get("ai/status")
+  aiStatus() {
+    return { available: this.quizzes.aiAvailable() };
+  }
+
   @Post("ai")
   @UseGuards(RateLimitGuard)
   @RateLimitProfile("ai")
