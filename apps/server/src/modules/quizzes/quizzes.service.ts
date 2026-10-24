@@ -6,7 +6,11 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { DEFAULT_TIME_OUT, type ImportQuiz } from "@buzrr/contract";
+import {
+  DEFAULT_TIME_OUT,
+  quizSettingsSchema,
+  type ImportQuiz,
+} from "@buzrr/contract";
 import { z } from "zod";
 import {
   LlmTimeoutError,
@@ -21,59 +25,36 @@ import {
   validateDefinition,
 } from "../question-types";
 import { CreateAiQuizDto } from "./dto/create-ai-quiz.dto";
+import {
+  AI_QUIZ_JSON_SCHEMA,
+  AI_REVIEW_JSON_SCHEMA,
+  aiQuizOutputSchema,
+  aiReviewOutputSchema,
+  applyReview,
+  buildAiPrompt,
+  buildReviewPrompt,
+  dedupe,
+  typedTimeOut,
+  type AiReviewOutput,
+  pickQuestions,
+  toDefinitions,
+  withSpares,
+  type AiDefinition,
+  type AiPromptInput,
+} from "./ai-quiz";
+import {
+  AI_TYPES,
+  DEFAULT_AI_MIX,
+  allocateTypes,
+  type AiAmount,
+  type AiMix,
+  type AiType,
+} from "./ai-mix";
 import { CreateQuizDto } from "./dto/create-quiz.dto";
+import { inAuthoredOrder, OPTION_ORDER } from "../../common/utils/option-order";
 
-/**
- * Shape the model must return (sent to the provider as a JSON Schema for
- * structured output, then used to validate the reply). Correct and wrong
- * answers are separate fields so there is no positional convention to get
- * wrong; options are shuffled before saving.
- */
-const aiQuizOutputSchema = z.object({
-  questions: z.array(
-    z.object({
-      question: z.string().describe("The question, one concise sentence."),
-      correctAnswer: z
-        .string()
-        .describe("The single correct option. Short: ideally 1-5 words."),
-      wrongAnswers: z
-        .array(z.string())
-        .length(3)
-        .describe(
-          "Exactly three plausible but wrong options, each about as short as the correct one.",
-        ),
-    }),
-  ),
-});
-
-// `$schema` is dropped: strict structured-output modes reject unknown keys.
-const { $schema: _draft, ...aiQuizJsonSchema } =
-  z.toJSONSchema(aiQuizOutputSchema);
-const AI_QUIZ_JSON_SCHEMA = {
-  name: "quiz_questions",
-  schema: aiQuizJsonSchema,
-};
-
-type AiQuestion = z.infer<typeof aiQuizOutputSchema>["questions"][number];
-
-function shuffleArray<T>(array: T[]): void {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j]!, array[i]!];
-  }
-}
-
-/** Trims every field; null if anything ended up blank or options repeat. */
-function toOptions(q: AiQuestion) {
-  const question = q.question.trim();
-  const answers = [q.correctAnswer, ...q.wrongAnswers].map((a) => a.trim());
-  const distinct = new Set(answers.map((a) => a.toLowerCase()));
-  if (!question || answers.some((a) => !a) || distinct.size !== answers.length)
-    return null;
-  const options = answers.map((title, i) => ({ title, isCorrect: i === 0 }));
-  shuffleArray(options);
-  return { question, options };
-}
+/** Review rounds for AI questions: review all, then review the rewrites. */
+const AI_REVIEW_ROUNDS = 2;
 
 @Injectable()
 export class QuizzesService {
@@ -84,6 +65,10 @@ export class QuizzesService {
     private readonly llm: TextGenerator,
     private readonly entitlements: EntitlementsService,
   ) {}
+
+  aiAvailable(): boolean {
+    return this.llm.configured;
+  }
 
   async create(
     user: AuthUser,
@@ -102,12 +87,90 @@ export class QuizzesService {
     return { quizId: quiz.id };
   }
 
+  /**
+   * Copies a quiz the user owns: settings and every question with its
+   * options and media (uploads are shared, not copied — they are never
+   * deleted while referenced). Duel moderation starts over (draft).
+   */
+  async duplicate(user: AuthUser, quizId: string): Promise<{ quizId: string }> {
+    const source = await this.prisma.db.quiz.findFirst({
+      where: { id: quizId, userId: user.userId },
+      include: {
+        questions: {
+          include: { options: { orderBy: OPTION_ORDER } },
+          orderBy: { order: "asc" },
+        },
+      },
+    });
+    if (!source) {
+      throw new NotFoundException("Unauthorized or quiz not found");
+    }
+    const copy = await this.prisma.db.$transaction(async (tx) => {
+      await this.entitlements.assertQuizCapacity(tx, user.userId);
+      return tx.quiz.create({
+        data: {
+          title: `${source.title} (copy)`.slice(0, 200),
+          description: source.description,
+          userId: user.userId,
+          thumbnail: source.thumbnail,
+          settings: source.settings ?? {},
+          questions: {
+            create: source.questions.map((q) => ({
+              title: q.title,
+              type: q.type,
+              config: q.config ?? {},
+              createdById: user.userId,
+              timeOut: q.timeOut,
+              media: q.media,
+              mediaType: q.mediaType,
+              audio: q.audio,
+              audioStartMs: q.audioStartMs,
+              audioRevealMs: q.audioRevealMs,
+              audioPlayOn: q.audioPlayOn,
+              audioClip: q.audioClip,
+              audioClipKey: q.audioClipKey,
+              audioRevealClip: q.audioRevealClip,
+              audioRevealKey: q.audioRevealKey,
+              mediaClip: q.mediaClip,
+              mediaKey: q.mediaKey,
+              order: q.order,
+              disabled: q.disabled,
+              options: {
+                create: inAuthoredOrder(
+                  q.options.map((o) => ({
+                    title: o.title,
+                    isCorrect: o.isCorrect,
+                  })),
+                ),
+              },
+            })),
+          },
+        },
+      });
+    });
+    return { quizId: copy.id };
+  }
+
   async update(
     user: AuthUser,
     quizId: string,
-    dto: { title?: string; description?: string; isPublic?: boolean },
+    dto: {
+      title?: string;
+      description?: string;
+      isPublic?: boolean;
+      settings?: Record<string, unknown>;
+    },
   ) {
+    let settings: ReturnType<typeof quizSettingsSchema.parse> | undefined;
+    if (dto.settings !== undefined) {
+      const parsed = quizSettingsSchema.safeParse(dto.settings);
+      if (!parsed.success) {
+        throw new BadRequestException("Invalid quiz settings");
+      }
+      settings = parsed.data;
+    }
     const data = {
+      ...(settings !== undefined ? { settings } : {}),
       ...(dto.title !== undefined ? { title: dto.title } : {}),
       ...(dto.description !== undefined
         ? { description: dto.description.trim() || null }
@@ -177,13 +240,83 @@ export class QuizzesService {
   }
 
   async findAllForUser(user: AuthUser) {
-    return this.prisma.db.quiz.findMany({
+    const quizzes = await this.prisma.db.quiz.findMany({
       where: { userId: user.userId },
       orderBy: { createdAt: "desc" },
       include: {
-        _count: { select: { questions: true, gameResults: true } },
+        gameSessions: {
+          select: { createdAt: true },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+        gameResults: {
+          select: { endedAt: true },
+          orderBy: { endedAt: "desc" },
+          take: 1,
+        },
+        _count: {
+          select: {
+            questions: { where: { disabled: false } },
+            gameResults: true,
+          },
+        },
       },
     });
+    // Newest first by whichever happened last: an edit or a game hosted.
+    const activity = (q: (typeof quizzes)[number]) =>
+      Math.max(
+        q.updatedAt.getTime(),
+        q.gameSessions[0]?.createdAt.getTime() ?? 0,
+        q.gameResults[0]?.endedAt.getTime() ?? 0,
+      );
+    return quizzes
+      .sort((a, b) => activity(b) - activity(a))
+      .map(({ gameSessions: _s, gameResults: _r, ...q }) => q);
+  }
+
+  /** Every quiz with its owner (admin overview). */
+  async findAll() {
+    return this.prisma.db.quiz.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        _count: {
+          select: {
+            questions: { where: { disabled: false } },
+            gameResults: true,
+          },
+        },
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+  }
+
+  /**
+   * Moves a quiz to the user with `email`, together with the questions its
+   * previous owner wrote (so they lose edit rights on them too).
+   */
+  async changeOwner(quizId: string, email: string) {
+    const target = await this.prisma.db.user.findUnique({
+      where: { email: email.toLowerCase() },
+      select: { id: true, name: true, email: true },
+    });
+    if (!target) throw new NotFoundException("No user with this email");
+    const quiz = await this.prisma.db.quiz.findUnique({
+      where: { id: quizId },
+      select: { id: true, userId: true },
+    });
+    if (!quiz) throw new NotFoundException("Quiz not found");
+    if (quiz.userId === target.id) return { quizId, owner: target };
+    await this.prisma.db.$transaction([
+      this.prisma.db.quiz.update({
+        where: { id: quizId },
+        data: { userId: target.id },
+      }),
+      this.prisma.db.question.updateMany({
+        where: { quizId, createdById: quiz.userId },
+        data: { createdById: target.id },
+      }),
+    ]);
+    return { quizId, owner: target };
   }
 
   async findOneForUser(user: AuthUser, quizId: string) {
@@ -197,7 +330,7 @@ export class QuizzesService {
           orderBy: { endedAt: "desc" },
           take: 50,
         },
-        _count: { select: { questions: true } },
+        _count: { select: { questions: { where: { disabled: false } } } },
       },
     });
     if (!quiz) {
@@ -255,10 +388,12 @@ export class QuizzesService {
               config: question.config,
               createdById: user.userId,
               options: {
-                create: question.options.map((option) => ({
-                  title: option.title,
-                  isCorrect: option.isCorrect,
-                })),
+                create: inAuthoredOrder(
+                  question.options.map((option) => ({
+                    title: option.title,
+                    isCorrect: option.isCorrect,
+                  })),
+                ),
               },
             })),
           },
@@ -313,26 +448,189 @@ export class QuizzesService {
     user: AuthUser,
     dto: CreateAiQuizDto,
   ): Promise<{ msg: string; quizId: string }> {
-    const prompt = `You are writing questions for a live, timed multiple-choice quiz game. Players read each question and its four options on their phones and have ${dto.time} seconds to answer.
+    const mix: AiMix = {
+      multipleChoice: (dto.multipleChoice ??
+        DEFAULT_AI_MIX.multipleChoice) as AiAmount,
+      trueFalse: (dto.trueFalse ?? DEFAULT_AI_MIX.trueFalse) as AiAmount,
+      typeAnswer: (dto.typeAnswer ?? DEFAULT_AI_MIX.typeAnswer) as AiAmount,
+    };
+    const counts = allocateTypes(dto.questions, mix);
+    const prompt = {
+      title: dto.title,
+      description: dto.description,
+      language: dto.language ?? "English",
+      time: dto.time,
+      difficulty: dto.difficulty ?? 3,
+    };
 
-Quiz topic, as described by the host:
-"""
-${dto.description}
-"""
+    // Agentic: write (with spares — questions that give their answer away
+    // are dropped), then have every question reviewed and the weak ones
+    // rewritten, and the rewrites reviewed once more. If that leaves too
+    // few, one more round for the rest.
+    const defs = await this.generateAiQuestions(dto.title, {
+      ...prompt,
+      counts: withSpares(counts),
+    });
+    // A rewrite can repeat another question, so duplicates go after the
+    // review too.
+    // The quiz's own words (title, description) are no subject of their own.
+    const topic = `${dto.title} ${dto.description}`;
+    let picked = dedupe(
+      await this.reviewAiQuestions(
+        prompt,
+        pickQuestions(defs, counts, dto.questions, topic),
+      ),
+      topic,
+    );
+    if (picked.length < dto.questions) {
+      const missing: Record<AiType, number> = {
+        multipleChoice: 0,
+        trueFalse: 0,
+        typeAnswer: 0,
+      };
+      for (const type of AI_TYPES) {
+        const have = picked.filter((d) => d.aiType === type).length;
+        missing[type] = Math.max(0, counts[type] - have);
+      }
+      const total = AI_TYPES.reduce((n, t) => n + missing[t], 0);
+      const more = await this.generateAiQuestions(dto.title, {
+        ...prompt,
+        counts: withSpares(missing),
+        avoid: picked.map((d) => d.title),
+        avoidAnswers: picked.flatMap((d) =>
+          d.aiType === "trueFalse"
+            ? []
+            : d.options.filter((o) => o.isCorrect).map((o) => o.title),
+        ),
+      });
+      const reviewed = await this.reviewAiQuestions(
+        prompt,
+        pickQuestions(more, missing, total, topic),
+      );
+      picked = pickQuestions(
+        [...picked, ...reviewed],
+        counts,
+        dto.questions,
+        topic,
+      );
+    }
 
-Write exactly ${dto.questions} questions on that topic.
+    // Each question is checked by its own type's handler, as on import.
+    const questions = picked.flatMap((d) => {
+      try {
+        return [
+          {
+            ...d,
+            ...validateDefinition(d.type, {
+              options: d.options,
+              config: d.config,
+            }),
+          },
+        ];
+      } catch (err) {
+        if (err instanceof QuestionDefinitionError) return [];
+        throw err;
+      }
+    });
 
-Rules:
-- Each question has exactly one correct answer and three plausible but clearly wrong answers.
-- Keep answer options SHORT so players can read all four within a few seconds: ideally 1-5 words, never more than about 60 characters. Put any needed context in the question, not in the options.
-- Keep each question concise: one sentence where possible, under about 150 characters.
-- Make the four options of a question similar in length and style so the correct one doesn't stand out.
-- Options are shuffled, so never use "All of the above", "None of the above" or answers that refer to other options.
-- Don't repeat questions.`;
+    if (questions.length < dto.questions) {
+      throw new BadRequestException(
+        "Couldn't generate enough questions. Try again with different parameters.",
+      );
+    }
 
+    const quiz = await this.prisma.db.$transaction(async (tx) => {
+      await this.entitlements.assertQuizCapacity(tx, user.userId);
+      return tx.quiz.create({
+        data: {
+          title: dto.title,
+          description: dto.description,
+          userId: user.userId,
+          questions: {
+            create: questions.map((q, index) => ({
+              type: q.type,
+              title: q.title,
+              config: q.config,
+              options: { create: inAuthoredOrder(q.options) },
+              // Typing takes longer than a tap.
+              timeOut:
+                q.type === "type_answer" ? typedTimeOut(dto.time) : dto.time,
+              order: index + 1,
+              createdById: user.userId,
+            })),
+          },
+        },
+      });
+    });
+
+    return { msg: "Quiz created successfully", quizId: quiz.id };
+  }
+
+  /**
+   * Has the model review the questions and rewrite the weak ones, then
+   * review the rewrites once more. A review that fails keeps the questions
+   * as they are — they already passed the server's own checks.
+   */
+  private async reviewAiQuestions(
+    prompt: Omit<AiPromptInput, "counts" | "avoid">,
+    defs: AiDefinition[],
+  ): Promise<AiDefinition[]> {
+    let current = defs;
+    let toReview = defs.map((_, i) => i);
+    for (
+      let round = 1;
+      round <= AI_REVIEW_ROUNDS && toReview.length > 0;
+      round++
+    ) {
+      const subset = toReview.map((i) => current[i]!);
+      let review: AiReviewOutput;
+      try {
+        const raw = await this.llm.generateJson(
+          buildReviewPrompt(prompt, subset),
+          AI_REVIEW_JSON_SCHEMA,
+        );
+        review = aiReviewOutputSchema.parse(raw);
+      } catch (err) {
+        this.logger.warn(
+          `AI review round ${round} failed, keeping the questions: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        break;
+      }
+      const result = applyReview(prompt.title, subset, review);
+      const rewritten = result.revised.filter(Boolean).length;
+      const dropped = result.defs.filter((d) => d === null).length;
+      this.logger.log(
+        `AI review round ${round}: ${subset.length} checked, ${rewritten} rewritten, ${dropped} dropped`,
+      );
+      // Back into place; the rewrites (still there) get the next round.
+      const next: (AiDefinition | null)[] = [...current];
+      toReview.forEach((idx, j) => (next[idx] = result.defs[j] ?? null));
+      const again = new Set(
+        toReview.filter((idx, j) => result.revised[j] && next[idx] !== null),
+      );
+      const kept: AiDefinition[] = [];
+      toReview = [];
+      next.forEach((d, i) => {
+        if (!d) return;
+        if (again.has(i)) toReview.push(kept.length);
+        kept.push(d);
+      });
+      current = kept;
+    }
+    return current;
+  }
+
+  /** One call to the model, as checked question definitions. */
+  private async generateAiQuestions(
+    quizTitle: string,
+    input: AiPromptInput,
+  ): Promise<AiDefinition[]> {
     let raw: unknown;
     try {
-      raw = await this.llm.generateJson(prompt, AI_QUIZ_JSON_SCHEMA);
+      raw = await this.llm.generateJson(
+        buildAiPrompt(input),
+        AI_QUIZ_JSON_SCHEMA,
+      );
     } catch (err) {
       this.logger.debug(
         `${this.llm.provider} generation failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -357,36 +655,6 @@ Rules:
         "The AI service returned an unexpected response. Please try again.",
       );
     }
-    const questionsArray = parsed.data.questions
-      .map(toOptions)
-      .filter((q) => q !== null);
-
-    if (questionsArray.length < dto.questions) {
-      throw new BadRequestException(
-        "Couldn't generate enough questions. Try again with different parameters.",
-      );
-    }
-
-    const quiz = await this.prisma.db.$transaction(async (tx) => {
-      await this.entitlements.assertQuizCapacity(tx, user.userId);
-      return tx.quiz.create({
-        data: {
-          title: dto.title,
-          description: dto.description,
-          userId: user.userId,
-          questions: {
-            create: questionsArray.slice(0, dto.questions).map((q, index) => ({
-              title: q.question,
-              options: { create: q.options },
-              timeOut: dto.time,
-              order: index + 1,
-              createdById: user.userId,
-            })),
-          },
-        },
-      });
-    });
-
-    return { msg: "Quiz created successfully", quizId: quiz.id };
+    return toDefinitions(quizTitle, parsed.data);
   }
 }

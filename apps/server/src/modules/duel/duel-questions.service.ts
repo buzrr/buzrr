@@ -3,6 +3,7 @@ import { Prisma } from "@buzrr/prisma";
 import type { DuelCategoriesResponse, DuelCategoryRef } from "@buzrr/contract";
 import { PrismaService } from "../../prisma/prisma.service";
 import { toLiveQuestion, type LiveQuestion } from "../question-types";
+import { OPTION_ORDER } from "../../common/utils/option-order";
 
 export const DUEL_QUESTION_COUNT = 7;
 const MIN_QUESTIONS = 3;
@@ -16,6 +17,7 @@ const POOL_WHERE = Prisma.sql`
     SELECT 1 FROM "Quiz" z WHERE z."id" = q."quizId" AND z."isPublic" = true
   ))
   AND q."moderationStatus" = 'approved'
+  AND NOT q."disabled"
   -- Duels score head to head: one right answer, scored types only
   -- (approval already requires this; kept here as the last guard).
   AND q."type" IN ('multiple_choice', 'true_false')
@@ -56,7 +58,7 @@ export class DuelQuestionsService {
     `;
     const rows = await this.prisma.db.question.findMany({
       where: { id: { in: ids.map((r) => r.id) } },
-      include: { options: { orderBy: { createdAt: "asc" } } },
+      include: { options: { orderBy: OPTION_ORDER } },
     });
     // findMany ignores the `IN` order, so restore the raw query's shuffle.
     const byId = new Map(rows.map((q) => [q.id, q]));

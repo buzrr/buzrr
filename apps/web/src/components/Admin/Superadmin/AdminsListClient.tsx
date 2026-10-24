@@ -1,7 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import type { FormEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { useQueryClient } from "@tanstack/react-query";
+import Modal from "@mui/material/Modal";
+import Box from "@mui/material/Box";
+import modalStyle from "@/utils/modalStyle";
+import { queryKeys } from "@/lib/modules/query-keys";
+import {
+  createUserAction,
+  resetPasswordAction,
+} from "@/app/admin/(privileged)/superadmin/admins/actions";
 import { toast } from "react-toastify";
 import Image from "next/image";
 import { DEFAULT_AVATAR } from "@/constants";
@@ -15,7 +25,8 @@ import type { AdminUserItem } from "@/lib/modules/admin-users/api";
 import { TextInput } from "@/components/ui/TextInput";
 import { Button } from "@/components/ui/Button";
 
-const ROW_HEIGHT = 88;
+/** A first guess; rows are measured (taller on phones, actions wrap). */
+const ROW_HEIGHT = 76;
 const DEBOUNCE_MS = 300;
 
 export default function AdminsListClient() {
@@ -24,6 +35,7 @@ export default function AdminsListClient() {
   const promote = usePromoteUserMutation();
   const demote = useDemoteUserMutation();
   const parentRef = useRef<HTMLDivElement>(null);
+  const [resetFor, setResetFor] = useState<AdminUserItem | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput.trim()), DEBOUNCE_MS);
@@ -73,16 +85,17 @@ export default function AdminsListClient() {
 
   return (
     <div className="mt-4">
+      <AddUserForm />
       <TextInput
-        placeholder="Search by name or email to promote someone…"
+        placeholder="Search by name or email…"
         value={searchInput}
         onChange={(e) => setSearchInput(e.target.value)}
-        containerClassName="max-w-md"
+        containerClassName="max-w-md mt-6"
       />
       <p className="mt-1 text-xs text-off-dark dark:text-off-white">
         {search
           ? "Showing search results across all users."
-          : "Showing current admins. Search above to find someone to promote."}
+          : "Showing all users."}
       </p>
 
       {query.isPending ? (
@@ -110,26 +123,27 @@ export default function AdminsListClient() {
               return (
                 <div
                   key={item.id}
+                  data-index={virtualRow.index}
+                  ref={virtualizer.measureElement}
                   style={{
                     position: "absolute",
                     top: 0,
                     left: 0,
                     width: "100%",
-                    height: `${virtualRow.size}px`,
                     transform: `translateY(${virtualRow.start}px)`,
                   }}
-                  className="flex items-center justify-between gap-4 border-b border-gray px-4"
+                  className="border-b border-gray px-3 md:px-4 py-3"
                 >
                   <AdminRow
                     item={item}
                     pending={
                       (promote.isPending &&
                         promote.variables?.userId === item.id) ||
-                      (demote.isPending &&
-                        demote.variables?.userId === item.id)
+                      (demote.isPending && demote.variables?.userId === item.id)
                     }
                     onPromote={() => handlePromote(item.id)}
                     onDemote={() => handleDemote(item.id)}
+                    onResetPassword={() => setResetFor(item)}
                   />
                 </div>
               );
@@ -137,6 +151,7 @@ export default function AdminsListClient() {
           </div>
         </div>
       )}
+      <ResetPasswordModal user={resetFor} onClose={() => setResetFor(null)} />
     </div>
   );
 }
@@ -146,44 +161,223 @@ function AdminRow({
   pending,
   onPromote,
   onDemote,
+  onResetPassword,
 }: {
   item: AdminUserItem;
   pending: boolean;
   onPromote: () => void;
   onDemote: () => void;
+  onResetPassword: () => void;
 }) {
+  // One grid for every row, so avatar, name, role and actions line up
+  // down the list. Phones: the actions go under the name.
   return (
-    <>
-      <div className="flex items-center gap-3">
-        <Image
-          src={item.image || DEFAULT_AVATAR}
-          width={40}
-          height={40}
-          alt={item.name ?? item.email}
-          className="rounded-full"
-        />
-        <div>
-          <p className="font-bold text-dark dark:text-white">
-            {item.name ?? "Unnamed"}
-          </p>
-          <p className="text-sm text-off-dark dark:text-off-white">
-            {item.email}
-          </p>
-        </div>
-        <span className="ml-2 rounded-full bg-lprimary/20 dark:bg-dprimary/20 px-2 py-0.5 text-xs font-bold capitalize text-lprimary dark:text-dprimary">
-          {item.role}
+    <div className="grid grid-cols-[40px_minmax(0,1fr)_auto] md:grid-cols-[40px_minmax(0,1fr)_88px_auto] items-center gap-x-3 gap-y-2">
+      <Image
+        src={item.image || DEFAULT_AVATAR}
+        width={40}
+        height={40}
+        alt=""
+        className="size-10 rounded-full object-cover"
+      />
+      <div className="min-w-0">
+        <p className="truncate font-bold text-dark dark:text-white">
+          {item.name ?? "Unnamed"}
+        </p>
+        <p
+          className="truncate text-sm text-off-dark dark:text-off-white"
+          title={item.email}
+        >
+          {item.email}
+        </p>
+      </div>
+      <span className="justify-self-end md:justify-self-start rounded-full bg-lprimary/20 dark:bg-dprimary/20 px-2 py-0.5 text-xs font-bold capitalize text-lprimary dark:text-dprimary">
+        {item.role}
+      </span>
+      <div className="col-start-2 col-span-2 md:col-start-auto md:col-span-1 flex items-center gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          className="flex-1 md:flex-none whitespace-nowrap !border !py-1.5"
+          onClick={onResetPassword}
+        >
+          Reset password
+        </Button>
+        {/* Same width whether it promotes, demotes or (superadmin) is
+            empty, so "Reset password" stays in one column. */}
+        <span className="flex-1 md:flex-none md:w-40 flex">
+          {item.role === "user" && (
+            <Button
+              size="sm"
+              disabled={pending}
+              className="w-full whitespace-nowrap !py-1.5"
+              onClick={onPromote}
+            >
+              Promote to admin
+            </Button>
+          )}
+          {item.role === "admin" && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={pending}
+              className="w-full whitespace-nowrap !border !py-1.5"
+              onClick={onDemote}
+            >
+              Demote to user
+            </Button>
+          )}
         </span>
       </div>
-      {item.role === "user" && (
-        <Button size="sm" disabled={pending} onClick={onPromote}>
-          Promote to admin
+    </div>
+  );
+}
+
+/** Creates a local email + password account (works with sign-up closed). */
+function AddUserForm() {
+  const queryClient = useQueryClient();
+  const [pending, startTransition] = useTransition();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<"user" | "admin">("user");
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    startTransition(async () => {
+      const res = await createUserAction({ name, email, password, role });
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(`User ${email.trim().toLowerCase()} created`);
+      setName("");
+      setEmail("");
+      setPassword("");
+      setRole("user");
+      queryClient.invalidateQueries({ queryKey: queryKeys.admins.lists });
+    });
+  }
+
+  return (
+    <form
+      onSubmit={onSubmit}
+      className="mt-4 rounded-xl border border-gray p-4 flex flex-col gap-3"
+    >
+      <p className="font-bold text-dark dark:text-white">Add user</p>
+      <div className="grid gap-3 md:grid-cols-4">
+        <TextInput
+          placeholder="Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
+        <TextInput
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <TextInput
+          type="password"
+          placeholder="Password (min. 8)"
+          autoComplete="new-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          minLength={8}
+          required
+        />
+        <select
+          value={role}
+          onChange={(e) => setRole(e.target.value as "user" | "admin")}
+          className="rounded-xl border border-gray bg-transparent px-3 py-2 text-dark dark:text-white dark:bg-dark"
+          aria-label="Role"
+        >
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div>
+        <Button size="sm" type="submit" disabled={pending}>
+          {pending ? "Creating…" : "Create user"}
         </Button>
-      )}
-      {item.role === "admin" && (
-        <Button size="sm" variant="outline" disabled={pending} onClick={onDemote}>
-          Demote to user
-        </Button>
-      )}
-    </>
+      </div>
+    </form>
+  );
+}
+
+/** Sets a new password and signs the user out of all sessions. */
+function ResetPasswordModal({
+  user,
+  onClose,
+}: {
+  user: AdminUserItem | null;
+  onClose: () => void;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [password, setPassword] = useState("");
+
+  function close() {
+    setPassword("");
+    onClose();
+  }
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!user) return;
+    startTransition(async () => {
+      const res = await resetPasswordAction({ userId: user.id, password });
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(`Password for ${user.email} reset`);
+      close();
+    });
+  }
+
+  return (
+    <Modal
+      open={user !== null}
+      onClose={close}
+      aria-labelledby="reset-pw-title"
+    >
+      <Box
+        sx={modalStyle}
+        className="bg-light-bg dark:bg-dark-bg rounded-2xl w-[90vw] max-w-[430px] p-6"
+      >
+        <form onSubmit={onSubmit} className="flex flex-col gap-4">
+          <h2
+            id="reset-pw-title"
+            className="text-lg font-black text-dark dark:text-white"
+          >
+            Reset password
+          </h2>
+          <p className="text-sm text-dark/80 dark:text-gray">
+            New password for <strong>{user?.email}</strong>. The user is signed
+            out everywhere.
+          </p>
+          <TextInput
+            type="password"
+            placeholder="New password (min. 8)"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            minLength={8}
+            required
+            autoFocus
+          />
+          <div className="flex gap-2 justify-end">
+            <Button size="sm" variant="ghost" type="button" onClick={close}>
+              Cancel
+            </Button>
+            <Button size="sm" type="submit" disabled={pending}>
+              {pending ? "Saving…" : "Set password"}
+            </Button>
+          </div>
+        </form>
+      </Box>
+    </Modal>
   );
 }

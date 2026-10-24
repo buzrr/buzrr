@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -19,6 +19,10 @@ import TextInput from "@/components/ui/TextInput";
 import { DEFAULT_AVATAR } from "@/constants";
 import { authClient } from "@/lib/auth-client";
 import { useEntitlementsQuery } from "@/lib/modules/billing/hooks";
+import { BUILTIN_SOUND_SKINS } from "@buzrr/contract";
+import { BUILTIN_SKINS, type BuiltinSkinId } from "@/lib/sound/synth";
+import { useSoundSkinsQuery } from "@/lib/modules/sound-skins/hooks";
+import { usePreferencesQuery } from "@/lib/modules/preferences/hooks";
 
 const accountSchema = z.object({
   name: z
@@ -102,7 +106,62 @@ function PreferencesCard() {
   );
 }
 
+/** Defaults for all the user's games: the audio skin. */
+function GameDefaultsCard() {
+  const prefs = usePreferencesQuery();
+  const skins = useSoundSkinsQuery();
+  const defaultSkin = prefs.data?.defaultSoundSkin ?? "builtin:show";
+  const defaultSkinName = (BUILTIN_SOUND_SKINS as readonly string[]).includes(
+    defaultSkin,
+  )
+    ? BUILTIN_SKINS[defaultSkin as BuiltinSkinId].name
+    : ((skins.data ?? []).find((sk) => sk.id === defaultSkin)?.name ??
+      "Audio skin");
+  return (
+    <SettingsCard
+      title="Game defaults"
+      description="Used by all your quizzes unless a quiz sets its own."
+    >
+      <PreferenceRow
+        label="Default audio skin"
+        description="Music and effects of quizzes set to “Default”."
+        control={
+          // A link to the page where it is picked.
+          <Link
+            href="/admin/audio-skins"
+            className="text-sm font-semibold text-lprimary dark:text-dprimary hover:underline whitespace-nowrap"
+          >
+            {defaultSkinName} →
+          </Link>
+        }
+      />
+    </SettingsCard>
+  );
+}
+
 function AccountCard() {
+  // How this account signs in (Google, or email + password), not assumed.
+  const [signInMethod, setSignInMethod] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void authClient
+      .listAccounts()
+      .then((res) => {
+        if (!alive) return;
+        const ids = (res.data ?? []).map((a) => a.providerId);
+        setSignInMethod(
+          ids.includes("google")
+            ? "Google"
+            : ids.includes("credential")
+              ? "email and password"
+              : null,
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
   const { data: session } = authClient.useSession();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -181,8 +240,9 @@ function AccountCard() {
         <div>
           <p className="text-sm font-bold text-dark dark:text-white">Email</p>
           <p className="text-sm text-off-dark dark:text-off-white">
-            {session?.user.email} · Signed in with Google — email can&apos;t be
-            changed here.
+            {session?.user.email}
+            {signInMethod ? ` · Signed in with ${signInMethod}` : ""} — email
+            can&apos;t be changed here.
           </p>
         </div>
         <Button
@@ -261,6 +321,7 @@ export default function SettingsClient() {
       </div>
       <div className="flex flex-col gap-6">
         <PreferencesCard />
+        <GameDefaultsCard />
         <AccountCard />
         <PlanCard />
         <DangerZoneCard />

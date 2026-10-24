@@ -15,10 +15,12 @@ import { mutedText } from "@/components/Game/GameUI";
 
 const SUBTITLES: Record<QuestionType, string> = {
   multiple_choice:
-    "Write the question, fill in four options and mark the correct one — or turn on multiple answers.",
+    "Write the question, fill in 2 to 8 options and mark the correct one — or turn on multiple answers.",
   true_false: "Write a statement and mark whether it's true or false.",
   poll: "Ask for opinions — there's no right answer and nothing is scored.",
   word_cloud: "Players answer in a word or two; the most common grow biggest.",
+  type_answer:
+    "Players type the answer; fast and exact scores best, typos can be forgiven.",
   rating: "Players rate on a scale; you see the average and the spread.",
   open_text: "Players write freely; answers appear on a wall.",
 };
@@ -111,11 +113,18 @@ export default function AddQuestionMenu({ quizId }: { quizId: string }) {
       <BasicModal
         btnTitle="Add Question"
         wide
+        confirmDismiss
         subtitle={type ? SUBTITLES[type] : undefined}
         open={type !== null}
         onClose={() => setType(null)}
       >
-        {type && <AddQuesForm quizId={quizId} type={type} />}
+        {type && (
+          <AddQuesForm
+            quizId={quizId}
+            type={type}
+            onDone={() => setType(null)}
+          />
+        )}
       </BasicModal>
     </div>
   );

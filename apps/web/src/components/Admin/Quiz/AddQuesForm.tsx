@@ -8,12 +8,30 @@ import type { Resolver } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { LuCheck, LuImagePlus, LuPlus, LuTrash2, LuX } from "react-icons/lu";
+import {
+  LuCheck,
+  LuGripVertical,
+  LuImagePlus,
+  LuMusic,
+  LuPlus,
+  LuShuffle,
+  LuTrash2,
+  LuX,
+} from "react-icons/lu";
+import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
+import AudioCueEditor from "@/components/Admin/Quiz/AudioCueEditor";
 import Image from "next/image";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   DEFAULT_QUESTION_TYPE,
+  MAX_ACCEPTED_ANSWERS,
+  MAX_OPTIONS,
   MAX_POLL_OPTIONS,
+  TYPE_ANSWER_MAX_LENGTH,
+  UNLIMITED_TIME_OUT,
+  answerPattern,
+  isUnlimitedTime,
+  MIN_OPTIONS,
   MIN_POLL_OPTIONS,
   RATING_LABEL_MAX,
   isQuestionType,
@@ -22,6 +40,7 @@ import {
   poll,
   rating,
   trueFalse,
+  typeAnswer,
   wordCloud,
   type QuestionType,
 } from "@buzrr/contract";
@@ -36,6 +55,7 @@ import {
   QUESTION_TYPE_ORDER,
   QuestionTypeIcon,
 } from "@/components/QuestionTypes";
+import { dropTargetClass } from "@/hooks/useFileDrop";
 import {
   OPTION_KEYS,
   OptionKey,
@@ -65,6 +85,10 @@ interface Question {
   timeOut?: number;
   media?: string | null;
   mediaType?: string | null;
+  audio?: string | null;
+  audioStartMs?: number | null;
+  audioRevealMs?: number | null;
+  audioPlayOn?: string | null;
   options?: Option[];
 }
 
@@ -78,7 +102,7 @@ const MCQ_OPTIONS = 4;
  * so word cloud and open text get a longer range and default.
  */
 function timeRangeFor(type: QuestionType) {
-  return type === "word_cloud" || type === "open_text"
+  return type === "word_cloud" || type === "open_text" || type === "type_answer"
     ? {
         min: 15,
         max: 75,
@@ -94,14 +118,18 @@ function timeRangeFor(type: QuestionType) {
 }
 
 const clampTime = (t: number, type: QuestionType) => {
+  if (isUnlimitedTime(t)) return UNLIMITED_TIME_OUT;
   const { min, max } = timeRangeFor(type);
   return Math.min(max, Math.max(min, t));
 };
 
 const isSliderTime = (type: QuestionType, t?: number) => {
   const { min, max } = timeRangeFor(type);
-  return t === undefined || (t >= min && t <= max);
+  return t === undefined || isUnlimitedTime(t) || (t >= min && t <= max);
 };
+
+/** The slider's last step past the range: no time limit ("∞"). */
+const SLIDER_UNLIMITED_STEP = 5;
 const OPTION_TYPES: QuestionType[] = ["multiple_choice", "true_false", "poll"];
 
 const blankOptions = (n: number): AuthoredOption[] =>
@@ -128,6 +156,19 @@ function singleCorrect(options: AuthoredOption[]): AuthoredOption[] {
   return options.map((o, i) => ({ ...o, isCorrect: i === first }));
 }
 
+/** The options in a new random order — never the one they are in. */
+function shuffled(options: AuthoredOption[]): AuthoredOption[] {
+  if (options.length < 2) return options;
+  for (;;) {
+    const next = [...options];
+    for (let i = next.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [next[i], next[j]] = [next[j]!, next[i]!];
+    }
+    if (next.some((o, i) => o !== options[i])) return next;
+  }
+}
+
 /** The options a type starts with, carrying over what fits from `from`. */
 function optionsFor(type: QuestionType, from: AuthoredOption[]) {
   if (type === "true_false") {
@@ -142,12 +183,22 @@ function optionsFor(type: QuestionType, from: AuthoredOption[]) {
   const titles = kept.map((o) => o.title);
   if (type === "multiple_choice") {
     // Single choice is the default: one correct option, A until picked.
+    const n = Math.min(MAX_OPTIONS, Math.max(MCQ_OPTIONS, titles.length));
     return singleCorrect(
-      blankOptions(MCQ_OPTIONS).map((o, i) => ({
+      blankOptions(n).map((o, i) => ({
         title: titles[i] ?? "",
         isCorrect: kept[i]?.isCorrect ?? false,
       })),
     );
+  }
+  if (type === "type_answer") {
+    // Accepted answers: carry over the right ones, else one empty row.
+    const right = kept.filter((o) => o.isCorrect && o.title.trim());
+    const rows = (right.length ? right : [{ title: "" }]).slice(
+      0,
+      MAX_ACCEPTED_ANSWERS,
+    );
+    return rows.map((o) => ({ title: o.title, isCorrect: true }));
   }
   if (type === "poll") {
     const n = Math.min(
@@ -185,10 +236,11 @@ function valuesFor(
   const r = configOf(rating.config, config, type === "rating");
   const o = configOf(openText.config, config, type === "open_text");
   const m = configOf(multipleChoice.config, config, type === "multiple_choice");
-  const t = trueFalse.config.safeParse(config);
+  const t = configOf(typeAnswer.config, config, type === "type_answer");
+  const tf = trueFalse.config.safeParse(config);
   const stored =
-    type === "true_false" && t.success
-      ? truthOptions(t.data.answer)
+    type === "true_false" && tf.success
+      ? truthOptions(tf.data.answer)
       : (question?.options ?? []).map((opt) => ({
           title: opt.title ?? "",
           isCorrect: Boolean(opt.isCorrect),
@@ -214,6 +266,8 @@ function valuesFor(
     allowAnonymous: o.allowAnonymous,
     multipleSubmissions:
       type === "word_cloud" ? w.multipleSubmissions : o.multipleSubmissions,
+    ignoreTypos: t.ignoreTypos,
+    fixedLength: t.fixedLength,
   };
 }
 
@@ -238,6 +292,8 @@ function configFor(v: FormValues): Record<string, unknown> {
         lowLabel: v.lowLabel.trim(),
         highLabel: v.highLabel.trim(),
       };
+    case "type_answer":
+      return { ignoreTypos: v.ignoreTypos, fixedLength: v.fixedLength };
     case "open_text":
       return {
         maxLength: v.textMaxLength,
@@ -251,9 +307,11 @@ function configFor(v: FormValues): Record<string, unknown> {
 
 /** The one-line recap in the footer. */
 function summaryOf(v: FormValues): ReactNode {
-  const secs = `${Number(v.time) || DEFAULT_QUESTION_TIMEOUT}s to answer`;
-  const strong = (t: string) => (
-    <b className="text-dark dark:text-white">{t}</b>
+  const secs = isUnlimitedTime(Number(v.time))
+    ? "no time limit"
+    : `${Number(v.time) || DEFAULT_QUESTION_TIMEOUT}s to answer`;
+  const strong = (text: string) => (
+    <b className="text-dark dark:text-white">{text}</b>
   );
   switch (v.type) {
     case "multiple_choice": {
@@ -274,6 +332,16 @@ function summaryOf(v: FormValues): ReactNode {
           {strong(v.options.find((o) => o.isCorrect)?.title ?? "—")} · {secs}
         </>
       );
+    case "type_answer": {
+      const n = v.options.filter((o) => o.title.trim()).length;
+      return (
+        <>
+          {strong(n === 1 ? `${n} accepted answer` : `${n} accepted answers`)}
+          {v.fixedLength ? ` · fixed length` : ""}
+          {v.ignoreTypos ? ` · typos forgiven` : ` · exact match`} · {secs}
+        </>
+      );
+    }
     case "poll":
       return (
         <>
@@ -286,7 +354,9 @@ function summaryOf(v: FormValues): ReactNode {
           {strong("Word cloud")} · not scored ·{" "}
           {v.multipleSubmissions
             ? "multiple submissions"
-            : `${v.cloudMaxAnswers} ${v.cloudMaxAnswers === 1 ? "answer" : "answers"} each`}
+            : v.cloudMaxAnswers === 1
+              ? `${v.cloudMaxAnswers} answer each`
+              : `${v.cloudMaxAnswers} answers each`}
         </>
       );
     case "rating":
@@ -300,8 +370,9 @@ function summaryOf(v: FormValues): ReactNode {
     case "open_text":
       return (
         <>
-          {strong("Open text")} · not scored · up to {v.textMaxLength} chars
-          {v.multipleSubmissions ? " · multiple submissions" : ""}
+          {strong("Open text")} · not scored · up to {v.textMaxLength}{" "}
+          characters
+          {v.multipleSubmissions ? ` · multiple submissions` : ""}
         </>
       );
   }
@@ -347,7 +418,8 @@ const AddQuesForm = (props: {
   question?: Question;
   /** The type a new question starts as (from the Add Question menu). */
   type?: QuestionType;
-  /** Called after a successful save of an existing question. */
+  /** Called after a successful save of an existing question, and after
+   *  "Done" on a new one (closes the dialog). */
   onDone?: () => void;
 }) => {
   const { question } = props;
@@ -359,6 +431,21 @@ const AddQuesForm = (props: {
   );
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Optional sound (MP3) with its two cue points (ms).
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioLink, setAudioLink] = useState(question?.audio ?? "");
+  const [audioPreview, setAudioPreview] = useState<string | null>(null);
+  const [audioCues, setAudioCues] = useState<{
+    startMs: number;
+    revealMs: number | null;
+  }>({
+    startMs: question?.audioStartMs ?? 0,
+    revealMs: question?.audioRevealMs ?? null,
+  });
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const [audioPlayOn, setAudioPlayOn] = useState(
+    question?.audioPlayOn ?? "quiz",
+  );
   const [customTime, setCustomTime] = useState(
     !isSliderTime(
       question?.type && isQuestionType(question.type)
@@ -395,7 +482,34 @@ const AddQuesForm = (props: {
       ),
     );
     if (fileInputRef.current) fileInputRef.current.value = "";
+    setAudioFile(null);
+    setAudioLink(question?.audio ?? "");
+    setAudioCues({
+      startMs: question?.audioStartMs ?? 0,
+      revealMs: question?.audioRevealMs ?? null,
+    });
+    if (audioInputRef.current) audioInputRef.current.value = "";
+    setAudioPlayOn(question?.audioPlayOn ?? "quiz");
   }, [question, initialType, reset]);
+
+  useEffect(() => {
+    if (!audioFile) {
+      setAudioPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(audioFile);
+    setAudioPreview(url);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [audioFile]);
+
+  function removeAudio() {
+    setAudioFile(null);
+    setAudioLink("");
+    setAudioCues({ startMs: 0, revealMs: null });
+    if (audioInputRef.current) audioInputRef.current.value = "";
+  }
 
   useEffect(() => {
     if (!file) {
@@ -412,6 +526,29 @@ const AddQuesForm = (props: {
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const selectedFile = e.target.files?.[0] || null;
     setFile(selectedFile);
+  }
+
+  // Drag and drop a file anywhere on the editor: a picture becomes the
+  // question's image, an audio file its sound.
+  // What is being dragged (its box gets the drop border); "any" when the
+  // browser doesn't tell the type before the drop.
+  const [dropping, setDropping] = useState<"image" | "audio" | "any" | null>(
+    null,
+  );
+  const AUDIO_EXT = /\.(mp3|wav|ogg|oga|opus|flac|m4a|aac|webm)$/i;
+  function onDropFile(e: React.DragEvent) {
+    e.preventDefault();
+    setDropping(null);
+    const f = e.dataTransfer.files?.[0];
+    if (!f) return;
+    if (f.type.startsWith("image/")) {
+      setFile(f);
+    } else if (f.type.startsWith("audio/") || AUDIO_EXT.test(f.name)) {
+      setAudioFile(f);
+      setAudioCues({ startMs: 0, revealMs: null });
+    } else {
+      toast.error("Drop a picture or an audio file");
+    }
   }
 
   function deleteFile() {
@@ -506,6 +643,9 @@ const AddQuesForm = (props: {
     formState.errors.options as { message?: string } | undefined
   )?.message;
 
+  // Which button submitted a new question: "Done + Next" keeps the dialog open.
+  const addNextRef = useRef(false);
+
   const onSubmit = handleSubmit((data) => {
     const fd = new FormData();
     fd.append("title", data.title.trim());
@@ -514,12 +654,17 @@ const AddQuesForm = (props: {
     fd.append(
       "options",
       JSON.stringify(
-        OPTION_TYPES.includes(data.type) && data.type !== "true_false"
-          ? data.options.map((o) => ({
-              title: o.title.trim(),
-              isCorrect: data.type === "poll" ? false : o.isCorrect,
-            }))
-          : [],
+        data.type === "type_answer"
+          ? data.options
+              .map((o) => ({ title: o.title.trim(), isCorrect: true }))
+              .filter((o) => o.title !== "")
+              .slice(0, MAX_ACCEPTED_ANSWERS)
+          : OPTION_TYPES.includes(data.type) && data.type !== "true_false"
+            ? data.options.map((o) => ({
+                title: o.title.trim(),
+                isCorrect: data.type === "poll" ? false : o.isCorrect,
+              }))
+            : [],
       ),
     );
     fd.append(
@@ -534,17 +679,27 @@ const AddQuesForm = (props: {
     fd.append("media_type", file ? "" : (question?.mediaType ?? ""));
     if (question?.id) fd.append("ques_id", question.id);
     if (file) fd.append("file", file);
+    if (audioFile) fd.append("audio", audioFile);
+    else if (audioLink) fd.append("audio_link", audioLink);
+    if (audioFile || audioLink) {
+      fd.append("audio_start_ms", String(audioCues.startMs));
+      if (audioCues.revealMs !== null) {
+        fd.append("audio_reveal_ms", String(audioCues.revealMs));
+      }
+      if (audioPlayOn !== "quiz") fd.append("audio_play_on", audioPlayOn);
+    }
 
     mutation.mutate(fd, {
       onSuccess: () => {
         toast.success(question?.id ? "Question updated" : "Question added");
-        if (question?.id) {
+        if (question?.id || !addNextRef.current) {
           props.onDone?.();
         } else {
           // Stay on the same type, ready for the next one.
           reset(valuesFor(undefined, data.type));
           setCustomTime(false);
           deleteFile();
+          removeAudio();
         }
       },
       onError: (err) => {
@@ -554,7 +709,32 @@ const AddQuesForm = (props: {
   });
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col">
+    <form
+      onSubmit={onSubmit}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes("Files")) {
+          e.preventDefault();
+          const type = e.dataTransfer.items[0]?.type ?? "";
+          setDropping(
+            type.startsWith("image/")
+              ? "image"
+              : type.startsWith("audio/")
+                ? "audio"
+                : "any",
+          );
+        }
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setDropping(null);
+        }
+      }}
+      onDrop={onDropFile}
+      className={clsx(
+        "flex flex-col rounded-2xl transition-shadow",
+        dropping && "ring-2 ring-dprimary ring-offset-2",
+      )}
+    >
       <div className="flex flex-col gap-4 px-5 pt-[18px] md:px-7 md:pt-4">
         <div className="flex flex-col gap-2">
           <span className={fieldLabelClass}>
@@ -663,6 +843,8 @@ const AddQuesForm = (props: {
                 <label
                   className={clsx(
                     "flex items-center gap-3.5 rounded-2xl border-[1.5px] border-dashed px-4 py-3 cursor-pointer transition-colors border-lprimary/25 dark:border-white/15 hover:border-dprimary bg-light-bg dark:bg-card-dark",
+                    (dropping === "image" || dropping === "any") &&
+                      dropTargetClass,
                   )}
                 >
                   <span className="size-10 shrink-0 rounded-xl flex items-center justify-center bg-lprimary/10 dark:bg-white/5 text-lprimary dark:text-dprimary">
@@ -683,6 +865,76 @@ const AddQuesForm = (props: {
                     className="sr-only"
                     ref={fileInputRef}
                     onChange={handleFile}
+                  />
+                </label>
+              )}
+            </div>
+            <div className="mt-3 flex flex-col gap-2">
+              <span className={fieldLabelClass}>
+                Sound
+                <span className={counterClass}>
+                  Optional · plays on the host&apos;s screen
+                </span>
+              </span>
+              {audioPreview || audioLink ? (
+                <AudioCueEditor
+                  src={audioPreview ?? audioLink}
+                  name={audioFile?.name ?? "Current sound"}
+                  questionMs={
+                    (Number(values.time) || DEFAULT_QUESTION_TIMEOUT) * 1000
+                  }
+                  startMs={audioCues.startMs}
+                  revealMs={audioCues.revealMs}
+                  onChange={setAudioCues}
+                  onRemove={removeAudio}
+                />
+              ) : null}
+              {audioPreview || audioLink ? (
+                <label className="flex items-center gap-2 text-[13px]">
+                  Plays on
+                  <select
+                    aria-label="Where the sound plays"
+                    value={audioPlayOn}
+                    onChange={(e) => setAudioPlayOn(e.target.value)}
+                    className="w-44 rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent dark:bg-dark px-2 py-1"
+                  >
+                    <option value="quiz">Like the quiz</option>
+                    <option value="host">Host&apos;s screen</option>
+                    <option value="players">Players&apos; devices</option>
+                    <option value="both">Both</option>
+                    <option value="off">Off</option>
+                  </select>
+                </label>
+              ) : (
+                <label
+                  className={clsx(
+                    "flex items-center gap-3.5 rounded-2xl border-[1.5px] border-dashed px-4 py-3 cursor-pointer transition-colors border-lprimary/25 dark:border-white/15 hover:border-dprimary bg-light-bg dark:bg-card-dark",
+                    (dropping === "audio" || dropping === "any") &&
+                      dropTargetClass,
+                  )}
+                >
+                  <span className="size-10 shrink-0 rounded-xl flex items-center justify-center bg-lprimary/10 dark:bg-white/5 text-lprimary dark:text-dprimary">
+                    <LuMusic size={20} />
+                  </span>
+                  <span className="flex flex-col">
+                    <span className="text-sm font-semibold">
+                      Upload a sound
+                    </span>
+                    <span className={clsx("text-[12.5px]", mutedText)}>
+                      MP3, WAV, OGG, FLAC or M4A under 20MB
+                    </span>
+                  </span>
+                  <input
+                    type="file"
+                    accept="audio/*,.mp3,.wav,.ogg,.oga,.opus,.flac,.m4a,.aac,.webm"
+                    name="audio"
+                    className="sr-only"
+                    ref={audioInputRef}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null;
+                      setAudioFile(f);
+                      setAudioCues({ startMs: 0, revealMs: null });
+                    }}
                   />
                 </label>
               )}
@@ -764,129 +1016,351 @@ const AddQuesForm = (props: {
                   }
 
                   const isPoll = type === "poll";
+                  // Poll and multiple choice can grow/shrink their options.
+                  const resizable = isPoll || type === "multiple_choice";
+                  const minOpts = isPoll ? MIN_POLL_OPTIONS : MIN_OPTIONS;
+                  const maxOpts = isPoll ? MAX_POLL_OPTIONS : MAX_OPTIONS;
                   const multi = values.mcqMulti;
+                  // Drag a row by its grip to move it; the letters follow
+                  // the order, so the correct mark moves with its text.
+                  const move = (from: number, to: number) => {
+                    if (from === to) return;
+                    const next = [...opts];
+                    const [moved] = next.splice(from, 1);
+                    next.splice(to, 0, moved!);
+                    field.onChange(next);
+                  };
                   return (
                     <div className="flex flex-col gap-2">
                       <span className={fieldLabelClass}>
                         Options
-                        <span className={counterClass}>
-                          {isPoll
-                            ? "No correct answer"
-                            : multi
-                              ? "Tap letters to mark the correct ones"
-                              : "Tap a letter to mark it correct"}
-                        </span>
-                      </span>
-                      <div
-                        role={
-                          isPoll ? undefined : multi ? "group" : "radiogroup"
-                        }
-                        aria-label={isPoll ? undefined : "Correct answers"}
-                        className="grid grid-cols-1 gap-2"
-                      >
-                        {opts.map((o, i) => {
-                          const isCorrect = !isPoll && o.isCorrect;
-                          return (
-                            <div
-                              key={i}
-                              className={clsx(
-                                "flex items-center gap-2.5 rounded-[14px] border-[1.5px] p-1.5 pr-3 transition-colors",
-                                isCorrect
-                                  ? "border-green-500 bg-green-500/8"
-                                  : titleError(i)
-                                    ? "border-red-light dark:border-red-dark bg-light-bg dark:bg-card-dark"
-                                    : "border-lprimary/15 dark:border-white/10 bg-light-bg dark:bg-card-dark focus-within:border-dprimary",
-                              )}
-                            >
-                              {isPoll ? (
-                                <OptionKey
-                                  index={i}
-                                  className="size-8 text-[15px]"
-                                />
-                              ) : (
-                                <button
-                                  type="button"
-                                  role={multi ? "checkbox" : "radio"}
-                                  aria-checked={isCorrect}
-                                  aria-label={`Mark option ${OPTION_KEYS[i]} correct`}
-                                  onClick={() =>
-                                    multi
-                                      ? update(i, { isCorrect: !o.isCorrect })
-                                      : field.onChange(
-                                          opts.map((x, j) => ({
-                                            ...x,
-                                            isCorrect: j === i,
-                                          })),
-                                        )
-                                  }
-                                  className="relative shrink-0 cursor-pointer"
-                                >
-                                  <OptionKey
-                                    index={i}
-                                    className={clsx(
-                                      "size-8 text-[15px] transition-opacity",
-                                      !isCorrect &&
-                                        "opacity-80 hover:opacity-100",
-                                    )}
-                                  />
-                                  {isCorrect && (
-                                    <span className="absolute -right-1.5 -bottom-1.5 size-[18px] rounded-full bg-green-500 text-white flex items-center justify-center border-2 border-white dark:border-dark">
-                                      <LuCheck size={10} strokeWidth={3.5} />
-                                    </span>
-                                  )}
-                                </button>
-                              )}
-                              <input
-                                type="text"
-                                value={o.title}
-                                onChange={(e) =>
-                                  update(i, { title: e.target.value })
-                                }
-                                required
-                                maxLength={500}
-                                autoComplete="off"
-                                placeholder={`Option ${OPTION_KEYS[i]}`}
-                                aria-label={`Option ${OPTION_KEYS[i]}`}
-                                className="flex-1 min-w-0 bg-transparent outline-none py-1.5 text-[15px] font-medium placeholder:text-[#8a8896] dark:placeholder:text-muted-dark"
-                              />
-                              {isPoll && opts.length > MIN_POLL_OPTIONS && (
-                                <button
-                                  type="button"
-                                  aria-label={`Remove option ${OPTION_KEYS[i]}`}
-                                  onClick={() =>
-                                    field.onChange(
-                                      opts.filter((_, j) => j !== i),
-                                    )
-                                  }
-                                  className="shrink-0 text-[#8a8896] dark:text-muted-dark hover:text-[#e5544e] cursor-pointer"
-                                >
-                                  <LuX size={16} />
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                        {isPoll && opts.length < MAX_POLL_OPTIONS && (
+                        <span className="flex items-center gap-2">
+                          <span className={counterClass}>
+                            {isPoll
+                              ? "No correct answer"
+                              : multi
+                                ? "Tap letters to mark the correct ones"
+                                : "Tap a letter to mark it correct"}
+                          </span>
                           <button
                             type="button"
-                            onClick={() =>
-                              field.onChange([
-                                ...opts,
-                                { title: "", isCorrect: false },
-                              ])
-                            }
-                            className="flex items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-lprimary/25 dark:border-white/15 p-2.5 text-sm font-bold text-lprimary dark:text-dprimary cursor-pointer hover:border-dprimary"
+                            onClick={() => field.onChange(shuffled(opts))}
+                            title="Put the options in a random order"
+                            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-bold text-lprimary dark:text-dprimary hover:bg-lprimary/10 dark:hover:bg-dprimary/10 cursor-pointer"
                           >
-                            <LuPlus size={16} />
-                            Add option
+                            <LuShuffle size={14} />
+                            Shuffle
                           </button>
-                        )}
-                      </div>
+                        </span>
+                      </span>
+                      <DragDropContext
+                        onDragEnd={(r) => {
+                          if (r.destination) {
+                            move(r.source.index, r.destination.index);
+                          }
+                        }}
+                      >
+                        <Droppable droppableId="options">
+                          {(drop) => (
+                            <div
+                              ref={drop.innerRef}
+                              {...drop.droppableProps}
+                              role={
+                                isPoll
+                                  ? undefined
+                                  : multi
+                                    ? "group"
+                                    : "radiogroup"
+                              }
+                              aria-label={
+                                isPoll ? undefined : "Correct answers"
+                              }
+                              // Rows carry their gap as a margin (the drag
+                              // measures it); the last one's is taken back.
+                              className="flex flex-col -mb-2"
+                            >
+                              {opts.map((o, i) => {
+                                const isCorrect = !isPoll && o.isCorrect;
+                                return (
+                                  <Draggable
+                                    key={i}
+                                    draggableId={`option-${i}`}
+                                    index={i}
+                                  >
+                                    {(drag, snapshot) => (
+                                      <div
+                                        ref={drag.innerRef}
+                                        {...drag.draggableProps}
+                                        className={clsx(
+                                          "mb-2 flex items-center gap-2.5 rounded-[14px] border-[1.5px] p-1.5 pl-1 pr-3 transition-colors",
+                                          snapshot.isDragging &&
+                                            "shadow-[0_12px_28px_-16px_rgba(0,0,0,0.5)]",
+                                          isCorrect
+                                            ? "border-green-500 bg-green-500/8"
+                                            : titleError(i)
+                                              ? "border-red-light dark:border-red-dark bg-light-bg dark:bg-card-dark"
+                                              : "border-lprimary/15 dark:border-white/10 bg-light-bg dark:bg-card-dark focus-within:border-dprimary",
+                                          snapshot.isDragging &&
+                                            !isCorrect &&
+                                            "border-lprimary dark:border-dprimary",
+                                        )}
+                                      >
+                                        <span
+                                          {...drag.dragHandleProps}
+                                          aria-label={`Move option ${OPTION_KEYS[i]!}`}
+                                          className="shrink-0 -mr-1 cursor-grab text-[#8a8896] dark:text-muted-dark"
+                                        >
+                                          <LuGripVertical size={18} />
+                                        </span>
+                                        {isPoll ? (
+                                          <OptionKey
+                                            index={i}
+                                            className="size-8 text-[15px]"
+                                          />
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            role={multi ? "checkbox" : "radio"}
+                                            aria-checked={isCorrect}
+                                            aria-label={`Mark option ${OPTION_KEYS[i]!} correct`}
+                                            onClick={() =>
+                                              multi
+                                                ? update(i, {
+                                                    isCorrect: !o.isCorrect,
+                                                  })
+                                                : field.onChange(
+                                                    opts.map((x, j) => ({
+                                                      ...x,
+                                                      isCorrect: j === i,
+                                                    })),
+                                                  )
+                                            }
+                                            className="relative shrink-0 cursor-pointer"
+                                          >
+                                            <OptionKey
+                                              index={i}
+                                              className={clsx(
+                                                "size-8 text-[15px] transition-opacity",
+                                                !isCorrect &&
+                                                  "opacity-80 hover:opacity-100",
+                                              )}
+                                            />
+                                            {isCorrect && (
+                                              <span className="absolute -right-1.5 -bottom-1.5 size-[18px] rounded-full bg-green-500 text-white flex items-center justify-center border-2 border-white dark:border-dark">
+                                                <LuCheck
+                                                  size={10}
+                                                  strokeWidth={3.5}
+                                                />
+                                              </span>
+                                            )}
+                                          </button>
+                                        )}
+                                        <input
+                                          type="text"
+                                          value={o.title}
+                                          onChange={(e) =>
+                                            update(i, { title: e.target.value })
+                                          }
+                                          required
+                                          maxLength={500}
+                                          autoComplete="off"
+                                          placeholder={`Option ${OPTION_KEYS[i]!}`}
+                                          aria-label={`Option ${OPTION_KEYS[i]!}`}
+                                          className="flex-1 min-w-0 bg-transparent outline-none py-1.5 text-[15px] font-medium placeholder:text-[#8a8896] dark:placeholder:text-muted-dark"
+                                        />
+                                        {resizable && opts.length > minOpts && (
+                                          <button
+                                            type="button"
+                                            aria-label={`Remove option ${OPTION_KEYS[i]!}`}
+                                            onClick={() => {
+                                              const rest = opts.filter(
+                                                (_, j) => j !== i,
+                                              );
+                                              // Single choice must keep one correct option.
+                                              field.onChange(
+                                                !isPoll && !multi
+                                                  ? singleCorrect(rest)
+                                                  : rest,
+                                              );
+                                            }}
+                                            className="shrink-0 text-[#8a8896] dark:text-muted-dark hover:text-[#e5544e] cursor-pointer"
+                                          >
+                                            <LuX size={16} />
+                                          </button>
+                                        )}
+                                      </div>
+                                    )}
+                                  </Draggable>
+                                );
+                              })}
+                              {drop.placeholder}
+                            </div>
+                          )}
+                        </Droppable>
+                      </DragDropContext>
+                      {resizable && opts.length < maxOpts && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            field.onChange([
+                              ...opts,
+                              { title: "", isCorrect: false },
+                            ])
+                          }
+                          className="flex items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-lprimary/25 dark:border-white/15 p-2.5 text-sm font-bold text-lprimary dark:text-dprimary cursor-pointer hover:border-dprimary"
+                        >
+                          <LuPlus size={16} />
+                          Add option
+                        </button>
+                      )}
                       {optionsError && (
                         <span className="text-xs text-red-light dark:text-red-dark">
                           {optionsError}
                         </span>
                       )}
+                    </div>
+                  );
+                }}
+              />
+            )}
+
+            {type === "type_answer" && (
+              <Controller
+                name="options"
+                control={control}
+                render={({ field }) => {
+                  const fixed = values.fixedLength;
+                  const rows = field.value;
+                  const set = (next: AuthoredOption[]) => field.onChange(next);
+                  const filled = rows.filter((o) => o.title.trim());
+                  const pattern =
+                    fixed && filled[0] ? answerPattern(filled[0].title) : null;
+                  // Fixed length: every answer must fit the same boxes.
+                  const misfit =
+                    pattern !== null &&
+                    filled.some(
+                      (o) =>
+                        answerPattern(o.title).join(" ") !== pattern.join(" "),
+                    );
+                  return (
+                    <div className="flex flex-col gap-2">
+                      <span className={fieldLabelClass}>
+                        Accepted answers
+                        <span className={counterClass}>
+                          {fixed
+                            ? `${rows.length} / ${MAX_ACCEPTED_ANSWERS} · same length each, players see one box per letter`
+                            : `${rows.length} / ${MAX_ACCEPTED_ANSWERS} · case and accents don't matter`}
+                        </span>
+                      </span>
+                      {rows.map((o, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-2.5 rounded-[14px] border-[1.5px] p-1.5 pl-3 pr-3 border-green-500 bg-green-500/8"
+                        >
+                          <LuCheck
+                            size={16}
+                            strokeWidth={3}
+                            className="shrink-0 text-green-600 dark:text-green-500"
+                          />
+                          <input
+                            type="text"
+                            value={o.title}
+                            onChange={(e) =>
+                              set(
+                                rows.map((x, j) =>
+                                  j === i
+                                    ? { title: e.target.value, isCorrect: true }
+                                    : x,
+                                ),
+                              )
+                            }
+                            maxLength={TYPE_ANSWER_MAX_LENGTH}
+                            autoComplete="off"
+                            placeholder={
+                              i === 0 ? "The answer" : "Also accepted"
+                            }
+                            aria-label={`Accepted answer ${i + 1}`}
+                            className="flex-1 min-w-0 bg-transparent outline-none py-1.5 text-[15px] font-medium placeholder:text-[#8a8896] dark:placeholder:text-muted-dark"
+                          />
+                          {rows.length > 1 && (
+                            <button
+                              type="button"
+                              aria-label={`Remove accepted answer ${i + 1}`}
+                              onClick={() =>
+                                set(rows.filter((_, j) => j !== i))
+                              }
+                              className="shrink-0 text-[#8a8896] dark:text-muted-dark hover:text-[#e5544e] cursor-pointer"
+                            >
+                              <LuX size={16} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {pattern && (
+                        <p
+                          aria-label="What players see"
+                          className="font-mono text-lg font-bold tracking-[0.25em] text-center py-1"
+                        >
+                          {pattern.map((n) => "_".repeat(n)).join(" ")}
+                        </p>
+                      )}
+                      {misfit && (
+                        <span className="text-xs text-red-light dark:text-red-dark">
+                          All answers need the same length per word as the first
+                          ({pattern!.join(" + ")} letters).
+                        </span>
+                      )}
+                      {rows.length < MAX_ACCEPTED_ANSWERS && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            set([...rows, { title: "", isCorrect: true }])
+                          }
+                          className="flex items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-lprimary/25 dark:border-white/15 p-2.5 text-sm font-bold text-lprimary dark:text-dprimary cursor-pointer hover:border-dprimary"
+                        >
+                          <LuPlus size={16} />
+                          Add accepted answer
+                        </button>
+                      )}
+                      {optionsError && (
+                        <span className="text-xs text-red-light dark:text-red-dark">
+                          {optionsError}
+                        </span>
+                      )}
+                      <div className={settingsBoxClass}>
+                        <SettingRow
+                          label="Fixed length"
+                          hint="Players see the answer's letters as boxes"
+                        >
+                          <Controller
+                            name="fixedLength"
+                            control={control}
+                            render={({ field: f }) => (
+                              <Switch
+                                checked={f.value}
+                                onCheckedChange={f.onChange}
+                                aria-label="Fixed length"
+                              />
+                            )}
+                          />
+                        </SettingRow>
+                        <SettingRow
+                          label="Ignore typos"
+                          hint="Close answers count, but score less"
+                        >
+                          <Controller
+                            name="ignoreTypos"
+                            control={control}
+                            render={({ field: f }) => (
+                              <Switch
+                                checked={f.value}
+                                onCheckedChange={f.onChange}
+                                aria-label="Ignore typos"
+                              />
+                            )}
+                          />
+                        </SettingRow>
+                      </div>
                     </div>
                   );
                 }}
@@ -1006,7 +1480,7 @@ const AddQuesForm = (props: {
               name="time"
               control={control}
               render={({ field, fieldState }) => {
-                const t = Number(field.value) || 0;
+                const secs = Number(field.value) || 0;
                 const range = timeRangeFor(type);
                 return (
                   <div
@@ -1028,7 +1502,7 @@ const AddQuesForm = (props: {
                           setCustomTime(mode === "Custom");
                           if (mode === "Slider") {
                             field.onChange(
-                              clampTime(t || range.fallback, type),
+                              clampTime(secs || range.fallback, type),
                             );
                           }
                         }}
@@ -1065,25 +1539,45 @@ const AddQuesForm = (props: {
                     ) : (
                       <div className="flex items-center gap-3.5">
                         <span className="shrink-0 w-[58px] text-[22px] font-extrabold tracking-[-0.02em] leading-none text-lprimary dark:text-dprimary">
-                          {t}
-                          <small
-                            className={clsx(
-                              "ml-[3px] text-[13px] font-semibold",
-                              mutedText,
-                            )}
-                          >
-                            sec
-                          </small>
+                          {isUnlimitedTime(secs) ? "∞" : secs}
+                          {!isUnlimitedTime(secs) && (
+                            <small
+                              className={clsx(
+                                "ml-[3px] text-[13px] font-semibold",
+                                mutedText,
+                              )}
+                            >
+                              sec
+                            </small>
+                          )}
                         </span>
                         <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                           <RangeSlider
                             label="Seconds to answer"
                             min={range.min}
-                            max={range.max}
-                            value={clampTime(t, type)}
-                            onChange={field.onChange}
-                            ticks={range.ticks}
+                            max={range.max + SLIDER_UNLIMITED_STEP}
+                            value={
+                              isUnlimitedTime(secs)
+                                ? range.max + SLIDER_UNLIMITED_STEP
+                                : clampTime(secs, type)
+                            }
+                            onChange={(v) =>
+                              field.onChange(
+                                v > range.max ? UNLIMITED_TIME_OUT : v,
+                              )
+                            }
+                            ticks={[...range.ticks, "∞"]}
+                            tickValues={[
+                              ...range.ticks.map((tk) => parseInt(tk, 10)),
+                              range.max + SLIDER_UNLIMITED_STEP,
+                            ]}
                           />
+                          {isUnlimitedTime(secs) && (
+                            <span className={clsx("text-xs", mutedText)}>
+                              No time limit and no countdown: the question stays
+                              open until everyone answered or you move on.
+                            </span>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1104,17 +1598,51 @@ const AddQuesForm = (props: {
         <p className={clsx("flex-1 text-[13px]", mutedText)}>
           {summaryOf(values)}
         </p>
-        <button
-          type="submit"
-          disabled={mutation.isPending}
-          className={clsx(primaryButtonClass, "px-[26px]")}
-        >
-          {mutation.isPending
-            ? "Saving..."
-            : question?.id
-              ? "Save changes"
-              : "Add question"}
-        </button>
+        {question?.id ? (
+          <button
+            type="submit"
+            disabled={mutation.isPending}
+            className={clsx(primaryButtonClass, "px-[26px]")}
+          >
+            {mutation.isPending ? "Saving..." : "Save changes"}
+          </button>
+        ) : (
+          <>
+            <button
+              type="submit"
+              disabled={mutation.isPending}
+              onClick={(e) => {
+                // Nothing written yet (no question, no answers, no media):
+                // "Done" just closes instead of failing validation.
+                const blank =
+                  !values.title?.trim() &&
+                  !file &&
+                  !fileLink &&
+                  !audioFile &&
+                  !audioLink &&
+                  (values.type === "true_false" ||
+                    (values.options ?? []).every((o) => !o.title.trim()));
+                if (blank) {
+                  e.preventDefault();
+                  props.onDone?.();
+                  return;
+                }
+                addNextRef.current = false;
+              }}
+              className="rounded-[14px] border-2 border-lprimary dark:border-dprimary px-[22px] py-3 font-bold text-lprimary dark:text-dprimary cursor-pointer hover:bg-lprimary/10 dark:hover:bg-dprimary/10 disabled:opacity-60"
+            >
+              Done
+            </button>
+            <button
+              type="submit"
+              disabled={mutation.isPending}
+              onClick={() => (addNextRef.current = true)}
+              className={clsx(primaryButtonClass, "px-[26px]")}
+            >
+              {mutation.isPending ? "Saving…" : "Done + Next"}
+            </button>
+          </>
+        )}
       </div>
     </form>
   );

@@ -1,6 +1,8 @@
 "use client";
 
 import GamePage from "@/components/Player/GamePage";
+import { LeaderBoard } from "@/components/Player/GameScreens";
+import { loadFinalResult } from "@/lib/final-result";
 import ValidatePlayer from "@/components/Player/ValidatePlayer";
 import ClientImage from "@/components/ClientImage";
 import Skeleton from "@/components/ui/Skeleton";
@@ -39,6 +41,20 @@ export default function PlayPageClient({ playerId }: { playerId: string }) {
   const { player, game } = data;
 
   if (!player.gameId || !game) {
+    // The room is gone; a finished player keeps their thank-you screen.
+    const last =
+      typeof window !== "undefined" ? loadFinalResult(playerId) : null;
+    if (last) {
+      return (
+        <LeaderBoard
+          playerId={playerId}
+          position={last.position}
+          score={last.score}
+          quizTitle={last.quizTitle}
+          players={last.players}
+        />
+      );
+    }
     redirect(`/player/joinRoom/${playerId}`);
   }
 

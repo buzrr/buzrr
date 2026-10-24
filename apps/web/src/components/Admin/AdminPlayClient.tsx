@@ -55,6 +55,7 @@ export default function AdminPlayClient({
     <Lobby
       quizId={room.quizId}
       quizTitle={quiz.title}
+      quizSettings={quiz.settings}
       roomId={roomId}
       userId={userId}
       gameCode={room.gameCode}

@@ -7,13 +7,24 @@ import {
 } from "@/state/hideQuestionsSlice";
 import { Switch } from "@/components/ui/Switch";
 
-const HideQuestions = () => {
+/** `defaultHidden`: initial state on mount (shown when there's nothing to hide). */
+const HideQuestions = ({
+  defaultHidden = true,
+}: {
+  defaultHidden?: boolean;
+}) => {
   const dispatch = useAppDispatch();
 
   const visibility = useAppSelector((state) => state.hideQuestions.visibility);
 
   useEffect(() => {
-    dispatch(setHideQuestions(HideQuestionsEnum.hide));
+    dispatch(
+      setHideQuestions(
+        defaultHidden ? HideQuestionsEnum.hide : HideQuestionsEnum.show,
+      ),
+    );
+    // Only the initial state: adding the first question must not hide it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch]);
 
   const handle = (checked: boolean) => {
