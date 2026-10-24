@@ -26,7 +26,7 @@ import {
 } from "../question-types";
 import { CreateAiQuizDto } from "./dto/create-ai-quiz.dto";
 import { CreateQuizDto } from "./dto/create-quiz.dto";
-import { inAuthoredOrder } from "../../common/utils/option-order";
+import { inAuthoredOrder, OPTION_ORDER } from "../../common/utils/option-order";
 
 /**
  * Shape the model must return (sent to the provider as a JSON Schema for
@@ -105,6 +105,60 @@ export class QuizzesService {
       });
     });
     return { quizId: quiz.id };
+  }
+
+  /**
+   * Copies a quiz the user owns: settings and every question with its
+   * options and media (uploads are shared, not copied — they are never
+   * deleted while referenced). Duel moderation starts over (draft).
+   */
+  async duplicate(user: AuthUser, quizId: string): Promise<{ quizId: string }> {
+    const source = await this.prisma.db.quiz.findFirst({
+      where: { id: quizId, userId: user.userId },
+      include: {
+        questions: {
+          include: { options: { orderBy: OPTION_ORDER } },
+          orderBy: { order: "asc" },
+        },
+      },
+    });
+    if (!source) {
+      throw new NotFoundException("Unauthorized or quiz not found");
+    }
+    const copy = await this.prisma.db.$transaction(async (tx) => {
+      await this.entitlements.assertQuizCapacity(tx, user.userId);
+      return tx.quiz.create({
+        data: {
+          title: `${source.title} (copy)`.slice(0, 200),
+          description: source.description,
+          userId: user.userId,
+          thumbnail: source.thumbnail,
+          settings: source.settings ?? {},
+          questions: {
+            create: source.questions.map((q) => ({
+              title: q.title,
+              type: q.type,
+              config: q.config ?? {},
+              createdById: user.userId,
+              timeOut: q.timeOut,
+              media: q.media,
+              mediaType: q.mediaType,
+              order: q.order,
+              disabled: q.disabled,
+              options: {
+                create: inAuthoredOrder(
+                  q.options.map((o) => ({
+                    title: o.title,
+                    isCorrect: o.isCorrect,
+                  })),
+                ),
+              },
+            })),
+          },
+        },
+      });
+    });
+    return { quizId: copy.id };
   }
 
   async update(
@@ -196,13 +250,38 @@ export class QuizzesService {
   }
 
   async findAllForUser(user: AuthUser) {
-    return this.prisma.db.quiz.findMany({
+    const quizzes = await this.prisma.db.quiz.findMany({
       where: { userId: user.userId },
       orderBy: { createdAt: "desc" },
       include: {
-        _count: { select: { questions: true, gameResults: true } },
+        gameSessions: {
+          select: { createdAt: true },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+        gameResults: {
+          select: { endedAt: true },
+          orderBy: { endedAt: "desc" },
+          take: 1,
+        },
+        _count: {
+          select: {
+            questions: { where: { disabled: false } },
+            gameResults: true,
+          },
+        },
       },
     });
+    // Newest first by whichever happened last: an edit or a game hosted.
+    const activity = (q: (typeof quizzes)[number]) =>
+      Math.max(
+        q.updatedAt.getTime(),
+        q.gameSessions[0]?.createdAt.getTime() ?? 0,
+        q.gameResults[0]?.endedAt.getTime() ?? 0,
+      );
+    return quizzes
+      .sort((a, b) => activity(b) - activity(a))
+      .map(({ gameSessions: _s, gameResults: _r, ...q }) => q);
   }
 
   async findOneForUser(user: AuthUser, quizId: string) {
@@ -216,7 +295,7 @@ export class QuizzesService {
           orderBy: { endedAt: "desc" },
           take: 50,
         },
-        _count: { select: { questions: true } },
+        _count: { select: { questions: { where: { disabled: false } } } },
       },
     });
     if (!quiz) {

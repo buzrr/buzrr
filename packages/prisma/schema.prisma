@@ -142,6 +142,8 @@ model Question {
   media            String?
   mediaType        String?
   order            Int                @default(1)
+  /// Kept in the quiz, but skipped in games, question counts and scoring.
+  disabled         Boolean            @default(false)
   /// Per-question moderation gate for the duel pool; the quiz's `isPublic`
   /// flag alone no longer decides eligibility.
   moderationStatus ModerationStatus   @default(draft)

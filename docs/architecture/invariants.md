@@ -32,7 +32,9 @@ the docs, and write an ADR.
    `20260712000003_drop_unused_tables`.) Do not add per-answer or mid-game
    writes to Postgres.
 4. **[explicit] `GameResult`+entries are immutable** (schema comment). Entries
-   snapshot names/pics because `Player` rows are ephemeral. Append-only.
+   snapshot names/pics because `Player` rows are ephemeral. Append-only, except
+   that a classic game's host or the quiz's owner may delete a whole result
+   (entries cascade).
 5. **[implied] All live-game Redis access goes through `GameStoreService`.**
    Matchmaking/invites own their separate keyspaces (`mm:duel:*`,
    `duel:invite:*`); nothing else touches `game:{code}:*` directly.

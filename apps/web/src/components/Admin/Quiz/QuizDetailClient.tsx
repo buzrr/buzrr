@@ -101,6 +101,7 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
                 roomId={leaderboardId}
                 onBack={() => setLeaderboardId(null)}
                 backLabel="Back to quiz details"
+                onDeleted={() => setLeaderboardId(null)}
               />
             </div>
           ) : (

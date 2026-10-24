@@ -63,6 +63,11 @@ const GameLobby = (params: {
 
   if (!socket) return null;
 
+  // Fewer than two players: a try-out — "End" goes back to editing the quiz.
+  const endRedirect =
+    roster.length < 2 && params.quizQuestions?.id
+      ? `/admin/quiz/${params.quizQuestions.id}`
+      : undefined;
   const reactions = (
     <ReactionOverlay
       socket={socket}
@@ -96,6 +101,7 @@ const GameLobby = (params: {
             inline
             roomId={params.roomId}
             alreadyEnded={alreadyEnded}
+            {...(endRedirect ? { redirectTo: endRedirect } : {})}
           />
         }
       />
@@ -108,6 +114,7 @@ const GameLobby = (params: {
           roomId={params.roomId}
           quizTitle={title}
           alreadyEnded={alreadyEnded}
+          quizId={params.quizQuestions?.id}
         />
       )}
     </div>

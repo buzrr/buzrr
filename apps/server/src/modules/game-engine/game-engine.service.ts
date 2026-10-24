@@ -446,6 +446,8 @@ export class GameEngineService
         quiz: {
           include: {
             questions: {
+              // Disabled questions are skipped: not played, counted or scored.
+              where: { disabled: false },
               orderBy: [{ order: "asc" }, { createdAt: "asc" }],
               include: { options: { orderBy: OPTION_ORDER } },
             },

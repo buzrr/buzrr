@@ -53,6 +53,26 @@ export class GameSessionsController {
     return this.gameSessions.getResult(user, resultId);
   }
 
+  /** Host deletes one past run of their quiz (its leaderboard). */
+  @Delete("results/:resultId")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteResult(
+    @CurrentAccountUser() user: AuthUser,
+    @Param("resultId") resultId: string,
+  ) {
+    await this.gameSessions.deleteResults(user, { resultId });
+  }
+
+  /** Host deletes every past run of one quiz. */
+  @Delete("results/by-quiz/:quizId")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteQuizResults(
+    @CurrentAccountUser() user: AuthUser,
+    @Param("quizId") quizId: string,
+  ) {
+    await this.gameSessions.deleteResults(user, { quizId });
+  }
+
   @Get(":roomId/lobby")
   adminLobby(
     @CurrentAccountUser() user: AuthUser,

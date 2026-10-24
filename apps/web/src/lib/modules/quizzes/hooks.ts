@@ -82,6 +82,30 @@ export function useDeleteQuizMutation() {
   });
 }
 
+export function useDuplicateQuizMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: quizzesApi.duplicate,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.quizzes.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.billing.me });
+    },
+  });
+}
+
+export function useDeleteResultsMutation(quizId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: quizzesApi.deleteResults,
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.quizzes.detail(quizId),
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.quizzes.all });
+    },
+  });
+}
+
 export function useImportQuizMutation() {
   const queryClient = useQueryClient();
   return useMutation({

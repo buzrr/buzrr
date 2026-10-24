@@ -168,13 +168,19 @@ export class GameSessionsService {
   async getResult(user: AuthUser, resultId: string) {
     const result = await this.prisma.db.gameResult.findUnique({
       where: { id: resultId },
-      include: { entries: { orderBy: { rank: "asc" } } },
+      include: {
+        entries: { orderBy: { rank: "asc" } },
+        quiz: { select: { userId: true } },
+      },
     });
     if (!result) {
       throw new NotFoundException("Result not found");
     }
     if (result.hostId) {
-      if (result.hostId !== user.userId) {
+      if (
+        result.hostId !== user.userId &&
+        result.quiz?.userId !== user.userId
+      ) {
         throw new ForbiddenException("Unauthorized");
       }
     } else if (!result.entries.some((e) => e.userId === user.userId)) {
@@ -182,6 +188,32 @@ export class GameSessionsService {
       throw new ForbiddenException("Unauthorized");
     }
     return result;
+  }
+
+  /**
+   * Deletes past runs the user hosted or whose quiz they own: one (`resultId`) or all of a quiz's
+   * (`quizId`). Entries go with them (cascade). Only classic games — duel
+   * results belong to their players' ratings.
+   */
+  async deleteResults(
+    user: AuthUser,
+    where: { resultId: string } | { quizId: string },
+  ): Promise<void> {
+    // The host's own runs, and every run of a quiz the user owns (the quiz
+    // page lists those too — e.g. hosted by someone else before a move).
+    const scope = {
+      mode: "classic" as const,
+      OR: [{ hostId: user.userId }, { quiz: { userId: user.userId } }],
+      ...("resultId" in where
+        ? { id: where.resultId }
+        : { quizId: where.quizId }),
+    };
+    const { count } = await this.prisma.db.gameResult.deleteMany({
+      where: scope,
+    });
+    if ("resultId" in where && count === 0) {
+      throw new NotFoundException("Result not found");
+    }
   }
 
   /**
@@ -329,6 +361,7 @@ export class GameSessionsService {
         where: { id: room.quizId },
         include: {
           questions: {
+            where: { disabled: false },
             include: { options: { orderBy: OPTION_ORDER } },
           },
         },
@@ -368,7 +401,7 @@ export class GameSessionsService {
             id: true,
             title: true,
             settings: true,
-            questions: { select: { id: true } },
+            questions: { where: { disabled: false }, select: { id: true } },
           },
         },
         creator: {

@@ -4,7 +4,10 @@ import clsx from "clsx";
 import Image from "next/image";
 import { DEFAULT_AVATAR } from "@/constants";
 import { useAppSelector } from "@/state/hooks";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import EndQuizButton from "@/components/Admin/EndQuizButton";
+import { useEndRoomMutation } from "@/lib/modules/game-sessions/hooks";
 import {
   labelClass,
   mutedText,
@@ -118,15 +121,44 @@ function PodiumSpot({
   );
 }
 
+/** Small games: how long the final podium shows before the editor. */
+const LEAVE_AFTER_MS = 6000;
+
 export default function LeaderBoard({
   roomId,
   quizTitle,
   alreadyEnded,
+  quizId,
 }: {
   roomId: string;
   quizTitle: string;
   alreadyEnded: boolean;
+  /** With fewer than three players the host goes straight back here. */
+  quizId?: string;
 }) {
+  const router = useRouter();
+  const endRoom = useEndRoomMutation();
+  // The roster, not the leaderboard: the final standings may not have
+  // arrived yet on the first render (an empty list closed every game).
+  const players = useAppSelector((state) => state.game.players.length);
+  // A test run or a tiny game: no podium ceremony — save the result and go
+  // back to the quiz editor.
+  const [stay, setStay] = useState(false);
+  const leaving = Boolean(quizId) && players < 3 && !stay;
+  const left = useRef(false);
+  useEffect(() => {
+    if (!leaving || left.current) return;
+    // A few seconds on the podium first; "Stay here" cancels.
+    const t = setTimeout(() => {
+      left.current = true;
+      const back = () => router.push(`/admin/quiz/${quizId}`);
+      if (alreadyEnded) back();
+      else endRoom.mutate(roomId, { onSettled: back });
+    }, LEAVE_AFTER_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leaving]);
+
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
   // A big room: the host is sent the top HOST_LEADERBOARD_TOP and the count.
   const playerCount =
@@ -166,7 +198,19 @@ export default function LeaderBoard({
           <PodiumSpot entries={onPlace(1)} place={1} />
           <PodiumSpot entries={onPlace(3)} place={3} />
         </div>
-        <div className="flex flex-col-reverse md:flex-row gap-3 md:justify-end pt-[18px] border-t border-lprimary/15 dark:border-white/10 [&>button]:w-full md:[&>button]:w-auto">
+        <div className="flex flex-col-reverse md:flex-row md:flex-wrap md:items-center gap-3 md:justify-end pt-[18px] border-t border-lprimary/15 dark:border-white/10 [&>button]:w-full md:[&>button]:w-auto">
+          {leaving && (
+            <span className={clsx("text-sm", mutedText)}>
+              Small game — back to the quiz in a few seconds.{" "}
+              <button
+                type="button"
+                onClick={() => setStay(true)}
+                className="font-semibold text-lprimary dark:text-dprimary hover:underline cursor-pointer"
+              >
+                Stay here
+              </button>
+            </span>
+          )}
           <EndQuizButton
             roomId={roomId}
             redirectTo="/admin"

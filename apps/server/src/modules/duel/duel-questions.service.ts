@@ -17,6 +17,7 @@ const POOL_WHERE = Prisma.sql`
     SELECT 1 FROM "Quiz" z WHERE z."id" = q."quizId" AND z."isPublic" = true
   ))
   AND q."moderationStatus" = 'approved'
+  AND NOT q."disabled"
   -- Duels score head to head: one right answer, scored types only
   -- (approval already requires this; kept here as the last guard).
   AND q."type" IN ('multiple_choice', 'true_false')

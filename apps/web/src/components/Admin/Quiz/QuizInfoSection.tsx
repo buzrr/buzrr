@@ -1,18 +1,126 @@
 "use client";
 
+import clsx from "clsx";
 import Link from "next/link";
-import { LuChevronRight } from "react-icons/lu";
+import { useState } from "react";
+import {
+  LuCheck,
+  LuChevronRight,
+  LuPencil,
+  LuTrash2,
+  LuX,
+} from "react-icons/lu";
+import ConfirmationModal from "@/components/Admin/ConfirmationModal";
+import { inputClass } from "@/components/Game/GameUI";
 import { toast } from "react-toastify";
 import HostQuizForm from "@/components/Admin/Quiz/HostQuizForm";
 import Switch from "@/components/ui/Switch";
 import { getApiErrorMessage } from "@/lib/api/errors";
-import { useUpdateQuizMutation } from "@/lib/modules/quizzes/hooks";
+import {
+  useDeleteResultsMutation,
+  useUpdateQuizMutation,
+} from "@/lib/modules/quizzes/hooks";
 import type { QuizDetail } from "@/lib/modules/quizzes/api";
 import QuizSettingsCard from "@/components/Admin/Quiz/QuizSettingsCard";
 
 function formatSessionDate(createdAt: string | Date) {
   const d = typeof createdAt === "string" ? new Date(createdAt) : createdAt;
   return d.toLocaleString("en-US", { timeZoneName: "short" });
+}
+
+/** Title and description, editable in place (pencil → fields → save). */
+function EditableHeader({ quiz }: { quiz: QuizDetail }) {
+  const updateQuiz = useUpdateQuizMutation();
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(quiz.title);
+  const [description, setDescription] = useState(quiz.description ?? "");
+  const start = () => {
+    setTitle(quiz.title);
+    setDescription(quiz.description ?? "");
+    setEditing(true);
+  };
+  const save = () => {
+    const trimmed = title.trim();
+    if (!trimmed) {
+      toast.error("The quiz needs a title");
+      return;
+    }
+    updateQuiz.mutate(
+      { quizId: quiz.id, title: trimmed, description: description.trim() },
+      {
+        onSuccess: () => setEditing(false),
+        onError: (err) => toast.error(getApiErrorMessage(err)),
+      },
+    );
+  };
+  if (!editing) {
+    return (
+      <div className="relative mt-3 mb-4 pr-10">
+        <h2 className="text-[26px] md:text-[32px] font-bold tracking-[-0.02em] leading-[1.05] mb-1 wrap-break-word">
+          {quiz.title}
+        </h2>
+        {quiz.description && (
+          <p className="text-[15px] text-off-dark dark:text-muted-dark wrap-break-word">
+            {quiz.description}
+          </p>
+        )}
+        <button
+          type="button"
+          aria-label="Edit title and description"
+          title="Edit title and description"
+          onClick={start}
+          className="absolute top-0 right-0 size-9 rounded-[10px] flex items-center justify-center text-lprimary dark:text-dprimary hover:bg-lprimary/10 dark:hover:bg-white/5 cursor-pointer"
+        >
+          <LuPencil size={18} />
+        </button>
+      </div>
+    );
+  }
+  return (
+    <form
+      className="mt-3 mb-4 flex flex-col gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save();
+      }}
+    >
+      <input
+        autoFocus
+        value={title}
+        maxLength={200}
+        onChange={(e) => setTitle(e.target.value)}
+        aria-label="Quiz title"
+        className={clsx(inputClass, "!py-2.5 text-lg font-bold")}
+      />
+      <textarea
+        value={description}
+        maxLength={1000}
+        rows={3}
+        onChange={(e) => setDescription(e.target.value)}
+        aria-label="Quiz description"
+        placeholder="Description (optional)"
+        className={clsx(inputClass, "!py-2.5 text-[15px] resize-none")}
+      />
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => setEditing(false)}
+          className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-semibold text-off-dark dark:text-muted-dark hover:bg-lprimary/8 dark:hover:bg-white/5 cursor-pointer"
+        >
+          <LuX size={15} />
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={updateQuiz.isPending}
+          className="inline-flex items-center gap-1.5 rounded-xl bg-lprimary dark:bg-dprimary px-3 py-1.5 text-sm font-bold text-white dark:text-dark cursor-pointer disabled:opacity-60"
+        >
+          <LuCheck size={15} />
+          {updateQuiz.isPending ? "Saving…" : "Save"}
+        </button>
+      </div>
+    </form>
+  );
 }
 
 /**
@@ -29,6 +137,8 @@ export function QuizInfoContent(props: {
   const questionCount = props.quiz._count?.questions ?? 0;
   const updateQuiz = useUpdateQuizMutation();
   const showHostForm = props.showHostForm ?? true;
+  const deleteResults = useDeleteResultsMutation(props.quiz.id);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
   return (
     <>
@@ -44,19 +154,26 @@ export function QuizInfoContent(props: {
             Home
           </Link>
           <LuChevronRight size={14} />
-          <span className="font-semibold text-dark dark:text-white">
+          <Link
+            href={"/admin"}
+            className="font-semibold text-dark dark:text-white hover:underline"
+          >
             Quizzes
+          </Link>
+          <LuChevronRight size={14} className="shrink-0" />
+          <span
+            aria-current="page"
+            className="min-w-0 truncate text-xs"
+            title={props.quiz.title}
+          >
+            {props.quiz.title.length > 30
+              ? `${props.quiz.title.slice(0, 30)}…`
+              : props.quiz.title}
           </span>
         </nav>
-        <h2 className="text-[26px] md:text-[32px] font-bold tracking-[-0.02em] leading-[1.05] mt-3 mb-1 wrap-break-word">
-          {props.quiz.title}
-        </h2>
-        <p className="capitalize mb-4 text-[15px] text-off-dark dark:text-muted-dark">
-          {props.quiz.description}
-        </p>
+        <EditableHeader quiz={props.quiz} />
         <p className="w-fit my-1 inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-[7px] text-[13px] font-semibold bg-[#c4ee4f] text-[#2c3a08] dark:bg-[#b8e94a] dark:text-[#15200a]">
-          Total number of questions :{" "}
-          <b className="font-extrabold">{questionCount}</b>
+          Questions: <b className="font-extrabold">{questionCount}</b>
         </p>
         <div className="flex items-center gap-2 mt-3 mb-1">
           <Switch
@@ -91,7 +208,7 @@ export function QuizInfoContent(props: {
       <div className="flex-1 flex flex-col min-h-0 w-[90%] mx-auto text-dark dark:text-white">
         <div className="flex items-center justify-between mt-6 mb-3">
           <h4 className="text-sm font-bold tracking-[0.04em] uppercase text-[#8a8896] dark:text-muted-dark">
-            Previously used
+            Previously played
           </h4>
           <span className="rounded-full px-2.5 py-0.5 text-xs bg-lprimary/10 dark:bg-white/5 text-off-dark dark:text-muted-dark">
             {pastGames.length}
@@ -99,49 +216,86 @@ export function QuizInfoContent(props: {
         </div>
         <div className="overflow-auto flex-1 min-h-0 flex flex-col gap-2.5 pr-1 -mr-1">
           {pastGames.length > 0 ? (
-            pastGames.map((result) => {
-              const leaderboardClass =
-                "flex-1 text-center rounded-[9px] p-[9px] text-[12.5px] font-semibold bg-[#ef7f4d] text-white transition-[filter] hover:brightness-106 cursor-pointer";
-              return (
-                <div
-                  key={result.id}
-                  className="rounded-[14px] p-3.5 border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 transition-[border-color,transform] hover:border-lprimary dark:hover:border-dprimary hover:-translate-y-px"
-                >
-                  <div className="flex items-center justify-between gap-2.5">
-                    <span className="text-[12.5px] font-medium text-off-dark dark:text-muted-dark">
-                      {formatSessionDate(result.endedAt)}
-                    </span>
-                    <span className="text-[13px] font-extrabold tracking-[0.06em] rounded-[7px] px-2 py-0.5 text-lprimary dark:text-dprimary bg-lprimary/10 dark:bg-white/5">
-                      {result.gameCode}
-                    </span>
+            <>
+              {pastGames.map((result) => {
+                const leaderboardClass =
+                  "flex-1 text-center rounded-[9px] p-[9px] text-[12.5px] font-semibold bg-[#ef7f4d] text-white transition-[filter] hover:brightness-106 cursor-pointer";
+                return (
+                  <div
+                    key={result.id}
+                    className="rounded-[14px] p-3.5 border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 transition-[border-color,transform] hover:border-lprimary dark:hover:border-dprimary hover:-translate-y-px"
+                  >
+                    <div className="flex items-center justify-between gap-2.5">
+                      <span className="text-[12.5px] font-medium text-off-dark dark:text-muted-dark">
+                        {formatSessionDate(result.endedAt)}
+                      </span>
+                      <span className="text-[13px] font-extrabold tracking-[0.06em] rounded-[7px] px-2 py-0.5 text-lprimary dark:text-dprimary bg-lprimary/10 dark:bg-white/5">
+                        {result.gameCode}
+                      </span>
+                    </div>
+                    <div className="text-xs mt-2 mb-[11px] text-off-dark dark:text-muted-dark">
+                      {result.playerCount === 1
+                        ? `${result.playerCount} player`
+                        : `${result.playerCount} players`}{" "}
+                      ·{" "}
+                      {result.questionCount === 1
+                        ? `${result.questionCount} question`
+                        : `${result.questionCount} questions`}
+                    </div>
+                    <div className="flex gap-2">
+                      {props.onShowLeaderboard ? (
+                        <button
+                          type="button"
+                          className={leaderboardClass}
+                          onClick={() => props.onShowLeaderboard?.(result.id)}
+                        >
+                          See leaderboard
+                        </button>
+                      ) : (
+                        <Link
+                          href={`/admin/quiz/leaderboard/${result.id}`}
+                          className={leaderboardClass}
+                        >
+                          See leaderboard
+                        </Link>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-xs mt-2 mb-[11px] text-off-dark dark:text-muted-dark">
-                    {result.playerCount} player
-                    {result.playerCount === 1 ? "" : "s"} ·{" "}
-                    {result.questionCount} question
-                    {result.questionCount === 1 ? "" : "s"}
-                  </div>
-                  <div className="flex gap-2">
-                    {props.onShowLeaderboard ? (
-                      <button
-                        type="button"
-                        className={leaderboardClass}
-                        onClick={() => props.onShowLeaderboard?.(result.id)}
-                      >
-                        See leaderboard
-                      </button>
-                    ) : (
-                      <Link
-                        href={`/admin/quiz/leaderboard/${result.id}`}
-                        className={leaderboardClass}
-                      >
-                        See leaderboard
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              );
-            })
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteAll(true)}
+                className="mt-1 self-center inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[13px] font-semibold text-red-light dark:text-red-dark hover:bg-red-light/10 dark:hover:bg-red-dark/10 cursor-pointer"
+              >
+                <LuTrash2 size={14} />
+                Delete all
+              </button>
+              <ConfirmationModal
+                open={confirmDeleteAll}
+                setOpen={setConfirmDeleteAll}
+                desc={
+                  pastGames.length === 1
+                    ? "Delete the played game of this quiz and its leaderboard? This can't be undone."
+                    : `Delete all ${pastGames.length} played games of this quiz and their leaderboards? This can't be undone.`
+                }
+                confirmLabel="Delete all"
+                confirming={deleteResults.isPending}
+                confirmingLabel="Deleting…"
+                onClick={() =>
+                  deleteResults.mutate(
+                    { quizId: props.quiz.id },
+                    {
+                      onSuccess: () => {
+                        setConfirmDeleteAll(false);
+                        toast.success("Played games deleted");
+                      },
+                      onError: (err) => toast.error(getApiErrorMessage(err)),
+                    },
+                  )
+                }
+              />
+            </>
           ) : (
             <div className="h-fit border border-lprimary/25 dark:border-white/15 border-dashed rounded-[14px] p-4 text-dark dark:text-white">
               <div className="p-2 text-lg font-black text-center">

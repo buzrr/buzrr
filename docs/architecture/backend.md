@@ -28,9 +28,9 @@ Global modules: `ConfigModule`, `RedisModule` (3 ioredis clients),
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | `health`         | `GET /health` (no prefix) — pings Postgres + Redis with 2s timeouts; 503 if either is down                                                                                                                                                                                                                                                                                                                       | Prisma, REDIS                            |
 | `players`        | `POST /players` (mint guest + player JWT), `PATCH /players/name`, `GET /players/:id`, `PATCH /players/:id/clear-game` — all `@Public()` + rate-limited                                                                                                                                                                                                                                                           | own JwtModule                            |
-| `game-sessions`  | `POST /game-sessions` (create room), `POST /join`, `GET /player-play/:playerId` (public; no question texts, options or media — only what the waiting screen needs), `GET /history`, `GET /results/:resultId`, `GET /:roomId/lobby`, `POST /:roomId/end`, `DELETE /:roomId/players/:playerId` (kick), `POST /:roomId/players/:playerId/ban`                                                                       | GameEngine, Billing                      |
-| `quizzes`        | CRUD `/quizzes`, `POST /quizzes/ai` (`TextGenerator`; `ai` rate profile; spends an AI token), `POST /quizzes/import` (batch import from Buzrr-AI; body = contract `importQuizSchema`)                                                                                                                                                                                                                            | TextGenerator, question types, Billing   |
-| `questions`      | `POST /questions` (standalone/bulk, no quiz; admin-only; body = contract `createStandaloneQuestionsSchema`), `PATCH /questions/reorder`, `DELETE /questions/:id`, `POST /questions/:id/report`; plus `QuizQuestionsController`: `GET/POST /quizzes/:quizId/questions` (multipart upsert; media via `MediaStorage`)                                                                                               | MediaStorage, question types, Moderation |
+| `game-sessions`  | `POST /game-sessions` (create room), `POST /join`, `GET /player-play/:playerId` (public; no question texts, options or media — only what the waiting screen needs), `GET /history`, `GET /results/:resultId`, `DELETE /results/…` (one, or by quiz), `GET /:roomId/lobby`, `POST /:roomId/end`, `DELETE /:roomId/players/:playerId` (kick), `POST /:roomId/players/:playerId/ban`                                | GameEngine, Billing                      |
+| `quizzes`        | CRUD `/quizzes`, `POST /quizzes/ai` (`TextGenerator`; `ai` rate profile; spends an AI token), `POST /quizzes/import` (batch import from Buzrr-AI; body = contract `importQuizSchema`), `POST /quizzes/:id/duplicate`                                                                                                                                                                                             | TextGenerator, question types, Billing   |
+| `questions`      | `POST /questions` (standalone/bulk, no quiz; admin-only; body = contract `createStandaloneQuestionsSchema`), `PATCH /questions/reorder`, `PATCH /questions/:id/disabled`, `DELETE /questions/:id`, `POST /questions/:id/report`; plus `QuizQuestionsController`: `GET/POST /quizzes/:quizId/questions` (multipart upsert; media via `MediaStorage`)                                                              | MediaStorage, question types, Moderation |
 | `moderation`     | `GET /moderation/questions?status=pending\|approved\|unapproved`, `GET .../counts`, `PATCH .../approve` · `.../unapprove` · `.../pending` · `.../categories` (bulk, `{ ids }` ≤100; skipped ids reported back), `PATCH .../:id/approve`, `PATCH .../:id/unapprove`, `PATCH .../:id/pending` (back to review), `PATCH .../:id/categories` (retag; no re-moderation) — `@Roles("admin","superadmin")`              | Categories                               |
 | `categories`     | `GET /categories` (any account — the list with question counts), `POST`/`PATCH`/`DELETE /categories[/:id]` (`@Roles("admin","superadmin")`; delete cascades tags + per-category ratings); `CategoriesService.assertExist` validates `categoryIds` on admin writes. **Only admins tag questions** (standalone create + moderation endpoints); quiz question saves and `POST /quizzes/import` ignore `categoryIds` | —                                        |
 | `admin-users`    | `GET /superadmin/users`, `PATCH /superadmin/users/:id/role` — `@Roles("superadmin")`                                                                                                                                                                                                                                                                                                                             | —                                        |
@@ -56,6 +56,15 @@ services.
   `update()` runs in a transaction: flipping `isPublic: true` also moves every
   duel-eligible `draft` question to `pending` (submits them for moderation)
   and every other draft to `unapproved`; already-decided ones are untouched.
+  `findAllForUser` sorts by last activity: an edit (`updatedAt`; question
+  writes touch the quiz) or the latest game hosted or finished.
+  `findOneForUser` includes the quiz's last 50 results, whoever hosted them.
+  `duplicate` copies an owned quiz — settings, questions (with `disabled`),
+  options in authored order — as "<title> (copy)" under the same capacity
+  check; media URLs are shared, not copied, and moderation restarts at `draft`.
+- Disabling a question (`PATCH /questions/:id/disabled`, owner only) keeps it
+  in the quiz and editor; games (engine load, player context) and question
+  counts skip it.
 - `questions.service.ts` — the multipart upsert (`upsertFromMultipart`) is the
   single write path for questions from the UI (create and edit). Fields:
   `type` (default `multiple_choice`), optional `config` (JSON), and options
@@ -136,8 +145,11 @@ services.
   order (Redis ban **before** Postgres detach) is deliberate — a join between
   the two would otherwise readmit the player. A detached-but-not-cleaned
   player is still kickable so retries can finish a partial failure.
-- `getResult`: hosted results visible to the host; hostless (duel) results
-  only to participants.
+- `getResult`: hosted results visible to the host and the quiz's owner;
+  hostless (duel) results only to participants. `deleteResults` (`DELETE`
+  `/results/:resultId` or `/results/by-quiz/:quizId`) removes classic results
+  the user hosted or whose quiz they own (entries cascade); duel results are
+  never deleted.
 
 Answers have **no REST surface** — `submit-answer` over the socket (with an
 ack) is the only way in, because scoring needs the server-measured time
