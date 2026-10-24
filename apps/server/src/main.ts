@@ -74,8 +74,10 @@ async function bootstrap() {
       index: false,
       dotfiles: "deny",
       setHeaders: (res) => {
-        // Private: signed links expire, shared caches must not keep them.
-        res.setHeader("Cache-Control", "private, max-age=21600");
+        // Keys are content ids (a file never changes): `immutable` spares
+        // the revalidation on every reload. Signed links expire, so shared
+        // caches must not keep them.
+        res.setHeader("Cache-Control", "private, max-age=21600, immutable");
         res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
       },

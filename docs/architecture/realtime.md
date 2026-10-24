@@ -318,10 +318,10 @@ win for each player in `/users/me/stats`.
 ## The lobby: everything ahead, start when ready
 
 A device joining a room (lobby, a reconnect, or late in the game) gets
-`preload-all`: every playable question's encrypted clips (no keys;
-`GameEngineService.lobbyAssets`, from Postgres, kept a minute). It downloads
-them through one `lobby` download slot, one after the other, and reports
-`assets-status` (files, `done` also after failures). The host gets
+`preload-all`: every playable question's encrypted clips and picture (no
+keys; `GameEngineService.lobbyAssets`, from Postgres, kept a minute). It
+downloads them through one `lobby` download slot, one after the other, and
+reports `assets-status` (files, `done` also after failures). The host gets
 `lobby-ready { ready, total, pending, forceAt }` at most once a second
 (`LobbyReadiness`): the lobby bar shows who is here (light) and who has
 everything (strong), "412 / 480 ready". `start-game` waits until no
@@ -331,14 +331,21 @@ button says "Start anyway (n still loading)". The server checks the same
 rule. In the game the per-question `preload` hints then find the files in
 the cache (the client keeps up to 600), so the countdown rarely waits.
 
-## Question sounds: preload and the countdown's wait
+## Question sounds and pictures: preload and the countdown's wait
+
+A question's picture is encrypted too (`Question.mediaClip` / `mediaKey`,
+made on save; older pictures get theirs in the background after a server
+start): `preload` lists it in `images`, every device downloads it (sound
+only where it plays), the countdown waits for it like for the clips, and
+`question-start` brings `mediaKey` — the device decrypts it then. Pictures
+without a copy (external links) load as before.
 
 - During a reveal (or the get-ready slide) the room gets `preload` with the
   next question's encrypted clips. Each device starts after a random pause of
   up to 3 s (`PRELOAD_SPREAD_MS`, `lib/sound/preload.ts`) and reports
   `preload-status` with `loaded: 0` at once, so the countdown counts it as
   downloading.
-- **Download slots** (`MAX_PARALLEL_AUDIO_DOWNLOADS`, `audio-slots.ts`): a
+- **Download slots** (`MAX_PARALLEL_DOWNLOADS`, `audio-slots.ts`): a
   device that has to download asks `preload-slot` first (ack `{ go, limited }`);
   queued devices get `preload-go { qIndex }` as slots free up — on a `done`
   report, a disconnect, or 8 s without progress (`SLOT_STALL_MS`). The host

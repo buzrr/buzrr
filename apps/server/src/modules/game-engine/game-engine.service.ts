@@ -28,6 +28,7 @@ import {
   acceptsMoreAnswers,
   isScored,
   mergeAnswers,
+  preloadImageUrls,
   preloadUrls,
   summarizeAnswers,
   toLiveQuestion,
@@ -485,7 +486,7 @@ export class GameEngineService
 
   /**
    * Everything a device can download ahead for this room: every playable
-   * question's encrypted clips (no keys), in play order. Read
+   * question's encrypted clips and picture (no keys), in play order. Read
    * from Postgres (the questions only reach Redis at the start).
    */
   async lobbyAssets(gameCode: string): Promise<PreloadAllPayload> {
@@ -515,9 +516,10 @@ export class GameEngineService
         .map((q, qIndex) => ({
           qIndex,
           urls: preloadUrls(q),
+          images: preloadImageUrls(q),
           playOn: q.audio?.playOn ?? "quiz",
         }))
-        .filter((p) => p.urls.length > 0),
+        .filter((p) => p.urls.length > 0 || p.images.length > 0),
     };
     this.lobbyAssetCache.set(gameCode, { at: Date.now(), payload });
     return payload;

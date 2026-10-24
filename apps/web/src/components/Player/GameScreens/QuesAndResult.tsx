@@ -1,4 +1,5 @@
 "use client";
+import QuestionPicture from "@/components/Game/QuestionPicture";
 import clsx from "clsx";
 import Image from "next/image";
 import type { ReactNode } from "react";
@@ -403,8 +404,9 @@ const QuestionAndResult = (params: {
           >
             {params.question?.mediaType === "image" &&
               params.question.media && (
-                <Image
-                  src={params.question.media}
+                <QuestionPicture
+                  media={params.question.media}
+                  mediaKey={params.question.mediaKey}
                   className="mb-4 md:mb-5 mx-auto max-h-[28dvh] w-auto rounded-2xl"
                   alt="Question image"
                   height={320}

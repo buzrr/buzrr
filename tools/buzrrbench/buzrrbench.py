@@ -510,9 +510,15 @@ class Bot:
 
     def on_preload(self, data: dict) -> None:
         M.counts["preload hints received"] += 1
-        if not self.assets or not self.sound_here(data.get("playOn")):
+        if not self.assets:
             return
-        urls = data.get("urls") or []
+        # Like the browser: the picture on every device, the sound only
+        # where it plays.
+        urls = list(data.get("images") or [])
+        if self.sound_here(data.get("playOn")):
+            urls += data.get("urls") or []
+        if not urls:
+            return
         q = data["qIndex"]
         self.tracked = (q, [u.split("?")[0] for u in urls], time.perf_counter())
         self.notify()
@@ -562,9 +568,9 @@ class Bot:
         self.start_preload(urls)
 
     async def preload_all(self, data: dict) -> None:
-        """Like the browser in the lobby: every question's sound where it
-        plays here, through the "lobby" download slot, one after the other,
-        reporting assets-status."""
+        """Like the browser in the lobby: every question's picture, and its
+        sound where it plays here, through the "lobby" download slot, one
+        after the other, reporting assets-status."""
         if not self.assets:
             return
         # It comes with the connect: wait until the client counts as connected.
@@ -574,6 +580,7 @@ class Bot:
             await asyncio.sleep(0.1)
         urls = []
         for q in data.get("questions") or []:
+            urls += q.get("images") or []
             if self.sound_here(q.get("playOn")):
                 urls += q.get("urls") or []
         self.lobby_total = len(urls)

@@ -11,7 +11,8 @@ const progress = new Map<
   string,
   { loaded: number; total: number; done: boolean; failed?: boolean }
 >();
-// Every question's clips (all loaded in the lobby): a whole quiz has to fit.
+// Every question's clips and picture (all loaded in the lobby): a whole quiz
+// has to fit.
 const MAX_ENTRIES = 600;
 
 const bare = (url: string) => url.split("?")[0]!;
@@ -153,7 +154,7 @@ const PRELOAD_SPREAD_MS = 3000;
 const QUEUED_REPORT_MS = 1500;
 
 /**
- * The server's download slots (a room hands out MAX_PARALLEL_AUDIO_DOWNLOADS
+ * The server's download slots (a room hands out MAX_PARALLEL_DOWNLOADS
  * at a time, per kind). `wait` resolves when it's this device's turn
  * (`limited` false: no rationing, so the device spreads its own start);
  * `keepAlive` says the slot is still in use; `done` frees it (questions free

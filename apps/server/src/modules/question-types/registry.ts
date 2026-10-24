@@ -79,6 +79,10 @@ export function toPublicQuestion(question: LiveQuestion): PublicQuestion {
   return {
     ...handlerFor(question.type).toPublic(question),
     audio: publicAudio(question.audio),
+    // The picture: the encrypted copy (preloaded) and its key, when made.
+    ...(question.mediaClip && question.mediaKey
+      ? { media: question.mediaClip, mediaKey: question.mediaKey }
+      : {}),
   };
 }
 
@@ -102,6 +106,18 @@ function publicAudio(audio: LiveQuestion["audio"]): PublicQuestion["audio"] {
     key: audio.clipKey,
     revealUrl: audio.revealClipUrl ?? null,
   };
+}
+
+/** The encrypted picture to download ahead of a question (no key). */
+export function preloadImageUrls(question: LiveQuestion | undefined): string[] {
+  return question?.mediaClip && question.mediaKey ? [question.mediaClip] : [];
+}
+
+/** Whether a question has anything for devices to download ahead. */
+export function hasPreload(question: LiveQuestion | undefined): boolean {
+  return (
+    preloadUrls(question).length > 0 || preloadImageUrls(question).length > 0
+  );
 }
 
 /** The clips to download ahead of a question (no keys). */
@@ -187,6 +203,8 @@ export interface QuestionRecord {
   audioClipKey?: string | null;
   audioRevealClip?: string | null;
   audioRevealKey?: string | null;
+  mediaClip?: string | null;
+  mediaKey?: string | null;
 }
 
 type LiveOption = LiveQuestion["options"][number];
@@ -220,6 +238,8 @@ export function toLiveQuestion(row: QuestionRecord): LiveQuestion | null {
       title: row.title,
       media: row.media,
       mediaType: row.mediaType,
+      mediaClip: row.mediaClip ?? null,
+      mediaKey: row.mediaKey ?? null,
       timeOut: row.timeOut,
       options: options.map((o) => ({
         id: o.id,

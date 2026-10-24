@@ -1,7 +1,7 @@
 "use client";
 
+import QuestionPicture from "@/components/Game/QuestionPicture";
 import clsx from "clsx";
-import Image from "next/image";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { LuCheck, LuCopy, LuShare2, LuSkipForward } from "react-icons/lu";
@@ -224,8 +224,9 @@ export default function QuestionScreen(props: QuestionScreenProps) {
             </span>
           </div>
           {question.mediaType === "image" && question.media && (
-            <Image
-              src={question.media}
+            <QuestionPicture
+              media={question.media}
+              mediaKey={question.mediaKey}
               className="mt-5 mx-auto max-h-[26dvh] w-auto rounded-2xl"
               alt="Question image"
               height={300}

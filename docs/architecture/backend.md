@@ -16,7 +16,7 @@ whitelist: true, forbidNonWhitelisted: false })` → global
 else becomes a logged 500) → with `STORAGE_DRIVER=local`, static serving of
 `/uploads/*` from the upload directory — only with a valid signature (403
 otherwise; see `MediaStorage` below), `nosniff`, `Cache-Control: private,
-max-age=21600`. Port:
+max-age=21600, immutable`. Port:
 `API_PORT` ?? `PORT` ?? 3001.
 
 ## Module map (`src/app.module.ts`)

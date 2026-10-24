@@ -151,6 +151,8 @@ export class QuizzesService {
               audioClipKey: q.audioClipKey,
               audioRevealClip: q.audioRevealClip,
               audioRevealKey: q.audioRevealKey,
+              mediaClip: q.mediaClip,
+              mediaKey: q.mediaKey,
               order: q.order,
               disabled: q.disabled,
               options: {

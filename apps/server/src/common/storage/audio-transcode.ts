@@ -109,7 +109,7 @@ export async function cutClip(
 }
 
 /** Runs ffmpeg on `input` (stdin → stdout, no temp files) with a timeout and an output cap. */
-function runFfmpeg(input: Buffer, args: string[]): Promise<Buffer> {
+export function runFfmpeg(input: Buffer, args: string[]): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const ff = spawn(
       "ffmpeg",

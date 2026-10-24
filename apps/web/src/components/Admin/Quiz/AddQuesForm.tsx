@@ -55,6 +55,7 @@ import {
   QUESTION_TYPE_ORDER,
   QuestionTypeIcon,
 } from "@/components/QuestionTypes";
+import { dropTargetClass } from "@/hooks/useFileDrop";
 import {
   OPTION_KEYS,
   OptionKey,
@@ -527,6 +528,29 @@ const AddQuesForm = (props: {
     setFile(selectedFile);
   }
 
+  // Drag and drop a file anywhere on the editor: a picture becomes the
+  // question's image, an audio file its sound.
+  // What is being dragged (its box gets the drop border); "any" when the
+  // browser doesn't tell the type before the drop.
+  const [dropping, setDropping] = useState<"image" | "audio" | "any" | null>(
+    null,
+  );
+  const AUDIO_EXT = /\.(mp3|wav|ogg|oga|opus|flac|m4a|aac|webm)$/i;
+  function onDropFile(e: React.DragEvent) {
+    e.preventDefault();
+    setDropping(null);
+    const f = e.dataTransfer.files?.[0];
+    if (!f) return;
+    if (f.type.startsWith("image/")) {
+      setFile(f);
+    } else if (f.type.startsWith("audio/") || AUDIO_EXT.test(f.name)) {
+      setAudioFile(f);
+      setAudioCues({ startMs: 0, revealMs: null });
+    } else {
+      toast.error("Drop a picture or an audio file");
+    }
+  }
+
   function deleteFile() {
     setFile(null);
     setPreviewUrl(null);
@@ -685,7 +709,32 @@ const AddQuesForm = (props: {
   });
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col">
+    <form
+      onSubmit={onSubmit}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes("Files")) {
+          e.preventDefault();
+          const type = e.dataTransfer.items[0]?.type ?? "";
+          setDropping(
+            type.startsWith("image/")
+              ? "image"
+              : type.startsWith("audio/")
+                ? "audio"
+                : "any",
+          );
+        }
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setDropping(null);
+        }
+      }}
+      onDrop={onDropFile}
+      className={clsx(
+        "flex flex-col rounded-2xl transition-shadow",
+        dropping && "ring-2 ring-dprimary ring-offset-2",
+      )}
+    >
       <div className="flex flex-col gap-4 px-5 pt-[18px] md:px-7 md:pt-4">
         <div className="flex flex-col gap-2">
           <span className={fieldLabelClass}>
@@ -794,6 +843,8 @@ const AddQuesForm = (props: {
                 <label
                   className={clsx(
                     "flex items-center gap-3.5 rounded-2xl border-[1.5px] border-dashed px-4 py-3 cursor-pointer transition-colors border-lprimary/25 dark:border-white/15 hover:border-dprimary bg-light-bg dark:bg-card-dark",
+                    (dropping === "image" || dropping === "any") &&
+                      dropTargetClass,
                   )}
                 >
                   <span className="size-10 shrink-0 rounded-xl flex items-center justify-center bg-lprimary/10 dark:bg-white/5 text-lprimary dark:text-dprimary">
@@ -855,7 +906,13 @@ const AddQuesForm = (props: {
                   </select>
                 </label>
               ) : (
-                <label className="flex items-center gap-3.5 rounded-2xl border-[1.5px] border-dashed px-4 py-3 cursor-pointer transition-colors border-lprimary/25 dark:border-white/15 hover:border-dprimary bg-light-bg dark:bg-card-dark">
+                <label
+                  className={clsx(
+                    "flex items-center gap-3.5 rounded-2xl border-[1.5px] border-dashed px-4 py-3 cursor-pointer transition-colors border-lprimary/25 dark:border-white/15 hover:border-dprimary bg-light-bg dark:bg-card-dark",
+                    (dropping === "audio" || dropping === "any") &&
+                      dropTargetClass,
+                  )}
+                >
                   <span className="size-10 shrink-0 rounded-xl flex items-center justify-center bg-lprimary/10 dark:bg-white/5 text-lprimary dark:text-dprimary">
                     <LuMusic size={20} />
                   </span>

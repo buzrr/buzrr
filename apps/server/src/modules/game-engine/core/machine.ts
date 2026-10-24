@@ -8,6 +8,8 @@ import { ANSWER_GRACE_MS } from "../../../common/utils/answer-timing";
 import { planBotAnswer } from "../../../common/utils/duel-bot";
 import {
   acceptsMoreAnswers,
+  hasPreload,
+  preloadImageUrls,
   preloadUrls,
   toPublicQuestion,
 } from "../../question-types";
@@ -347,10 +349,7 @@ function advance(
     // A question with sound always gets a countdown, so downloads can finish.
     // … unless it has no time limit: those open straight away.
     const nextQ = state.questions[meta.qIndex + 1];
-    if (
-      !isUnlimitedTime(nextQ?.timeOut) &&
-      (mod || preloadUrls(nextQ).length > 0)
-    ) {
+    if (!isUnlimitedTime(nextQ?.timeOut) && (mod || hasPreload(nextQ))) {
       return startCountdown(state, meta.qIndex + 1, now, ctx);
     }
     return openQuestion(state, meta.qIndex + 1, now, ctx);
@@ -777,10 +776,11 @@ function onRosterChanged(state: GameState): Transition {
   return noop(state);
 }
 
-/** Tell the room to download question `index`'s sound clips now (if any). */
+/** Tell the room to download question `index`'s sound clips and picture now (if any). */
 function preloadEffects(state: GameState, index: number): Effect[] {
   const urls = preloadUrls(state.questions[index]);
-  return urls.length > 0
+  const images = preloadImageUrls(state.questions[index]);
+  return urls.length > 0 || images.length > 0
     ? [
         {
           kind: "emit",
@@ -790,6 +790,7 @@ function preloadEffects(state: GameState, index: number): Effect[] {
             payload: {
               qIndex: index,
               urls,
+              ...(images.length > 0 ? { images } : {}),
               playOn: state.questions[index]?.audio?.playOn ?? "quiz",
             },
           },
@@ -813,7 +814,7 @@ const DOWNLOAD_RECHECK_MS = 1_000;
  */
 function waitForDownloads(state: GameState, now: number): Transition | null {
   const { meta } = state;
-  if (preloadUrls(state.questions[meta.qIndex]).length === 0) return null;
+  if (!hasPreload(state.questions[meta.qIndex])) return null;
   const connected = new Set(
     state.roster.filter((p) => p.connected).map((p) => p.id),
   );

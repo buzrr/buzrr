@@ -157,6 +157,10 @@ model Question {
   audioClipKey     String?
   audioRevealClip  String?
   audioRevealKey   String?
+  /// The picture as devices load it ahead of time: AES-256-GCM encrypted,
+  /// the key goes out with `question-start` (images only).
+  mediaClip        String?
+  mediaKey         String?
   order            Int                @default(1)
   /// Kept in the quiz, but skipped in games, question counts and scoring.
   disabled         Boolean            @default(false)
