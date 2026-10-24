@@ -174,3 +174,105 @@ describe("hostDisconnected", () => {
     expect(store.meta.hostConnected).toBe(true);
   });
 });
+
+describe("lobby grace", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("takes a player gone past the given grace off the lobby list", async () => {
+    vi.useFakeTimers();
+    const { store, io, engine } = setup(meta(), [player("p1"), player("p2")]);
+
+    await engine.playerDisconnected(CODE, "p2", 10_000);
+    await vi.advanceTimersByTimeAsync(9_999);
+    expect(io.events("player-removed")).toEqual([]);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(io.events("player-removed")).toEqual([
+      {
+        room: CODE,
+        event: "player-removed",
+        payload: { id: "p2", timedOut: true },
+      },
+    ]);
+    expect(store.players.has("p2")).toBe(false);
+  });
+
+  it("keeps a player who came back within the grace", async () => {
+    vi.useFakeTimers();
+    const { store, io, engine } = setup(meta(), [player("p1"), player("p2")]);
+
+    await engine.playerDisconnected(CODE, "p2", 10_000);
+    store.players.set("p2", player("p2", { connected: true }));
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(io.events("player-removed")).toEqual([]);
+    expect(store.players.has("p2")).toBe(true);
+  });
+
+  it("never removes a player once the game runs (they keep their score)", async () => {
+    vi.useFakeTimers();
+    const { store, io, engine } = openQuestion();
+    store.scores.set("p2", 900);
+
+    await engine.playerDisconnected(CODE, "p2", 10_000);
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(io.events("player-removed")).toEqual([]);
+    expect(store.players.get("p2")?.connected).toBe(false);
+    expect(store.scores.get("p2")).toBe(900);
+  });
+});
+
+describe("leaderboard broadcast", () => {
+  const entries = Array.from({ length: 12 }, (_, i) => ({
+    playerId: `p${i + 1}`,
+    name: `P${i + 1}`,
+    profilePic: null,
+    score: 1200 - i,
+    rank: i + 1,
+  }));
+  const send = (engine: GameEngineService, n: number) =>
+    (
+      engine as unknown as {
+        send: (code: string, to: unknown, message: unknown) => void;
+      }
+    ).send(
+      CODE,
+      { room: true },
+      {
+        event: "leaderboard",
+        payload: { entries: entries.slice(0, n), isFinal: false },
+      },
+    );
+
+  it("sends the host the whole board and the players its top", () => {
+    const { io, engine } = setup(meta(), []);
+
+    send(engine, 12);
+
+    const [host, players] = io.events("leaderboard");
+    expect(host).toMatchObject({ room: `host:${CODE}` });
+    expect((host!.payload as { entries: unknown[] }).entries).toHaveLength(12);
+    expect(players).toMatchObject({
+      room: `${CODE}!host:${CODE}`,
+      payload: { total: 12 },
+    });
+    expect((players!.payload as { entries: unknown[] }).entries).toHaveLength(
+      10,
+    );
+  });
+
+  it("broadcasts a small board to the room as it is", () => {
+    const { io, engine } = setup(meta(), []);
+
+    send(engine, 4);
+
+    expect(io.events("leaderboard")).toEqual([
+      {
+        room: CODE,
+        event: "leaderboard",
+        payload: { entries: entries.slice(0, 4), isFinal: false },
+      },
+    ]);
+  });
+});

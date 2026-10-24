@@ -97,8 +97,25 @@ export const answerResultSchema = z.object({
   rank: z.number().int().nullable(),
 });
 
+/**
+ * Players are sent only the top of a room's leaderboard (the host all of it):
+ * the whole board to everyone grows with the room twice over — entries times
+ * recipients — and held up the events behind it. A player's own standing
+ * comes with `answer-result`.
+ */
+export const PLAYER_LEADERBOARD_TOP = 10;
+
+/**
+ * The host is sent the top this many — after a question also whoever was
+ * up there before it, so their move down can be shown. A room of hundreds
+ * renders no more rows than that.
+ */
+export const HOST_LEADERBOARD_TOP = 50;
+
 export const leaderboardSchema = z.object({
   entries: z.array(leaderboardEntrySchema),
+  /** How many players there are, when `entries` is only the top. */
+  total: z.number().int().optional(),
   isFinal: z.boolean(),
 });
 
@@ -196,6 +213,8 @@ export const stateSyncSchema = z.object({
   reveal: questionEndSchema.optional(),
   /** Present while phase is "reveal", "final" or "ended". */
   leaderboard: z.array(leaderboardEntrySchema).optional(),
+  /** Players: how many are on the board when `leaderboard` is only the top (and their own row). */
+  leaderboardTotal: z.number().int().optional(),
   players: z.array(rosterPlayerSchema),
   /** Present for player connections only. */
   you: answerResultSchema.optional(),
@@ -226,7 +245,18 @@ export const playerRefSchema = z.object({
 export const playerRemovedSchema = playerRefSchema.extend({
   /** True when the host banned the player instead of just kicking them. */
   banned: z.boolean().optional(),
+  /** Not the host's doing: the player's device went quiet in the lobby. */
+  timedOut: z.boolean().optional(),
 });
+
+/**
+ * Players' devices send `heartbeat` this often. A socket that has sent one
+ * and then stays quiet for `HEARTBEAT_TIMEOUT_MS` (three missed beats) is
+ * dropped and the player shows as offline; in the lobby, a player gone that
+ * long after their last beat leaves the list (and is back if they return).
+ */
+export const HEARTBEAT_INTERVAL_MS = 10_000;
+export const HEARTBEAT_TIMEOUT_MS = 35_000;
 
 export const duelInviteAcceptSchema = z.object({ code: z.string().min(1) });
 export const removePlayerSchema = z.object({ id: z.string().min(1) });
@@ -304,6 +334,8 @@ export interface ClientToServerEvents {
     ack: (result: SubmitAnswerAck) => void,
   ) => void;
   "request-sync": () => void;
+  /** A player's device is still here (every `HEARTBEAT_INTERVAL_MS`). */
+  heartbeat: () => void;
   /** A player voluntarily leaves the room (back / leave-game confirmation). */
   "leave-room": () => void;
   // -- host intents (the server decides what each one means) --

@@ -1,0 +1,811 @@
+#!/usr/bin/env python3
+"""
+buzrrbench - load test for a Buzrr classic room.
+
+Joins N simulated players to a room (by game code), waits in the lobby until
+the host starts the game, then answers every question at random after a random
+0.5-20 s delay (late answers are sent on purpose; their rejections are counted).
+
+Each player also downloads what its browser would, with its own cache:
+  - the player context
+  - question images, as each question opens
+
+Measures:
+  - HTTP latency: create player, join room
+  - socket connect latency (connect + first state-sync)
+  - request-sync -> state-sync round trip (lobby, a few probe bots every 10 s)
+  - submit-answer ack latency (accepted / rejected by reason)
+  - broadcast spread: how far apart the players received question-start /
+    question-end for the same question
+  - downloads: latency and bytes per kind
+
+Usage:
+  python3 buzrrbench.py [--url https://www.buzrr.in] [--code ABC123] [--users 50]
+                        [--kbps 2000] [--no-assets]
+                        [--timeout-after 60 --timeout-users 5] [--procs 4] [--probe-bots 20]
+
+With --timeout-after/--timeout-users, that many connected players "freeze" at
+that point (like a locked phone): they send nothing any more — no heartbeat,
+answers — while the socket still answers the transport ping, so
+only the server's heartbeat check can drop them. Dropped, they stay away.
+Missing values are asked for interactively.
+
+The run ends by itself once 95 % of the connected players are done (game over,
+dropped, kicked) plus 30 s for stragglers; the rest count as "bots without game
+end". With --procs N the players are split over N processes (one asyncio loop
+can't keep up beyond ~200 bots); the parent merges their numbers into one summary.
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import os
+import random
+import signal
+import statistics
+import string
+import subprocess
+import sys
+import tempfile
+import time
+from collections import Counter, defaultdict
+from dataclasses import dataclass, field
+from urllib.parse import urljoin, urlparse
+
+try:
+    import aiohttp
+    import socketio
+except ImportError:
+    sys.exit(
+        "Missing dependencies. Install with:\n"
+        "  python3 -m venv .venv && .venv/bin/pip install -r requirements.txt\n"
+        "  (WSL/Ubuntu: sudo apt install python3-venv first)"
+    )
+
+ANSWER_DELAY = (0.5, 20.0)
+ACK_TIMEOUT = 15.0
+SYNC_PROBE_EVERY = 10.0  # only --probe-bots players probe
+HEARTBEAT_EVERY = 10.0  # HEARTBEAT_INTERVAL_MS in the contract
+# The run stops this long after DONE_SHARE of the connected players are done.
+DONE_SHARE = 0.95
+DONE_GRACE = 30.0
+CHUNK = 64 * 1024
+
+
+
+# -- metrics -------------------------------------------------------------------
+
+
+class Metrics:
+    def __init__(self) -> None:
+        self.lat: dict[str, list[float]] = defaultdict(list)  # ms
+        self.errors: Counter[str] = Counter()
+        self.counts: Counter[str] = Counter()
+        # (event, qIndex) -> receive timestamps (s), for broadcast spread
+        self.recv: dict[tuple[str, int], list[float]] = defaultdict(list)
+        self.bytes: Counter[str] = Counter()
+
+    def add(self, name: str, ms: float) -> None:
+        self.lat[name].append(ms)
+
+    def err(self, what: str) -> None:
+        self.errors[what] += 1
+
+    # --procs: children dump raw numbers, the parent merges them.
+    def dump(self) -> dict:
+        return {
+            "lat": self.lat, "errors": self.errors, "counts": self.counts,
+            "recv": [[ev, q, ts] for (ev, q), ts in self.recv.items()],
+            "bytes": self.bytes,
+        }
+
+    def merge(self, d: dict) -> None:
+        for k, v in d["lat"].items():
+            self.lat[k].extend(v)
+        self.errors.update(d["errors"])
+        self.counts.update(d["counts"])
+        self.bytes.update(d["bytes"])
+        for ev, q, ts in d["recv"]:
+            self.recv[(ev, q)].extend(ts)  # time.time(): comparable across processes
+
+
+M = Metrics()
+
+
+def fmt_stats(values: list[float]) -> str:
+    if not values:
+        return "-"
+    v = sorted(values)
+
+    def pct(p: float) -> float:
+        return v[min(len(v) - 1, int(round(p / 100 * (len(v) - 1))))]
+
+    return (
+        f"n={len(v):5d}  min={v[0]:7.1f}  avg={statistics.fmean(v):7.1f}  "
+        f"p50={pct(50):7.1f}  p95={pct(95):7.1f}  p99={pct(99):7.1f}  max={v[-1]:7.1f}"
+    )
+
+
+# -- random answers --------------------------------------------------------------
+
+
+def random_answer(q: dict) -> dict | None:
+    """An answer of the right shape for the question's type (random choice)."""
+    t = q.get("type")
+    opts = [o["id"] for o in q.get("options") or []]
+    if t == "multiple_choice":
+        if not opts:
+            return None
+        if q.get("multiSelect"):
+            k = random.randint(1, len(opts))
+            return {"optionIds": random.sample(opts, k)}
+        return {"optionId": random.choice(opts)}
+    if t == "true_false":
+        return {"optionId": random.choice(opts)} if opts else None
+    if t == "poll":
+        if not opts:
+            return None
+        k = random.randint(1, len(opts)) if q.get("multiSelect") else 1
+        return {"optionIds": random.sample(opts, k)}
+    if t == "rating":
+        top = 10 if str(q.get("scale")) == "10" else 5
+        return {"value": random.randint(1, top)}
+    if t == "word_cloud":
+        n = random.randint(1, max(1, int(q.get("maxAnswers") or 1)))
+        maxlen = int(q.get("maxLength") or 20)
+        return {
+            "words": [
+                "".join(random.choices(string.ascii_lowercase, k=random.randint(3, min(10, maxlen))))
+                for _ in range(n)
+            ]
+        }
+    if t == "open_text":
+        return {"text": "bench " + "".join(random.choices(string.ascii_lowercase, k=12)), "anonymous": False}
+    return None
+
+
+# -- one simulated player ------------------------------------------------------------
+
+
+@dataclass
+class Bot:
+    idx: int
+    base: str
+    code: str
+    http: aiohttp.ClientSession
+    sio: socketio.AsyncClient = field(default_factory=lambda: socketio.AsyncClient(reconnection=True))
+    player_id: str = ""
+    token: str = ""
+    phase: str = "idle"
+    connected: bool = False
+    ever_connected: bool = False
+    game_ended: bool = False  # saw game-over / game-session-ended
+    probe: bool = False  # one of the --probe-bots request-sync probes
+    done: asyncio.Event = field(default_factory=asyncio.Event)
+    sync_sent: float = 0.0
+    answered_q: set = field(default_factory=set)
+    assets: bool = True
+    kbps: float = 0.0  # download limit per device, 0 = none
+    cache: dict = field(default_factory=dict)  # bare url -> download task
+    bw_free_at: float = 0.0  # when the device's downlink is free again (--kbps)
+    tasks: set = field(default_factory=set)
+    seen_q: set = field(default_factory=set)
+    frozen_at: float = 0.0  # --timeout-*: when this player stopped sending (perf_counter)
+
+    # -- helpers ------------------------------------------------------------------
+
+    @property
+    def frozen(self) -> bool:
+        return self.frozen_at > 0
+
+    def freeze(self) -> None:
+        """Stop sending anything, like a page frozen on a locked phone."""
+        self.frozen_at = time.perf_counter()
+        # A frozen page can't reconnect either once the server drops it.
+        self.sio.reconnection = False
+        M.counts["players timed out (frozen)"] += 1
+
+    def spawn(self, coro) -> None:
+        t = asyncio.create_task(coro)
+        self.tasks.add(t)
+        t.add_done_callback(self.tasks.discard)
+
+    async def http_json(self, method: str, path: str, metric: str, retries: int = 0, **kw):
+        """JSON request; with `retries`, 5xx and network errors are retried like
+        the web client does (0.8 s, 1.6 s, 3.2 s + jitter)."""
+        for attempt in range(retries + 1):
+            t0 = time.perf_counter()
+            last = attempt == retries
+            try:
+                async with self.http.request(method, f"{self.base}{path}", **kw) as r:
+                    body = await r.json(content_type=None)
+                    M.add(metric, (time.perf_counter() - t0) * 1000)
+                    if r.status < 400:
+                        return body
+                    if r.status < 500 or last:
+                        M.err(f"{metric}: HTTP {r.status} {str(body)[:80]}")
+                        return None
+                    what = f"HTTP {r.status}"
+            except Exception as e:  # noqa: BLE001
+                if last:
+                    M.err(f"{metric}: {type(e).__name__}")
+                    return None
+                what = type(e).__name__
+            M.counts[f"{metric}: retried after {what}"] += 1
+            await asyncio.sleep(0.4 * 2 ** (attempt + 1) + random.uniform(0, 0.4))
+        return None
+
+    async def run(self) -> None:
+        p = await self.http_json(
+            "POST", "/api/players", "http create-player",
+            json={"username": f"bench-{self.idx:03d}", "profile": ""},
+        )
+        if not p:
+            self.done.set()
+            return
+        self.player_id, self.token = p["playerId"], p["accessToken"]
+        ok = await self.http_json(
+            "POST", "/api/game-sessions/join", "http join-room", retries=3,
+            json={"gameCode": self.code},
+            headers={"Authorization": f"Bearer {self.token}"},
+        )
+        if ok is None:
+            self.done.set()
+            return
+        await self.load_context()
+
+        self.register()
+        t0 = time.perf_counter()
+        self._connect_t0 = t0
+        try:
+            await self.sio.connect(
+                f"{self.base}?userType=player&gameCode={self.code}",
+                auth={"token": self.token},
+                transports=["websocket"],
+                wait_timeout=20,
+            )
+        except Exception as e:  # noqa: BLE001
+            M.err(f"socket connect: {type(e).__name__} {e}"[:120])
+            self.done.set()
+            return
+        M.add("socket connect", (time.perf_counter() - t0) * 1000)
+        self.connected = self.ever_connected = True
+        probe = asyncio.create_task(self.sync_probe() if self.probe else asyncio.sleep(0))
+        beats = asyncio.create_task(self.heartbeat())
+        await self.done.wait()
+        probe.cancel()
+        beats.cancel()
+        # A bot that gives up (error, kicked, game over) leaves for real: no
+        # auto-reconnect, so the host sees it go offline instead of a silent
+        # player that keeps coming back without answering.
+        try:
+            self.sio.reconnection = False
+            if self.sio.connected:
+                await self.sio.disconnect()
+        except Exception:
+            pass
+
+    async def load_context(self) -> None:
+        """What the player page loads: the play context."""
+        await self.http_json(
+            "GET", f"/api/game-sessions/player-play/{self.player_id}", "http player-play"
+        )
+
+    # -- downloads ------------------------------------------------------------------
+
+    def fetch(self, url: str, kind: str) -> asyncio.Task:
+        """One download per URL per device (browser cache), keyed without the signature."""
+        key = url.split("?")[0]
+        task = self.cache.get(key)
+        if task is None or (task.done() and (task.cancelled() or task.exception())):
+            task = asyncio.create_task(self._download(url, kind))
+            self.cache[key] = task
+            self.tasks.add(task)
+            task.add_done_callback(self.tasks.discard)
+        return task
+
+    async def _download(self, url: str, kind: str) -> int:
+        full = urljoin(self.base + "/", url)
+        t0 = time.perf_counter()
+        loaded = 0
+        try:
+            async with self.http.get(
+                full, timeout=aiohttp.ClientTimeout(total=None, sock_connect=15, sock_read=30)
+            ) as r:
+                if r.status >= 400:
+                    M.err(f"download {kind}: HTTP {r.status}")
+                    raise RuntimeError(f"HTTP {r.status}")
+                async for chunk in r.content.iter_chunked(CHUNK):
+                    loaded += len(chunk)
+                    if self.kbps:
+                        # One downlink per device, shared by its parallel downloads.
+                        now = time.perf_counter()
+                        self.bw_free_at = max(now, self.bw_free_at) + len(chunk) * 8 / 1000 / self.kbps
+                        await asyncio.sleep(self.bw_free_at - now)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:  # noqa: BLE001
+            if not isinstance(e, RuntimeError):
+                M.err(f"download {kind}: {type(e).__name__}")
+            raise
+        M.add(f"download {kind}", (time.perf_counter() - t0) * 1000)
+        M.counts[f"downloads: {kind}"] += 1
+        M.bytes[kind] += loaded
+        return loaded
+
+    def download(self, url: str | None, kind: str) -> None:
+        if url and self.assets:
+            self.fetch(url, kind).add_done_callback(lambda t: t.cancelled() or t.exception())
+
+    async def _emit(self, event: str, payload) -> None:
+        if self.frozen:
+            return
+        try:
+            await self.sio.emit(event, payload) if payload is not None else await self.sio.emit(event)
+            M.counts[f"{event} sent"] += 1
+        except Exception:  # noqa: BLE001
+            M.err(f"{event} emit failed")
+
+    def on_question(self, q_index: int, question: dict) -> None:
+        """What the question screen loads as it opens: its image."""
+        if not self.assets or q_index in self.seen_q:
+            return
+        self.seen_q.add(q_index)
+        if question.get("media"):
+            self.download(question["media"], "question image")
+
+    def set_phase(self, phase: str) -> None:
+        self.phase = phase
+
+    # socket handlers
+    def register(self) -> None:
+        s = self.sio
+        first_sync = {"seen": False}
+
+        @s.on("state-sync")
+        async def _sync(data):
+            now = time.perf_counter()
+            if not first_sync["seen"]:
+                first_sync["seen"] = True
+                M.add("socket connect -> first state-sync", (now - self._connect_t0) * 1000)
+            elif self.sync_sent:
+                M.add("request-sync rtt", (now - self.sync_sent) * 1000)
+                self.sync_sent = 0.0
+            self.set_phase(data.get("phase", self.phase))
+            if self.phase == "question" and data.get("question"):
+                self.on_question(data["qIndex"], data["question"])
+                self.schedule_answer(data["qIndex"], data["question"])
+
+        @s.on("game-started")
+        async def _started(_data=None):
+            self.set_phase("starting")
+            M.recv[("game-started", 0)].append(time.time())
+
+        @s.on("question-start")
+        async def _qstart(data):
+            q = data["index"]
+            self.set_phase("question")
+            M.recv[("question-start", q)].append(time.time())
+            self.on_question(q, data["question"])
+            self.schedule_answer(q, data["question"])
+
+        @s.on("question-end")
+        async def _qend(data):
+            self.set_phase("reveal")
+            M.recv[("question-end", data["index"])].append(time.time())
+
+        @s.on("answer-result")
+        async def _res(data):
+            M.counts["answer-result " + ("correct" if data.get("isCorrect") else "wrong/none")] += 1
+
+        @s.on("leaderboard")
+        async def _lb(data):
+            if data.get("isFinal"):
+                self.set_phase("final")
+
+        @s.on("game-over")
+        async def _over(_data=None):
+            self.set_phase("ended")
+            M.counts["game-over received"] += 1
+            self.game_ended = True
+            self.done.set()
+
+        @s.on("game-session-ended")
+        async def _ended(_data=None):
+            M.counts["game-session-ended received"] += 1
+            self.game_ended = True
+            self.done.set()
+
+        @s.on("player-removed")
+        async def _removed(data):
+            if data.get("id") == self.player_id:
+                M.err("kicked/banned by host")
+                self.done.set()
+
+        @s.event
+        async def connect():
+            # The web client beats right on every (re)connect.
+            self.spawn(self._emit("heartbeat", None))
+
+        @s.event
+        async def disconnect(*_args):
+            if self.frozen and not self.done.is_set():
+                # The server noticed: stay away (a frozen page can't reconnect).
+                M.add("frozen -> dropped by server", (time.perf_counter() - self.frozen_at) * 1000)
+                M.counts["frozen players dropped by server"] += 1
+                self.connected = False
+                self.done.set()
+                return
+            if not self.done.is_set():
+                M.counts["socket disconnects (unexpected)"] += 1
+
+    async def heartbeat(self) -> None:
+        """Like the web client: one beat on connect, then every 10 s (missing
+        three gets the socket dropped by the server)."""
+        while True:
+            if self.sio.connected:
+                await self._emit("heartbeat", None)
+            await asyncio.sleep(HEARTBEAT_EVERY)
+
+    async def sync_probe(self) -> None:
+        """Lobby only: request-sync round trip as a latency probe (--probe-bots
+        players only — every bot syncing every few seconds was itself a load)."""
+        await asyncio.sleep(random.uniform(0, SYNC_PROBE_EVERY))
+        while True:
+            if not self.frozen and self.phase in ("idle", "lobby") and not self.sync_sent:
+                self.sync_sent = time.perf_counter()
+                try:
+                    await self.sio.emit("request-sync")
+                except Exception:  # noqa: BLE001
+                    M.err("request-sync emit failed")
+                    self.sync_sent = 0.0
+            await asyncio.sleep(SYNC_PROBE_EVERY)
+
+    def schedule_answer(self, q_index: int, question: dict) -> None:
+        if q_index in self.answered_q:
+            return
+        self.answered_q.add(q_index)
+        asyncio.create_task(self.answer(q_index, question))
+
+    async def answer(self, q_index: int, question: dict) -> None:
+        delay = random.uniform(*ANSWER_DELAY)
+        await asyncio.sleep(delay)
+        if self.frozen:
+            M.counts["answers not sent (frozen)"] += 1
+            return
+        ans = random_answer(question)
+        if ans is None:
+            M.counts[f"skipped (unsupported type {question.get('type')})"] += 1
+            return
+        late = self.phase != "question"
+        t0 = time.perf_counter()
+        try:
+            ack = await self.sio.call(
+                "submit-answer", {"qIndex": q_index, "answer": ans}, timeout=ACK_TIMEOUT
+            )
+        except socketio.exceptions.TimeoutError:
+            M.err("submit-answer: ack timeout")
+            return
+        except Exception as e:  # noqa: BLE001
+            M.err(f"submit-answer: {type(e).__name__}")
+            return
+        ms = (time.perf_counter() - t0) * 1000
+        if ack and ack.get("accepted"):
+            M.add("submit-answer ack (accepted)", ms)
+            M.counts["answers accepted"] += 1
+        else:
+            M.add("submit-answer ack (rejected)", ms)
+            reason = (ack or {}).get("reason", "no ack payload")
+            M.counts[f"answers rejected: {reason}{' (sent late)' if late else ''}"] += 1
+
+    async def close(self) -> None:
+        for t in list(self.tasks):
+            t.cancel()
+        try:
+            if self.frozen:
+                if self.sio.connected:
+                    M.counts["frozen players never dropped"] += 1
+                    await self.sio.disconnect()
+                return
+            if self.sio.connected:
+                await self.sio.emit("leave-room")
+                await asyncio.sleep(0.05)
+                await self.sio.disconnect()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+# -- driver -------------------------------------------------------------------------
+
+
+def split_join_url(url: str) -> tuple[str, str | None]:
+    """A join link (https://host/join/ABC123) gives the server and the room code."""
+    u = urlparse(url.strip())
+    parts = [p for p in u.path.split("/") if p]
+    if u.scheme and u.netloc and len(parts) >= 2 and parts[-2] == "join":
+        return f"{u.scheme}://{u.netloc}", parts[-1].upper()
+    return url.strip().rstrip("/"), None
+
+
+def find_api(base: str) -> str:
+    """Where the API (REST + socket) answers: the given server when it
+    answers a Socket.IO handshake, else a sibling — port 3001 next to a local web app on
+    3000 (`yarn dev`), or api.<host>. Falls back to the given server."""
+    import urllib.request
+
+    def is_api(url: str) -> bool:
+        # The Socket.IO handshake: what the bots need, and what a web app
+        # alone doesn't answer.
+        try:
+            probe = f"{url}/socket.io/?EIO=4&transport=polling"
+            with urllib.request.urlopen(probe, timeout=5) as r:
+                return r.status == 200 and b'"sid"' in r.read()
+        except Exception:  # noqa: BLE001
+            return False
+
+    if is_api(base):
+        return base
+    u = urlparse(base)
+    candidates = []
+    if u.port == 3000:
+        candidates.append(f"{u.scheme}://{u.hostname}:3001")
+    if u.hostname and not u.hostname.startswith("api."):
+        host = u.hostname[4:] if u.hostname.startswith("www.") else u.hostname
+        candidates.append(f"{u.scheme}://api.{host}")
+    for c in candidates:
+        if is_api(c):
+            print(f"API found at {c} (the web app is on {base})")
+            return c
+    print(f"warning: no game server answered at {base} — trying it anyway")
+    return base
+
+
+def ask(prompt: str, default: str | None = None) -> str:
+    suffix = f" [{default}]" if default else ""
+    val = input(f"{prompt}{suffix}: ").strip()
+    return val or (default or "")
+
+
+def report(started: float, no_game_end: int | None = None) -> None:
+    print("\n" + "=" * 100)
+    print(f"buzrrbench summary - {time.time() - started:.0f}s run")
+    print("=" * 100)
+    print("\nLatencies [ms]")
+    for name in sorted(M.lat):
+        print(f"  {name:38s} {fmt_stats(M.lat[name])}")
+    spreads = []
+    for (ev, q), ts in sorted(M.recv.items(), key=lambda kv: (kv[0][1], kv[0][0])):
+        if len(ts) > 1:
+            spreads.append((ev, q, (max(ts) - min(ts)) * 1000, len(ts)))
+    if spreads:
+        print("\nBroadcast spread (first to last player receiving the same event) [ms]")
+        for ev, q, spread, n in spreads:
+            print(f"  q{q + 1:<3d} {ev:28s} spread={spread:8.1f}  receivers={n}")
+    if M.bytes:
+        print("\nDownloads")
+        for kind, n in sorted(M.bytes.items()):
+            print(f"  {kind:38s} files={M.counts[f'downloads: {kind}']:6d}  {n / 1e6:10.2f} MB")
+        print(f"  {'total':38s} {'':12s} {sum(M.bytes.values()) / 1e6:10.2f} MB")
+    if no_game_end is not None:
+        M.counts["bots without game end"] = no_game_end
+    if M.counts:
+        print("\nCounts")
+        for k, v in sorted(M.counts.items()):
+            print(f"  {k:60s} {v}")
+    if M.errors:
+        print("\nErrors")
+        for k, v in M.errors.most_common():
+            print(f"  {k:60s} {v}")
+    print()
+
+
+def parse_args() -> argparse.Namespace:
+    ap = argparse.ArgumentParser(description="Buzrr room load test")
+    ap.add_argument("--url", help="server URL, e.g. https://www.buzrr.in")
+    ap.add_argument("--code", help="room code (Teilnahmecode)")
+    ap.add_argument("--users", type=int, help="number of parallel players")
+    ap.add_argument("--ramp", type=float, default=20.0, help="players started per second (default 20)")
+    ap.add_argument("--kbps", type=float, default=0.0,
+                    help="download bandwidth per player in kbit/s, e.g. 2000 for a weak phone (default: unlimited)")
+    ap.add_argument("--no-assets", action="store_true", help="skip all downloads (images)")
+    ap.add_argument("--timeout-after", type=float, metavar="SEC",
+                    help="after SEC seconds, --timeout-users players freeze (stop sending, heartbeat too)")
+    ap.add_argument("--timeout-users", type=int, default=0, metavar="N",
+                    help="how many connected players freeze at --timeout-after (default 0)")
+    ap.add_argument("--probe-bots", type=int, default=20, metavar="N",
+                    help="players that probe the request-sync round trip in the lobby (default 20)")
+    ap.add_argument("--procs", type=int, default=1, metavar="N",
+                    help="split the players over N processes (use for more than ~200; default 1)")
+    # internal: set by the parent for its --procs children
+    ap.add_argument("--child-out", help=argparse.SUPPRESS)
+    ap.add_argument("--first-idx", type=int, default=1, help=argparse.SUPPRESS)
+    ap.add_argument("--label", default="", help=argparse.SUPPRESS)
+    return ap.parse_args()
+
+
+async def run_bots(args: argparse.Namespace, base: str, code: str, users: int) -> int | None:
+    """Runs this process's players; returns how many never saw the game end
+    (None if none did — e.g. stopped in the lobby)."""
+    tag = f"[{args.label}] " if args.label else ""
+    started = time.time()
+    conn = aiohttp.TCPConnector(limit=0)
+    async with aiohttp.ClientSession(connector=conn, timeout=aiohttp.ClientTimeout(total=30)) as http:
+        bots = [
+            Bot(
+                args.first_idx + i, base, code, http,
+                assets=not args.no_assets,
+                kbps=args.kbps,
+            )
+            for i in range(users)
+        ]
+        for b in random.sample(bots, min(args.probe_bots, users)):
+            b.probe = True
+        stop = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            try:
+                loop.add_signal_handler(sig, stop.set)
+            except NotImplementedError:
+                pass
+
+        async def progress():
+            while True:
+                await asyncio.sleep(5)
+                phases = Counter(b.phase for b in bots if b.connected)
+                acc = M.counts["answers accepted"]
+                rej = sum(v for k, v in M.counts.items() if k.startswith("answers rejected"))
+                print(
+                    f"{tag}[{time.time() - started:6.0f}s] connected={sum(b.connected for b in bots)}/{users} "
+                    + (f"frozen={sum(b.frozen and b.connected for b in bots)} " if args.timeout_users else "")
+                    + f"phases={dict(phases)} answers ok={acc} rejected={rej} "
+                    f"downloaded={sum(M.bytes.values()) / 1e6:.1f}MB errors={sum(M.errors.values())}",
+                    flush=True,
+                )
+
+        async def time_out_some():
+            await asyncio.sleep(max(0.0, args.timeout_after - (time.time() - started)))
+            alive = [b for b in bots if b.connected and not b.frozen and not b.done.is_set()]
+            picked = random.sample(alive, min(args.timeout_users, len(alive)))
+            for b in picked:
+                b.freeze()
+            print(
+                f"{tag}[{time.time() - started:6.0f}s] {len(picked)} players froze "
+                f"(no heartbeat, answers) - the server should drop them",
+                flush=True,
+            )
+
+        async def end_when_mostly_done():
+            # Once the game is over for most players, don't hang on a few that
+            # never got the end (lost socket, stuck): give them DONE_GRACE, stop.
+            while True:
+                await asyncio.sleep(1)
+                joined = [b for b in bots if b.ever_connected]
+                if not joined or not any(b.game_ended for b in joined):
+                    continue
+                # floor: with --procs a child may hold few bots (9 of 10 counts)
+                if sum(b.done.is_set() for b in joined) >= int(DONE_SHARE * len(joined)):
+                    break
+            print(f"{tag}[{time.time() - started:6.0f}s] {DONE_SHARE:.0%} done - "
+                  f"stopping in {DONE_GRACE:.0f}s", flush=True)
+            await asyncio.sleep(DONE_GRACE)
+            stop.set()
+
+        tasks = []
+        prog = asyncio.create_task(progress())
+        ender = asyncio.create_task(end_when_mostly_done())
+        freezer = asyncio.create_task(time_out_some()) if args.timeout_users else None
+        print(f"{tag}{users} players joining {code} on {base} - waiting for the host to start (Ctrl+C to stop)",
+              flush=True)
+        try:
+            for b in bots:
+                tasks.append(asyncio.create_task(b.run()))
+                if stop.is_set():
+                    break
+                await asyncio.sleep(1.0 / args.ramp)
+            all_done = asyncio.gather(*tasks)
+            stopper = asyncio.create_task(stop.wait())
+            await asyncio.wait({all_done, stopper}, return_when=asyncio.FIRST_COMPLETED)
+            all_done.add_done_callback(lambda f: f.cancelled() or f.exception())
+        except asyncio.CancelledError:
+            # python-socketio's own Ctrl+C handler cancels every task; still report.
+            pass
+        for t in (prog, ender, freezer):
+            if t:
+                t.cancel()
+        joined = [b for b in bots if b.ever_connected]
+        no_end = sum(not b.game_ended for b in joined) if any(b.game_ended for b in joined) else None
+        for b in bots:
+            b.done.set()
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*(b.close() for b in bots), return_exceptions=True), timeout=5
+            )
+            await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=5)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            pass
+    return no_end
+
+
+def split(total: int, parts: int) -> list[int]:
+    return [total // parts + (1 if i < total % parts else 0) for i in range(parts)]
+
+
+def run_parent(args: argparse.Namespace, base: str, code: str, users: int) -> None:
+    """--procs: start the children, wait, merge their numbers, one summary."""
+    started = time.time()
+    procs = min(args.procs, users)
+    sizes = split(users, procs)
+    freeze = split(args.timeout_users, procs)
+    probes = split(args.probe_bots, procs)
+    tmp = tempfile.mkdtemp(prefix="buzrrbench-")
+    children = []
+    first = 1
+    for i, n in enumerate(sizes):
+        out = os.path.join(tmp, f"p{i + 1}.json")
+        cmd = [sys.executable, os.path.abspath(__file__),
+               "--url", base, "--code", code, "--users", str(n),
+               "--ramp", str(args.ramp / procs), "--kbps", str(args.kbps),
+               "--probe-bots", str(probes[i]),
+               "--child-out", out, "--first-idx", str(first), "--label", f"p{i + 1}"]
+        if args.no_assets:
+            cmd.append("--no-assets")
+        if args.timeout_users and freeze[i]:
+            cmd += ["--timeout-after", str(args.timeout_after), "--timeout-users", str(freeze[i])]
+        children.append((out, subprocess.Popen(cmd)))
+        first += n
+
+    # Ctrl+C reaches the children through the terminal's process group; the
+    # parent only waits (a no-op handler, not SIG_IGN, so children keep theirs).
+    signal.signal(signal.SIGINT, lambda *_: None)
+    signal.signal(signal.SIGTERM, lambda *_: [p.send_signal(signal.SIGTERM) for _, p in children])
+    no_end = None
+    for i, (out, p) in enumerate(children):
+        while p.poll() is None:
+            try:
+                p.wait()
+            except InterruptedError:
+                pass
+        try:
+            with open(out, encoding="utf-8") as f:
+                d = json.load(f)
+        except (OSError, ValueError):
+            M.err(f"process p{i + 1}: no result (exit {p.returncode})")
+            continue
+        M.merge(d["metrics"])
+        if d["no_game_end"] is not None:
+            no_end = (no_end or 0) + d["no_game_end"]
+    report(started, no_end)
+
+
+def main() -> None:
+    args = parse_args()
+    base, link_code = split_join_url(
+        args.url or ask("Server URL or join link", "https://www.buzrr.in")
+    )
+    code = (args.code or link_code or ask("Room code")).strip().upper()
+    base = find_api(base)
+    users = args.users or int(ask("Parallel users", "20"))
+    if not code or users < 1:
+        sys.exit("room code and a positive number of users are required")
+    if (args.timeout_after is None) != (args.timeout_users < 1):
+        sys.exit("--timeout-after and --timeout-users go together")
+    if args.procs > 1 and not args.child_out:
+        run_parent(args, base, code, users)
+        return
+    started = time.time()
+    no_end = None
+    try:
+        no_end = asyncio.run(run_bots(args, base, code, users))
+    except KeyboardInterrupt:
+        pass
+    if args.child_out:
+        with open(args.child_out, "w", encoding="utf-8") as f:
+            json.dump({"metrics": M.dump(), "no_game_end": no_end}, f)
+    else:
+        report(started, no_end)
+
+
+if __name__ == "__main__":
+    main()

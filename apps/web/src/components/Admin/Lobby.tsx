@@ -1,7 +1,7 @@
 "use client";
 import clsx from "clsx";
 import { DEFAULT_AVATAR } from "@/constants";
-import { useEffect, useState, useCallback } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import { removePlayer, setPlayers } from "@/state/admin/playersSlice";
 import Image from "next/image";
@@ -63,6 +63,8 @@ const Lobby = (params: {
   const { socket } = useAdminSocket({
     gameCode: params.gameCode,
     onPlayerRemoved: (player) => {
+      // A device that went quiet just drops off the list — no toast.
+      if (player.timedOut) return;
       toast.error(
         player.banned
           ? `You have banned ${player.name ?? "the player"}`
@@ -117,6 +119,16 @@ const Lobby = (params: {
     );
   }
 
+  // Stable for the memoised cards; always calls the latest handler.
+  const removeRef = useRef(handlePlayerRemove);
+  useEffect(() => {
+    removeRef.current = handlePlayerRemove;
+  });
+  const onKick = useCallback(
+    (player: PlayerPayload) => removeRef.current(player),
+    [],
+  );
+
   function handleGameStart() {
     if (!socket?.connected) {
       toast.error("Not connected to the game server yet. Please wait.");
@@ -137,9 +149,13 @@ const Lobby = (params: {
   const joinUrl = buildJoinUrl(params.gameCode);
   const isFull = players.length >= maxPlayers;
   const fillPct = Math.min(100, (players.length / maxPlayers) * 100);
-  const visiblePlayers = players.filter((p) =>
-    (p.name ?? "").toLowerCase().includes(query.trim().toLowerCase()),
-  );
+  // A big room lists only its newest LOBBY_LIST_LIMIT — or what the search
+  // finds.
+  const needle = query.trim().toLowerCase();
+  const visiblePlayers = needle
+    ? players.filter((p) => (p.name ?? "").toLowerCase().includes(needle))
+    : players.slice(-LOBBY_LIST_LIMIT);
+  const hiddenCount = needle ? 0 : players.length - visiblePlayers.length;
 
   useEffect(() => {
     setCanShare(typeof navigator.share === "function");
@@ -344,45 +360,19 @@ const Lobby = (params: {
 
           <div className="md:flex-1 md:min-h-0 md:overflow-y-auto px-4 py-3 md:px-[22px] md:py-4 grid grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-2.5 content-start">
             {visiblePlayers.map((player) => (
-              <div
+              <PlayerCard
                 key={player.id}
-                className="group flex items-center gap-[11px] min-w-0 rounded-[14px] border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 hover:border-dprimary py-2 pr-2 pl-[9px] transition-colors animate-pop-in"
-              >
-                <Image
-                  src={player.profilePic || DEFAULT_AVATAR}
-                  width={36}
-                  height={36}
-                  alt=""
-                  className="size-9 shrink-0 rounded-full object-cover"
-                />
-                <span
-                  className="flex-1 min-w-0 truncate text-[14.5px] font-medium"
-                  title={player.name ?? undefined}
-                >
-                  {player.name}
-                </span>
-                <span className="flex gap-0.5 shrink-0 md:opacity-55 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
-                  <button
-                    type="button"
-                    aria-label={`Ban ${player.name} from this room`}
-                    title="Ban (can't rejoin)"
-                    onClick={() => setPlayerToBan(player)}
-                    className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
-                  >
-                    <LuBan size={17} />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Remove ${player.name}`}
-                    title="Kick (can rejoin)"
-                    onClick={() => handlePlayerRemove(player)}
-                    className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
-                  >
-                    <LuX size={17} />
-                  </button>
-                </span>
-              </div>
+                player={player}
+                onBan={setPlayerToBan}
+                onKick={onKick}
+              />
             ))}
+            {hiddenCount > 0 && (
+              <div className="col-span-full text-center text-[13px] py-2 text-[#8a8896] dark:text-muted-dark">
+                Showing the newest {visiblePlayers.length} of {players.length}{" "}
+                players — search to find the others.
+              </div>
+            )}
             {visiblePlayers.length === 0 && (
               <div className="col-span-full text-center text-sm py-10 text-[#8a8896] dark:text-muted-dark">
                 {query.trim()
@@ -425,5 +415,60 @@ const Lobby = (params: {
     </div>
   );
 };
+
+/** The host's waiting list shows at most this many (the newest), or the search's matches. */
+const LOBBY_LIST_LIMIT = 150;
+
+/**
+ * One waiting player. Memoised: with hundreds in the room, a batch of joins
+ * re-renders only the new cards, not the whole grid.
+ */
+const PlayerCard = memo(function PlayerCard({
+  player,
+  onBan,
+  onKick,
+}: {
+  player: PlayerPayload;
+  onBan: (player: PlayerPayload) => void;
+  onKick: (player: PlayerPayload) => void;
+}) {
+  return (
+    <div className="group flex items-center gap-[11px] min-w-0 rounded-[14px] border bg-light-bg dark:bg-card-dark border-lprimary/15 dark:border-white/5 hover:border-dprimary py-2 pr-2 pl-[9px] transition-colors animate-pop-in">
+      <Image
+        src={player.profilePic || DEFAULT_AVATAR}
+        width={36}
+        height={36}
+        alt=""
+        className="size-9 shrink-0 rounded-full object-cover"
+      />
+      <span
+        className="flex-1 min-w-0 truncate text-[14.5px] font-medium"
+        title={player.name ?? undefined}
+      >
+        {player.name}
+      </span>
+      <span className="flex gap-0.5 shrink-0 md:opacity-55 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
+        <button
+          type="button"
+          aria-label={`Ban ${player.name ?? ""} from this room`}
+          title="Ban (can't rejoin)"
+          onClick={() => onBan(player)}
+          className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
+        >
+          <LuBan size={17} />
+        </button>
+        <button
+          type="button"
+          aria-label={`Remove ${player.name ?? ""}`}
+          title="Kick (can rejoin)"
+          onClick={() => onKick(player)}
+          className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
+        >
+          <LuX size={17} />
+        </button>
+      </span>
+    </div>
+  );
+});
 
 export default Lobby;
