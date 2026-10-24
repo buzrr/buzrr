@@ -20,6 +20,7 @@ import { openTextHandler } from "./types/open-text";
 import { pollHandler } from "./types/poll";
 import { ratingHandler } from "./types/rating";
 import { trueFalseHandler } from "./types/true-false";
+import { typeAnswerHandler } from "./types/type-answer";
 import { wordCloudHandler } from "./types/word-cloud";
 
 /**
@@ -29,6 +30,7 @@ import { wordCloudHandler } from "./types/word-cloud";
 const HANDLERS: { [K in QuestionType]: QuestionTypeHandler<K> } = {
   multiple_choice: multipleChoiceHandler,
   true_false: trueFalseHandler,
+  type_answer: typeAnswerHandler,
   poll: pollHandler,
   word_cloud: wordCloudHandler,
   rating: ratingHandler,

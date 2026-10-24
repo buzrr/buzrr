@@ -184,6 +184,26 @@ def random_answer(q: dict) -> dict | None:
                 for _ in range(n)
             ]
         }
+    if t == "type_answer":
+        pattern = q.get("pattern")
+        if pattern:
+            # Fixed length: letters fill the boxes word by word (like TypeAnswer.tsx);
+            # some players don't fill them all.
+            total = sum(pattern)
+            n = total if random.random() < 0.8 else random.randint(1, total)
+            chars = random.choices(string.ascii_lowercase + "äöü", k=n)
+            words, at = [], 0
+            for size in pattern:
+                if chars[at : at + size]:
+                    words.append("".join(chars[at : at + size]))
+                at += size
+            return {"guess": " ".join(words)}
+        # Free text: one to three words, trimmed, at most maxLength.
+        guess = " ".join(
+            "".join(random.choices(string.ascii_letters + "äöüß", k=random.randint(2, 10)))
+            for _ in range(random.choice([1, 1, 2, 3]))
+        )
+        return {"guess": guess[: int(q.get("maxLength") or 100)].strip()}
     if t == "open_text":
         return {"text": "bench " + "".join(random.choices(string.ascii_lowercase, k=12)), "anonymous": False}
     return None

@@ -1,7 +1,13 @@
 "use client";
 
 import clsx from "clsx";
-import { useState, type ComponentProps, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import { LuCheck } from "react-icons/lu";
 import {
   OPTION_KEYS,
@@ -32,7 +38,7 @@ export function OptionLabel({
 const BAR_MS = 900;
 
 /** A reveal bar that grows from empty, its percentage counting up alongside. */
-function ResultBar({
+export function ResultBar({
   fill,
   pct,
   correct,
@@ -79,6 +85,50 @@ function optionTextClass(options: { title: string }[]) {
   if (longest > 80) return "text-[15px] md:text-base";
   if (longest > 40) return "text-base md:text-lg";
   return "text-[17px] md:text-xl";
+}
+
+/** The right answer lights up: green border and a light green fill. */
+export function CorrectGlow({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.animate(
+      [
+        {
+          borderColor: "rgba(34,197,94,0)",
+          backgroundColor: "rgba(34,197,94,0)",
+          boxShadow: "0 0 0 0 rgba(34,197,94,0)",
+          transform: "scale(1)",
+        },
+        {
+          borderColor: "rgba(34,197,94,1)",
+          backgroundColor: "rgba(34,197,94,0.3)",
+          boxShadow: "0 0 0 8px rgba(34,197,94,0.25)",
+          transform: "scale(1.05)",
+          offset: 0.4,
+        },
+        {
+          borderColor: "rgba(34,197,94,1)",
+          backgroundColor: "rgba(34,197,94,0.14)",
+          boxShadow: "0 0 0 0 rgba(34,197,94,0)",
+          transform: "scale(1)",
+        },
+      ],
+      {
+        duration: 1300,
+        delay: 250,
+        easing: "cubic-bezier(.2,.8,.2,1)",
+        fill: "both",
+      },
+    );
+  }, []);
+  return (
+    <div
+      ref={ref}
+      className="-mx-2.5 rounded-xl border-2 border-transparent px-2.5 py-1.5"
+    >
+      {children}
+    </div>
+  );
 }
 
 /**
