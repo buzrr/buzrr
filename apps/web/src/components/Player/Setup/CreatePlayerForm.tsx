@@ -17,7 +17,8 @@ import { clearPlayerLocalSession } from "@/lib/player-session";
 import { loadPlayerProfile, savePlayerProfile } from "@/lib/player-prefs";
 import { isAxiosError } from "axios";
 import { mutedText, primaryButtonClass } from "@/components/Game/GameUI";
-import { useT } from "@/lib/i18n/context";
+import { useLocale, useT } from "@/lib/i18n/context";
+import { randomPlayerName } from "@/lib/random-name";
 import {
   BackSquare,
   Steps,
@@ -50,6 +51,7 @@ const CreatePlayerForm = (props: {
   subtitle?: ReactNode;
 }) => {
   const t = useT();
+  const locale = useLocale();
   const router = useRouter();
   const mutation = useCreatePlayerMutation();
   const joinMutation = useJoinRoomMutation();
@@ -140,6 +142,7 @@ const CreatePlayerForm = (props: {
           router.push(`/player/joinRoom/${res.playerId}`);
         },
         onError: (err) => {
+          // Server refusals (e.g. a name not allowed) have German texts.
           toast.error(t(getApiErrorMessage(err)));
         },
       },
@@ -193,24 +196,42 @@ const CreatePlayerForm = (props: {
                 {field.value.length}/{NAME_MAX}
               </span>
             </span>
-            <input
-              type="text"
-              id="displayName"
-              name={field.name}
-              placeholder={t("Enter display name")}
-              className={clsx(joinInputClass, "mt-2")}
-              required
-              autoComplete="off"
-              maxLength={NAME_MAX}
-              value={field.value}
-              onBlur={field.onBlur}
-              ref={field.ref}
-              aria-invalid={!!fieldState.error}
-              onChange={(e) => {
-                handleNameChange(e.target.value);
-                field.onChange(sanitizeName(e.target.value));
-              }}
-            />
+            <span className="mt-2 flex gap-2">
+              <input
+                type="text"
+                id="displayName"
+                name={field.name}
+                placeholder={t("Enter display name")}
+                className={clsx(joinInputClass, "min-w-0 flex-1")}
+                required
+                autoComplete="off"
+                maxLength={NAME_MAX}
+                value={field.value}
+                onBlur={field.onBlur}
+                ref={field.ref}
+                aria-invalid={!!fieldState.error}
+                onChange={(e) => {
+                  handleNameChange(e.target.value);
+                  field.onChange(sanitizeName(e.target.value));
+                }}
+              />
+              <button
+                type="button"
+                aria-label={t("Random name")}
+                title={t("Random name")}
+                onClick={() => {
+                  const name = randomPlayerName(locale);
+                  handleNameChange(name);
+                  field.onChange(name);
+                }}
+                className={clsx(
+                  joinInputClass,
+                  "!w-auto shrink-0 px-4 text-xl cursor-pointer hover:border-lprimary dark:hover:border-dprimary",
+                )}
+              >
+                🎲
+              </button>
+            </span>
             {fieldState.error?.message ? (
               <span className="mt-1.5 block text-sm text-red-light dark:text-red-dark">
                 {fieldState.error.message}

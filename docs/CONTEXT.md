@@ -130,8 +130,10 @@ effects }` in `game-engine/core/`, unit-tested; `GameEngineService` is
    **Lobby removal still has no backstop.**
 4. **CORS defaults open**: unset `WEB_ORIGIN` reflects any origin; prod must
    set it (documented in `.env.example`).
-5. **Player row growth**: guest identities are never deleted (by design,
-   ADR-005) and there is no cleanup job.
+5. **Player row growth** is bounded: `PlayerCleanupService` deletes guest
+   rows not in a room once a day after `PLAYER_RETENTION_DAYS` (default and
+   minimum 8 — longer than the 7-day player token), in batches, behind a
+   Redis lock.
 6. **AI quiz output relies on provider schema support**: `POST
 /api/quizzes/ai` uses structured output (`TextGenerator.generateJson`,
    JSON Schema from a zod schema) and re-validates the reply. Local

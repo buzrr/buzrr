@@ -367,6 +367,8 @@ export const DE: Record<string, string> = {
   "Players (CSV)": "Spieler (CSV)",
   "Players open the link, enter a name and play the quiz on their own. You see the results in the report.":
     "Die Spieler öffnen den Link, geben einen Namen ein und spielen das Quiz alleine. Die Ergebnisse siehst du im Bericht.",
+  "Please pick a different name — this one isn't allowed.":
+    "Bitte wähle einen anderen Namen – dieser ist nicht erlaubt.",
   Points: "Punkte",
   "Promote to admin": "Zum Admin machen",
   "Put the options in a random order":
@@ -376,6 +378,7 @@ export const DE: Record<string, string> = {
   "Question types": "Fragetypen",
   "Questions (CSV)": "Fragen (CSV)",
   "Quiz order": "Quiz-Reihenfolge",
+  "Random name": "Zufallsname",
   Reopen: "Wieder öffnen",
   Report: "Bericht",
   "Reset password": "Passwort zurücksetzen",
