@@ -57,15 +57,220 @@ export const moderationSettingsSchema = z.object({
   confirmNextQuestion: z.boolean().default(true),
 });
 
-/** Where question sounds play: the host's screen, the players' devices, both, or nowhere. */
+/** Where game sounds play: the host's screen, the players' devices, both, or nowhere. */
 export const soundPlayOnSchema = z.enum(["host", "players", "both", "off"]);
 
-/** A quiz's sounds: where its questions' own sounds play. */
+/** The moments a sound skin has a sound for. */
+export const soundSlotSchema = z.enum([
+  /** Background music: lobby and get-ready slides (loops). */
+  "lobby",
+  /** The countdown before a question (once). */
+  "countdown",
+  /** The countdown before the last question instead (empty: "countdown"). */
+  "lastCountdown",
+  /** While a question is open, building up towards its end (loops). */
+  "question",
+  /** The last question instead of "question" (empty: "question" plays). */
+  "lastQuestion",
+  /** The "tusch" when a question ends (once). */
+  "end",
+  /** With the results animation when the answer is shown (once). */
+  "reveal",
+  /** Party music on the scoreboard between questions (loops). */
+  "scores",
+  /** More party at the very end, on the final leaderboard (loops). */
+  "final",
+  /** Host lobby cues: a player joins, a bubble pops, a reaction comes in. */
+  "join",
+  "bubble",
+  "reaction",
+]);
+
+/** The host's short lobby cues (not songs: volume and source only). */
+export const CUE_SLOTS = ["join", "bubble", "reaction"] as const;
+export type CueSlot = (typeof CUE_SLOTS)[number];
+export const isCueSlot = (slot: SoundSlot): slot is CueSlot =>
+  (CUE_SLOTS as readonly string[]).includes(slot);
+/** Where a user skin's cue comes from: a built-in skin's, none, or its own file. */
+export const cueSourceSchema = z.enum([
+  "builtin:show",
+  "builtin:arcade",
+  "builtin:chill",
+  "off",
+  "custom",
+]);
+export type CueSource = z.infer<typeof cueSourceSchema>;
+
+/** Ids of the built-in, synthesized skins (no audio files involved). */
+export const BUILTIN_SOUND_SKINS = [
+  "builtin:show",
+  "builtin:arcade",
+  "builtin:chill",
+] as const;
+
+/** A quiz's game sounds. `skin`: a built-in id or a SoundSkin id. */
 export const soundSettingsSchema = z.object({
+  /** "default" = the quiz owner's default audio skin (their settings). */
+  skin: z.string().min(1).max(64).default("default"),
   playOn: soundPlayOnSchema.default("host"),
   /** With sounds on the host only: players may switch them on for themselves. */
   playerOptIn: z.boolean().default(true),
+  /** Background music (lobby, question, scores, final). Off: effects only. */
+  music: z.boolean().default(true),
 });
+
+/** Slots whose song can line up with the end of the countdown / question. */
+export const END_ALIGNABLE_SLOTS = [
+  "countdown",
+  "lastCountdown",
+  "question",
+  "lastQuestion",
+] as const;
+/** The countdown before a question: the usual one or the last question's. */
+export const isCountdownSlot = (slot: SoundSlot) =>
+  slot === "countdown" || slot === "lastCountdown";
+/** The music while a question runs: the usual one or the last question's. */
+export const isQuestionSlot = (slot: SoundSlot) =>
+  slot === "question" || slot === "lastQuestion";
+
+/**
+ * How one slot's song plays. Every field is optional: missing = the slot's
+ * usual behaviour (volume 80, no fade-in, loops repeat, from the start).
+ * Built-in skins use volume, fade-in and repeat only (they have no timeline).
+ */
+export const soundSlotOptionsSchema = z.object({
+  /** 0–100; 80 = the usual level. */
+  volume: z.number().int().min(0).max(100).optional(),
+  /** Fade in over `fadeInSec` seconds. */
+  fadeIn: z.boolean().optional(),
+  fadeInSec: z.number().min(0.1).max(30).optional(),
+  /** Play again from `startMs` when it ends (default: on for the loop slots). */
+  repeat: z.boolean().optional(),
+  /** Where in the file to start (ms). */
+  startMs: z.number().int().min(0).max(3_600_000).optional(),
+  /**
+   * Countdown / question only. "start": play from `startMs`. "end": time it
+   * so the file's `endMs` falls on the end of the countdown (5 s) or the
+   * question, then keep playing `extendSec` (0–5) and fade out.
+   */
+  align: z.enum(["start", "end"]).optional(),
+  endMs: z.number().int().min(0).max(3_600_000).optional(),
+  extendSec: z.number().min(0).max(5).optional(),
+  /**
+   * Countdowns: where in the song the question music starts (it waits for
+   * that point). Unset: when the countdown song is over (its file end, or
+   * the end of its extend).
+   */
+  nextAtMs: z.number().int().min(0).max(3_600_000).optional(),
+  /** Cue slots of a user skin: which sound plays (default: its file, else Show's). */
+  source: cueSourceSchema.optional(),
+});
+export type SoundSlotOptions = z.infer<typeof soundSlotOptionsSchema>;
+export const soundSkinOptionsSchema = z.partialRecord(
+  soundSlotSchema,
+  soundSlotOptionsSchema,
+);
+export type SoundSkinOptions = z.infer<typeof soundSkinOptionsSchema>;
+/**
+ * A built-in skin as configured on this instance (the superadmin's): its
+ * slot options, the defaults "reset" restores, and files for slots that play
+ * a recording instead of the synth.
+ */
+export interface BuiltinSkinData {
+  options: SoundSkinOptions;
+  defaults: SoundSkinOptions;
+  slots: Partial<Record<SoundSlot, string>>;
+}
+/** Built-in skin id -> its configuration. */
+export type BuiltinSoundOptions = Partial<Record<string, BuiltinSkinData>>;
+
+/**
+ * The built-in skins' default options (new installations, and what "reset
+ * options" restores). TV Game Show's are tuned for its recordings; the
+ * synth uses volume, fade-in and repeat of them where a slot has no file.
+ */
+/**
+ * The built-in skins' recordings (web public files): TV Game Show plays
+ * these on every installation unless the superadmin set other files. The
+ * players' copies are small (mono, 64 kbit/s).
+ */
+const TV_SHOW_SLOTS = [
+  "lobby",
+  "countdown",
+  "lastCountdown",
+  "question",
+  "lastQuestion",
+  "end",
+  "reveal",
+  "scores",
+  "final",
+] as const;
+export const BUILTIN_DEFAULT_SLOTS: Partial<
+  Record<
+    (typeof BUILTIN_SOUND_SKINS)[number],
+    Partial<Record<SoundSlot, string>>
+  >
+> = {
+  "builtin:show": Object.fromEntries(
+    TV_SHOW_SLOTS.map((s) => [s, `/sounds/tv-game-show/${s}.mp3`]),
+  ),
+};
+export const BUILTIN_DEFAULT_PLAYER_SLOTS: typeof BUILTIN_DEFAULT_SLOTS = {
+  "builtin:show": Object.fromEntries(
+    TV_SHOW_SLOTS.map((s) => [s, `/sounds/tv-game-show/${s}.player.mp3`]),
+  ),
+};
+
+export const BUILTIN_DEFAULT_OPTIONS: Partial<
+  Record<(typeof BUILTIN_SOUND_SKINS)[number], SoundSkinOptions>
+> = {
+  "builtin:show": {
+    end: { endMs: 52, volume: 51, startMs: 34 },
+    final: { volume: 95 },
+    lobby: { volume: 63, startMs: 0 },
+    scores: { volume: 83 },
+    question: { align: "end", endMs: 54816, volume: 70, extendSec: 3.8 },
+    countdown: {
+      align: "end",
+      endMs: 3885,
+      fadeIn: true,
+      extendSec: 1.9,
+      fadeInSec: 0.4,
+    },
+    lastQuestion: { align: "end", endMs: 60410, extendSec: 2.8 },
+    lastCountdown: {
+      align: "end",
+      endMs: 6382,
+      fadeIn: true,
+      startMs: 0,
+      extendSec: 1.6,
+      fadeInSec: 1.4,
+    },
+  },
+};
+
+/** A user's sound skin: an uploaded MP3 per slot (missing slots stay silent). */
+export const soundSkinSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** Offered to every user (set by admins). */
+  isGlobal: z.boolean(),
+  ownerId: z.string().nullable(),
+  slots: z.partialRecord(soundSlotSchema, z.string()),
+  /** How each slot's song plays. */
+  options: soundSkinOptionsSchema.optional(),
+  /**
+   * The final song, encrypted, for downloading ahead of time during a game;
+   * the key comes with the final leaderboard (`finalSoundKey`).
+   */
+  finalClipUrl: z.string().nullable().optional(),
+});
+
+/** A user's defaults for their quizzes (Settings page). */
+export const userPreferencesSchema = z.object({
+  defaultSoundSkin: z.string().min(1).max(64).default("builtin:show"),
+});
+export type UserPreferences = z.infer<typeof userPreferencesSchema>;
 
 /** `Quiz.settings`. Unknown/missing keys fall back to the defaults. */
 export const quizSettingsSchema = z.object({
@@ -139,20 +344,20 @@ export const phaseChangeSchema = z.object({
 });
 
 /**
- * What a download slot is for: a question's sound clips, or everything ahead
- * (fetched once, in the lobby). Each kind has its own MAX_PARALLEL_DOWNLOADS
- * per room.
+ * What a download slot is for: a question's sound clips, or the sound skin's
+ * files (fetched once, in the lobby). Each kind has its own
+ * MAX_PARALLEL_DOWNLOADS per room.
  */
-export const downloadKindSchema = z.enum(["question", "lobby"]);
+export const downloadKindSchema = z.enum(["question", "skin", "lobby"]);
 export type DownloadKind = z.infer<typeof downloadKindSchema>;
 
 /** A device asks for one of the room's download slots (`preload-slot`). */
 export const preloadSlotSchema = z.object({
-  /** The question (kind "question"); 0 for the lobby. */
+  /** The question (kind "question"); 0 for the skin. */
   qIndex: z.number().int().nonnegative(),
   kind: downloadKindSchema.default("question"),
 });
-/** The device is done with its slot (the lobby's; questions report `preload-status`). */
+/** The device is done with its slot (skin files; questions report `preload-status`). */
 export const slotDoneSchema = preloadSlotSchema;
 /**
  * `go`: start downloading now. Otherwise wait for `preload-go` — the server
@@ -337,6 +542,8 @@ export const leaderboardSchema = z.object({
   /** How many players there are, when `entries` is only the top. */
   total: z.number().int().optional(),
   isFinal: z.boolean(),
+  /** Final leaderboard: decrypts the skin's preloaded final song. */
+  finalSoundKey: z.string().optional(),
   /**
    * Final leaderboard: ms until the host's board has re-sorted and filled
    * the podium (`finalRevealMs`) — players see their place then.
@@ -445,6 +652,8 @@ export const stateSyncSchema = z.object({
   you: answerResultSchema.optional(),
   /** Present for moderated games. */
   moderation: moderationSettingsSchema.optional(),
+  /** Present on the final leaderboard: decrypts the skin's final song. */
+  finalSoundKey: z.string().optional(),
   /** Host connections in "closed": the answers so far (see `closed-summary`). */
   closedSummary: questionEndSchema.optional(),
 });
@@ -519,7 +728,9 @@ export type GamePhase = z.infer<typeof gamePhaseSchema>;
 export type ModerationSettings = z.infer<typeof moderationSettingsSchema>;
 export type QuizSettings = z.infer<typeof quizSettingsSchema>;
 export type SoundPlayOn = z.infer<typeof soundPlayOnSchema>;
+export type SoundSlot = z.infer<typeof soundSlotSchema>;
 export type SoundSettings = z.infer<typeof soundSettingsSchema>;
+export type SoundSkin = z.infer<typeof soundSkinSchema>;
 export type PhaseChangePayload = z.infer<typeof phaseChangeSchema>;
 export type PreloadPayload = z.infer<typeof preloadSchema>;
 export type PreloadStatusPayload = z.infer<typeof preloadStatusSchema>;
@@ -651,7 +862,7 @@ export interface ClientToServerEvents {
     payload: z.input<typeof preloadSlotSchema>,
     ack: (result: PreloadSlotAck) => void,
   ) => void;
-  /** Done with a download slot (the lobby's files). */
+  /** Done with a download slot (the skin's files). */
   "slot-done": (payload: z.infer<typeof slotDoneSchema>) => void;
   /** Host: keep waiting for downloads, or open the question now. */
   "downloads-decision": (payload: DownloadsDecisionPayload) => void;

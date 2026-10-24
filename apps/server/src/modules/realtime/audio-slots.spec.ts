@@ -42,13 +42,13 @@ describe("AudioSlots", () => {
     ]);
   });
 
-  it("keeps the lobby's slots apart from the question's", () => {
+  it("keeps the skin's slots apart from the question's", () => {
     const s = new AudioSlots(1);
     s.request("ROOM", "question", 0, "a", "sa", 0);
-    expect(s.request("ROOM", "lobby", 0, "b", "sb", 0)).toBe(true);
-    expect(s.request("ROOM", "lobby", 0, "c", "sc", 0)).toBe(false);
+    expect(s.request("ROOM", "skin", 0, "b", "sb", 0)).toBe(true);
+    expect(s.request("ROOM", "skin", 0, "c", "sc", 0)).toBe(false);
     expect(s.leave("ROOM", "b", "sb", 1)).toEqual([
-      { socketId: "sc", qIndex: 0, kind: "lobby" },
+      { socketId: "sc", qIndex: 0, kind: "skin" },
     ]);
   });
 

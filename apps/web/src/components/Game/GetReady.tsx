@@ -36,7 +36,8 @@ export default function GetReady({
   const devices = useAppSelector((state) => state.game.downloadDevices);
   const done = useAppSelector((state) => state.game.downloadsDone);
   const waitAll = useAppSelector((state) => state.game.waitAll);
-  // Every frame, so the digits and the ring hit 0 exactly at the deadline.
+  // Every frame, so the digits and the ring hit 0 exactly at the deadline
+  // (with the countdown's beep).
   const remaining = useFrameCountdown(phase === "starting" ? deadline : 0);
   const seconds = Math.ceil(remaining);
   const counting =

@@ -273,7 +273,7 @@ export default function QuesResult(props: QuesResultProps) {
             "md:transition-[grid-template-columns,column-gap] md:duration-700 md:ease-[cubic-bezier(.2,.8,.2,1)]",
         )}
       >
-        {/* The results animation. */}
+        {/* The results animation (with the skin's reveal sound). */}
         {phase === "reveal" && <ConfettiBurst duration={1400} />}
         {showAnswerPanel && (
           <section

@@ -202,7 +202,7 @@ export default function LeaderBoard({
 
   // Once the rankings have settled, the winners step onto the podium —
   // third, second, first — then the fireworks start, a new burst every few
-  // seconds until the host ends the game.
+  // seconds until the host ends the game (the final music loops on its own).
   const [podiumStage, setPodiumStage] = useState(0);
   useEffect(() => {
     const start = podiumStartMs(withDelta, countMs);

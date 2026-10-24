@@ -44,7 +44,7 @@ function isMp3(buffer: Buffer): boolean {
 }
 
 /**
- * Questions store MP3 only. An MP3 passes through untouched;
+ * Questions and sound skins store MP3 only. An MP3 passes through untouched;
  * WAV, Ogg/Opus, FLAC, M4A/AAC and WebM audio are re-encoded with ffmpeg
  * (stdin → stdout, no temp files, audio only, metadata dropped). Anything
  * else is refused. Needs `ffmpeg` on the PATH (the server image has it).
@@ -91,6 +91,29 @@ export async function cutClip(
     (startMs / 1000).toFixed(3),
     "-t",
     (durationMs / 1000).toFixed(3),
+    "-i",
+    "pipe:0",
+    "-vn",
+    "-map_metadata",
+    "-1",
+    "-ac",
+    "1",
+    "-codec:a",
+    "libmp3lame",
+    "-b:a",
+    CLIP_BITRATE,
+    "-f",
+    "mp3",
+    "pipe:1",
+  ]);
+}
+
+/**
+ * A whole MP3 re-encoded small (mono, CLIP_BITRATE) — the copy of a sound
+ * skin file that players' devices load; the host plays the original.
+ */
+export async function toPlayerMp3(mp3: Buffer): Promise<Buffer> {
+  return runFfmpeg(mp3, [
     "-i",
     "pipe:0",
     "-vn",

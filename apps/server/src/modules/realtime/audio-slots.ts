@@ -29,7 +29,7 @@ export interface Grant {
   kind: string;
 }
 
-/** Rooms are kept per game and kind ("question" / "lobby"). */
+/** Rooms are kept per game and kind ("question" / "skin"). */
 const SEP = "\u0000";
 const keyOf = (game: string, kind: string) => `${game}${SEP}${kind}`;
 const kindOf = (key: string) => key.slice(key.indexOf(SEP) + 1);

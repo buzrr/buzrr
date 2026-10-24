@@ -77,6 +77,8 @@ export interface GameLiveState {
   moderation: ModerationSettings | null;
   /** The latest preload hint (next question's sound clips). */
   preload: PreloadPayload | null;
+  /** Final leaderboard: decrypts the sound skin's preloaded final song. */
+  finalSoundKey: string | null;
   /** Countdown over, devices still downloading the question's sound. */
   waitingFor: number;
   /** How many are in the room (server's `reaction-limit`); 0 = not told. */
@@ -148,6 +150,7 @@ const initialState: GameLiveState = {
   streaks: null,
   moderation: null,
   preload: null,
+  finalSoundKey: null,
   myAnswerMs: null,
   waitingFor: 0,
   roomSize: 0,
@@ -230,6 +233,7 @@ const gameSlice = createSlice({
       state.players = s.players;
       state.you = s.you ?? null;
       state.moderation = s.moderation ?? null;
+      state.finalSoundKey = s.finalSoundKey ?? null;
       state.closedSummary = s.closedSummary ?? null;
       // Mid-question (and in moderated "closed") the server sends the
       // standing as of the last reveal — none yet on the first question.
@@ -265,7 +269,8 @@ const gameSlice = createSlice({
       }>,
     ) => {
       // A moderated game with a get-ready slide opens on it (the server's
-      // `phase-change: ready` follows) — never a countdown in between.
+      // `phase-change: ready` follows) — never a countdown in between, whose
+      // music would start for a moment.
       const mod = action.payload.moderation;
       state.phase =
         mod?.enabled && mod.confirmNextQuestion ? "ready" : "starting";
@@ -387,6 +392,7 @@ const gameSlice = createSlice({
         entries: LeaderboardEntry[];
         total?: number;
         isFinal: boolean;
+        finalSoundKey?: string;
         revealInMs?: number;
       }>,
     ) => {
@@ -394,6 +400,9 @@ const gameSlice = createSlice({
       state.leaderboardTotal = action.payload.total ?? null;
       state.finalRevealInMs = action.payload.revealInMs ?? null;
       state.isFinalLeaderboard = action.payload.isFinal;
+      if (action.payload.finalSoundKey) {
+        state.finalSoundKey = action.payload.finalSoundKey;
+      }
       if (action.payload.isFinal) {
         state.phase = "final";
       }

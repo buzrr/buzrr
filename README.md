@@ -119,25 +119,25 @@ Open http://localhost:3000 and create a local account (email + password —
 `yarn setup` writes sensible local defaults; these are the ones you'll touch. See
 the [`.env.example`](.env.example) files for the full, commented list.
 
-| Variable                                         | Required | Purpose                                                                                                                                                                                        |
-| ------------------------------------------------ | :------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AUTH_EMAIL_PASSWORD`                            |   ✅¹    | `ON` enables local email + password accounts (web).                                                                                                                                            |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`      |   ✅¹    | Google sign-in (web).                                                                                                                                                                          |
-| `BETTER_AUTH_SECRET`                             |    ✅    | Signs/verifies session JWTs. **Must match** between web and server.                                                                                                                            |
-| `DATABASE_URL` / `DIRECT_URL`                    |    ✅    | PostgreSQL connection (defaults to the Docker container).                                                                                                                                      |
-| `REDIS_URL`                                      |    ✅    | Redis for live game state (server won't boot without it).                                                                                                                                      |
-| `NEXT_PUBLIC_SOCKET_URL` / `NEXT_PUBLIC_API_URL` |    ✅    | Where the browser reaches the API.                                                                                                                                                             |
-| `GEMINI_API_KEY` or `LLM_BASE_URL` + `LLM_MODEL` |    ➖    | Enables AI quiz generation (Gemini or an OpenAI-compatible server).                                                                                                                            |
-| `STORAGE_DRIVER` + `CLOUDINARY_*` / `S3_*`       |    ➖    | Where question images go (unset: uploads disabled).                                                                                                                                            |
-| `GITHUB_TOKEN`                                   |    ➖    | Raises GitHub API rate limits for landing-page repo stats (web).                                                                                                                               |
-| `LANDING_VIDEO_URL`                              |    ➖    | MP4 shown on the landing page (web); unset hides the section.                                                                                                                                  |
-| `NEXT_PUBLIC_AI_API_URL`                         |    ➖    | Where the browser reaches Buzrr-AI; unset hides AI Spaces.                                                                                                                                     |
-| `BILLING` + `DODO_*` + `APP_URL`                 |    ➖    | Enables Buzrr Pro billing. Off = no billing, everyone gets Pro.                                                                                                                                |
-| `UPSTASH_REDIS_REST_*` + `RATELIMIT`             |    ➖    | Enables rate limiting.                                                                                                                                                                         |
-| `DUEL_BOTS`                                      |    ➖    | Set to `OFF` to disable bot opponents in 1v1 matchmaking.                                                                                                                                      |
-| `MAX_PLAYERS_FREE` / `_PRO` / `_NOBILLING`       |    ➖    | Room size per plan (server; defaults 50 / 250 / 250).                                                                                                                                          |
-| `DB_POOL_MAX`                                    |    ➖    | DB connections per server process (default 10). See [big rooms](docs/self-hosting.md#big-rooms).                                                                                               |
-| `MAX_PARALLEL_DOWNLOADS`                         |    ➖    | Devices per room downloading at once (default unlimited): audio question clips and question images (one pool), the lobby downloads (another). See [big rooms](docs/self-hosting.md#big-rooms). |
+| Variable                                         | Required | Purpose                                                                                                                                                                                     |
+| ------------------------------------------------ | :------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AUTH_EMAIL_PASSWORD`                            |   ✅¹    | `ON` enables local email + password accounts (web).                                                                                                                                         |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`      |   ✅¹    | Google sign-in (web).                                                                                                                                                                       |
+| `BETTER_AUTH_SECRET`                             |    ✅    | Signs/verifies session JWTs. **Must match** between web and server.                                                                                                                         |
+| `DATABASE_URL` / `DIRECT_URL`                    |    ✅    | PostgreSQL connection (defaults to the Docker container).                                                                                                                                   |
+| `REDIS_URL`                                      |    ✅    | Redis for live game state (server won't boot without it).                                                                                                                                   |
+| `NEXT_PUBLIC_SOCKET_URL` / `NEXT_PUBLIC_API_URL` |    ✅    | Where the browser reaches the API.                                                                                                                                                          |
+| `GEMINI_API_KEY` or `LLM_BASE_URL` + `LLM_MODEL` |    ➖    | Enables AI quiz generation (Gemini or an OpenAI-compatible server).                                                                                                                         |
+| `STORAGE_DRIVER` + `CLOUDINARY_*` / `S3_*`       |    ➖    | Where question images go (unset: uploads disabled).                                                                                                                                         |
+| `GITHUB_TOKEN`                                   |    ➖    | Raises GitHub API rate limits for landing-page repo stats (web).                                                                                                                            |
+| `LANDING_VIDEO_URL`                              |    ➖    | MP4 shown on the landing page (web); unset hides the section.                                                                                                                               |
+| `NEXT_PUBLIC_AI_API_URL`                         |    ➖    | Where the browser reaches Buzrr-AI; unset hides AI Spaces.                                                                                                                                  |
+| `BILLING` + `DODO_*` + `APP_URL`                 |    ➖    | Enables Buzrr Pro billing. Off = no billing, everyone gets Pro.                                                                                                                             |
+| `UPSTASH_REDIS_REST_*` + `RATELIMIT`             |    ➖    | Enables rate limiting.                                                                                                                                                                      |
+| `DUEL_BOTS`                                      |    ➖    | Set to `OFF` to disable bot opponents in 1v1 matchmaking.                                                                                                                                   |
+| `MAX_PLAYERS_FREE` / `_PRO` / `_NOBILLING`       |    ➖    | Room size per plan (server; defaults 50 / 250 / 250).                                                                                                                                       |
+| `DB_POOL_MAX`                                    |    ➖    | DB connections per server process (default 10). See [big rooms](docs/self-hosting.md#big-rooms).                                                                                            |
+| `MAX_PARALLEL_DOWNLOADS`                         |    ➖    | Devices per room downloading at once (default unlimited): audio question clips and question images (one pool), audio skin files (another). See [big rooms](docs/self-hosting.md#big-rooms). |
 
 ¹ At least one sign-in method is required.
 
@@ -225,3 +225,15 @@ issue? See [SECURITY.md](SECURITY.md).
 ## 📄 License
 
 [AGPL-3.0](LICENSE) © Buzrr contributors
+
+### Sound recordings
+
+The TV Game Show recordings in
+[`apps/web/public/sounds/tv-game-show/`](apps/web/public/sounds/tv-game-show/)
+were generated with Suno (suno.com) on a paid Pro/Premier plan and downloaded
+through Suno's download, which grants commercial use rights under Suno's Terms
+of Service. They remain subject to those terms (no removal of Suno's metadata,
+no use to train AI models), and Suno gives no assurance that copyright
+subsists in AI-generated output — they are not covered by this repository's
+AGPL license. `end.mp3` there is not from Suno and free to use. Details:
+[NOTICE.md](apps/web/public/sounds/tv-game-show/NOTICE.md).

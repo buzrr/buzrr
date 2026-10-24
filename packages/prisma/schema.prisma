@@ -57,6 +57,8 @@ model User {
   /// max(plan cap, hostSizeLimit) — see billing/entitlements.service.ts.
   hostSizeLimit       Int                  @default(50) @map("host_size_limit")
   role                Role                 @default(user)
+  /// `userPreferencesSchema` in @buzrr/contract: the default audio skin.
+  preferences         Json                 @default("{}")
   /// Dodo Payments customer, set by the first verified billing webhook.
   dodoCustomerId      String?              @unique @map("dodo_customer_id")
   /// Lifetime Free-plan AI generations spent (never refills).
@@ -86,6 +88,7 @@ model User {
   questions           Question[]
   categoryRatings     UserCategoryRating[]
   duelDays            DuelDay[]
+  soundSkins          SoundSkin[]
 
   @@index([role])
   @@map("users")
@@ -444,4 +447,46 @@ enum ModerationStatus {
   pending
   approved
   unapproved
+}
+
+/// A set of game sounds (an uploaded MP3 per moment: lobby, countdown,
+/// question, end, reveal, scores, final). Built-in skins are synthesized in
+/// the browser and have no row. Global skins are offered to every user.
+model SoundSkin {
+  id          String   @id @default(cuid())
+  name        String
+  userId      String?  @map("user_id")
+  isGlobal    Boolean  @default(false) @map("is_global")
+  /// slot -> uploaded MP3 URL (`soundSlotSchema`), full quality (the host)
+  slots       Json     @default("{}")
+  /// slot -> the same, small (mono, 64 kbit/s), what players' devices load
+  playerSlots Json     @default("{}") @map("player_slots")
+  /// The final song as devices load it ahead of time: encrypted
+  /// ({ url, key }); the key goes out only with the final leaderboard.
+  finalClip   Json?    @map("final_clip")
+  /// slot -> playback options (`soundSlotOptionsSchema`)
+  options     Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sound_skins")
+}
+
+/// Playback options of a built-in (synthesized) skin, for everyone; only the
+/// superadmin changes them.
+model BuiltinSoundOptions {
+  skinId      String   @id @map("skin_id")
+  /// slot -> playback options (`soundSlotOptionsSchema`)
+  options     Json     @default("{}")
+  /// slot -> file URL (public `builtin-*` uploads); slots without one are synthesized
+  slots       Json     @default("{}")
+  /// slot -> the same, small, for players' devices
+  playerSlots Json     @default("{}") @map("player_slots")
+  /// unused: the defaults live in the code (`BUILTIN_DEFAULT_OPTIONS`)
+  defaults    Json     @default("{}")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("builtin_sound_options")
 }

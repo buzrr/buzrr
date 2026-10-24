@@ -70,9 +70,12 @@ export interface BubbleStats {
 
 const Game = ({
   onStats,
+  onPop,
   reportEveryMs = 1000,
 }: {
   onStats?: (stats: BubbleStats) => void;
+  /** A bubble popped (e.g. to play its sound). */
+  onPop?: () => void;
   /** Changed totals go out at most this often. */
   reportEveryMs?: number;
 }) => {
@@ -89,9 +92,11 @@ const Game = ({
   const [misses, setMisses] = useState(0);
   const missesRef = useRef(0);
   const onStatsRef = useRef(onStats);
+  const onPopRef = useRef(onPop);
   const reportEveryRef = useRef(reportEveryMs);
   useEffect(() => {
     onStatsRef.current = onStats;
+    onPopRef.current = onPop;
     reportEveryRef.current = reportEveryMs;
   });
 
@@ -325,6 +330,7 @@ const Game = ({
           bubblesRef.current.splice(i, 1);
           scoreRef.current += 1;
           setScore(scoreRef.current);
+          onPopRef.current?.();
           return;
         }
       }

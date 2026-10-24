@@ -48,6 +48,8 @@ export type EngineEvent =
       quizTitle: string;
       /** Moderated mode settings from the room; null/absent = unmoderated. */
       moderation?: ModerationSettings | null;
+      /** The quiz's sound skin final-song key, if it has one. */
+      finalSoundKey?: string | null;
     }
   /** The host's single pacing intent — the machine decides what it means. */
   | { type: "host-next" }
@@ -156,9 +158,13 @@ function start(
     questions: LiveQuestion[];
     quizTitle: string;
     moderation?: ModerationSettings | null;
+    finalSoundKey?: string | null;
   },
   now: number,
 ): Transition {
+  const keyPatch = event.finalSoundKey
+    ? { finalSoundKey: event.finalSoundKey }
+    : {};
   if (state.meta.phase !== "lobby") return noop(state);
   if (event.questions.length === 0) {
     return noop(state, {
@@ -178,6 +184,7 @@ function start(
       qIndex: 0,
       qDeadline: 0,
       moderation: JSON.stringify(mod),
+      ...keyPatch,
     };
     return {
       state: { ...withMeta(state, patch), questions: event.questions },
@@ -212,6 +219,7 @@ function start(
     startedAt: now,
     qDeadline: firstQuestionAt,
     ...(mod ? { moderation: JSON.stringify(mod) } : {}),
+    ...keyPatch,
   };
   return {
     state: { ...withMeta(state, patch), questions: event.questions },
@@ -688,6 +696,10 @@ function enterFinal(state: GameState, pacing: PacingStrategy): Transition {
           entries: finalEntries,
           isFinal: true,
           revealInMs: finalRevealMs(finalEntries),
+          // The preloaded final song becomes playable now.
+          ...(state.meta.finalSoundKey
+            ? { finalSoundKey: state.meta.finalSoundKey }
+            : {}),
         },
       },
     },

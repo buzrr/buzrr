@@ -10,6 +10,7 @@ import {
   LuBookText,
   LuCrown,
   LuHistory,
+  LuMusic,
   LuLogOut,
   LuSettings,
   LuSwords,
@@ -27,6 +28,7 @@ const NavLinks = [
   { href: "/admin", label: "Quizzes", icon: LuBookText },
   { href: "/admin/history", label: "History", icon: LuHistory },
   { href: "/admin/billing", label: "Plan & Billing", icon: LuCrown },
+  { href: "/admin/audio-skins", label: "Audio Skins", icon: LuMusic },
   { href: "/admin/settings", label: "Settings", icon: LuSettings },
 ];
 

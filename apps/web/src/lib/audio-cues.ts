@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { decryptClipBuffer, fetchClip } from "@/lib/sound/preload";
-import { audioContext } from "@/lib/sound/audio-context";
+import { audioContext } from "@/lib/sound/synth";
 import { fadeOutAndPause } from "@/lib/sound/fade";
 
 /**
@@ -79,7 +79,7 @@ async function playBuffer(
     const now = ctx.currentTime;
     gain.gain.cancelScheduledValues(now);
     gain.gain.setValueAtTime(gain.gain.value, now);
-    // A second's fade: the reveal part makes way for what comes next.
+    // A second's fade: the reveal part makes way for the scoreboard music.
     gain.gain.linearRampToValueAtTime(0.0001, now + 1);
     try {
       src.stop(now + 1.05);

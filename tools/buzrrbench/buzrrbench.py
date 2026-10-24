@@ -10,15 +10,16 @@ then in the lobby, sometimes a burst. During the game few do: 3 % of the players
 tap 1-3 times 10 s into a question, 10 % right after the answer is shown.
 
 Each player also downloads what its browser would, with its own cache:
-  - the player context
+  - the player context and the quiz's sound skin (if it is a user skin)
   - question images, as each question opens
   - question sounds: the encrypted clips announced by `preload` (with
     `preload-status` progress reports, like a phone, so the countdown can wait
     for slow devices; with the server's download slots a device first asks
     for one and waits for `preload-go`), or an external sound file when the
-    question opens, on devices where question sounds are on (`--sound-optin`
-    decides how many players switch sound on when the quiz plays it on the
-    host only)
+    question opens
+  - the skin's sound files for each phase and the preloaded final song, on
+    devices where game sounds are on (`--sound-optin` decides how many players
+    switch sound on when the quiz plays it on the host only)
 
 Measures:
   - HTTP latency: create player, join room
@@ -94,7 +95,9 @@ DONE_GRACE = 30.0
 QUEUED_REPORT_EVERY = 1.5
 SLOT_ACK_TIMEOUT = 10.0
 SLOT_GIVE_UP = 90.0  # like the web client: start anyway after this long
-LOBBY_KEEPALIVE_EVERY = 4.0  # holding the lobby slot: ask again, refreshes it
+SKIN_KEEPALIVE_EVERY = 4.0  # holding the skin slot: ask again, refreshes it
+MUSIC_SLOTS = {"lobby", "question", "lastQuestion", "scores", "final"}
+CUE_SLOTS = {"join", "bubble", "reaction"}  # the host's lobby cues: not on players
 # During the game, reactions are rare: this share of all players taps 1-3
 # times once a question has run QUESTION_REACT_AFTER s, and this share
 # right after the answer is shown. In the lobby they tap regularly.
@@ -106,6 +109,7 @@ PRELOAD_REPORT_EVERY = 0.4  # like the web client's throttle
 DOWNLOAD_TRIES = 6
 CHUNK = 64 * 1024
 
+BUILTIN_SKINS = {"builtin:show", "builtin:arcade", "builtin:chill"}
 DEFAULT_EMOJIS = ["👍", "❤️", "😂"]
 EMOJI_POOL = [
     "😀", "😂", "🤣", "😅", "😍", "🥰", "😎", "🤔", "😱", "😭",
@@ -263,6 +267,7 @@ class Bot:
     sound_pref: bool | None = None  # the device's sound switch (None = default)
     sound: dict = field(default_factory=dict)  # quiz sound settings
     reactions_on: bool = True
+    skin: dict | None = None
     emojis: list = field(default_factory=lambda: list(DEFAULT_EMOJIS))
     # The room's reaction budget, as the server sends it (reaction-limit).
     react_limit: int = 5
@@ -376,6 +381,7 @@ class Bot:
         probe = asyncio.create_task(self.sync_probe() if self.probe else asyncio.sleep(0))
         reacts = asyncio.create_task(self.react())
         beats = asyncio.create_task(self.heartbeat())
+        self.prefetch_skin()
         await self.done.wait()
         bubbles.cancel()
         probe.cancel()
@@ -392,13 +398,29 @@ class Bot:
             pass
 
     async def load_context(self) -> None:
-        """What the player page loads: the play context (quiz settings)."""
+        """What the player page loads: the play context (quiz settings) and the skin."""
         ctx = await self.http_json(
             "GET", f"/api/game-sessions/player-play/{self.player_id}", "http player-play"
         )
         settings = (((ctx or {}).get("game") or {}).get("quiz") or {}).get("settings") or {}
         self.sound = settings.get("sound") or {}
         self.reactions_on = settings.get("reactions", True) is not False
+        skin_id = self.sound.get("skin", "builtin:show")
+        if self.assets and skin_id not in BUILTIN_SKINS and self.sound_here("quiz"):
+            self.skin = await self.http_json(
+                "GET", f"/api/sound-skins/{skin_id}", "http sound-skin",
+                headers={"Authorization": f"Bearer {self.token}"},
+            )
+        elif self.assets and self.sound_here("quiz"):
+            # A built-in skin can have recordings (the superadmin's): its
+            # files then load like a user skin's.
+            data = await self.http_json(
+                "GET", "/api/sound-skins/builtin-options", "http builtin-skins",
+                headers={"Authorization": f"Bearer {self.token}"},
+            )
+            files = ((data or {}).get(skin_id) or {}).get("slots") or {}
+            if files:
+                self.skin = {"slots": files}
 
     # -- downloads ------------------------------------------------------------------
 
@@ -534,7 +556,7 @@ class Bot:
 
     async def wait_for_slot(self, kind: str, q: int, waiting=None) -> None:
         """Like the web client: ask for a download slot (kind "question" /
-        "lobby") and wait for `preload-go` if queued; `waiting` runs every
+        "skin") and wait for `preload-go` if queued; `waiting` runs every
         QUEUED_REPORT_EVERY s meanwhile."""
         t0 = time.perf_counter()
         go = self.slot_go.setdefault((kind, q), asyncio.Event())
@@ -602,7 +624,7 @@ class Bot:
 
         async def keepalive():
             while True:
-                await asyncio.sleep(LOBBY_KEEPALIVE_EVERY)
+                await asyncio.sleep(SKIN_KEEPALIVE_EVERY)
                 self.spawn(self._emit_ack("preload-slot", {"qIndex": 0, "kind": "lobby"}))
                 await status(False)
         alive = asyncio.create_task(keepalive())
@@ -620,6 +642,42 @@ class Bot:
         await status(True, failed)
         self.lobby_done = True
         M.add("lobby preload (all assets)", (time.perf_counter() - t0) * 1000)
+
+    def prefetch_skin(self) -> None:
+        """Like the web client: the skin's files once, in the lobby, through
+        the room's skin download slot (only what plays on this device)."""
+        if not self.assets or not self.skin or not self.sound_here("quiz"):
+            return
+        slots = self.skin.get("slots") or {}
+        music = self.sound.get("music", True) is not False
+        urls = [
+            u for slot, u in slots.items()
+            if u and (music or slot not in MUSIC_SLOTS) and slot not in CUE_SLOTS
+            and not (slot == "final" and self.skin.get("finalClipUrl"))
+        ]
+        if urls:
+            self.spawn(self.fetch_skin_files(urls, "skin sound (prefetch)"))
+
+    async def fetch_skin_files(self, urls: list, kind: str) -> None:
+        missing = [u for u in urls if u.split("?")[0] not in self.cache]
+        if not missing:
+            return
+        await self.wait_for_slot("skin", 0)
+
+        async def keepalive():
+            while True:
+                await asyncio.sleep(SKIN_KEEPALIVE_EVERY)
+                self.spawn(self._emit_ack("preload-slot", {"qIndex": 0, "kind": "skin"}))
+        alive = asyncio.create_task(keepalive())
+        try:
+            for u in missing:  # one after the other, like the browser
+                try:
+                    await self.fetch(u, kind)
+                except Exception:  # noqa: BLE001 - counted in the download
+                    pass
+        finally:
+            alive.cancel()
+            self.spawn(self._emit("slot-done", {"qIndex": 0, "kind": "skin"}))
 
     async def _emit_ack(self, event: str, payload) -> None:
         if self.frozen or not self.sio.connected:
@@ -648,8 +706,40 @@ class Bot:
             else:
                 self.download(audio["url"], "question sound (file)")
 
+    def on_phase(self, old: str, new: str) -> None:
+        """Skin files a device with sound on fetches as phases change (see director.tsx)."""
+        if not self.assets or old == new or not self.sound_here("quiz"):
+            return
+        slots = (self.skin or {}).get("slots") or {}
+        bed = {"idle": "lobby", "lobby": "lobby", "ready": "lobby", "question": "question",
+               "scores": "scores", "final": "final", "ended": "final"}.get(new)
+        final_url = (self.skin or {}).get("finalClipUrl")
+        if bed == "final" and final_url:
+            # The preloaded encrypted song plays instead (cached by now, mostly).
+            bed = None
+            self.download(final_url, "final song (late)")
+        wanted = [bed] if bed else []
+        if new == "starting":
+            wanted.append("countdown")
+        if old == "question" and new in ("closed", "reveal", "scores"):
+            wanted.append("end")
+        if new == "reveal":
+            wanted.append("reveal")
+        for slot in wanted:
+            # Like the browser: through the skin slot unless already here.
+            if slots.get(slot):
+                self.spawn(self.fetch_skin_files([slots[slot]], f"skin sound ({slot})"))
+        if final_url and old in ("idle", "lobby") and new not in ("idle", "lobby"):
+            self.spawn(self._preload_final(final_url))
+
+    async def _preload_final(self, url: str) -> None:
+        # Each device at a random moment within a minute of the start.
+        await asyncio.sleep(random.uniform(0, 60))
+        await self.fetch_skin_files([url], "final song (preload)")
+
     def set_phase(self, phase: str) -> None:
-        self.phase = phase
+        old, self.phase = self.phase, phase
+        self.on_phase(old, phase)
 
     # socket handlers
     def register(self) -> None:

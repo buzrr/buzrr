@@ -4,7 +4,10 @@ import { NestExpressApplication } from "@nestjs/platform-express";
 import { AppModule } from "./app.module";
 import { AllExceptionsFilter } from "./common/filters/http-exception.filter";
 import { LOCAL_UPLOADS_ROUTE } from "./common/storage/local.storage";
-import { verifyAssetSignature } from "./common/storage/asset-signing";
+import {
+  isPublicAssetKey,
+  verifyAssetSignature,
+} from "./common/storage/asset-signing";
 import {
   localStorageConfig,
   resolveStorageDriver,
@@ -62,7 +65,10 @@ async function bootstrap() {
         next: () => void,
       ) => {
         const key = req.path.replace(/^\/+/, "");
-        if (!verifyAssetSignature(key, req.query.sig)) {
+        if (
+          !isPublicAssetKey(key) &&
+          !verifyAssetSignature(key, req.query.sig)
+        ) {
           res.status(403).end();
           return;
         }
@@ -73,11 +79,18 @@ async function bootstrap() {
       prefix: `${LOCAL_UPLOADS_ROUTE}/`,
       index: false,
       dotfiles: "deny",
-      setHeaders: (res) => {
+      setHeaders: (res, path) => {
         // Keys are content ids (a file never changes): `immutable` spares
         // the revalidation on every reload. Signed links expire, so shared
-        // caches must not keep them.
-        res.setHeader("Cache-Control", "private, max-age=21600, immutable");
+        // caches must not keep them; built-in skin files may be cached
+        // anywhere for a year.
+        const name = path.split(/[\\/]/).pop() ?? "";
+        res.setHeader(
+          "Cache-Control",
+          isPublicAssetKey(name)
+            ? "public, max-age=31536000, immutable"
+            : "private, max-age=21600, immutable",
+        );
         res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
       },

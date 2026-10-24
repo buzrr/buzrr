@@ -1,4 +1,7 @@
-import { roomSettings } from "../../common/game-look/game-look";
+import {
+  resolveGameLook,
+  roomSettings,
+} from "../../common/game-look/game-look";
 import {
   ForbiddenException,
   Injectable,
@@ -120,7 +123,8 @@ export class GameSessionsService {
 
   /**
    * Opens a room for a quiz the user owns. `settings` (already validated by
-   * `createGameSessionSchema`) are this game's own.
+   * `createGameSessionSchema`) are this game's own; the plan's limits apply
+   * when they are read (`resolveGameLook`), as for the quiz's.
    */
   async createRoom(
     user: AuthUser,
@@ -377,6 +381,7 @@ export class GameSessionsService {
             where: { disabled: false },
             include: { options: { orderBy: OPTION_ORDER } },
           },
+          user: { select: { preferences: true } },
         },
       }),
       this.entitlements.maxPlayersFor(room.creatorId),
@@ -385,13 +390,17 @@ export class GameSessionsService {
     if (!quiz) {
       throw new NotFoundException("Quiz not found");
     }
+    // The owner's defaults filled in (audio skin).
+    const { user: owner, ...rest } = quiz;
+    const look = resolveGameLook(
+      { settings: roomSettings({ settings: room.settings, quiz }) },
+      owner?.preferences,
+      plan === "pro",
+    );
     return {
       room,
       players,
-      quiz: {
-        ...quiz,
-        settings: roomSettings({ settings: room.settings, quiz }),
-      },
+      quiz: { ...rest, settings: look.settings },
       maxPlayers,
       plan,
     };
@@ -410,13 +419,13 @@ export class GameSessionsService {
     const loaded = await this.loadGameForPlay(player.gameId);
     if (!loaded) return { player, game: null };
     const { settings, ...session } = loaded;
-    const game = {
-      ...session,
-      quiz: {
-        ...session.quiz,
-        settings: roomSettings({ settings, quiz: session.quiz }),
-      },
-    };
+    const { user: owner, ...quiz } = session.quiz;
+    const look = resolveGameLook(
+      { settings: roomSettings({ settings, quiz }) },
+      owner?.preferences,
+      (await this.entitlements.resolvePlan(loaded.creatorId)) === "pro",
+    );
+    const game = { ...session, quiz: { ...quiz, settings: look.settings } };
     return { player, game };
   }
 
@@ -433,6 +442,7 @@ export class GameSessionsService {
             title: true,
             settings: true,
             questions: { where: { disabled: false }, select: { id: true } },
+            user: { select: { preferences: true } },
           },
         },
         creator: {

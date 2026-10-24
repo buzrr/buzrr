@@ -305,6 +305,13 @@ export function buildSnapshot(
     payload.closedSummary = tally;
   }
 
+  if (
+    (meta.phase === "final" || meta.phase === "ended") &&
+    meta.finalSoundKey
+  ) {
+    payload.finalSoundKey = meta.finalSoundKey;
+  }
+
   if (playerId) {
     const you = buildAnswerResult(scores, answers, playerId);
     // While the question is open a player may learn *that* their answer was

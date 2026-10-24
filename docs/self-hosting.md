@@ -172,8 +172,9 @@ of the server responsive meanwhile.
 `MAX_PARALLEL_DOWNLOADS` (formerly `MAX_PARALLEL_AUDIO_DOWNLOADS`, still
 read) rations the downloads devices make ahead of time: at most that many
 devices per room fetch the next question's encrypted audio clips and picture
-at the same time (and, as a separate pool, everything they load in the
-lobby), the others queue and start as slots free up (a device finishes, leaves, or
+at the same time (and, as a separate pool, the audio skin's files when they
+join),
+the others queue and start as slots free up (a device finishes, leaves, or
 sends no progress for 8 s). Unset or `0` = no limit. Without it, 500 phones
 start the same download within three seconds, and on a modest uplink many of
 them time out. Around `30` keeps each download fast; a 64 kbit/s clip is

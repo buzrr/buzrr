@@ -12,6 +12,7 @@ import {
 } from "@buzrr/contract";
 import { roomSettings } from "../../common/game-look/game-look";
 import { signAssetsDeep } from "../../common/storage/asset-signing";
+import { finalClipOf } from "../sound-skins/final-clip";
 import type { GameOverPayload, QuestionAnswer } from "@buzrr/contract";
 import type { DuelOutcome, Prisma } from "@buzrr/prisma";
 import { nanoid } from "nanoid";
@@ -569,6 +570,16 @@ export class GameEngineService
     // Moderated mode comes from the room's settings (invalid → unmoderated).
     const settings = roomSettings(session);
     const moderation = settings.moderation;
+    // A user sound skin's final song is preloaded encrypted; its key goes
+    // out with the final leaderboard.
+    const skinId = settings.sound.skin;
+    const skin = !skinId.startsWith("builtin:")
+      ? await this.prisma.db.soundSkin.findUnique({
+          where: { id: skinId },
+          select: { finalClip: true },
+        })
+      : null;
+    const finalSoundKey = finalClipOf(skin?.finalClip)?.key ?? null;
 
     const { effects } = step(
       state,
@@ -577,6 +588,7 @@ export class GameEngineService
         questions,
         quizTitle: session.quiz.title,
         moderation: moderation?.enabled ? moderation : null,
+        finalSoundKey,
       },
       Date.now(),
     );

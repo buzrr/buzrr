@@ -1,6 +1,6 @@
 import { quizSettingsSchema } from "@buzrr/contract";
 import { describe, expect, it } from "vitest";
-import { roomSettings } from "../game-look";
+import { resolveGameLook, roomSettings } from "../game-look";
 
 const defaults = quizSettingsSchema.parse({});
 
@@ -34,5 +34,19 @@ describe("roomSettings", () => {
     expect(roomSettings({ settings: null, quiz: { settings: null } })).toEqual(
       defaults,
     );
+  });
+
+  it("keeps the plan's limits for a game's own settings", () => {
+    const look = resolveGameLook(
+      {
+        settings: roomSettings({
+          settings: { sound: { skin: "user-skin" } },
+          quiz: { settings: {} },
+        }),
+      },
+      {},
+      false,
+    );
+    expect(look.settings.sound.skin).toMatch(/^builtin:/);
   });
 });

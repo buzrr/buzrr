@@ -45,6 +45,8 @@ export interface GameMeta {
    * the room's settings at start; absent = not moderated. Read via `moderationOf`.
    */
   moderation?: string;
+  /** Decrypts the sound skin's preloaded final song; sent with the final leaderboard. */
+  finalSoundKey?: string;
   /** When the countdown started waiting for devices' downloads (0 = not waiting). */
   preloadWaitSince?: number;
   /** 1 = the host chose to wait for every download (no time limit). */

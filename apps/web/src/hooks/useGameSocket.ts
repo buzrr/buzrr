@@ -167,10 +167,10 @@ export function useGameSocket({
       if (conn.connected) conn.emit("preload-status", r);
     });
     // Download slots: ask the server before fetching a question's sound or
-    // the lobby's files; a queued device waits for `preload-go` (asking again
+    // the skin's files; a queued device waits for `preload-go` (asking again
     // after a reconnect). No answer (an older server) or no turn within
-    // SLOT_GIVE_UP_MS: go. The host never queues: its screen plays the
-    // sounds for the room, so it fetches them all at once.
+    // SLOT_GIVE_UP_MS: go. The host never queues: its screen plays every
+    // song, so it fetches them all at once.
     setSlotChannel(
       userType === "admin"
         ? null

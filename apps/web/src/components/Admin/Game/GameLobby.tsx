@@ -21,7 +21,7 @@ import { ClosedSlide, ReadySlide } from "@/components/Game/ModeratedSteps";
 import { closedNextLabel } from "@/lib/moderation";
 import { isScoredType, revealHasPoint } from "@buzrr/contract";
 import { ReactionOverlay } from "@/components/Game/Flyers";
-import { GameSounds, SoundToggle } from "@/lib/sound/director";
+import { GameSounds, LiveSounds, SoundToggle } from "@/lib/sound/director";
 
 interface QuizQuestionItem {
   title?: string;
@@ -110,9 +110,11 @@ const GameLobby = (params: {
     </span>
   );
 
-  // One sound provider for every phase (question sounds and their preloads).
+  // One sound provider for every phase: remounting it between the countdown
+  // and the question screens restarted (or lost) the music.
   return (
     <GameSounds role="host" quizSettings={params.quizQuestions?.settings}>
+      <LiveSounds socket={socket} />
       {!inGame ? (
         // idle / lobby / starting — the pre-question countdown
         <>

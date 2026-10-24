@@ -19,6 +19,10 @@ import TextInput from "@/components/ui/TextInput";
 import { DEFAULT_AVATAR } from "@/constants";
 import { authClient } from "@/lib/auth-client";
 import { useEntitlementsQuery } from "@/lib/modules/billing/hooks";
+import { BUILTIN_SOUND_SKINS } from "@buzrr/contract";
+import { BUILTIN_SKINS, type BuiltinSkinId } from "@/lib/sound/synth";
+import { useSoundSkinsQuery } from "@/lib/modules/sound-skins/hooks";
+import { usePreferencesQuery } from "@/lib/modules/preferences/hooks";
 
 const accountSchema = z.object({
   name: z
@@ -97,6 +101,39 @@ function PreferencesCard() {
         label="Default quiz view"
         description="How your quizzes are laid out on the Quizzes page."
         control={<GridListToggle />}
+      />
+    </SettingsCard>
+  );
+}
+
+/** Defaults for all the user's games: the audio skin. */
+function GameDefaultsCard() {
+  const prefs = usePreferencesQuery();
+  const skins = useSoundSkinsQuery();
+  const defaultSkin = prefs.data?.defaultSoundSkin ?? "builtin:show";
+  const defaultSkinName = (BUILTIN_SOUND_SKINS as readonly string[]).includes(
+    defaultSkin,
+  )
+    ? BUILTIN_SKINS[defaultSkin as BuiltinSkinId].name
+    : ((skins.data ?? []).find((sk) => sk.id === defaultSkin)?.name ??
+      "Audio skin");
+  return (
+    <SettingsCard
+      title="Game defaults"
+      description="Used by all your quizzes unless a quiz sets its own."
+    >
+      <PreferenceRow
+        label="Default audio skin"
+        description="Music and effects of quizzes set to “Default”."
+        control={
+          // A link to the page where it is picked.
+          <Link
+            href="/admin/audio-skins"
+            className="text-sm font-semibold text-lprimary dark:text-dprimary hover:underline whitespace-nowrap"
+          >
+            {defaultSkinName} →
+          </Link>
+        }
       />
     </SettingsCard>
   );
@@ -261,6 +298,7 @@ export default function SettingsClient() {
       </div>
       <div className="flex flex-col gap-6">
         <PreferencesCard />
+        <GameDefaultsCard />
         <AccountCard />
         <PlanCard />
         <DangerZoneCard />

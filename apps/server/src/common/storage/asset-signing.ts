@@ -2,8 +2,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { localStorageConfig, resolveStorageDriver } from "./storage.provider";
 
 /**
- * Uploaded media (question images and sounds) on the local store is not
- * public: `/uploads/<key>` is only served with a signature,
+ * Uploaded media (question images and sounds, sound-skin files) on the local
+ * store is not public: `/uploads/<key>` is only served with a signature,
  * `?sig=<expiry>.<hmac>`. Signatures are handed out only to whoever may see
  * the asset —
  *
@@ -62,6 +62,11 @@ export function signAssetUrl(
   // Rounded so the same asset gets the same URL for a while (browser cache).
   const expiry = Math.ceil((Date.now() / 1000 + ttlSeconds) / 600) * 600;
   return `${bare}?sig=${expiry}.${mac(key, expiry, k)}`;
+}
+
+/** Public without a signature: built-in skins' files, `builtin-<…>.<ext>`. */
+export function isPublicAssetKey(key: string): boolean {
+  return /^builtin-[\w-]+\.\w+$/.test(key);
 }
 
 /** Whether `sig` (from the query) admits `key` right now. */

@@ -5,6 +5,7 @@ import Game, { type BubbleStats } from "@/components/Game";
 import BackNavButton from "@/components/BackNavButton";
 import { DEFAULT_AVATAR } from "@/constants";
 import type { GameSession } from "@/types/db";
+import { useGameSound } from "@/lib/sound/director";
 import { useAppSelector } from "@/state/hooks";
 import { BUBBLE_CROWD, BUBBLE_CROWD_EVERY_MS } from "@buzrr/contract";
 import Image from "next/image";
@@ -31,6 +32,7 @@ const WaitGameStart = (params: {
   /** Reaction buttons, shown under the bubble field (never over it). */
   reactionBar?: ReactNode;
 }) => {
+  const sound = useGameSound();
   // A big room: bubble totals go out less often.
   const roomSize = useAppSelector((state) => state.game.roomSize);
   const game = params.game;
@@ -101,6 +103,10 @@ const WaitGameStart = (params: {
               reportEveryMs={
                 roomSize >= BUBBLE_CROWD ? BUBBLE_CROWD_EVERY_MS : 1000
               }
+              // Their own pops, when sound is on here.
+              onPop={() => {
+                if (sound?.on) sound.playCueSound("bubble");
+              }}
             />
             {params.reactionBar}
             <div className="flex flex-col mt-2 md:hidden">

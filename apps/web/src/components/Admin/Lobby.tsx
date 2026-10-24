@@ -17,7 +17,7 @@ import { useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { AnimatedNumber } from "@/components/Game/motion";
 import { ReactionOverlay, useFlyers } from "@/components/Game/Flyers";
-import { GameSounds } from "@/lib/sound/director";
+import { GameSounds, LiveSounds, fadeOutAllSounds } from "@/lib/sound/director";
 import HostHeader from "@/components/Admin/Game/HostHeader";
 import {
   LuBan,
@@ -255,6 +255,9 @@ const Lobby = (params: {
       return;
     }
     setLoad(true);
+    // The lobby music fades out over START_FADE_SEC; the game's next song
+    // comes in after START_NEXT_AFTER_SEC, over the fade.
+    fadeOutAllSounds(START_FADE_SEC, START_NEXT_AFTER_SEC);
     socket.emit("start-game", params.gameCode);
     // Move to the game screen right away instead of waiting for the
     // `game-started` round-trip — it syncs the countdown over the socket on
@@ -359,6 +362,7 @@ const Lobby = (params: {
 
   return (
     <GameSounds role="host" quizSettings={params.quizSettings}>
+      <LiveSounds socket={socket} />
       <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 -mb-12 pb-4 md:pb-0 md:h-[100dvh] text-dark dark:text-white">
         <HostHeader
           title={params.quizTitle}
@@ -630,6 +634,10 @@ const FLUSH_MS = 500;
 const FLYER_PLAYER_LIMIT = 60;
 /** Above this many players: no reorder animation, plain numbers. */
 const CROWD_LIMIT = 40;
+/** "Start": the lobby music fades out over this long… */
+const START_FADE_SEC = 2;
+/** …and the game's first song (the reveal music, if any) comes in after this. */
+const START_NEXT_AFTER_SEC = 1;
 
 /** The host's waiting list shows at most this many (the newest), or the search's matches. */
 const LOBBY_LIST_LIMIT = 150;

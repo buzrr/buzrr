@@ -1,5 +1,8 @@
 "use client";
 
+import type { SoundSlot } from "@buzrr/contract";
+import { renderBuiltin, type BuiltinSkinId } from "./synth";
+
 const BARS = 480;
 
 export interface Wave {
@@ -9,7 +12,7 @@ export interface Wave {
 }
 
 /** Peaks of decoded audio, normalised to the loudest bar. */
-function peaksOf(audio: AudioBuffer): Wave {
+export function peaksOf(audio: AudioBuffer): Wave {
   const data = audio.getChannelData(0);
   const step = Math.max(1, Math.floor(data.length / BARS));
   const peaks: number[] = [];
@@ -38,4 +41,22 @@ export async function decodePeaks(src: string): Promise<Wave> {
   } finally {
     void ctx.close();
   }
+}
+
+const synthWaves = new Map<string, Promise<Wave | null>>();
+
+/** A built-in skin's slot, rendered offline once per page (cached). */
+export function builtinPeaks(
+  skinId: BuiltinSkinId,
+  slot: SoundSlot,
+): Promise<Wave | null> {
+  const key = `${skinId}:${slot}`;
+  let p = synthWaves.get(key);
+  if (!p) {
+    p = renderBuiltin(skinId, slot)
+      .then((buf) => (buf ? peaksOf(buf) : null))
+      .catch(() => null);
+    synthWaves.set(key, p);
+  }
+  return p;
 }

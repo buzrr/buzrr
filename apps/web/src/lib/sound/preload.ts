@@ -11,8 +11,8 @@ const progress = new Map<
   string,
   { loaded: number; total: number; done: boolean; failed?: boolean }
 >();
-// Every question's clips and picture (all loaded in the lobby): a whole quiz
-// has to fit.
+// Every question's clips and picture (all loaded in the lobby) plus a
+// skin's files: a whole quiz has to fit.
 const MAX_ENTRIES = 600;
 
 const bare = (url: string) => url.split("?")[0]!;
@@ -117,7 +117,7 @@ let tracked: { qIndex: number; keys: string[]; reportedDone?: boolean } | null =
 const listeners = new Set<(r: Report) => void>();
 
 function notify() {
-  // "Done" once per question: other downloads (lobby files, images) keep
+  // "Done" once per question: other downloads (skin sounds, images) keep
   // calling notify, and every report is a store write on the server.
   if (!tracked || tracked.reportedDone) return;
   let loaded = 0;
@@ -169,8 +169,29 @@ let slots: SlotChannel | null = null;
 export function setSlotChannel(channel: SlotChannel | null) {
   slots = channel;
 }
-/** Holding the lobby slot: "still in use" this often. */
-const LOBBY_KEEPALIVE_MS = 4000;
+const SKIN_KEEPALIVE_MS = 4000;
+
+/**
+ * The sound skin's files, fetched in one download slot (kind "skin"): a
+ * full room joining doesn't pull the lobby music and every other song at
+ * the same moment. Files already here are skipped; resolves when all are
+ * in (or given up).
+ */
+export async function fetchSkinFiles(urls: string[]): Promise<void> {
+  const missing = urls.filter((u) => !cache.has(bare(u)));
+  if (missing.length === 0) return;
+  const channel = slots;
+  if (channel) await channel.wait("skin", 0);
+  const alive = channel
+    ? setInterval(() => channel.keepAlive("skin", 0), SKIN_KEEPALIVE_MS)
+    : null;
+  try {
+    for (const u of missing) await fetchClip(u).catch(() => undefined);
+  } finally {
+    if (alive) clearInterval(alive);
+    channel?.done("skin", 0);
+  }
+}
 
 /**
  * Start downloading clips; with `qIndex` their progress is reported (the
@@ -285,7 +306,7 @@ export async function preloadAll(urls: string[]): Promise<void> {
     ? setInterval(() => {
         channel.keepAlive("lobby", 0);
         reportAssets({ loaded, total, done: false });
-      }, LOBBY_KEEPALIVE_MS)
+      }, SKIN_KEEPALIVE_MS)
     : null;
   try {
     for (const u of missing) {

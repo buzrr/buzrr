@@ -1,11 +1,14 @@
 "use client";
 
 import {
+  BUILTIN_SOUND_SKINS,
   quizSettingsSchema,
   type ModerationSettings,
   type QuizSettings,
   type SoundSettings,
 } from "@buzrr/contract";
+import { useSoundSkinsQuery } from "@/lib/modules/sound-skins/hooks";
+import { BUILTIN_SKINS, type BuiltinSkinId } from "@/lib/sound/synth";
 import Switch from "@/components/ui/Switch";
 
 type SubKey = Exclude<keyof ModerationSettings, "enabled">;
@@ -34,7 +37,7 @@ export function quizSettingsOf(raw: unknown): QuizSettings {
 }
 
 /**
- * The quiz settings controls: question sounds, live reactions, moderated mode.
+ * The quiz settings controls: sounds, live reactions, moderated mode.
  * Controlled — the quiz editor saves every change, the "Host quiz" dialog
  * keeps them for the game it opens.
  */
@@ -48,17 +51,19 @@ export default function QuizSettingsFields({
   disabled?: boolean;
 }) {
   const mod = settings.moderation;
+  const skins = useSoundSkinsQuery();
   const setSound = (patch: Partial<SoundSettings>) =>
     onChange({ ...settings, sound: { ...settings.sound, ...patch } });
   const setModeration = (patch: Partial<ModerationSettings>) =>
     onChange({ ...settings, moderation: { ...mod, ...patch } });
+  // Same width for every sound selector, so they line up.
   const selectClass =
     "w-44 rounded-lg border border-lprimary/20 dark:border-white/10 bg-transparent dark:bg-dark px-2 py-1 text-[13px]";
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-col gap-1.5 text-sm">
-        <span className="font-semibold">Question sounds</span>
+        <span className="font-semibold">Sounds</span>
         <label className="flex items-center gap-2">
           <span className="w-20 shrink-0 text-[13px]">Play on</span>
           <select
@@ -76,6 +81,46 @@ export default function QuizSettingsFields({
             <option value="off">Off</option>
           </select>
         </label>
+        {settings.sound.playOn !== "off" && (
+          <label className="flex items-center gap-2">
+            <span className="w-20 shrink-0 text-[13px]">Audio skin</span>
+            <select
+              aria-label="Audio skin"
+              value={settings.sound.skin}
+              disabled={disabled}
+              onChange={(e) => setSound({ skin: e.target.value })}
+              className={selectClass}
+            >
+              <option value="default">Default (your settings)</option>
+              {BUILTIN_SOUND_SKINS.map((id) => (
+                <option key={id} value={id}>
+                  {BUILTIN_SKINS[id as BuiltinSkinId].name}
+                </option>
+              ))}
+              {(skins.data ?? []).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                  {s.isGlobal ? " (shared)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {settings.sound.playOn !== "off" && (
+          <label className="flex items-center gap-2">
+            <span className="w-20 shrink-0 text-[13px]">Music</span>
+            <select
+              aria-label="Music"
+              value={settings.sound.music ? "on" : "off"}
+              disabled={disabled}
+              onChange={(e) => setSound({ music: e.target.value === "on" })}
+              className={selectClass}
+            >
+              <option value="on">Music</option>
+              <option value="off">No music (effects only)</option>
+            </select>
+          </label>
+        )}
         {settings.sound.playOn === "host" && (
           <label className="flex items-center gap-2">
             <Switch

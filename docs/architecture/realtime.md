@@ -353,9 +353,11 @@ without a copy (external links) load as before.
   the countdown keeps counting it. In memory per server process; unlimited
   when unset (the ack says `limited: false` and devices spread their own start).
 - Slots come in two kinds, each with its own limit: `question` (above) and
-  `lobby` — everything ahead (see the lobby above: one slot, the files one
-  after the other, `preload-slot` again every 4 s as a keepalive, then
-  `slot-done`).
+  `skin` — a user sound skin's files. A device with sound on fetches them
+  once in the lobby (`fetchSkinFiles`: one slot, the files one after the
+  other, `preload-slot` again every 4 s as a keepalive, then `slot-done`);
+  the final song's encrypted clip and any file not yet here when its phase
+  plays go through the same slot.
 - A failed download is retried up to 5 times after a random, growing pause; a
   clip given up reports `done: true, failed: true` — the countdown never
   waits for it. Clips are mono, 64 kbit/s.
@@ -365,6 +367,61 @@ without a copy (external links) load as before.
   `downloadsDone`; the host answers with `downloads-decision { wait }`: go on
   now, or wait without the 30 s limit (`preloadWaitAll`, then `waitAll: true`).
   Questions with "∞" time have no countdown and no wait.
+
+## Sound skins: playback options
+
+A user skin can have its own countdown and song for the last question
+(`lastCountdown`, `lastQuestion`; empty: the usual countdown / question music
+plays). Built-in skins always have them: a recording (the superadmin's), or
+a stepped-up synth (higher countdown with a heartbeat and a bigger hit; the
+question loop starting halfway up its build).
+
+Built-in skins can have recordings (`builtin_sound_options.slots`, public
+`builtin-*` uploads) with default options to reset to; a slot without one is
+synthesized. "Clone to own" copies a built-in into a user skin (files copied). Each slot of a skin has options (`soundSlotOptionsSchema`, stored per user
+skin in `sound_skins.options`, for the built-in skins in
+`builtin_sound_options` — only the superadmin changes those):
+
+- `volume` 0–100 (80 = the usual level), `fadeIn` + `fadeInSec` (the
+  question music fades in over 2 s unless set otherwise).
+- `repeat` (lobby, question, last question, scores, reveal, final): default off, on for
+  the lobby. Built-in synth loops run until the phase ends unless repeat is
+  set off (then 8 bars).
+- Files only: `startMs`. Countdown / question: `align: "end"` plays the file
+  so its `endMs` lands on the end of the countdown (5 s) or the question,
+  starting later when there is less time left than song before that point;
+  `extendSec` (0–5) keeps it playing after the phase ends, then it fades out.
+  "∞" questions play from the start.
+
+Lobby cues (`join`, `bubble`, `reaction`, host only): a built-in skin plays
+its own variant (Show, Arcade's 8-bit, Chill's soft ones); a user skin picks
+per cue — a built-in variant, off, or its own file (`source`; default: the
+file if there is one, else Show's) — with a volume.
+
+The tusch (`end`) plays on top of everything and is never stopped. Its zero
+point (`endMs`; the synth skins' hit after their roll) lands on the question's
+end: it is started that long before the deadline; if the question closes
+early, it comes in right at the zero point.
+
+The question music starts once the countdown is over: the countdown's song
+stops when the question opens, an end-aligned one after its "plays on after
+0" seconds, and the question music waits for that. Lobby, reveal and
+scoreboard songs fade out over 1 s when their phase ends, and the next
+sound waits for that too.
+
+The options editor shows the uploaded file's waveform: click or drag sets
+the start point (or, end-aligned, the end / zero point), with the part that
+plays, the extend and the fade-in drawn on it.
+
+Every skin file has a small copy for players' devices (`player_slots`:
+mono, 64 kbit/s, full length so cue points still fit); players get those
+URLs, the host plays the originals. Files without one (older uploads,
+built-in skins' files) get it once in the background after the server starts.
+
+Files play through Web Audio (`lib/sound/song.ts`: gain ramps work on iOS);
+an `<audio>` element is the fallback. The audio skins page has a test bench
+per skin: a round with countdown, question (chosen length), tusch and
+optionally reveal and scoreboard, timed like a game.
 
 ## Lobby extras: bubbles and reactions
 
@@ -393,7 +450,8 @@ without a copy (external links) load as before.
 - **Host lobby:** applies reactions in batches (every 500 ms) and joins every
   250 ms; player cards are memoised, so an update re-renders only the cards
   it changed. Above 40 players no reorder animation and no count-up numbers,
-  above 60 no bubbles rise out of the cards.
+  above 60 no bubbles rise out of the cards. The join ping plays at most
+  every 150 ms (Arcade's reaction pling at most every 5 s).
 
 ## Changing the socket contract — touch list
 
