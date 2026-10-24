@@ -20,6 +20,7 @@ import {
 import { Tooltip } from "@/components/ui/Tooltip";
 import { AnimatedNumber, useEntered } from "@/components/Game/motion";
 import { ChoiceList, SubmitButton, toggleChoice } from "./Inputs";
+import { useT } from "@/lib/i18n/context";
 import type { QuestionRenderer } from "./types";
 
 export function OptionLabel({
@@ -155,6 +156,7 @@ export function OptionsReveal({
   correctOptionIds: string[];
   renderKey?: (index: number) => ReactNode;
 }) {
+  const t = useT();
   const density = useContext(RevealDensity);
   // Bars share out the picks; with multi-select one player can count twice.
   const picks = counts.reduce((sum, c) => sum + c, 0);
@@ -197,7 +199,7 @@ export function OptionsReveal({
               {ok && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-green-500 px-2 py-0.5 text-[11.5px] font-bold tracking-[0.04em] uppercase text-white">
                   <LuCheck size={13} strokeWidth={3} />
-                  Correct
+                  {t("Correct")}
                 </span>
               )}
               <span className={clsx("text-sm font-medium", mutedText)}>
@@ -234,6 +236,7 @@ function MultiSelectInput({
   disabled,
   onSubmit,
 }: ComponentProps<QuestionRenderer<"multiple_choice">["AnswerInput"]>) {
+  const t = useT();
   const [draft, setDraft] = useState<string[]>([]);
   const sent =
     selected && "optionIds" in selected
@@ -245,7 +248,7 @@ function MultiSelectInput({
   return (
     <>
       <p className={clsx("mt-3 text-sm font-medium", mutedText)}>
-        Select all that apply.
+        {t("Select all that apply.")}
       </p>
       <ChoiceList
         options={question.options}
@@ -305,12 +308,13 @@ export const multipleChoiceRenderer: QuestionRenderer<"multiple_choice"> = {
   },
 
   HostPrompt({ question }) {
+    const t = useT();
     // Rows size to their content; the panel scrolls if it ever overflows.
     return (
       <>
         {question.multiSelect && (
           <p className={clsx("mt-3 text-sm font-medium", mutedText)}>
-            Players select all that apply
+            {t("Players select all that apply")}
           </p>
         )}
         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 md:auto-rows-fr gap-3.5 mt-7">

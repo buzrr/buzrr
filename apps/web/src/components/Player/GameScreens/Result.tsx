@@ -9,6 +9,7 @@ import {
   describeAnswer,
   isScoredType,
 } from "@/components/QuestionTypes";
+import { useT } from "@/lib/i18n/context";
 import type { AnswerResultPayload } from "@buzrr/contract";
 
 /**
@@ -27,6 +28,7 @@ const Result = (params: {
   /** What moves on (playing alone), instead of waiting for the host. */
   next?: ReactNode;
 }) => {
+  const t = useT();
   const you = params.you;
   const sound = useGameSound();
   const revealAudio = useAppSelector((state) => state.game.question?.audio);
@@ -61,7 +63,7 @@ const Result = (params: {
       <div className="flex flex-col items-center justify-center h-[85dvh] gap-4">
         <div className="h-14 w-14 rounded-full border-4 border-light-bg dark:border-off-dark border-t-lprimary dark:border-t-dprimary animate-spin" />
         <p className="text-off-dark dark:text-off-white">
-          Checking your answer…
+          {t("Checking your answer…")}
         </p>
       </div>
     );

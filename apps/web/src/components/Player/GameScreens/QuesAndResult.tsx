@@ -23,6 +23,7 @@ import { useAppSelector } from "@/state/hooks";
 import type { Standing } from "@/state/game/gameSlice";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
 import { AnswerInput, QuestionTypePill } from "@/components/QuestionTypes";
+import { useT, useLocale } from "@/lib/i18n/context";
 import {
   GameTopBar,
   StatTile,
@@ -245,6 +246,8 @@ const QuestionAndResult = (params: {
   /** Result screen: what moves on (playing alone), instead of waiting. */
   next?: ReactNode;
 }) => {
+  const t = useT();
+  const locale = useLocale();
   const deadline = useAppSelector((state) => state.game.deadline);
   const connection = useAppSelector((state) => state.game.connection);
   const qIndex = useAppSelector((state) => state.game.qIndex);
@@ -318,7 +321,7 @@ const QuestionAndResult = (params: {
                 key={params.question?.id ?? params.question?.title}
                 value={Math.ceil(remaining)}
                 max={timeOut}
-                label="seconds"
+                label={t("seconds")}
                 className="size-[150px]"
                 valueClassName="text-5xl"
               />
@@ -326,7 +329,7 @@ const QuestionAndResult = (params: {
               <TimerRing
                 value={0}
                 max={1}
-                label="time's up"
+                label={t("time's up")}
                 className="size-[150px]"
                 valueClassName="text-5xl"
               />
@@ -342,7 +345,7 @@ const QuestionAndResult = (params: {
                     mutedText,
                   )}
                 >
-                  Room code{" "}
+                  {t("Room code")}{" "}
                   <b className="tracking-[0.08em] text-dark dark:text-white">
                     {params.gameCode}
                   </b>
@@ -355,7 +358,10 @@ const QuestionAndResult = (params: {
                     mutedText,
                   )}
                 >
-                  Question {qIndex + 1} of {qCount}
+                  {t("Question {n} of {total}", {
+                    n: qIndex + 1,
+                    total: qCount,
+                  })}
                 </span>
               )}
             </div>
@@ -375,7 +381,7 @@ const QuestionAndResult = (params: {
                 className="size-[42px] rounded-full object-cover"
               />
               <div className={clsx("flex flex-col text-[12.5px]", mutedText)}>
-                Quiz by
+                {t("Quiz by")}
                 <b className="text-[15px] font-semibold text-dark dark:text-white">
                   {params.hostName}
                 </b>
@@ -387,11 +393,11 @@ const QuestionAndResult = (params: {
               <StatTile
                 value={you.rank ? ordinal(you.rank) : "—"}
                 suffix={players.length > 0 ? ` /${players.length}` : undefined}
-                label="Your rank"
+                label={t("Your rank")}
               />
               <StatTile
                 value={you.totalScore.toLocaleString()}
-                label="Total points"
+                label={t("Total points")}
               />
             </div>
           )}
@@ -410,7 +416,7 @@ const QuestionAndResult = (params: {
                   media={params.question.media}
                   mediaKey={params.question.mediaKey}
                   className="mb-4 md:mb-5 mx-auto max-h-[28dvh] w-auto rounded-2xl"
-                  alt="Question image"
+                  alt={t("Question image")}
                   height={320}
                   width={500}
                 />
@@ -426,7 +432,7 @@ const QuestionAndResult = (params: {
                   <QuestionTypePill type={params.question.type} />
                 )}
               <span className="hidden md:inline-block w-fit text-[12.5px] font-bold tracking-[0.06em] uppercase rounded-full px-3 py-1.5 text-lprimary dark:text-dprimary bg-lprimary/8 dark:bg-white/5">
-                Question {qIndex + 1}
+                {t("Question")} {qIndex + 1}
                 {qCount > 0 && ` of ${qCount}`}
               </span>
             </div>
@@ -451,7 +457,7 @@ const QuestionAndResult = (params: {
             {params.locked && !params.canAddMore && (
               <div className="mt-6 flex justify-center animate-fade-up">
                 <WaitingDots>
-                  Answer received — waiting for the results
+                  {t("Answer received — waiting for the results")}
                 </WaitingDots>
               </div>
             )}
@@ -473,7 +479,7 @@ const QuestionAndResult = (params: {
               {status.icon}
             </div>
             <h2 className="text-[26px] md:text-[40px] font-extrabold tracking-[-0.02em]">
-              {status.heading}
+              {t(status.heading)}
             </h2>
             {/* Moderated with standings to come: the points come with them
                 (the scores step's own row, or the final standings). */}
@@ -488,27 +494,27 @@ const QuestionAndResult = (params: {
                 )}
               >
                 {params.status === "timesout"
-                  ? "No answer this round"
+                  ? t("No answer this round")
                   : params.status === "received"
-                    ? "Not scored — thanks for answering"
-                    : `+${params.points ?? 0} points`}
+                    ? t("Not scored — thanks for answering")
+                    : t("+{n} points", { n: params.points ?? 0 })}
               </span>
             )}
             {params.status !== "timesout" && you?.timeTakenMs != null && (
               <span className={clsx("text-sm font-semibold", mutedText)}>
-                You answered within{" "}
-                {(you.timeTakenMs / 1000).toLocaleString("en", {
-                  maximumFractionDigits: 1,
-                  minimumFractionDigits: 1,
-                })}{" "}
-                seconds
+                {t("You answered within {s} seconds", {
+                  s: (you.timeTakenMs / 1000).toLocaleString(locale, {
+                    maximumFractionDigits: 1,
+                    minimumFractionDigits: 1,
+                  }),
+                })}
               </span>
             )}
             <div className="mt-3 md:mt-[22px] flex flex-col gap-3 md:gap-4 w-full max-w-[420px] animate-fade-up [animation-delay:150ms]">
               <AnswerRow
-                label="Your answer"
+                label={t("Your answer")}
                 className={status.answer}
-                emptyText="You didn't answer in time"
+                emptyText={t("You didn't answer in time")}
               >
                 {params.yourAnswer}
               </AnswerRow>
@@ -517,7 +523,7 @@ const QuestionAndResult = (params: {
                 params.correctAnswers?.map((node, i) => (
                   <AnswerRow
                     key={i}
-                    label="Correct answer"
+                    label={t("Correct answer")}
                     className={STATUS.correct.answer}
                   >
                     {node}
@@ -532,11 +538,13 @@ const QuestionAndResult = (params: {
                 <WaitingDots>
                   {params.hideRoomCode
                     ? isLast
-                      ? "Final results coming up"
-                      : "Next question coming up"
+                      ? t("Final results coming up")
+                      : t("Next question coming up")
                     : isLast
-                      ? "Waiting for the final results"
-                      : `Waiting for the host to start question ${qIndex + 2}`}
+                      ? t("Waiting for the final results")
+                      : t("Waiting for the host to start question {n}", {
+                          n: qIndex + 2,
+                        })}
                 </WaitingDots>
               )}
             </div>

@@ -15,6 +15,7 @@ import { toast } from "react-toastify";
 import modalStyle from "@/utils/modalStyle";
 import type { GameSocket } from "@/types/socket";
 import { useAppSelector } from "@/state/hooks";
+import { useT } from "@/lib/i18n/context";
 import {
   BASE_REACTION_EMOJIS,
   MAX_CUSTOM_REACTIONS,
@@ -295,6 +296,7 @@ export function ReactionBar({
   /** A call to send, shown beside the bar (the podium). */
   hint?: string;
 }) {
+  const t = useT();
   const [shot, setShot] = useState(false);
   const { spawn, layer } = useFlyers();
   const [custom, setCustom] = useState<string[]>([]);
@@ -321,7 +323,7 @@ export function ReactionBar({
     setBlockedUntil(0);
   }
   const limitReached = () =>
-    toast.info("Limit reached — wait a little.", {
+    toast.info(t("Limit reached — wait a little."), {
       toastId: "reaction-limit",
       autoClose: 2500,
     });
@@ -422,7 +424,7 @@ export function ReactionBar({
             key={emoji}
             emoji={emoji}
             onSend={send}
-            onLongPress={() => toast.info("Base smileys cannot be changed")}
+            onLongPress={() => toast.info(t("Base smileys cannot be changed"))}
           />
         ))}
         {custom.map((emoji, i) => (
@@ -436,7 +438,7 @@ export function ReactionBar({
         {custom.length < MAX_CUSTOM_REACTIONS && (
           <button
             type="button"
-            aria-label="Add a reaction"
+            aria-label={t("Add a reaction")}
             onClick={() => setEditing("add")}
             className="size-10 rounded-full flex items-center justify-center cursor-pointer border-2 border-dashed border-lprimary/30 dark:border-white/20 text-off-dark dark:text-muted-dark hover:bg-lprimary/10 dark:hover:bg-white/10"
           >
@@ -451,7 +453,7 @@ export function ReactionBar({
             !inline && "fixed z-40 bottom-[7.5rem] left-1/2 -translate-x-1/2",
           )}
         >
-          Reactions again in {blockedFor} s
+          {t("Reactions again in {s} s", { s: blockedFor })}
         </p>
       )}
       <EmojiPicker
@@ -496,6 +498,7 @@ function EmojiPicker({
   onPick: (emoji: string) => void;
   onRemove?: () => void;
 }) {
+  const t = useT();
   return (
     <Modal open={open} onClose={onClose} aria-labelledby="emoji-picker-title">
       <Box
@@ -506,7 +509,7 @@ function EmojiPicker({
           id="emoji-picker-title"
           className="text-lg font-black text-dark dark:text-white text-center"
         >
-          {current ? "Change your reaction" : "Add a reaction"}
+          {current ? t("Change your reaction") : t("Add a reaction")}
         </h2>
         <div className="mt-4 grid grid-cols-8 gap-1">
           {REACTION_EMOJI_CHOICES.map((emoji) => {
@@ -538,7 +541,7 @@ function EmojiPicker({
               onClick={onRemove}
               className="mr-auto px-4 py-2 rounded-xl font-bold text-red-light dark:text-red-dark hover:bg-red-light/10 cursor-pointer"
             >
-              Remove
+              {t("Remove")}
             </button>
           )}
           <button
@@ -546,7 +549,7 @@ function EmojiPicker({
             onClick={onClose}
             className="px-4 py-2 rounded-xl font-bold text-dark dark:text-white hover:bg-card-light dark:hover:bg-card-dark cursor-pointer"
           >
-            Cancel
+            {t("Cancel")}
           </button>
         </div>
       </Box>

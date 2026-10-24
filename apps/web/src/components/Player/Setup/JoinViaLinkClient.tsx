@@ -8,6 +8,7 @@ import clsx from "clsx";
 import JoinShell from "@/components/Player/Setup/JoinShell";
 import ProfilePreview from "@/components/Player/Setup/ProfilePreview";
 import { PROFILES } from "@/components/Player/SelectProfile";
+import { useT } from "@/lib/i18n/context";
 import { mutedText } from "@/components/Game/GameUI";
 
 /**
@@ -16,6 +17,7 @@ import { mutedText } from "@/components/Game/GameUI";
  * manual-join fallback stays available for invalid/expired links.
  */
 export default function JoinViaLinkClient({ gameCode }: { gameCode: string }) {
+  const t = useT();
   // Codes are uppercase, whitespace-free (see JoinRoomForm) — normalize the
   // raw URL segment so a typed/lower-cased link still resolves.
   const normalizedCode = useMemo(
@@ -41,12 +43,12 @@ export default function JoinViaLinkClient({ gameCode }: { gameCode: string }) {
               joinGameCode={normalizedCode}
             />
             <p className={clsx("text-sm", mutedText)}>
-              Having trouble?{" "}
+              {t("Having trouble?")}{" "}
               <Link
                 href="/player"
                 className="font-semibold text-lprimary dark:text-dprimary hover:underline"
               >
-                Join with a room code instead
+                {t("Join with a room code instead")}
               </Link>
             </p>
           </>

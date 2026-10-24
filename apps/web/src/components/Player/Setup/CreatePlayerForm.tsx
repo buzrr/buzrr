@@ -17,6 +17,7 @@ import { clearPlayerLocalSession } from "@/lib/player-session";
 import { loadPlayerProfile, savePlayerProfile } from "@/lib/player-prefs";
 import { isAxiosError } from "axios";
 import { mutedText, primaryButtonClass } from "@/components/Game/GameUI";
+import { useT } from "@/lib/i18n/context";
 import {
   BackSquare,
   Steps,
@@ -48,6 +49,7 @@ const CreatePlayerForm = (props: {
   /** Replaces "Joining a private quiz" under the heading. */
   subtitle?: ReactNode;
 }) => {
+  const t = useT();
   const router = useRouter();
   const mutation = useCreatePlayerMutation();
   const joinMutation = useJoinRoomMutation();
@@ -99,11 +101,11 @@ const CreatePlayerForm = (props: {
         onError: (err) => {
           if (isAxiosError(err) && err.response?.status === 401) {
             clearPlayerLocalSession();
-            toast.error("Your session expired. Please try again.");
+            toast.error(t("Your session expired. Please try again."));
             return;
           }
           if (isAxiosError(err) && err.response?.status === 404) {
-            toast.error("This quiz link is invalid or the game has ended.");
+            toast.error(t("This quiz link is invalid or the game has ended."));
             return;
           }
           toast.error(getApiErrorMessage(err));
@@ -138,7 +140,7 @@ const CreatePlayerForm = (props: {
           router.push(`/player/joinRoom/${res.playerId}`);
         },
         onError: (err) => {
-          toast.error(getApiErrorMessage(err));
+          toast.error(t(getApiErrorMessage(err)));
         },
       },
     );
@@ -155,23 +157,23 @@ const CreatePlayerForm = (props: {
       </div>
       <div>
         <h1 className="text-[32px] md:text-[44px] font-extrabold tracking-[-0.03em] leading-[1.06]">
-          Create a custom profile
+          {t("Create a custom profile")}
         </h1>
         <p className={clsx("mt-2.5 text-base", mutedText)}>
           {props.subtitle ? (
             props.subtitle
           ) : props.joinGameCode ? (
             <>
-              Joining room{" "}
+              {t("Joining room")}{" "}
               <b className="font-bold tracking-[0.1em] text-lprimary dark:text-dprimary">
                 {props.joinGameCode}
               </b>
             </>
           ) : (
             <>
-              Joining a{" "}
+              {t("Joining a")}{" "}
               <b className="font-semibold text-dark dark:text-white">
-                private quiz
+                {t("private quiz")}
               </b>
             </>
           )}
@@ -186,7 +188,7 @@ const CreatePlayerForm = (props: {
         render={({ field, fieldState }) => (
           <label className="block">
             <span className={joinLabelClass}>
-              Display name
+              {t("Display name")}
               <span className={joinCounterClass}>
                 {field.value.length}/{NAME_MAX}
               </span>
@@ -195,7 +197,7 @@ const CreatePlayerForm = (props: {
               type="text"
               id="displayName"
               name={field.name}
-              placeholder="Enter display name"
+              placeholder={t("Enter display name")}
               className={clsx(joinInputClass, "mt-2")}
               required
               autoComplete="off"
@@ -215,7 +217,7 @@ const CreatePlayerForm = (props: {
               </span>
             ) : (
               <span className={clsx("mt-1.5 block", joinCounterClass)}>
-                Letters, numbers and underscores only.
+                {t("Letters, numbers and underscores only.")}
               </span>
             )}
           </label>
@@ -227,7 +229,11 @@ const CreatePlayerForm = (props: {
         disabled={!props.data.name.trim() || pending}
         className={clsx(primaryButtonClass, "w-full py-4 text-[17px]")}
       >
-        {pending ? "Loading..." : props.joinGameCode ? "Join game" : "Next"}
+        {pending
+          ? t("Loading…")
+          : props.joinGameCode
+            ? t("Join game")
+            : t("Next")}
       </button>
     </form>
   );

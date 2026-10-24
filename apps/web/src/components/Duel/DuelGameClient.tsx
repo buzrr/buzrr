@@ -20,9 +20,11 @@ import GetReady from "@/components/Game/GetReady";
 import ReportQuestionButton from "./ReportQuestionButton";
 import DuelAudio, { type DuelOutcome } from "./DuelAudio";
 import { FlameIcon, TrophyIcon } from "./duelUi";
+import { useT, pl, tx } from "@/lib/i18n/context";
 import { readMatched, type StoredMatch } from "./matchedStorage";
 
 export default function DuelGameClient({ gameCode }: { gameCode: string }) {
+  const t = useT();
   const [token, setToken] = useState<string | null>(null);
   const [tokenError, setTokenError] = useState(false);
   const { data: profile } = useDuelProfileQuery();
@@ -58,7 +60,7 @@ export default function DuelGameClient({ gameCode }: { gameCode: string }) {
   }, [gameOver, queryClient]);
 
   const title = matched?.category
-    ? `1v1 Duel · ${matched.category.name}`
+    ? tx("1v1 Duel · {category}", { category: matched.category.name })
     : "1v1 Duel";
 
   const outcome = useMemo<DuelOutcome | null>(() => {
@@ -78,16 +80,16 @@ export default function DuelGameClient({ gameCode }: { gameCode: string }) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70dvh] gap-4 px-4 text-center">
         <p className="text-dark dark:text-white">
-          Couldn&apos;t start the duel. Please sign in and try again.
+          {t("Couldn't start the duel. Please sign in and try again.")}
         </p>
         <Link href="/duel">
-          <Button>Back to Duel</Button>
+          <Button>{t("Back to Duel")}</Button>
         </Link>
       </div>
     );
   }
 
-  if (!token || !socket) return <GetReady title="1v1 Duel" />;
+  if (!token || !socket) return <GetReady title={t("1v1 Duel")} />;
 
   return (
     <>
@@ -110,7 +112,7 @@ export default function DuelGameClient({ gameCode }: { gameCode: string }) {
             />
           </>
         ) : (
-          <GetReady title="1v1 Duel" />
+          <GetReady title={t("1v1 Duel")} />
         )
       ) : phase === "reveal" ? (
         <Result you={you} gameCode={gameCode} quizTitle={title} hideRoomCode />
@@ -129,6 +131,7 @@ export default function DuelGameClient({ gameCode }: { gameCode: string }) {
 
 /** Persistent header: both players' live scores and connection dots. */
 function DuelScoreBar({ myId }: { myId?: string }) {
+  const t = useT();
   const players = useAppSelector((state) => state.game.players);
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
   const phase = useAppSelector((state) => state.game.phase);
@@ -152,7 +155,7 @@ function DuelScoreBar({ myId }: { myId?: string }) {
         <div key={p.id} className="flex items-center gap-4">
           {index > 0 && (
             <span className="font-black text-off-dark dark:text-off-white">
-              VS
+              {t("VS")}
             </span>
           )}
           <div className="flex items-center gap-2 bg-white dark:bg-dark rounded-full py-1 pl-1 pr-4 shadow">
@@ -172,7 +175,7 @@ function DuelScoreBar({ myId }: { myId?: string }) {
             </span>
             <div>
               <p className="text-xs font-bold text-dark dark:text-white leading-tight">
-                {p.id === myId ? "You" : p.name}
+                {p.id === myId ? t("You") : p.name}
               </p>
               <p
                 key={p.score}
@@ -197,6 +200,7 @@ function DuelStartingScreen({
   matched: StoredMatch | null;
   streak?: DailyStreak;
 }) {
+  const t = useT();
   const players = useAppSelector((state) => state.game.players);
   const qCount = useAppSelector((state) => state.game.qCount);
   const deadline = useAppSelector((state) => state.game.deadline);
@@ -204,16 +208,20 @@ function DuelStartingScreen({
 
   const opponent = players.find((p) => p.id !== myId) ?? matched?.opponent;
   const questionCount = qCount || matched?.questionCount;
-  const categoryName = matched?.category?.name ?? "Random";
+  const categoryName = matched?.category?.name ?? t("Random");
 
   return (
     <div className="flex min-h-[70dvh] flex-col items-center justify-center gap-3.5 px-4">
       <p className="text-center text-[28px] font-extrabold tracking-tight text-dark dark:text-white sm:text-[38px] animate-fade-up">
-        {opponent ? `You vs ${opponent.name}` : "Get ready!"}
+        {opponent
+          ? t("You vs {name}", { name: opponent.name })
+          : t("Get ready!")}
       </p>
       <span className="rounded-full bg-card-light dark:bg-card-dark px-3 py-1.5 text-[13.5px] font-bold text-lprimary dark:text-dprimary">
         {categoryName}
-        {questionCount ? ` · ${questionCount} questions` : ""}
+        {questionCount
+          ? ` · ${t(pl(questionCount, "{n} question", "{n} questions"), { n: questionCount })}`
+          : ""}
       </span>
       <p
         key={remaining}
@@ -225,10 +233,17 @@ function DuelStartingScreen({
         <span className="inline-flex items-center gap-1 rounded-full bg-flame/12 py-1 pl-[7px] pr-2.5 text-[13px] font-extrabold text-flame">
           <FlameIcon size={14} />
           {streak.playedToday
-            ? `${streak.current}-day streak · today already counted`
+            ? t(
+                pl(
+                  streak.current,
+                  "{n}-day streak · today already counted",
+                  "{n}-day streak · today already counted",
+                ),
+                { n: streak.current },
+              )
             : streak.current > 0
-              ? `${streak.current}-day streak · today counts`
-              : "Finish this duel to start a streak"}
+              ? t("{n}-day streak · today counts", { n: streak.current })
+              : t("Finish this duel to start a streak")}
         </span>
       )}
     </div>
@@ -239,6 +254,7 @@ const positive = "text-green-600 dark:text-green-400";
 const negative = "text-red-light dark:text-red-dark";
 
 function DuelResultScreen({ myId }: { myId?: string }) {
+  const t = useT();
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
   const eloChanges = useAppSelector((state) => state.game.eloChanges);
   const rated = useAppSelector((state) => state.game.rated);
@@ -253,13 +269,13 @@ function DuelResultScreen({ myId }: { myId?: string }) {
   const won = Boolean(me && opponent && me.score > opponent.score);
   const outcome =
     !me || !opponent
-      ? "Duel over"
+      ? t("Duel over")
       : me.score === opponent.score
-        ? "It's a tie!"
+        ? t("It's a tie!")
         : won
-          ? "You won!"
-          : "You lost";
-  const categoryName = category?.name ?? "Random";
+          ? t("You won!")
+          : t("You lost");
+  const categoryName = category?.name ?? t("Random");
   const categoryQuery = category
     ? `category=${encodeURIComponent(category.id)}`
     : "";
@@ -291,7 +307,7 @@ function DuelResultScreen({ myId }: { myId?: string }) {
               className="h-[84px] w-[84px] rounded-full sm:h-[104px] sm:w-[104px]"
             />
             <p className="text-[17px] font-bold text-dark dark:text-white">
-              {entry!.playerId === myId ? "You" : entry!.name}
+              {entry!.playerId === myId ? t("You") : entry!.name}
             </p>
             <p className="text-2xl font-extrabold text-lprimary dark:text-dprimary sm:text-[30px]">
               {entry!.score}
@@ -301,7 +317,13 @@ function DuelResultScreen({ myId }: { myId?: string }) {
       </div>
 
       <div className="grid w-full max-w-[520px] grid-cols-2 rounded-[22px] border border-lprimary/15 dark:border-white/5 bg-white dark:bg-dark shadow-[0_10px_30px_-18px_rgba(70,40,160,0.35)] animate-fade-up [animation-delay:300ms]">
-        <SummaryCell label={category ? `${categoryName} rating` : "Rating"}>
+        <SummaryCell
+          label={
+            category
+              ? t("{category} rating", { category: categoryName })
+              : t("Rating")
+          }
+        >
           {rated && myElo ? (
             <>
               <span className="flex items-center gap-2 text-[21px] font-extrabold text-dark dark:text-white sm:text-[26px]">
@@ -321,43 +343,49 @@ function DuelResultScreen({ myId }: { myId?: string }) {
           ) : (
             <SummaryEmpty
               note={
-                rated ? "Rating unchanged" : "Friendly duel — rating unaffected"
+                rated
+                  ? t("Rating unchanged")
+                  : t("Friendly duel — rating unaffected")
               }
             />
           )}
         </SummaryCell>
-        <SummaryCell label="Daily streak" divided>
+        <SummaryCell label={t("Daily streak")} divided>
           {myStreak ? (
             <>
               <span className="flex items-center gap-1.5 text-[21px] font-extrabold text-flame sm:text-[26px]">
                 <FlameIcon size={24} />
-                {myStreak.current} day{myStreak.current === 1 ? "" : "s"}
+                {t(pl(myStreak.current, "{n} day", "{n} days"), {
+                  n: myStreak.current,
+                })}
               </span>
               <span className="text-[13px] text-off-dark dark:text-muted-dark">
                 {myStreak.advanced
-                  ? "Today's duel counted"
-                  : "Already counted today"}{" "}
-                · best {myStreak.best}
+                  ? t("Today's duel counted")
+                  : t("Already counted today")}{" "}
+                {t("· best {n}", { n: myStreak.best })}
               </span>
             </>
           ) : (
-            <SummaryEmpty note="Unfinished duels don't count" />
+            <SummaryEmpty note={t("Unfinished duels don't count")} />
           )}
         </SummaryCell>
       </div>
 
       <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-center">
         <Link href={`/duel?${categoryQuery ? `${categoryQuery}&` : ""}auto=1`}>
-          <Button fullWidth>Play Again · {categoryName}</Button>
+          <Button fullWidth>
+            {t("Play Again · {category}", { category: categoryName })}
+          </Button>
         </Link>
         <Link href={categoryQuery ? `/duel?${categoryQuery}` : "/duel"}>
           <Button variant="outline" fullWidth>
-            Change category
+            {t("Change category")}
           </Button>
         </Link>
         <Link href="/">
           <Button variant="outline" fullWidth>
-            Home
+            {t("Home")}
           </Button>
         </Link>
       </div>

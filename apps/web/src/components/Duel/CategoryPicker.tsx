@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import clsx from "clsx";
 import type { DuelCategory } from "@buzrr/contract";
 import { labelClass } from "@/components/Game/GameUI";
+import { useT, pl } from "@/lib/i18n/context";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -54,6 +55,7 @@ export default function CategoryPicker({
   selected: string | null;
   onSelect: (categoryId: string | null) => void;
 }) {
+  const t = useT();
   const perPage = usePerPage();
   const [page, setPage] = useState(0);
   const [query, setQuery] = useState("");
@@ -90,17 +92,19 @@ export default function CategoryPicker({
           <ShuffleIcon size={18} />
         </span>
         <span className="flex min-w-0 flex-wrap items-baseline gap-x-2.5">
-          <span className="text-base font-bold">Random</span>
+          <span className="text-base font-bold">{t("Random")}</span>
           <span className="text-[12.5px] font-medium text-off-dark dark:text-muted-dark">
-            Any category, mixed every round
+            {t("Any category, mixed every round")}
           </span>
           <small className="w-full text-[11.5px] font-medium text-off-dark dark:text-muted-dark">
-            {formatPlays(randomPlays)} plays
+            {t(pl(randomPlays, "{n} play", "{n} plays"), {
+              n: formatPlays(randomPlays),
+            })}
           </small>
         </span>
         {selected === null && (
           <span className="ml-auto rounded-full border border-lprimary/15 dark:border-white/10 bg-white dark:bg-dark px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-[0.06em] text-lprimary dark:text-dprimary">
-            Default
+            {t("Default")}
           </span>
         )}
       </button>
@@ -108,7 +112,7 @@ export default function CategoryPicker({
       {categories.length > 0 && (
         <>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-            <span className={labelClass}>Or pick a category</span>
+            <span className={labelClass}>{t("Or pick a category")}</span>
             <label className="flex w-full items-center gap-2 rounded-xl border-[1.5px] border-lprimary/15 dark:border-white/10 bg-white dark:bg-card-dark px-3 py-2 text-[#8a8896] dark:text-muted-dark sm:w-60 focus-within:border-lprimary dark:focus-within:border-dprimary">
               <SearchIcon size={16} />
               <input
@@ -117,8 +121,15 @@ export default function CategoryPicker({
                   setQuery(e.target.value);
                   setPage(0);
                 }}
-                placeholder={`Search ${categories.length} categories`}
-                aria-label="Search categories"
+                placeholder={t(
+                  pl(
+                    categories.length,
+                    "Search {n} category",
+                    "Search {n} categories",
+                  ),
+                  { n: categories.length },
+                )}
+                aria-label={t("Search categories")}
                 className="w-full bg-transparent text-[13.5px] text-dark dark:text-white outline-none placeholder:text-[#8a8896] dark:placeholder:text-muted-dark"
               />
             </label>
@@ -126,7 +137,7 @@ export default function CategoryPicker({
 
           {visible.length === 0 ? (
             <p className="py-4 text-center text-sm text-off-dark dark:text-muted-dark">
-              No categories match &ldquo;{query}&rdquo;.
+              {t("No categories match “{query}”.", { query })}
             </p>
           ) : (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-2.5">
@@ -151,7 +162,9 @@ export default function CategoryPicker({
                   <span className="flex min-w-0 flex-col gap-px">
                     <span className="truncate">{c.name}</span>
                     <small className="text-[11.5px] font-medium text-off-dark dark:text-muted-dark">
-                      {formatPlays(c.plays)} plays
+                      {t(pl(c.plays, "{n} play", "{n} plays"), {
+                        n: formatPlays(c.plays),
+                      })}
                     </small>
                   </span>
                 </button>
@@ -162,7 +175,7 @@ export default function CategoryPicker({
           {pages > 1 && (
             <div className="flex items-center justify-center gap-3">
               <PagerButton
-                label="Previous page"
+                label={t("Previous page")}
                 disabled={current === 0}
                 onClick={() => setPage(current - 1)}
               >
@@ -173,7 +186,7 @@ export default function CategoryPicker({
                   <button
                     key={i}
                     type="button"
-                    aria-label={`Page ${i + 1}`}
+                    aria-label={t("Page {n}", { n: i + 1 })}
                     aria-current={i === current ? "page" : undefined}
                     onClick={() => setPage(i)}
                     className={clsx(
@@ -186,10 +199,10 @@ export default function CategoryPicker({
                 ))}
               </span>
               <span className="min-w-[46px] text-center text-[13px] font-semibold text-off-dark dark:text-muted-dark">
-                {current + 1} of {pages}
+                {t("{n} of {total}", { n: current + 1, total: pages })}
               </span>
               <PagerButton
-                label="Next page"
+                label={t("Next page")}
                 disabled={current === pages - 1}
                 onClick={() => setPage(current + 1)}
               >

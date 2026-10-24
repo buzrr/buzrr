@@ -28,6 +28,7 @@ import {
   useSoloTestsQuery,
   useUpdateSoloTestMutation,
 } from "@/lib/modules/solo/hooks";
+import { useLocale, useT } from "@/lib/i18n/context";
 import modalStyle from "@/utils/modalStyle";
 
 const actionClass =
@@ -46,6 +47,7 @@ export default function SoloTestsPanel({
   questionCount: number;
   onShowReport?: (testId: string) => void;
 }) {
+  const t = useT();
   const router = useRouter();
   const tests = useSoloTestsQuery(quizId);
   const create = useCreateSoloTestMutation();
@@ -65,7 +67,7 @@ export default function SoloTestsPanel({
     <div className="flex flex-col w-[90%] mx-auto text-dark dark:text-white">
       <div className="flex items-center justify-between mt-6 mb-3">
         <h4 className="text-sm font-bold tracking-[0.04em] uppercase text-[#8a8896] dark:text-muted-dark">
-          Play alone
+          {t("Play alone")}
         </h4>
         <span className="rounded-full px-2.5 py-0.5 text-xs bg-lprimary/10 dark:bg-white/5 text-off-dark dark:text-muted-dark">
           {tests.data?.length ?? 0}
@@ -80,7 +82,7 @@ export default function SoloTestsPanel({
           onClick={practice}
           leftIcon={<LuUser size={16} />}
         >
-          Play alone
+          {t("Play alone")}
         </Button>
         <Button
           size="sm"
@@ -89,12 +91,13 @@ export default function SoloTestsPanel({
           onClick={() => setCreating(true)}
           leftIcon={<LuClipboardList size={16} />}
         >
-          Create test
+          {t("Create test")}
         </Button>
       </div>
       <p className="mt-2 text-xs text-off-dark dark:text-muted-dark">
-        A test is a link: everyone plays the quiz on their own, with the time
-        limits, whenever suits them.
+        {t(
+          "A test is a link: everyone plays the quiz on their own, with the time limits, whenever suits them.",
+        )}
       </p>
       <div className="flex flex-col gap-2.5 mt-3">
         {tests.data?.map((test) => (
@@ -117,11 +120,13 @@ function TestCard({
   test: SoloTestItem;
   onShowReport?: (testId: string) => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const update = useUpdateSoloTestMutation();
   const del = useDeleteSoloTestMutation();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const fmt = (iso: string) =>
-    new Date(iso).toLocaleString("en", {
+    new Date(iso).toLocaleString(locale, {
       dateStyle: "medium",
       timeStyle: "short",
     });
@@ -129,9 +134,9 @@ function TestCard({
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(soloLink(test.code));
-      toast.success("Link copied");
+      toast.success(t("Link copied"));
     } catch {
-      toast.error("Failed to copy link");
+      toast.error(t("Failed to copy link"));
     }
   };
 
@@ -146,13 +151,14 @@ function TestCard({
         </span>
       </div>
       <div className="text-xs mt-2 text-off-dark dark:text-muted-dark">
-        {test.finished} finished · {test.started} started ·{" "}
+        {t("{n} finished", { n: test.finished })} ·{" "}
+        {t("{n} started", { n: test.started })} ·{" "}
         {test.closed ? (
-          <b className="text-red-light dark:text-red-dark">Closed</b>
+          <b className="text-red-light dark:text-red-dark">{t("Closed")}</b>
         ) : test.closesAt ? (
-          `Open until ${fmt(test.closesAt)}`
+          t("Open until {date}", { date: fmt(test.closesAt) })
         ) : (
-          "Open, no deadline"
+          t("Open, no deadline")
         )}
       </div>
       <div className="flex flex-wrap gap-1 mt-2 -mx-1 text-lprimary dark:text-dprimary">
@@ -162,11 +168,11 @@ function TestCard({
           onClick={() => onShowReport?.(test.id)}
         >
           <LuChartBar size={14} />
-          Report
+          {t("Report")}
         </button>
         <button type="button" className={actionClass} onClick={copy}>
           <LuCopy size={14} />
-          Copy link
+          {t("Copy link")}
         </button>
         <button
           type="button"
@@ -180,7 +186,7 @@ function TestCard({
           }
         >
           {test.closed ? <LuLockOpen size={14} /> : <LuLock size={14} />}
-          {test.closed ? "Reopen" : "Close now"}
+          {test.closed ? t("Reopen") : t("Close now")}
         </button>
         <button
           type="button"
@@ -188,16 +194,18 @@ function TestCard({
           onClick={() => setConfirmDelete(true)}
         >
           <LuTrash2 size={14} />
-          Delete
+          {t("Delete")}
         </button>
       </div>
       <ConfirmationModal
         open={confirmDelete}
         setOpen={setConfirmDelete}
-        desc="Delete this test and everyone's results? The link stops working. This can't be undone."
-        confirmLabel="Delete"
+        desc={t(
+          "Delete this test and everyone's results? The link stops working. This can't be undone.",
+        )}
+        confirmLabel={t("Delete")}
         confirming={del.isPending}
-        confirmingLabel="Deleting…"
+        confirmingLabel={t("Deleting…")}
         onClick={() =>
           del.mutate(test.id, {
             onSuccess: () => setConfirmDelete(false),
@@ -219,6 +227,7 @@ function CreateTestModal({
   onClose: () => void;
   quizId: string;
 }) {
+  const t = useT();
   const create = useCreateSoloTestMutation();
   const [deadline, setDeadline] = useState("");
   const [made, setMade] = useState<SoloTestItem | null>(null);
@@ -250,27 +259,30 @@ function CreateTestModal({
       >
         <ModalCloseButton onClose={close} />
         <h2 id="create-test-title" className="text-lg font-black">
-          {made ? "Your test is ready" : "Create test"}
+          {made ? t("Your test is ready") : t("Create test")}
         </h2>
         {made ? (
           <div className="mt-4 flex flex-col gap-4">
             <ShareRoom
               url={soloLink(made.code)}
-              caption="SCAN TO PLAY"
-              toastMessage="Link copied"
+              caption={t("SCAN TO PLAY")}
+              toastMessage={t("Link copied")}
             />
             <Button size="sm" onClick={close}>
-              Done
+              {t("Done")}
             </Button>
           </div>
         ) : (
           <div className="mt-3 flex flex-col gap-4">
             <p className="text-sm text-off-dark dark:text-muted-dark">
-              Players open the link, enter a name and play the quiz on their
-              own. You see the results in the report.
+              {t(
+                "Players open the link, enter a name and play the quiz on their own. You see the results in the report.",
+              )}
             </p>
             <label className="flex flex-col gap-1.5">
-              <span className="text-sm font-semibold">Deadline (optional)</span>
+              <span className="text-sm font-semibold">
+                {t("Deadline (optional)")}
+              </span>
               <input
                 type="datetime-local"
                 value={deadline}
@@ -280,10 +292,10 @@ function CreateTestModal({
             </label>
             <div className="flex gap-2 justify-end">
               <Button size="sm" variant="ghost" onClick={close}>
-                Cancel
+                {t("Cancel")}
               </Button>
               <Button size="sm" disabled={create.isPending} onClick={submit}>
-                Create test
+                {t("Create test")}
               </Button>
             </div>
           </div>

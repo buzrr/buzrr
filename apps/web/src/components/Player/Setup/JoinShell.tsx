@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 import ClientImage from "@/components/ClientImage";
 import { DEFAULT_AVATAR } from "@/constants";
+import { useT } from "@/lib/i18n/context";
 import { mutedText, panelClass } from "@/components/Game/GameUI";
 
 export {
@@ -16,11 +17,12 @@ export {
 } from "@/components/Game/GameUI";
 
 export function BackSquare({ href }: { href: string }) {
+  const t = useT();
   const router = useRouter();
   return (
     <button
       type="button"
-      aria-label="Go back"
+      aria-label={t("Go back")}
       onClick={() => router.push(href)}
       className="size-11 rounded-xl border border-lprimary/15 dark:border-white/10 flex items-center justify-center hover:bg-lprimary/8 dark:hover:bg-white/5 transition-colors cursor-pointer"
     >
@@ -30,6 +32,7 @@ export function BackSquare({ href }: { href: string }) {
 }
 
 export function Steps({ step, total = 2 }: { step: number; total?: number }) {
+  const t = useT();
   return (
     <span
       className={clsx(
@@ -48,7 +51,7 @@ export function Steps({ step, total = 2 }: { step: number; total?: number }) {
           )}
         />
       ))}
-      Step {step} of {total}
+      {t("Step {n} of {total}", { n: step, total })}
     </span>
   );
 }
@@ -107,6 +110,7 @@ export default function JoinShell({
   form: ReactNode;
   preview: ReactNode;
 }) {
+  const t = useT();
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col pb-16 md:pb-6 md:min-h-[calc(100dvh-3rem)] text-dark dark:text-white">
       <div className="py-4">
@@ -114,7 +118,7 @@ export default function JoinShell({
           props={{
             src: "/images/logo.svg",
             darksrc: "/images/logo-dark.svg",
-            alt: "Buzrr Logo",
+            alt: t("Buzrr Logo"),
             width: 80,
             height: 80,
           }}

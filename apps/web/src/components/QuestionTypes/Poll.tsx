@@ -6,17 +6,19 @@ import { mutedText } from "@/components/Game/GameUI";
 import { ChoiceList, SubmitButton, toggleChoice } from "./Inputs";
 import { OptionLabel } from "./MultipleChoice";
 import type { QuestionRenderer } from "./types";
+import { useT } from "@/lib/i18n/context";
 import { PollBars } from "./Visuals";
 
 export const pollRenderer: QuestionRenderer<"poll"> = {
   AnswerInput({ question, selected, disabled, onSubmit }) {
+    const t = useT();
     const [draft, setDraft] = useState<string[]>([]);
     const chosen = selected?.optionIds ?? draft;
     return (
       <>
         {question.multiSelect && (
           <p className={clsx("mt-3 text-sm font-medium", mutedText)}>
-            Pick as many as you like.
+            {t("Pick as many as you like.")}
           </p>
         )}
         <ChoiceList
@@ -33,7 +35,7 @@ export const pollRenderer: QuestionRenderer<"poll"> = {
             disabled={disabled || draft.length === 0}
             onClick={() => onSubmit({ optionIds: draft })}
           >
-            Submit vote
+            {t("Submit vote")}
           </SubmitButton>
         )}
       </>

@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { useAppSelector } from "@/state/hooks";
 import { useEffect, useState } from "react";
 import { LuSkipForward } from "react-icons/lu";
+import { useT } from "@/lib/i18n/context";
 import {
   WaitingDots,
   dangerButtonClass,
@@ -28,6 +29,7 @@ export default function GetReady({
   /** Host, while devices still download the sound: wait for all (true) or go on. */
   onDownloads?: (wait: boolean) => void;
 }) {
+  const t = useT();
   const phase = useAppSelector((state) => state.game.phase);
   const deadline = useAppSelector((state) => state.game.deadline);
   const countdownMs = useAppSelector((state) => state.game.countdownMs);
@@ -73,7 +75,7 @@ export default function GetReady({
         />
 
         <span className="relative text-[12.5px] font-bold tracking-[0.08em] uppercase rounded-full px-3 py-1.5 text-lprimary dark:text-dprimary bg-lprimary/8 dark:bg-white/5">
-          Be prepared
+          {t("Be prepared")}
         </span>
         {title && (
           <h1 className="relative max-w-full text-2xl md:text-4xl font-bold tracking-[-0.02em] leading-tight text-pretty wrap-break-word">
@@ -94,37 +96,40 @@ export default function GetReady({
           {counting || ((zero || empty) && waitingFor === 0) ? (
             <p className={clsx("text-base md:text-lg font-medium", mutedText)}>
               {qIndex > 0
-                ? `Question ${qIndex + 1} coming up`
-                : "First question coming up"}
+                ? t("Question {n} coming up", { n: qIndex + 1 })
+                : t("First question coming up")}
             </p>
           ) : waitingFor > 0 && onDownloads ? (
             <WaitingDots>
-              Audio downloads: {done} of {devices} done
+              {t("Audio downloads: {done} of {n} done", {
+                done,
+                n: devices,
+              })}
             </WaitingDots>
           ) : waitingFor > 0 ? (
             <WaitingDots>
-              Waiting for sound downloads · {waitingFor} left
+              {t("Waiting for sound downloads · {n} left", { n: waitingFor })}
             </WaitingDots>
           ) : (
-            <WaitingDots>Waiting for the question</WaitingDots>
+            <WaitingDots>{t("Waiting for the question")}</WaitingDots>
           )}
         </div>
         {onDownloads && phase === "starting" && waitingFor > 0 && (
           <div className="relative flex flex-col items-center gap-3">
             <p className={clsx("text-sm", mutedText)}>
               {waitAll
-                ? "Waiting until every download is done."
-                : "Wait for them?"}
+                ? t("Waiting until every download is done.")
+                : t("Wait for them?")}
             </p>
             <div className="flex flex-wrap justify-center gap-2.5">
               <button
                 type="button"
                 data-host-key="skip"
-                title={'You can also press "Esc"'}
+                title={t('You can also press "Esc"')}
                 onClick={() => onDownloads(false)}
                 className={dangerButtonClass}
               >
-                No, go on
+                {t("No, go on")}
               </button>
               {!waitAll && (
                 <button
@@ -132,7 +137,7 @@ export default function GetReady({
                   onClick={() => onDownloads(true)}
                   className={primaryButtonClass}
                 >
-                  Yes, wait until done
+                  {t("Yes, wait until done")}
                 </button>
               )}
             </div>
@@ -145,12 +150,12 @@ export default function GetReady({
           <button
             type="button"
             data-host-key="skip"
-            title={'You can also press "Esc"'}
+            title={t('You can also press "Esc"')}
             onClick={onSkip}
             className={dangerButtonClass}
           >
             <LuSkipForward size={17} />
-            Skip
+            {t("Skip")}
           </button>
         </div>
       )}

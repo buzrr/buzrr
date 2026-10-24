@@ -11,6 +11,7 @@ import { useJoinRoomMutation } from "@/lib/modules/game-sessions/hooks";
 import { clearPlayerLocalSession } from "@/lib/player-session";
 import { isAxiosError } from "axios";
 import { mutedText, primaryButtonClass } from "@/components/Game/GameUI";
+import { useT } from "@/lib/i18n/context";
 import {
   BackSquare,
   Steps,
@@ -27,6 +28,7 @@ const normalizeCode = (value: string) =>
     .slice(0, CODE_LENGTH);
 
 const JoinRoomForm = ({ joiningAs }: { joiningAs?: ReactNode }) => {
+  const t = useT();
   const router = useRouter();
   const mutation = useJoinRoomMutation();
   const [code, setCode] = useState("");
@@ -71,7 +73,7 @@ const JoinRoomForm = ({ joiningAs }: { joiningAs?: ReactNode }) => {
         onError: (err) => {
           if (isAxiosError(err) && err.response?.status === 401) {
             clearPlayerLocalSession();
-            toast.error("Your session expired. Create your player again.");
+            toast.error(t("Your session expired. Create your player again."));
             router.replace("/player");
             return;
           }
@@ -137,15 +139,15 @@ const JoinRoomForm = ({ joiningAs }: { joiningAs?: ReactNode }) => {
       {joiningAs}
       <div>
         <h1 className="text-[32px] md:text-[44px] font-extrabold tracking-[-0.03em] leading-[1.06]">
-          Enter room code
+          {t("Enter room code")}
         </h1>
         <p className={clsx("mt-2.5 text-base", mutedText)}>
-          Enter the 6-character code provided by the admin.
+          {t("Enter the 6-character code provided by the admin.")}
         </p>
       </div>
       <div>
         <span className={joinLabelClass}>
-          Room code
+          {t("Room code")}
           <span className={joinCounterClass}>
             {code.length}/{CODE_LENGTH}
           </span>
@@ -168,7 +170,7 @@ const JoinRoomForm = ({ joiningAs }: { joiningAs?: ReactNode }) => {
             autoComplete="off"
             spellCheck={false}
             inputMode="text"
-            aria-label="Room code"
+            aria-label={t("Room code")}
             className="absolute inset-0 z-10 size-full opacity-0 text-base cursor-text"
           />
           <div
@@ -204,7 +206,7 @@ const JoinRoomForm = ({ joiningAs }: { joiningAs?: ReactNode }) => {
         className={clsx("flex items-center gap-2 text-[13.5px]", mutedText)}
       >
         <LuScanLine size={16} className="shrink-0" />
-        Got a QR code? Scan it with your camera to skip this step.
+        {t("Got a QR code? Scan it with your camera to skip this step.")}
       </span>
       <button
         type="submit"

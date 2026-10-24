@@ -12,6 +12,7 @@ import {
 import { Switch } from "@/components/ui/Switch";
 import { SubmitButton, useAnswerFocus } from "./Inputs";
 import type { QuestionRenderer } from "./types";
+import { useT } from "@/lib/i18n/context";
 import { TextWall } from "./Visuals";
 
 type Entry = { text: string; anonymous: boolean };
@@ -23,6 +24,7 @@ function entriesOf(answer: QuestionAnswer<"open_text"> | null): Entry[] {
 }
 
 function SentList({ entries }: { entries: Entry[] }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-2 mt-4 md:mt-7">
       {entries.map((entry, i) => (
@@ -38,7 +40,7 @@ function SentList({ entries }: { entries: Entry[] }) {
             <small
               className={clsx("block mt-1 text-xs font-semibold", mutedText)}
             >
-              Posted anonymously
+              {t("Posted anonymously")}
             </small>
           )}
         </div>
@@ -53,6 +55,7 @@ function AnswerForm({
   disabled,
   onSubmit,
 }: ComponentProps<QuestionRenderer<"open_text">["AnswerInput"]>) {
+  const t = useT();
   const [text, setText] = useState("");
   const [anonymous, setAnonymous] = useState(false);
   const sent = entriesOf(selected);
@@ -81,7 +84,9 @@ function AnswerForm({
           sent.length > 0 ? "mt-3" : "mt-4 md:mt-7",
           "min-h-[130px] resize-none leading-normal",
         )}
-        placeholder={sent.length ? "Add another answer" : "Type your answer"}
+        placeholder={
+          sent.length ? t("Add another answer") : t("Type your answer")
+        }
         value={text}
         maxLength={question.maxLength}
         disabled={disabled || full}
@@ -98,10 +103,10 @@ function AnswerForm({
             <Switch
               checked={anonymous}
               onCheckedChange={setAnonymous}
-              aria-label="Post anonymously"
+              aria-label={t("Post anonymously")}
               disabled={disabled || full}
             />
-            Post anonymously
+            {t("Post anonymously")}
           </label>
         ) : (
           <span />
@@ -113,15 +118,15 @@ function AnswerForm({
       {repeat && (
         <span className={clsx("mt-2 text-[13.5px]", mutedText)}>
           {full
-            ? "That's the most answers you can send"
-            : "You can send as many answers as you like while time's left"}
+            ? t("That's the most answers you can send")
+            : t("You can send as many answers as you like while time's left")}
         </span>
       )}
       <SubmitButton
         disabled={disabled || full || text.trim() === ""}
         onClick={send}
       >
-        {sent.length ? "Submit another" : "Submit"}
+        {sent.length ? t("Submit another") : "Submit"}
       </SubmitButton>
     </>
   );

@@ -6,6 +6,7 @@ import Game, { type BubbleStats } from "@/components/Game";
 import BackNavButton from "@/components/BackNavButton";
 import { DEFAULT_AVATAR } from "@/constants";
 import type { GameSession } from "@/types/db";
+import { useT } from "@/lib/i18n/context";
 import { useGameSound } from "@/lib/sound/director";
 import { useAppSelector } from "@/state/hooks";
 import { BUBBLE_CROWD, BUBBLE_CROWD_EVERY_MS } from "@buzrr/contract";
@@ -36,6 +37,7 @@ const WaitGameStart = (params: {
   avatars?: string[];
   onPickAvatar?: (profilePic: string) => void;
 }) => {
+  const t = useT();
   const sound = useGameSound();
   // A big room: bubble totals go out less often.
   const roomSize = useAppSelector((state) => state.game.roomSize);
@@ -48,7 +50,7 @@ const WaitGameStart = (params: {
       type="button"
       disabled={!canPick}
       onClick={() => setPicking((v) => !v)}
-      title={canPick ? "Change your avatar" : undefined}
+      title={canPick ? t("Change your avatar") : undefined}
       className={
         size === "lg"
           ? "flex justify-between items-center w-fit gap-2 rounded-full p-3 bg-off-white dark:bg-off-dark font-bold text-dark dark:text-white enabled:cursor-pointer"
@@ -58,7 +60,7 @@ const WaitGameStart = (params: {
       {/* eslint-disable-next-line @next/next/no-img-element -- skin files and uploads */}
       <img
         src={pic}
-        alt="Profile"
+        alt={t("Profile")}
         className={
           size === "lg"
             ? "rounded-full h-8 w-8 object-cover"
@@ -75,7 +77,7 @@ const WaitGameStart = (params: {
     picking && canPick ? (
       <div
         role="radiogroup"
-        aria-label="Your avatar"
+        aria-label={t("Your avatar")}
         className="grid grid-cols-6 gap-2 p-2 mb-2 rounded-2xl bg-off-white dark:bg-off-dark"
       >
         {params.avatars!.map((src) => (
@@ -117,23 +119,25 @@ const WaitGameStart = (params: {
               {game.quiz.title}
             </h1>
             <h2 className="text-sm mt-8 p-2 dark:text-white">
-              You&apos;ve joined as
+              {t("You've joined as")}
             </h2>
             {chip("lg")}
             <div className="mt-2 hidden md:block">{picker}</div>
             <div className="flex flex-col mt-10">
-              <p className="text-sm dark:text-off-white py-1">Room Code</p>
+              <p className="text-sm dark:text-off-white py-1">
+                {t("Room Code")}
+              </p>
               <h2 className="text-4xl font-extrabold dark:text-white py-1">
                 {game.gameCode}
               </h2>
             </div>
             <div className="mt-auto">
-              <p className="text-sm dark:text-off-white py-2">Quiz By</p>
+              <p className="text-sm dark:text-off-white py-2">{t("Quiz By")}</p>
               <Image
                 src={game.creator?.image ?? DEFAULT_AVATAR}
                 width={50}
                 height={50}
-                alt="Profile"
+                alt={t("Profile")}
                 className="rounded-full h-8 w-8 inline"
               />
               <h2 className="dark:text-white inline p-2">
@@ -146,7 +150,7 @@ const WaitGameStart = (params: {
               {game.quiz.title}
             </h1>
             <h2 className="text-xs p-2 dark:text-white md:hidden">
-              You&apos;ve joined as
+              {t("You've joined as")}
             </h2>
             {chip("sm")}
             <div className="md:hidden">{picker}</div>
@@ -162,7 +166,7 @@ const WaitGameStart = (params: {
             />
             {params.reactionBar}
             <div className="flex flex-col mt-2 md:hidden">
-              <p className="text-xs dark:text-off-white">Room Code</p>
+              <p className="text-xs dark:text-off-white">{t("Room Code")}</p>
               <h2 className="text-2xl font-extrabold dark:text-white">
                 {game.gameCode}
               </h2>

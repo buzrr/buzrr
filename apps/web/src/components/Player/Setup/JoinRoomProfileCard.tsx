@@ -12,6 +12,7 @@ import { getApiErrorMessage } from "@/lib/api/errors";
 import { updatePlayerNameSchema } from "@/lib/modules/forms/schemas";
 import { useUpdatePlayerNameMutation } from "@/lib/modules/players/hooks";
 import { labelClass, mutedText } from "@/components/Game/GameUI";
+import { useT } from "@/lib/i18n/context";
 import { MeCard, joinInputClass } from "./JoinShell";
 
 type FormValues = z.infer<typeof updatePlayerNameSchema>;
@@ -34,6 +35,7 @@ const JoinRoomProfileCard = (params: {
   onNameSaved: (name: string) => void;
   variant: "card" | "chip";
 }) => {
+  const t = useT();
   const [isEditing, setIsEditing] = useState(false);
   const mutation = useUpdatePlayerNameMutation();
   const { register, handleSubmit, reset, formState } = useForm<FormValues>({
@@ -53,7 +55,7 @@ const JoinRoomProfileCard = (params: {
         onSuccess: (res) => {
           params.onNameSaved(res.name);
           setIsEditing(false);
-          toast.success("Player name updated");
+          toast.success(t("Player name updated"));
         },
         onError: (err) => toast.error(getApiErrorMessage(err)),
       },
@@ -69,8 +71,8 @@ const JoinRoomProfileCard = (params: {
             e.target.value = cleanName(e.target.value);
           },
         })}
-        placeholder="Enter display name"
-        aria-label="Display name"
+        placeholder={t("Enter display name")}
+        aria-label={t("Display name")}
         className={joinInputClass}
         required
         autoComplete="off"
@@ -95,7 +97,7 @@ const JoinRoomProfileCard = (params: {
           className="flex-1 rounded-xl border-[1.5px] border-lprimary/15 dark:border-white/10 px-4 py-2.5 font-semibold cursor-pointer hover:border-dprimary"
           onClick={() => setIsEditing(false)}
         >
-          Cancel
+          {t("Cancel")}
         </button>
       </div>
     </form>
@@ -115,7 +117,7 @@ const JoinRoomProfileCard = (params: {
           <span
             className={clsx("flex-1 min-w-0 flex flex-col text-xs", mutedText)}
           >
-            Joining as
+            {t("Joining as")}
             <b className="truncate text-[15px] text-dark dark:text-white">
               {params.name}
             </b>
@@ -126,7 +128,7 @@ const JoinRoomProfileCard = (params: {
               className={editButtonClass}
               onClick={startEdit}
             >
-              Edit
+              {t("Edit")}
             </button>
           )}
         </div>
@@ -137,7 +139,7 @@ const JoinRoomProfileCard = (params: {
 
   return (
     <>
-      <span className={labelClass}>Joining as</span>
+      <span className={labelClass}>{t("Joining as")}</span>
       {isEditing ? (
         <div className="w-full max-w-sm flex flex-col items-center gap-4">
           <MeCard image={params.profilePic} name={null} size="md" />
@@ -153,7 +155,7 @@ const JoinRoomProfileCard = (params: {
               className={editButtonClass}
               onClick={startEdit}
             >
-              Edit
+              {t("Edit")}
             </button>
           }
         />

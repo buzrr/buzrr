@@ -4,6 +4,7 @@ import { isUnlimitedTime } from "@buzrr/contract";
 
 import clsx from "clsx";
 import { useId, type ReactNode } from "react";
+import { useT, currentLocale } from "@/lib/i18n/context";
 import ConnectionStatusPill from "@/components/ConnectionStatusPill";
 
 export const OPTION_KEYS = ["A", "B", "C", "D", "E", "F", "G", "H"];
@@ -74,6 +75,7 @@ export function Progress({
   /** Host header: just "Question x of y" and a short bar. */
   compact?: boolean;
 }) {
+  const t = useT();
   const current = qIndex + 1;
   const segmented = qCount <= 15 && !compact;
   return (
@@ -86,12 +88,12 @@ export function Progress({
       <span className="text-[13.5px] font-semibold whitespace-nowrap">
         {final ? (
           <>
-            <b className="text-lprimary dark:text-dprimary">Quiz complete</b>
+            <b className="text-lprimary dark:text-dprimary">
+              {t("Quiz complete")}
+            </b>
           </>
         ) : (
-          <>
-            Question {current} of {qCount}
-          </>
+          <>{t("Question {n} of {total}", { n: current, total: qCount })}</>
         )}
       </span>
       {segmented && (
@@ -133,7 +135,9 @@ export function Progress({
             mutedText,
           )}
         >
-          {final ? `${qCount} of ${qCount}` : `${qCount - current} left`}
+          {final
+            ? t("{n} of {total}", { n: qCount, total: qCount })
+            : t("{n} left", { n: qCount - current })}
         </span>
       )}
     </div>
@@ -156,16 +160,19 @@ export function GameTopBar({
   /** Shown as a small chip beside the connection pill, for late joiners. */
   gameCode?: string;
 }) {
+  const t = useT();
   return (
     <div className="flex items-center gap-2.5 md:gap-[18px] py-2 md:py-[18px] shrink-0">
       <div className="flex items-center gap-2 shrink-0">
         <ConnectionStatusPill className="!shadow-none !text-[13px] !font-semibold !px-3 !py-1.5 !border-lprimary/15 dark:!border-white/10 !bg-white dark:!bg-white/5" />
         {gameCode && (
           <span
-            title="Game code"
+            title={t("Game code")}
             className="rounded-full border border-lprimary/15 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-1.5 text-[13px] font-semibold"
           >
-            <span className={clsx("mr-1.5 font-medium", mutedText)}>Code</span>
+            <span className={clsx("mr-1.5 font-medium", mutedText)}>
+              {t("Code")}
+            </span>
             <b className="font-extrabold tracking-[0.1em] text-lprimary dark:text-dprimary">
               {gameCode}
             </b>
@@ -353,6 +360,7 @@ export function WaitingDots({ children }: { children: ReactNode }) {
 }
 
 export function ordinal(n: number) {
+  if (currentLocale() === "de") return `${n}.`;
   const s = ["th", "st", "nd", "rd"];
   const v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);

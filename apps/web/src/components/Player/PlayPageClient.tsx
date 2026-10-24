@@ -8,9 +8,11 @@ import GameLogo from "@/components/Game/GameLogo";
 import Skeleton from "@/components/ui/Skeleton";
 import { usePlayerPlayQuery } from "@/lib/modules/game-sessions/hooks";
 import { isAxiosError } from "axios";
+import { useT } from "@/lib/i18n/context";
 import { notFound, redirect } from "next/navigation";
 
 export default function PlayPageClient({ playerId }: { playerId: string }) {
+  const t = useT();
   const { data, isPending, isError, error } = usePlayerPlayQuery(playerId);
 
   if (isError && isAxiosError(error) && error.response?.status === 404) {
@@ -33,7 +35,7 @@ export default function PlayPageClient({ playerId }: { playerId: string }) {
         role="alert"
         aria-atomic="true"
       >
-        Could not load game data. Please try again.
+        {t("Could not load game data. Please try again.")}
       </div>
     );
   }

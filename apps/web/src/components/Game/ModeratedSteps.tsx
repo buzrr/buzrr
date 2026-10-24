@@ -14,6 +14,7 @@ import {
   panelClass,
   primaryButtonClass,
 } from "@/components/Game/GameUI";
+import { useT, currentLocale } from "@/lib/i18n/context";
 import { rankBadgeClass } from "@/components/Admin/Game/QuesResult";
 
 /**
@@ -38,6 +39,7 @@ function Slide({
   nextLabel?: string;
   waitingFor: string;
 }) {
+  const t = useT();
   const [advancing, setAdvancing] = useState(false);
   return (
     <div
@@ -90,7 +92,7 @@ function Slide({
           <button
             type="button"
             data-host-key="next"
-            title={'You can also press "Space"'}
+            title={t('You can also press "Space"')}
             disabled={advancing}
             onClick={() => {
               setAdvancing(true);
@@ -109,20 +111,21 @@ function Slide({
 
 /** Before every question: the host starts it, then the countdown runs. */
 export function ReadySlide({ onNext }: { onNext?: () => void }) {
+  const t = useT();
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const qCount = useAppSelector((state) => state.game.qCount);
   return (
     <Slide
       badge={`Question ${qIndex + 1} of ${qCount}`}
-      title="Be prepared!"
+      title={t("Be prepared!")}
       subtitle={
         qIndex === 0
-          ? "The quiz is about to begin"
-          : "The next question is coming up"
+          ? t("The quiz is about to begin")
+          : t("The next question is coming up")
       }
       onNext={onNext}
-      nextLabel="Start question"
-      waitingFor="Waiting for the host to start"
+      nextLabel={t("Start question")}
+      waitingFor={t("Waiting for the host to start")}
     />
   );
 }
@@ -135,6 +138,7 @@ export function ClosedSlide({
   onNext?: () => void;
   nextLabel?: string;
 }) {
+  const t = useT();
   const question = useAppSelector((state) => state.game.question);
   const answeredCount = useAppSelector((state) => state.game.answeredCount);
   const players = useAppSelector((state) => state.game.players);
@@ -150,25 +154,32 @@ export function ClosedSlide({
   );
   return (
     <Slide
-      badge={answered ? "Answer locked in" : "Time's up"}
+      badge={answered ? t("Answer locked in") : t("Time's up")}
       title={
         answered
-          ? `You answered within ${(myMs / 1000).toLocaleString("en", {
-              minimumFractionDigits: 1,
-              maximumFractionDigits: 1,
-            })} seconds`
-          : (question?.title ?? "Time's up!")
+          ? t("You answered within {s} seconds", {
+              s: (myMs / 1000).toLocaleString(currentLocale(), {
+                minimumFractionDigits: 1,
+                maximumFractionDigits: 1,
+              }),
+            })
+          : (question?.title ?? t("Time's up!"))
       }
-      subtitle={onNext ? `${answeredCount} of ${total} answered` : undefined}
+      subtitle={
+        onNext
+          ? t("{n} of {total} answered", { n: answeredCount, total })
+          : undefined
+      }
       onNext={onNext}
       nextLabel={nextLabel}
-      waitingFor="Waiting for the host"
+      waitingFor={t("Waiting for the host")}
     />
   );
 }
 
 /** Players' standings after a question (moderated "show scores"). */
 export function PlayerScores({ playerId }: { playerId: string }) {
+  const t = useT();
   const board = useAppSelector((state) => state.game.leaderboard);
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const you = useAppSelector((state) => state.game.you);
@@ -184,7 +195,7 @@ export function PlayerScores({ playerId }: { playerId: string }) {
           ...board,
           {
             playerId,
-            name: me?.name ?? "You",
+            name: me?.name ?? t("You"),
             profilePic: me?.profilePic ?? null,
             score: you.totalScore,
             rank: you.rank,
@@ -195,7 +206,7 @@ export function PlayerScores({ playerId }: { playerId: string }) {
     <div className="w-full max-w-xl mx-auto px-4 py-6 md:py-10 text-dark dark:text-white">
       <section className={clsx(panelClass, "flex flex-col gap-3 p-5 md:p-7")}>
         <span className={labelClass}>
-          Standings after question {qIndex + 1}
+          {t("Standings after question {n}", { n: qIndex + 1 })}
         </span>
         <div className="flex flex-col gap-1.5">
           {leaderboard.map((e, i) => (

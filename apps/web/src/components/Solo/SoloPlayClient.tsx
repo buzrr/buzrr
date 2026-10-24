@@ -16,6 +16,7 @@ import { clearPlayerLocalSession } from "@/lib/player-session";
 import { soloApi } from "@/lib/modules/solo/api";
 import { GameSounds, SoundToggle } from "@/lib/sound/director";
 import { audioContext } from "@/lib/sound/synth";
+import { pl, tx, useLocale, useT } from "@/lib/i18n/context";
 import { LeaderBoard, Question, Result } from "@/components/Player/GameScreens";
 import type { AnswerSender } from "@/components/Player/GameScreens/Question";
 import CreatePlayerForm from "@/components/Player/Setup/CreatePlayerForm";
@@ -47,6 +48,7 @@ const hasPlayer = () =>
  * same game state, so the usual player screens render them.
  */
 export default function SoloPlayClient({ code: rawCode }: { code: string }) {
+  const t = useT();
   const code = rawCode.replace(/\s/g, "").toUpperCase();
   const dispatch = useAppDispatch();
   const phase = useAppSelector((s) => s.game.phase);
@@ -99,7 +101,7 @@ export default function SoloPlayClient({ code: rawCode }: { code: string }) {
       // The guest token ran out: a new profile starts a new run.
       clearPlayerLocalSession();
       setReady(false);
-      toast.error("Your session expired. Please try again.");
+      toast.error(tx("Your session expired. Please try again."));
       return;
     }
     toast.error(getApiErrorMessage(err));
@@ -179,12 +181,12 @@ export default function SoloPlayClient({ code: rawCode }: { code: string }) {
     [view, apply],
   );
 
-  if (info.isPending) return <GetReady title="Play alone" />;
+  if (info.isPending) return <GetReady title={t("Play alone")} />;
   if (info.isError || !info.data) {
     return (
       <Notice
-        title="Test not found"
-        text="This link is invalid or the test was deleted."
+        title={t("Test not found")}
+        text={t("This link is invalid or the test was deleted.")}
       />
     );
   }
@@ -200,7 +202,7 @@ export default function SoloPlayClient({ code: rawCode }: { code: string }) {
             onCreated={() => setReady(true)}
             subtitle={
               <>
-                Test:{" "}
+                {t("Test")}:{" "}
                 <b className="font-bold text-lprimary dark:text-dprimary">
                   {test.title}
                 </b>
@@ -270,7 +272,7 @@ export default function SoloPlayClient({ code: rawCode }: { code: string }) {
               onClick={() => void run(() => soloApi.next(view.attemptId))}
               className={clsx(primaryButtonClass, "px-6")}
             >
-              {last ? "See my result" : "Next question"}
+              {last ? t("See my result") : t("Next question")}
               <LuArrowRight size={18} />
             </button>
           }
@@ -307,6 +309,8 @@ function Intro(props: {
   busy: boolean;
   onStart: () => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
   return (
     <div className="flex flex-col items-center justify-center min-h-[85dvh] px-4 py-8 text-dark dark:text-white">
       <div
@@ -315,7 +319,7 @@ function Intro(props: {
           "w-full max-w-md px-6 sm:px-10 py-10 text-center animate-fade-up",
         )}
       >
-        <span className={labelClass}>Play alone</span>
+        <span className={labelClass}>{t("Play alone")}</span>
         <h1 className="mt-4 text-[28px] md:text-[34px] font-extrabold tracking-[-0.02em] leading-[1.1] break-words">
           {props.title}
         </h1>
@@ -333,7 +337,7 @@ function Intro(props: {
               alt=""
               className="size-6 rounded-full object-cover"
             />
-            Quiz by <b>{props.hostName}</b>
+            {t("Quiz by")} <b>{props.hostName}</b>
           </p>
         )}
         <ul
@@ -344,31 +348,32 @@ function Intro(props: {
         >
           <li className="flex items-center gap-2.5">
             <LuListChecks size={18} className="shrink-0" />
-            {props.questionCount === 1
-              ? `${props.questionCount} question`
-              : `${props.questionCount} questions`}
+            {t(pl(props.questionCount, "{n} question", "{n} questions"), {
+              n: props.questionCount,
+            })}
           </li>
           <li className="flex items-center gap-2.5">
             <LuClock size={18} className="shrink-0" />
-            Each question has a time limit — the faster, the more points.
+            {t("Each question has a time limit — the faster, the more points.")}
           </li>
           <li className="flex items-center gap-2.5">
             <LuUser size={18} className="shrink-0" />
-            You play on your own, at your own pace between questions.
+            {t("You play on your own, at your own pace between questions.")}
           </li>
         </ul>
         {props.closesAt && !props.closed && (
           <p className={clsx("mt-4 text-sm", mutedText)}>
-            Open until{" "}
-            {new Date(props.closesAt).toLocaleString("en", {
-              dateStyle: "medium",
-              timeStyle: "short",
+            {t("Open until {date}", {
+              date: new Date(props.closesAt).toLocaleString(locale, {
+                dateStyle: "medium",
+                timeStyle: "short",
+              }),
             })}
           </p>
         )}
         {props.closed ? (
           <p className="mt-6 font-bold text-red-light dark:text-red-dark">
-            This test is closed.
+            {t("This test is closed.")}
           </p>
         ) : (
           <button
@@ -377,7 +382,7 @@ function Intro(props: {
             onClick={props.onStart}
             className={clsx(primaryButtonClass, "mt-6 w-full px-6")}
           >
-            Start
+            {t("Start")}
             <LuArrowRight size={18} />
           </button>
         )}

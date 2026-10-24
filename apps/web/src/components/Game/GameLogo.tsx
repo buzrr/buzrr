@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/i18n/context";
 import ClientImage from "@/components/ClientImage";
 
 /**
@@ -13,12 +14,13 @@ export default function GameLogo({
   logo?: string | null;
   size: number;
 }) {
+  const t = useT();
   if (logo) {
     return (
       // eslint-disable-next-line @next/next/no-img-element -- signed upload URL, any aspect ratio
       <img
         src={logo}
-        alt="Quiz logo"
+        alt={t("Quiz logo")}
         style={{ maxHeight: size, maxWidth: size * 3 }}
         className="shrink-0 object-contain"
       />

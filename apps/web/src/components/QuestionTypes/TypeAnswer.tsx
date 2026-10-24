@@ -11,6 +11,7 @@ import {
 } from "@/components/Game/GameUI";
 import { SubmitButton, useAnswerFocus } from "./Inputs";
 import { CorrectGlow, ResultBar } from "./MultipleChoice";
+import { useT } from "@/lib/i18n/context";
 import type { QuestionRenderer } from "./types";
 
 /** Splits typed characters (spaces ignored) into the pattern's words. */
@@ -40,6 +41,7 @@ function BoxesInput({
   onChange: (v: string) => void;
   onEnter: () => void;
 }) {
+  const t = useT();
   const inputRef = useAnswerFocus<HTMLInputElement>(disabled);
   const total = pattern.reduce((a, b) => a + b, 0);
   const chars = Array.from(value.replace(/\s+/g, "")).slice(0, total);
@@ -85,7 +87,7 @@ function BoxesInput({
         autoCapitalize="characters"
         spellCheck={false}
         enterKeyHint="send"
-        aria-label="Type your answer"
+        aria-label={t("Type your answer")}
         value={chars.join("")}
         disabled={disabled}
         maxLength={total}
@@ -114,6 +116,7 @@ function AnswerForm({
   disabled,
   onSubmit,
 }: ComponentProps<QuestionRenderer<"type_answer">["AnswerInput"]>) {
+  const t = useT();
   const [text, setText] = useState("");
   const inputRef = useAnswerFocus<HTMLInputElement>(
     disabled || Boolean(selected),
@@ -127,7 +130,7 @@ function AnswerForm({
         )}
       >
         <small className={clsx("block text-xs font-semibold", mutedText)}>
-          Your answer
+          {t("Your answer")}
         </small>
         {selected.guess}
       </div>
@@ -156,7 +159,7 @@ function AnswerForm({
         />
         <div className="flex justify-center mt-2.5">
           <span className={counterClass}>
-            {Array.from(text).length} / {total} letters
+            {t("{n} / {total} letters", { n: Array.from(text).length, total })}
           </span>
         </div>
         <SubmitButton disabled={disabled || text === ""} onClick={send} />
@@ -174,7 +177,7 @@ function AnswerForm({
         spellCheck={false}
         enterKeyHint="send"
         className={clsx(inputClass, "mt-4 md:mt-7 text-lg font-semibold")}
-        placeholder="Type your answer"
+        placeholder={t("Type your answer")}
         value={text}
         maxLength={question.maxLength}
         disabled={disabled}
@@ -202,6 +205,7 @@ export const typeAnswerRenderer: QuestionRenderer<"type_answer"> = {
   },
 
   HostPrompt({ question }) {
+    const t = useT();
     if (question.pattern) {
       return (
         <div className="flex-1 flex flex-col items-center justify-center gap-4 py-10">
@@ -218,8 +222,9 @@ export const typeAnswerRenderer: QuestionRenderer<"type_answer"> = {
             ))}
           </div>
           <p className={clsx("text-lg font-semibold", mutedText)}>
-            {question.pattern.reduce((a, b) => a + b, 0)} letters — fast and
-            exact scores best
+            {t("{n} letters — fast and exact scores best", {
+              n: question.pattern.reduce((a, b) => a + b, 0),
+            })}
           </p>
         </div>
       );
@@ -230,13 +235,14 @@ export const typeAnswerRenderer: QuestionRenderer<"type_answer"> = {
           <LuKeyboard size={32} />
         </span>
         <p className={clsx("text-lg font-semibold", mutedText)}>
-          Players type their answer — fast and exact scores best
+          {t("Players type their answer — fast and exact scores best")}
         </p>
       </div>
     );
   },
 
   RevealBreakdown({ summary, hideCorrect }) {
+    const t = useT();
     const maxCount = Math.max(1, ...summary.answers.map((a) => a.count));
     const twoCols = summary.answers.length >= 5;
     return (
@@ -246,7 +252,7 @@ export const typeAnswerRenderer: QuestionRenderer<"type_answer"> = {
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1 rounded-full bg-green-500 px-2 py-0.5 text-[11.5px] font-bold tracking-[0.04em] uppercase text-white">
                 <LuCheck size={13} strokeWidth={3} />
-                Correct
+                {t("Correct")}
               </span>
               {summary.accepted.map((a) => (
                 <b
@@ -261,7 +267,7 @@ export const typeAnswerRenderer: QuestionRenderer<"type_answer"> = {
         )}
         {summary.answers.length === 0 ? (
           <p className={clsx("text-sm py-6 text-center", mutedText)}>
-            Nobody answered.
+            {t("Nobody answered.")}
           </p>
         ) : (
           <div
@@ -284,7 +290,8 @@ export const typeAnswerRenderer: QuestionRenderer<"type_answer"> = {
                     <span className="flex-1 min-w-0 truncate">{a.text}</span>
                     {ok && a.precision < 1 && (
                       <span className={clsx("text-xs font-medium", mutedText)}>
-                        {Math.round(a.precision * 100)}% exact
+                        {Math.round(a.precision * 100)}
+                        {t("% exact")}
                       </span>
                     )}
                     <span className={clsx("text-sm font-medium", mutedText)}>
