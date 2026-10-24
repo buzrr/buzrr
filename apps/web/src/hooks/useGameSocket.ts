@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
+import { HEARTBEAT_INTERVAL_MS } from "@buzrr/contract";
 import { useAppDispatch } from "@/state/hooks";
 import {
   answerResult,
@@ -9,6 +10,7 @@ import {
   applySync,
   gameOver,
   gameStarted,
+  reactionBudgetKnown,
   leaderboardReceived,
   playerConnection,
   playerRemoved,
@@ -83,8 +85,16 @@ export function useGameSocket({
     dispatch(resetGame());
     dispatch(setConnection("connecting"));
 
+    // Players' devices prove they are still here (see HEARTBEAT_TIMEOUT_MS):
+    // a page that stops beating is dropped, and in the lobby leaves the list.
+    const beat = () => {
+      if (userType === "player" && conn.connected) conn.emit("heartbeat");
+    };
+    const heartbeat = setInterval(beat, HEARTBEAT_INTERVAL_MS);
+
     conn.on("connect", () => {
       dispatch(setConnection("connected"));
+      beat();
       // The server pushes state-sync on connect; this is only a safety net
       // for proxies that drop the initial burst.
       conn.emit("request-sync");
@@ -105,8 +115,10 @@ export function useGameSocket({
       dispatch(setConnection("disconnected"));
     };
     conn.io.on("reconnect_failed", onReconnectFailed);
-    const onVisibilityChange = () =>
+    const onVisibilityChange = () => {
       resyncOnReturn(conn, document.visibilityState);
+      if (document.visibilityState === "visible") beat();
+    };
     document.addEventListener("visibilitychange", onVisibilityChange);
     conn.on("connect_error", () => {
       // The manager keeps retrying with backoff, so this is transient.
@@ -115,6 +127,9 @@ export function useGameSocket({
 
     conn.on("state-sync", (payload) => dispatch(applySync(payload)));
     conn.on("game-started", (payload) => dispatch(gameStarted(payload)));
+    // The reaction budget (and the room's size) — kept in the store, so a
+    // reaction bar mounted later (the final standings') still knows it.
+    conn.on("reaction-limit", (p) => dispatch(reactionBudgetKnown(p)));
     conn.on("question-start", (payload) => dispatch(questionStart(payload)));
     conn.on("question-end", (payload) => dispatch(questionEnd(payload)));
     conn.on("answer-result", (payload) => dispatch(answerResult(payload)));
@@ -146,6 +161,7 @@ export function useGameSocket({
     setSocket(conn);
 
     return () => {
+      clearInterval(heartbeat);
       conn.io.off("reconnect_failed", onReconnectFailed);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       conn.disconnect();

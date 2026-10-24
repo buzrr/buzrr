@@ -1,4 +1,5 @@
 "use client";
+import type { QuizSettings } from "@buzrr/contract";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/modules/query-keys";
@@ -58,6 +59,7 @@ export function useUpdateQuizMutation() {
       title?: string;
       description?: string;
       isPublic?: boolean;
+      settings?: QuizSettings;
     }) => quizzesApi.update(quizId, body),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.quizzes.all });
