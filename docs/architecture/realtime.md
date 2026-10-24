@@ -211,7 +211,12 @@ stripped** by the question type's handler (`toPublicQuestion` in
 including the player's own: a question-phase `state-sync` tells a player
 _that_ (and what) they answered, but `you.isCorrect`/`score` stay masked
 until the reveal, and `you.totalScore`/`rank` are the standings as of the
-last reveal (`buildSnapshot`).
+last reveal (`buildSnapshot`). The REST side holds the same line: the public
+join context (`GET /game-sessions/player-play/:playerId`,
+`getPlayerPlayContext`) carries no question texts, options or media — only
+what the waiting screen needs — and
+local-store media links are signed only as their question opens
+([backend.md](backend.md#cross-cutting-services-srccommon)).
 
 Ranks are **dense**: equal scores share a rank and the next score is one
 place below (900, 500, 500, 0 → 1, 2, 2, 3; `denseRanks` in the contract).

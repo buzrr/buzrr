@@ -359,15 +359,14 @@ export class GameSessionsService {
     return this.prisma.db.gameSession.findUnique({
       where: { id: gameSessionId },
       include: {
+        // Players get each question over the socket as it opens; this public
+        // context must not hand out question texts, options or media before
+        // the game shows them — only what the waiting screen needs.
         quiz: {
-          include: {
-            questions: {
-              include: {
-                options: {
-                  select: { id: true, title: true },
-                },
-              },
-            },
+          select: {
+            id: true,
+            title: true,
+            questions: { select: { id: true } },
           },
         },
         creator: {

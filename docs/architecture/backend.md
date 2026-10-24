@@ -14,7 +14,9 @@ CORS (`WEB_ORIGIN` via `parseCorsOrigin`, credentials on) → global prefix
 whitelist: true, forbidNonWhitelisted: false })` → global
 `AllExceptionsFilter` (HttpExceptions pass through with status; everything
 else becomes a logged 500) → with `STORAGE_DRIVER=local`, static serving of
-`/uploads/*` from the upload directory (`nosniff`, immutable caching). Port:
+`/uploads/*` from the upload directory — only with a valid signature (403
+otherwise; see `MediaStorage` below), `nosniff`, `Cache-Control: private,
+max-age=21600`. Port:
 `API_PORT` ?? `PORT` ?? 3001.
 
 ## Module map (`src/app.module.ts`)
@@ -26,7 +28,7 @@ Global modules: `ConfigModule`, `RedisModule` (3 ioredis clients),
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | `health`         | `GET /health` (no prefix) — pings Postgres + Redis with 2s timeouts; 503 if either is down                                                                                                                                                                                                                                                                                                                       | Prisma, REDIS                            |
 | `players`        | `POST /players` (mint guest + player JWT), `PATCH /players/name`, `GET /players/:id`, `PATCH /players/:id/clear-game` — all `@Public()` + rate-limited                                                                                                                                                                                                                                                           | own JwtModule                            |
-| `game-sessions`  | `POST /game-sessions` (create room), `POST /join`, `GET /player-play/:playerId` (public), `GET /history`, `GET /results/:resultId`, `GET /:roomId/lobby`, `POST /:roomId/end`, `DELETE /:roomId/players/:playerId` (kick), `POST /:roomId/players/:playerId/ban`                                                                                                                                                 | GameEngine, Billing                      |
+| `game-sessions`  | `POST /game-sessions` (create room), `POST /join`, `GET /player-play/:playerId` (public; no question texts, options or media — only what the waiting screen needs), `GET /history`, `GET /results/:resultId`, `GET /:roomId/lobby`, `POST /:roomId/end`, `DELETE /:roomId/players/:playerId` (kick), `POST /:roomId/players/:playerId/ban`                                                                       | GameEngine, Billing                      |
 | `quizzes`        | CRUD `/quizzes`, `POST /quizzes/ai` (`TextGenerator`; `ai` rate profile; spends an AI token), `POST /quizzes/import` (batch import from Buzrr-AI; body = contract `importQuizSchema`)                                                                                                                                                                                                                            | TextGenerator, question types, Billing   |
 | `questions`      | `POST /questions` (standalone/bulk, no quiz; admin-only; body = contract `createStandaloneQuestionsSchema`), `PATCH /questions/reorder`, `DELETE /questions/:id`, `POST /questions/:id/report`; plus `QuizQuestionsController`: `GET/POST /quizzes/:quizId/questions` (multipart upsert; media via `MediaStorage`)                                                                                               | MediaStorage, question types, Moderation |
 | `moderation`     | `GET /moderation/questions?status=pending\|approved\|unapproved`, `GET .../counts`, `PATCH .../approve` · `.../unapprove` · `.../pending` · `.../categories` (bulk, `{ ids }` ≤100; skipped ids reported back), `PATCH .../:id/approve`, `PATCH .../:id/unapprove`, `PATCH .../:id/pending` (back to review), `PATCH .../:id/categories` (retag; no re-moderation) — `@Roles("admin","superadmin")`              | Categories                               |
@@ -217,7 +219,13 @@ max, resetsAt? }`; the web client's upgrade prompt keys on that body.
   also bound when `CLOUDINARY_*` or `S3_BUCKET`/`S3_ACCESS_KEY_ID`/
   `S3_SECRET_ACCESS_KEY` are incomplete. `s3`/`local` accept only
   magic-byte-sniffed PNG/JPEG/GIF/WebP/AVIF (no SVG — they serve bytes as-is).
-  Only an unknown `STORAGE_DRIVER` fails at boot.
+  Only an unknown `STORAGE_DRIVER` fails at boot. `local` uploads are not
+  public: `storage/asset-signing.ts` signs their URLs (`?sig=<expiry>.<hmac>`,
+  HMAC-SHA256 keyed from `BETTER_AUTH_SECRET`, valid 6 h); the database keeps
+  the bare URL. Signed links go out with a question as it opens
+  (`question-start`, `state-sync`) and, through the global
+  `SignAssetsInterceptor`, in REST responses to authenticated requests only.
+  S3/Cloudinary URLs stay public and unsigned.
 - `TextGenerator` (`llm/`) — prompt in, text out: `GeminiGenerator` or
   `OpenAICompatibleGenerator` (plain `fetch` to `/chat/completions`). Chosen
   by `LLM_PROVIDER` / `LLM_BASE_URL`; `configured` is false with nothing set,

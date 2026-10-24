@@ -9,6 +9,7 @@ import {
   HOST_LEADERBOARD_TOP,
   PLAYER_LEADERBOARD_TOP,
 } from "@buzrr/contract";
+import { signAssetsDeep } from "../../common/storage/asset-signing";
 import type { GameOverPayload, QuestionAnswer } from "@buzrr/contract";
 import type { DuelOutcome, Prisma } from "@buzrr/prisma";
 import { nanoid } from "nanoid";
@@ -255,10 +256,14 @@ export class GameEngineService
         // What is left of the window once the writes before this broadcast
         // are done — the clock has been running since the window opened, so
         // the client is told the truth rather than the full timeOut.
-        target.emit("question-start", {
-          ...message.payload,
-          remainingMs: Math.max(0, message.deadline - Date.now()),
-        });
+        // The question's media only becomes loadable now, for the room.
+        target.emit(
+          "question-start",
+          signAssetsDeep({
+            ...message.payload,
+            remainingMs: Math.max(0, message.deadline - Date.now()),
+          }),
+        );
         break;
       case "question-end":
         target.emit("question-end", message.payload);

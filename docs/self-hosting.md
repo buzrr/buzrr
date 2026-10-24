@@ -84,7 +84,9 @@ docker compose exec postgres psql -U buzrr -c \
 ### Question images
 
 Stored on the `buzrr-uploads` volume by default and served by the API at
-`/uploads`. To use object storage instead, see `apps/server/.env.example`:
+`/uploads` — only through signed links that expire after 6 h, handed to the
+players of a game as a question opens and to signed-in users. To use object
+storage instead, see `apps/server/.env.example`:
 
 - **S3-compatible** (AWS S3, Cloudflare R2, Backblaze B2, SeaweedFS, Garage, …):
   `STORAGE_DRIVER=s3`, `S3_BUCKET`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`,

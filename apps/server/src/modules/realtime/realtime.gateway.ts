@@ -1,3 +1,4 @@
+import { signAssetsDeep } from "../../common/storage/asset-signing";
 import {
   HEARTBEAT_TIMEOUT_MS,
   duelQueueSchema,
@@ -494,7 +495,8 @@ export class RealtimeGateway
         socket.data.playerId,
       );
       if (snapshot) {
-        socket.emit("state-sync", snapshot);
+        // A (re)connecting member of the room gets the open question's media.
+        socket.emit("state-sync", signAssetsDeep(snapshot));
         // A (re)connecting host gets the running results right away rather
         // than on the next answer.
         if (socket.data.isRoomHost && snapshot.phase === "question") {
