@@ -9,6 +9,7 @@ import reducer, {
   applySync,
   gameOver,
   gameProgress,
+  reactionBudgetKnown,
   liveSummary,
   questionEnd,
   questionStart,
@@ -280,5 +281,25 @@ describe("standing", () => {
         applySync(sync({ phase: "question", qIndex: 0, you: result(1, 0) })),
       ).standing,
     ).toBeNull();
+  });
+});
+
+describe("reactionBudgetKnown", () => {
+  it("keeps the budget for bars mounted later; a reset counts", () => {
+    let s = reducer(
+      fresh(),
+      reactionBudgetKnown({ limit: 5, windowMs: 60_000, players: 40 }),
+    );
+    expect(s.reactionBudget).toMatchObject({ limit: 5, resetSeq: 0 });
+    expect(s.roomSize).toBe(40);
+    s = reducer(
+      s,
+      reactionBudgetKnown({ limit: 5, windowMs: 60_000, reset: true }),
+    );
+    s = reducer(
+      s,
+      reactionBudgetKnown({ limit: 2, windowMs: 60_000, reset: true }),
+    );
+    expect(s.reactionBudget).toMatchObject({ limit: 2, resetSeq: 2 });
   });
 });

@@ -12,6 +12,7 @@ import type {
   QuestionStartPayload,
   StateSyncPayload,
 } from "@buzrr/contract";
+import { REACTION_WINDOW_MS } from "@buzrr/contract";
 import type { ConnectionStatus } from "@/types/socket";
 
 /**
@@ -66,6 +67,14 @@ export interface GameLiveState {
   category: DuelCategoryRef;
   /** Duels only: daily streak per signed-in playerId, from game-over. */
   streaks: GameOverPayload["streaks"] | null;
+  /** How many are in the room (server's `reaction-limit`); 0 = not told. */
+  roomSize: number;
+  /**
+   * The reaction budget (server's `reaction-limit`): `limit` per `windowMs`;
+   * `resetSeq` counts fresh starts. Kept here, not in the bar, so a bar
+   * mounted later still knows it.
+   */
+  reactionBudget: { limit: number; windowMs: number; resetSeq: number };
 }
 
 export interface Standing {
@@ -114,6 +123,8 @@ const initialState: GameLiveState = {
   rated: false,
   category: null,
   streaks: null,
+  roomSize: 0,
+  reactionBudget: { limit: 5, windowMs: REACTION_WINDOW_MS, resetSeq: 0 },
 };
 
 /**
@@ -198,6 +209,26 @@ const gameSlice = createSlice({
       state.deadline = Date.now() + action.payload.remainingMs;
       state.countdownMs = action.payload.remainingMs;
       state.gameOver = false;
+    },
+    roomSizeKnown: (state, action: PayloadAction<number>) => {
+      state.roomSize = action.payload;
+    },
+    reactionBudgetKnown: (
+      state,
+      action: PayloadAction<{
+        limit: number;
+        windowMs: number;
+        reset?: boolean;
+        players?: number;
+      }>,
+    ) => {
+      const p = action.payload;
+      state.reactionBudget = {
+        limit: Math.max(0, p.limit),
+        windowMs: p.windowMs,
+        resetSeq: state.reactionBudget.resetSeq + (p.reset ? 1 : 0),
+      };
+      if (typeof p.players === "number") state.roomSize = p.players;
     },
     questionStart: (state, action: PayloadAction<QuestionStartPayload>) => {
       const q = action.payload;
@@ -305,6 +336,8 @@ const gameSlice = createSlice({
 export const {
   applySync,
   gameStarted,
+  roomSizeKnown,
+  reactionBudgetKnown,
   questionStart,
   questionEnd,
   answerResult,

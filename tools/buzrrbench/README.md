@@ -1,8 +1,11 @@
 # buzrrbench
 
-Load test for a Buzrr classic room: N simulated players join by room code, wait
-in the lobby until the host starts, then answer every question at random after
-0.5–20 s (late answers on purpose; rejections counted).
+Load test for a Buzrr classic room: N simulated players join by room code, pop
+lobby bubbles (sending `bubble-stats`) until the host starts, then answer every
+question at random after 0.5–20 s (late answers on purpose; rejections counted).
+Each player picks three reaction emojis (mostly smileys) and taps one now and
+then in the lobby — sometimes a burst. During the game few tap: 3 % of the
+players 1–3 times 10 s into a question, 10 % right after the answer is shown.
 
 Every player also downloads what its browser would, with its own cache: the
 play context and question images.
@@ -35,8 +38,10 @@ app on 3000, or `api.<host>`).
 | --------------------- | --------- | ---------------------------------------------------------------------------- |
 | `--kbps N`            | unlimited | Download bandwidth per player (kbit/s), e.g. `2000` for a weak phone/Wi-Fi.  |
 | `--no-assets`         |           | No downloads at all (sockets only, like before).                             |
+| `--no-reactions`      |           | Players send no reactions.                                                   |
+| `--react-share F`     | `0.2`     | Share of players who send reactions at all (within the room's budget).       |
 | `--timeout-after SEC` |           | With `--timeout-users`: when players time out (seconds after the start).     |
-| `--timeout-users N`   | `0`       | That many connected players freeze then: no heartbeat or answers.            |
+| `--timeout-users N`   | `0`       | That many connected players freeze then: no heartbeat, answers or reactions. |
 | `--probe-bots N`      | `20`      | Random players that probe the `request-sync` round trip in the lobby (10 s). |
 | `--procs N`           | `1`       | Split the players over N processes; one summary. Use it above ~200 players.  |
 

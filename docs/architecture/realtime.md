@@ -299,11 +299,34 @@ win for each player in `/users/me/stats`.
   exactly what the current client speaks. Adding a compat alias "just in case"
   reintroduces the drift this removal cleared.
 
-## Host lobby
+## Lobby extras: bubbles and reactions
 
-The host's lobby applies `player-joined` events in batches (every 250 ms)
-and lists only the newest 150 players, or the search's matches; player cards
-are memoised, so a batch re-renders only the cards it added.
+- **Bubble game:** players send `bubble-stats` (their running hits/misses)
+  only when they changed — at most once a second, in a room of
+  `BUBBLE_CROWD` (150) or more at most every `BUBBLE_CROWD_EVERY_MS` (10 s;
+  the room size comes with `reaction-limit`, whose step changes at 150 too) —
+  plus a refresh every 15 s; an idle phone sends nothing else. The gateway keeps the latest
+  totals per player in a per-room map and sends the host one
+  `bubble-stats-batch` a second with the players whose totals changed since
+  it last told the host (`players: { [playerId]: { hits, misses } }`); what
+  was sent is forgotten every 15 batches, so the refreshes reach a host that
+  reconnected. A room quiet for 10 batches stops its timer. At 500 players
+  that is one event a second into the host's browser instead of about 500.
+- **Reactions:** relayed to `host:{code}` one by one, within a budget per
+  player (`reactionLimitFor` the room's size: < 50 → 30, < 150 → 10,
+  < 500 → 5, else 2) per `REACTION_WINDOW_MS` (60 s), counted per player
+  (a reconnect gets no new budget) and started afresh with every
+  `question-start` and the final standings (`reaction-limit` with
+  `reset`). Over it the player gets `reaction-limited { retryInMs }`: a
+  "limit reached" toast, the buttons fade until then. Above
+  `ROOM_REACTIONS_PER_S` (40) in a room within one second, only each
+  player's first reaction of that second passes. A quiz with
+  `settings.reactions` off hides the players' reaction bar (client-side; the
+  gateway does not check it).
+- **Host lobby:** applies reactions in batches (every 500 ms) and joins every
+  250 ms; player cards are memoised, so an update re-renders only the cards
+  it changed. Above 40 players no reorder animation and no count-up numbers,
+  above 60 no bubbles rise out of the cards.
 
 ## Changing the socket contract — touch list
 

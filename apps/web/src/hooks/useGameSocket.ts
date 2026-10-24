@@ -10,6 +10,7 @@ import {
   applySync,
   gameOver,
   gameStarted,
+  reactionBudgetKnown,
   leaderboardReceived,
   playerConnection,
   playerRemoved,
@@ -126,6 +127,9 @@ export function useGameSocket({
 
     conn.on("state-sync", (payload) => dispatch(applySync(payload)));
     conn.on("game-started", (payload) => dispatch(gameStarted(payload)));
+    // The reaction budget (and the room's size) — kept in the store, so a
+    // reaction bar mounted later (the final standings') still knows it.
+    conn.on("reaction-limit", (p) => dispatch(reactionBudgetKnown(p)));
     conn.on("question-start", (payload) => dispatch(questionStart(payload)));
     conn.on("question-end", (payload) => dispatch(questionEnd(payload)));
     conn.on("answer-result", (payload) => dispatch(answerResult(payload)));

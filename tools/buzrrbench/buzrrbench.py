@@ -2,9 +2,12 @@
 """
 buzrrbench - load test for a Buzrr classic room.
 
-Joins N simulated players to a room (by game code), waits in the lobby until
+Joins N simulated players to a room (by game code), pops lobby bubbles until
 the host starts the game, then answers every question at random after a random
 0.5-20 s delay (late answers are sent on purpose; their rejections are counted).
+Every player picks three reaction emojis (mostly smileys) and taps one now and
+then in the lobby, sometimes a burst. During the game few do: 3 % of the players
+tap 1-3 times 10 s into a question, 10 % right after the answer is shown.
 
 Each player also downloads what its browser would, with its own cache:
   - the player context
@@ -21,12 +24,12 @@ Measures:
 
 Usage:
   python3 buzrrbench.py [--url https://www.buzrr.in] [--code ABC123] [--users 50]
-                        [--kbps 2000] [--no-assets]
+                        [--kbps 2000] [--no-assets] [--no-reactions]
                         [--timeout-after 60 --timeout-users 5] [--procs 4] [--probe-bots 20]
 
 With --timeout-after/--timeout-users, that many connected players "freeze" at
 that point (like a locked phone): they send nothing any more — no heartbeat,
-answers — while the socket still answers the transport ping, so
+answers, reactions — while the socket still answers the transport ping, so
 only the server's heartbeat check can drop them. Dropped, they stay away.
 Missing values are asked for interactively.
 
@@ -68,11 +71,31 @@ ANSWER_DELAY = (0.5, 20.0)
 ACK_TIMEOUT = 15.0
 SYNC_PROBE_EVERY = 10.0  # only --probe-bots players probe
 HEARTBEAT_EVERY = 10.0  # HEARTBEAT_INTERVAL_MS in the contract
+# Share of players who play the lobby bubble game; how often totals may go
+# out (BUBBLE_CROWD / BUBBLE_CROWD_EVERY_MS in the contract) and unchanged
+# ones are sent again, as the web client does.
+BUBBLE_PLAYER_SHARE = 0.4
+BUBBLE_CROWD = 150
+BUBBLE_CROWD_EVERY_S = 10.0
+BUBBLE_REFRESH_S = 15.0
 # The run stops this long after DONE_SHARE of the connected players are done.
 DONE_SHARE = 0.95
 DONE_GRACE = 30.0
+# During the game, reactions are rare: this share of all players taps 1-3
+# times once a question has run QUESTION_REACT_AFTER s, and this share
+# right after the answer is shown. In the lobby they tap regularly.
+QUESTION_REACT_SHARE = 0.03
+QUESTION_REACT_AFTER = 10.0
+REVEAL_REACT_SHARE = 0.10
 CHUNK = 64 * 1024
 
+DEFAULT_EMOJIS = ["👍", "❤️", "😂"]
+EMOJI_POOL = [
+    "😀", "😂", "🤣", "😅", "😍", "🥰", "😎", "🤔", "😱", "😭",
+    "🥳", "🤯", "🙈", "😬", "🤩", "😇", "👍", "❤️", "🔥", "🎉", "👏",
+]
+# Phases in which the player screen shows the reaction bar (inline in the lobby).
+REACTION_PHASES = {"idle", "lobby", "starting", "question", "reveal", "final"}
 
 
 # -- metrics -------------------------------------------------------------------
@@ -185,9 +208,19 @@ class Bot:
     probe: bool = False  # one of the --probe-bots request-sync probes
     done: asyncio.Event = field(default_factory=asyncio.Event)
     sync_sent: float = 0.0
+    hits: int = 0
+    misses: int = 0
     answered_q: set = field(default_factory=set)
     assets: bool = True
     kbps: float = 0.0  # download limit per device, 0 = none
+    reacting: bool = True
+    reactions_on: bool = True
+    emojis: list = field(default_factory=lambda: list(DEFAULT_EMOJIS))
+    # The room's reaction budget, as the server sends it (reaction-limit).
+    react_limit: int = 5
+    react_window: float = 60.0
+    react_sent: list = field(default_factory=list)
+    room_size: int = 0  # from reaction-limit
     cache: dict = field(default_factory=dict)  # bare url -> download task
     bw_free_at: float = 0.0  # when the device's downlink is free again (--kbps)
     tasks: set = field(default_factory=set)
@@ -272,10 +305,14 @@ class Bot:
             return
         M.add("socket connect", (time.perf_counter() - t0) * 1000)
         self.connected = self.ever_connected = True
+        bubbles = asyncio.create_task(self.pop_bubbles())
         probe = asyncio.create_task(self.sync_probe() if self.probe else asyncio.sleep(0))
+        reacts = asyncio.create_task(self.react())
         beats = asyncio.create_task(self.heartbeat())
         await self.done.wait()
+        bubbles.cancel()
         probe.cancel()
+        reacts.cancel()
         beats.cancel()
         # A bot that gives up (error, kicked, game over) leaves for real: no
         # auto-reconnect, so the host sees it go offline instead of a silent
@@ -288,10 +325,12 @@ class Bot:
             pass
 
     async def load_context(self) -> None:
-        """What the player page loads: the play context."""
-        await self.http_json(
+        """What the player page loads: the play context (quiz settings)."""
+        ctx = await self.http_json(
             "GET", f"/api/game-sessions/player-play/{self.player_id}", "http player-play"
         )
+        settings = (((ctx or {}).get("game") or {}).get("quiz") or {}).get("settings") or {}
+        self.reactions_on = settings.get("reactions", True) is not False
 
     # -- downloads ------------------------------------------------------------------
 
@@ -383,6 +422,18 @@ class Bot:
             self.set_phase("starting")
             M.recv[("game-started", 0)].append(time.time())
 
+        @s.on("reaction-limit")
+        async def _react_limit(data):
+            self.react_limit = int(data.get("limit", self.react_limit)) or 10**9
+            self.room_size = int(data.get("players", self.room_size))
+            self.react_window = float(data.get("windowMs", 60000)) / 1000
+            if data.get("reset"):
+                self.react_sent = []
+
+        @s.on("reaction-limited")
+        async def _react_limited(_data=None):
+            M.counts["reactions rejected by the server"] += 1
+
         @s.on("question-start")
         async def _qstart(data):
             q = data["index"]
@@ -390,11 +441,17 @@ class Bot:
             M.recv[("question-start", q)].append(time.time())
             self.on_question(q, data["question"])
             self.schedule_answer(q, data["question"])
+            if self.reacting and random.random() < QUESTION_REACT_SHARE:
+                self.spawn(self.tap(delay=QUESTION_REACT_AFTER + random.uniform(0, 3),
+                                    taps=random.randint(1, 3)))
 
         @s.on("question-end")
         async def _qend(data):
             self.set_phase("reveal")
             M.recv[("question-end", data["index"])].append(time.time())
+            # The answer is out: a good moment for a smiley.
+            if self.reacting and random.random() < REVEAL_REACT_SHARE:
+                self.spawn(self.tap(delay=random.uniform(0.5, 3.0), taps=random.randint(1, 3)))
 
         @s.on("answer-result")
         async def _res(data):
@@ -448,6 +505,65 @@ class Bot:
             if self.sio.connected:
                 await self._emit("heartbeat", None)
             await asyncio.sleep(HEARTBEAT_EVERY)
+
+    async def pop_bubbles(self) -> None:
+        """Lobby: some players pop bubbles now and then (some misses). Like the
+        web client, totals go out only when they changed — at most once a
+        second, every 10 s in a room of 150 or more — plus a refresh every
+        15 s."""
+        plays = random.random() < BUBBLE_PLAYER_SHARE
+        last, last_at = None, 0.0
+        while True:
+            await asyncio.sleep(1.0)
+            if self.frozen or self.phase not in ("idle", "lobby"):
+                continue
+            if plays and random.random() < 0.6:
+                self.hits += random.randint(0, 3)
+                self.misses += random.randint(0, 2)
+            now = time.monotonic()
+            every = BUBBLE_CROWD_EVERY_S if self.room_size >= BUBBLE_CROWD else 1.0
+            if now - last_at < every:
+                continue
+            if (self.hits, self.misses) == last and now - last_at < BUBBLE_REFRESH_S:
+                continue
+            last, last_at = (self.hits, self.misses), now
+            try:
+                await self.sio.emit("bubble-stats", {"hits": self.hits, "misses": self.misses})
+                M.counts["bubble-stats sent"] += 1
+            except Exception:  # noqa: BLE001
+                M.err("bubble-stats emit failed")
+
+    async def react(self) -> None:
+        """Lobby: now and then a smiley from the player's three — sometimes a
+        burst. During the game only the question / reveal moments tap."""
+        if not self.reacting:
+            return
+        while True:
+            await asyncio.sleep(random.uniform(6, 30))
+            if self.phase in ("idle", "lobby"):
+                await self.tap()
+
+    async def tap(self, delay: float = 0.0, taps: int | None = None) -> None:
+        await asyncio.sleep(delay)
+        if self.frozen or not self.reactions_on or self.phase not in REACTION_PHASES:
+            return
+        emoji = random.choice(self.emojis)
+        burst = taps or (random.randint(3, 10) if random.random() < 0.15 else random.choice([1, 1, 1, 2]))
+        for _ in range(burst):
+            # Like the web client: within the room's budget (the server
+            # rejects the rest and the phone shows "limit reached").
+            now = time.monotonic()
+            self.react_sent = [t for t in self.react_sent if now - t < self.react_window]
+            if len(self.react_sent) >= self.react_limit:
+                M.counts["reactions held back (budget used up)"] += 1
+                break
+            self.react_sent.append(now)
+            try:
+                await self.sio.emit("reaction", {"emoji": emoji})
+                M.counts["reactions sent"] += 1
+            except Exception:  # noqa: BLE001
+                M.err("reaction emit failed")
+            await asyncio.sleep(random.uniform(0.06, 0.15))
 
     async def sync_probe(self) -> None:
         """Lobby only: request-sync round trip as a latency probe (--probe-bots
@@ -610,6 +726,9 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--kbps", type=float, default=0.0,
                     help="download bandwidth per player in kbit/s, e.g. 2000 for a weak phone (default: unlimited)")
     ap.add_argument("--no-assets", action="store_true", help="skip all downloads (images)")
+    ap.add_argument("--no-reactions", action="store_true", help="players send no reactions")
+    ap.add_argument("--react-share", type=float, default=0.2,
+                    help="share of players who send reactions at all (default 0.2)")
     ap.add_argument("--timeout-after", type=float, metavar="SEC",
                     help="after SEC seconds, --timeout-users players freeze (stop sending, heartbeat too)")
     ap.add_argument("--timeout-users", type=int, default=0, metavar="N",
@@ -637,6 +756,8 @@ async def run_bots(args: argparse.Namespace, base: str, code: str, users: int) -
                 args.first_idx + i, base, code, http,
                 assets=not args.no_assets,
                 kbps=args.kbps,
+                reacting=not args.no_reactions and random.random() < args.react_share,
+                emojis=list(DEFAULT_EMOJIS) if random.random() < 0.3 else random.sample(EMOJI_POOL, 3),
             )
             for i in range(users)
         ]
@@ -672,7 +793,7 @@ async def run_bots(args: argparse.Namespace, base: str, code: str, users: int) -
                 b.freeze()
             print(
                 f"{tag}[{time.time() - started:6.0f}s] {len(picked)} players froze "
-                f"(no heartbeat, answers) - the server should drop them",
+                f"(no heartbeat, answers, reactions) - the server should drop them",
                 flush=True,
             )
 
@@ -751,6 +872,9 @@ def run_parent(args: argparse.Namespace, base: str, code: str, users: int) -> No
                "--child-out", out, "--first-idx", str(first), "--label", f"p{i + 1}"]
         if args.no_assets:
             cmd.append("--no-assets")
+        if args.no_reactions:
+            cmd.append("--no-reactions")
+        cmd += ["--react-share", str(args.react_share)]
         if args.timeout_users and freeze[i]:
             cmd += ["--timeout-after", str(args.timeout_after), "--timeout-users", str(freeze[i])]
         children.append((out, subprocess.Popen(cmd)))

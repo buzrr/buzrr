@@ -366,6 +366,7 @@ export class GameSessionsService {
           select: {
             id: true,
             title: true,
+            settings: true,
             questions: { select: { id: true } },
           },
         },

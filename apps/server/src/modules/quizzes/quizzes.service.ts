@@ -6,7 +6,11 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { DEFAULT_TIME_OUT, type ImportQuiz } from "@buzrr/contract";
+import {
+  DEFAULT_TIME_OUT,
+  quizSettingsSchema,
+  type ImportQuiz,
+} from "@buzrr/contract";
 import { z } from "zod";
 import {
   LlmTimeoutError,
@@ -105,9 +109,23 @@ export class QuizzesService {
   async update(
     user: AuthUser,
     quizId: string,
-    dto: { title?: string; description?: string; isPublic?: boolean },
+    dto: {
+      title?: string;
+      description?: string;
+      isPublic?: boolean;
+      settings?: Record<string, unknown>;
+    },
   ) {
+    let settings: ReturnType<typeof quizSettingsSchema.parse> | undefined;
+    if (dto.settings !== undefined) {
+      const parsed = quizSettingsSchema.safeParse(dto.settings);
+      if (!parsed.success) {
+        throw new BadRequestException("Invalid quiz settings");
+      }
+      settings = parsed.data;
+    }
     const data = {
+      ...(settings !== undefined ? { settings } : {}),
       ...(dto.title !== undefined ? { title: dto.title } : {}),
       ...(dto.description !== undefined
         ? { description: dto.description.trim() || null }

@@ -135,6 +135,23 @@ export default function QuesResult(props: QuesResultProps) {
   );
   const playerCount = leaderboardTotal ?? leaderboard.length;
 
+  // An emoji meant for the board (a right answer at the reveal) stays on the
+  // player's row — this question's board only: it remounts with the next.
+  const [rowEmoji, setRowEmoji] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!socket) return;
+    const onReaction = (r: {
+      playerId: string;
+      emoji: string;
+      board?: boolean;
+    }) => {
+      if (r.board) setRowEmoji((m) => ({ ...m, [r.playerId]: r.emoji }));
+    };
+    socket.on("reaction", onReaction);
+    return () => {
+      socket.off("reaction", onReaction);
+    };
+  }, [socket]);
   const listRef = useRef<HTMLDivElement>(null);
   useFlipReorder(listRef, rows.map((r) => r.playerId).join());
   const connectedById = new Map(players.map((p) => [p.id, p.connected]));
@@ -260,6 +277,15 @@ export default function QuesResult(props: QuesResultProps) {
                 <span className="flex-1 min-w-0 truncate text-[15px] font-semibold">
                   {lead.name}
                 </span>
+                {rowEmoji[lead.playerId] && (
+                  <span
+                    key={rowEmoji[lead.playerId]}
+                    aria-hidden
+                    className="shrink-0 text-2xl leading-none animate-pop-in"
+                  >
+                    {rowEmoji[lead.playerId]}
+                  </span>
+                )}
                 {lead.delta !== undefined && (
                   <span
                     className={clsx(
