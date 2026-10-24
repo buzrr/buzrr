@@ -12,15 +12,27 @@ import HideQuestions from "@/components/Admin/Quiz/HideQuestions";
 import HiddenQuestionsOverlay from "@/components/Admin/Quiz/HiddenQuestionsOverlay";
 import HostQuizForm from "@/components/Admin/Quiz/HostQuizForm";
 import LeaderboardView from "@/components/Admin/LeaderboardView";
+import SoloReportView from "@/components/Solo/SoloReportView";
 import Skeleton from "@/components/ui/Skeleton";
 import { IconButton } from "@/components/ui/IconButton";
 import { useQuizDetailQuery } from "@/lib/modules/quizzes/hooks";
 import { isAxiosError } from "axios";
+import { useT } from "@/lib/i18n/context";
 import { notFound } from "next/navigation";
 
 export default function QuizDetailClient({ quizId }: { quizId: string }) {
+  const t = useT();
   const { data: quiz, isPending, isError, error } = useQuizDetailQuery(quizId);
   const [leaderboardId, setLeaderboardId] = useState<string | null>(null);
+  const [soloReportId, setSoloReportId] = useState<string | null>(null);
+  const showLeaderboard = (id: string) => {
+    setSoloReportId(null);
+    setLeaderboardId(id);
+  };
+  const showSoloReport = (id: string) => {
+    setLeaderboardId(null);
+    setSoloReportId(id);
+  };
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (isError) {
@@ -29,7 +41,7 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
     }
     return (
       <div className="text-dark dark:text-white w-full h-full flex items-center justify-center p-8">
-        Could not load this quiz. Try again later.
+        {t("Could not load this quiz. Try again later.")}
       </div>
     );
   }
@@ -48,7 +60,7 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
   if (!quiz) {
     return (
       <div className="text-dark dark:text-white w-full h-full flex items-center justify-center p-8">
-        Could not load this quiz. Try again later.
+        {t("Could not load this quiz. Try again later.")}
       </div>
     );
   }
@@ -58,7 +70,11 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
   return (
     <div className="w-full max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-2 md:py-4">
       <div className="text-dark dark:text-white w-full flex flex-col md:flex-row gap-3 md:h-[calc(100dvh-8.5rem)]">
-        <QuizInfoSection quiz={quiz} onShowLeaderboard={setLeaderboardId} />
+        <QuizInfoSection
+          quiz={quiz}
+          onShowLeaderboard={showLeaderboard}
+          onShowSoloReport={showSoloReport}
+        />
 
         {/* Mobile drawer: the quiz info the top bar has no room for
             (description, public toggle, past sessions). */}
@@ -78,7 +94,7 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
         >
           <div className="flex justify-end">
             <IconButton
-              aria-label="Close quiz info"
+              aria-label={t("Close quiz info")}
               className="text-dark dark:text-white"
               onClick={() => setSidebarOpen(false)}
               icon={<RxCross2 size={22} />}
@@ -88,26 +104,39 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
             quiz={quiz}
             showHostForm={false}
             onShowLeaderboard={(resultId) => {
-              setLeaderboardId(resultId);
+              showLeaderboard(resultId);
+              setSidebarOpen(false);
+            }}
+            onShowSoloReport={(testId) => {
+              showSoloReport(testId);
               setSidebarOpen(false);
             }}
           />
         </div>
 
         <div className="bg-white dark:bg-dark rounded-xl w-full flex-1 flex flex-col min-h-0">
-          {leaderboardId ? (
+          {soloReportId ? (
+            <div className="flex-1 min-h-0 overflow-y-auto p-4">
+              <SoloReportView
+                testId={soloReportId}
+                onBack={() => setSoloReportId(null)}
+                backLabel={t("Back to quiz details")}
+              />
+            </div>
+          ) : leaderboardId ? (
             <div className="flex-1 min-h-0 overflow-y-auto p-4">
               <LeaderboardView
                 roomId={leaderboardId}
                 onBack={() => setLeaderboardId(null)}
-                backLabel="Back to quiz details"
+                backLabel={t("Back to quiz details")}
+                onDeleted={() => setLeaderboardId(null)}
               />
             </div>
           ) : (
             <>
               <div className="p-3 flex items-center gap-2 justify-start md:hidden">
                 <IconButton
-                  aria-label="Open quiz info"
+                  aria-label={t("Open quiz info")}
                   className="text-dark dark:text-white"
                   onClick={() => setSidebarOpen(true)}
                   icon={
@@ -134,18 +163,18 @@ export default function QuizDetailClient({ quizId }: { quizId: string }) {
                   {`Questions: ${questionCount}`}
                 </span>
               </div>
-              <div className="w-[95%] mx-auto my-2 md:hidden">
-                <HostQuizForm
-                  quizId={quizId}
-                  disabled={questionCount === 0}
-                  className="w-full"
-                />
-              </div>
+              {/* "Host quiz" floats at the bottom right, on every screen size. */}
+              <HostQuizForm
+                quizId={quizId}
+                settings={quiz.settings}
+                disabled={questionCount === 0}
+                className="fixed bottom-14 right-4 z-30 w-56 md:w-64"
+              />
               <div className="relative flex flex-col flex-1 min-h-0">
                 <div className="relative flex flex-col flex-1 min-h-0 md:overflow-y-auto p-4 md:px-6 gap-4 md:gap-[18px]">
                   <div className="sticky -top-4 z-10 -mx-4 -mt-4 px-4 pt-4 pb-1 md:-mx-6 md:px-6 md:rounded-t-xl bg-white dark:bg-dark flex items-center gap-2 md:gap-3.5">
                     <AddQuestionMenu quizId={quizId} />
-                    <HideQuestions />
+                    <HideQuestions defaultHidden={questionCount > 0} />
                   </div>
                   <AllQues quizId={quizId} />
                 </div>

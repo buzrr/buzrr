@@ -7,6 +7,7 @@ import {
   LuGitPullRequest,
   LuGithub,
   LuHeart,
+  LuLogIn,
   LuPlay,
   LuScale,
   LuServer,
@@ -32,14 +33,17 @@ import {
 } from "@/components/Marketing/product";
 import { siteGraph, webPageSchema } from "@/lib/seo/json-ld";
 import { buildPageMetadata } from "@/lib/seo/metadata";
-import { DEFAULT_TITLE, SITE_DESCRIPTION } from "@/lib/seo/site";
+import { SITE_DESCRIPTION, defaultTitle } from "@/lib/seo/site";
+import { getInstanceConfig } from "@/lib/instance";
+import { getT } from "@/lib/i18n/server";
 
-export const metadata = buildPageMetadata({
-  title: DEFAULT_TITLE,
-  absoluteTitle: true,
-  description: SITE_DESCRIPTION,
-  path: "/",
-});
+export const generateMetadata = () =>
+  buildPageMetadata({
+    title: defaultTitle(),
+    absoluteTitle: true,
+    description: SITE_DESCRIPTION,
+    path: "/",
+  });
 
 const heroBadges = [
   { icon: <LuUsers size={13} />, label: "Contributors Welcome" },
@@ -85,7 +89,65 @@ const features = [
 const formatStat = (n: number | null) =>
   n === null ? "—" : n.toLocaleString("en-US");
 
+/** Private instance: just the three ways in, no marketing, no GitHub calls. */
+function PrivateHome({
+  duels,
+  t,
+}: {
+  duels: boolean;
+  t: (text: string) => string;
+}) {
+  const button =
+    "flex items-center justify-center gap-2 w-full px-8 py-3 rounded-xl text-lg font-black transition-colors";
+  return (
+    <div className="min-h-dvh bg-light-bg dark:bg-dark-bg">
+      <LandingNavbar />
+      <main className="max-w-md mx-auto px-4 pt-16 pb-16 sm:pt-24 flex flex-col items-center text-center animate-fade-up">
+        <h1 className="text-4xl sm:text-5xl font-black text-dark dark:text-white leading-tight">
+          {t("Build quizzes.")}
+          <br />
+          <span className="text-lprimary dark:text-dprimary">
+            {t("Battle")}
+          </span>{" "}
+          {t("friends.")}
+        </h1>
+        <div className="mt-10 flex flex-col gap-4 w-full">
+          {duels && (
+            <Link
+              href="/duel"
+              className={`${button} bg-lprimary dark:bg-dprimary text-white dark:text-dark hover:opacity-90`}
+            >
+              <LuPlay size={18} />
+              {t("Start 1v1")}
+            </Link>
+          )}
+          <Link
+            href="/player"
+            className={
+              duels
+                ? `${button} border-2 border-lprimary dark:border-dprimary text-lprimary dark:text-dprimary hover:bg-lprimary/10 dark:hover:bg-dprimary/10`
+                : `${button} bg-lprimary dark:bg-dprimary text-white dark:text-dark hover:opacity-90`
+            }
+          >
+            <LuDoorOpen size={18} />
+            {t("Join Room")}
+          </Link>
+          <Link
+            href="/admin"
+            className={`${button} border-2 border-card-light dark:border-off-dark text-dark dark:text-white hover:bg-card-light dark:hover:bg-card-dark`}
+          >
+            <LuLogIn size={18} />
+            {t("Admin Login")}
+          </Link>
+        </div>
+      </main>
+    </div>
+  );
+}
+
 export default async function Home() {
+  const { privateBuzz, duels } = getInstanceConfig();
+  if (privateBuzz) return <PrivateHome duels={duels} t={await getT()} />;
   const stats = await getGithubStats();
 
   const statTiles = [
@@ -114,7 +176,7 @@ export default async function Home() {
           ...siteGraph(),
           webPageSchema({
             path: "/",
-            title: DEFAULT_TITLE,
+            title: defaultTitle(),
             description: SITE_DESCRIPTION,
           }),
         ]}
@@ -145,13 +207,15 @@ export default async function Home() {
             </p>
 
             <div className="mt-8 flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
-              <Link
-                href="/duel"
-                className="flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-3 rounded-xl text-lg font-black bg-lprimary dark:bg-dprimary text-white dark:text-dark hover:opacity-90 transition-opacity"
-              >
-                <LuPlay size={18} />
-                Start 1v1
-              </Link>
+              {duels && (
+                <Link
+                  href="/duel"
+                  className="flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-3 rounded-xl text-lg font-black bg-lprimary dark:bg-dprimary text-white dark:text-dark hover:opacity-90 transition-opacity"
+                >
+                  <LuPlay size={18} />
+                  Start 1v1
+                </Link>
+              )}
               <Link
                 href="/player"
                 className="flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-3 rounded-xl text-lg font-black border-2 border-lprimary dark:border-dprimary text-lprimary dark:text-dprimary hover:bg-lprimary/10 dark:hover:bg-dprimary/10 transition-colors"

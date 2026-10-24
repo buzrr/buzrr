@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { DuelProfile, DuelRecord } from "@buzrr/contract";
+import { useT, tx } from "@/lib/i18n/context";
 import { DEFAULT_AVATAR } from "@/constants";
 
 const EMPTY: DuelRecord = {
@@ -39,6 +40,7 @@ export default function DuelProfileCard({
   categoryName: string;
   compact?: boolean;
 }) {
+  const t = useT();
   const record = recordFor(profile, categoryId);
   const duels = played(record);
   // Re-keying on the category replays the fade when the selection changes.
@@ -62,7 +64,7 @@ export default function DuelProfileCard({
             ? "rating"
             : "starting"
           : record.ratedDuels
-            ? `${categoryName} rating`
+            ? tx("{category} rating", { category: categoryName })
             : "starting rating"}
       </span>
     </div>
@@ -83,12 +85,16 @@ export default function DuelProfileCard({
         />
         <div className="flex min-w-0 flex-col">
           <b className="text-[15px] text-dark dark:text-white">
-            {profile.name ?? "Player"}
+            {profile.name ?? t("Player")}
           </b>
           <span className="truncate text-[12.5px] text-off-dark dark:text-muted-dark">
             {duels
-              ? `${record.wins}W · ${record.losses}L in ${categoryName}`
-              : `No ${categoryName} duels yet`}
+              ? tx("{w}W · {l}L in {category}", {
+                  w: record.wins,
+                  l: record.losses,
+                  category: categoryName,
+                })
+              : tx("No {category} duels yet", { category: categoryName })}
           </span>
         </div>
         {rating}
@@ -99,7 +105,7 @@ export default function DuelProfileCard({
   return (
     <Link
       href="/duel/profile"
-      aria-label="Open your profile"
+      aria-label={t("Open your profile")}
       className="block rounded-[22px] border border-lprimary/15 dark:border-white/5 bg-white dark:bg-dark px-[18px] py-4 sm:px-[26px] sm:py-[22px] shadow-[0_10px_30px_-18px_rgba(70,40,160,0.35)] transition-colors hover:border-lprimary/40 dark:hover:border-dprimary/40"
     >
       <div className="flex items-center gap-[18px]">
@@ -112,7 +118,7 @@ export default function DuelProfileCard({
         />
         <div>
           <div className="text-lg sm:text-[21px] font-bold text-dark dark:text-white">
-            {profile.name ?? "Player"}
+            {profile.name ?? t("Player")}
           </div>
           <div className="text-sm sm:text-[14.5px] text-off-dark dark:text-muted-dark">
             {duels
@@ -123,15 +129,15 @@ export default function DuelProfileCard({
         {rating}
       </div>
       <div className="mt-[18px] grid grid-cols-3 border-t border-lprimary/15 dark:border-white/5 pt-4">
-        <Stat value={String(duels)} label="Duels" />
+        <Stat value={String(duels)} label={t("Duels")} />
         <Stat
           value={`${record.wins}W · ${record.losses}L`}
-          label="Record"
+          label={t("Record")}
           divided
         />
         <Stat
           value={duels ? `${Math.round((record.wins / duels) * 100)}%` : "–"}
-          label="Win rate"
+          label={t("Win rate")}
           divided
         />
       </div>

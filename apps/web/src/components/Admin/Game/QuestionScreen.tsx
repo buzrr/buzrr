@@ -1,12 +1,14 @@
 "use client";
 
+import QuestionPicture from "@/components/Game/QuestionPicture";
 import clsx from "clsx";
-import Image from "next/image";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { LuCheck, LuCopy, LuPlay, LuShare2 } from "react-icons/lu";
+import { LuCheck, LuCopy, LuShare2, LuSkipForward } from "react-icons/lu";
 import { toast } from "react-toastify";
 import { useAppSelector } from "@/state/hooks";
+import { useAudioSegment } from "@/lib/audio-cues";
+import { useGameSound } from "@/lib/sound/director";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
 import { buildJoinUrl } from "@/lib/join-link";
 import {
@@ -19,9 +21,10 @@ import {
   labelClass,
   mutedText,
   panelClass,
-  primaryButtonClass,
+  dangerButtonClass,
   subtleCardClass,
 } from "@/components/Game/GameUI";
+import { useT } from "@/lib/i18n/context";
 import type { GameSocket } from "@/types/socket";
 
 interface QuestionScreenProps {
@@ -34,7 +37,11 @@ interface QuestionScreenProps {
  * server ends the question at its own deadline; "Next" just asks the server
  * to skip ahead.
  */
+/** Seconds into a question before the host can skip it. */
+const SKIP_AFTER_S = 15;
+
 export default function QuestionScreen(props: QuestionScreenProps) {
+  const t = useT();
   const { gameCode, socket } = props;
   const question = useAppSelector((state) => state.game.question);
   const deadline = useAppSelector((state) => state.game.deadline);
@@ -43,6 +50,17 @@ export default function QuestionScreen(props: QuestionScreenProps) {
   const answered = useAppSelector((state) => state.game.answeredCount);
   const players = useAppSelector((state) => state.game.players);
   const live = useAppSelector((state) => state.game.liveSummary);
+  // The question's sound: from its start cue, for the question's time —
+  // if the quiz's sound settings put it on this screen.
+  const sound = useGameSound();
+  const audioHere = sound ? sound.questionAudioHere(question?.audio) : true;
+  useAudioSegment(
+    audioHere ? question?.audio?.url : null,
+    question?.audio?.startMs,
+    question ? question.timeOut * 1000 : null,
+    question?.id,
+    question?.audio?.key,
+  );
   const remaining = useServerCountdown(deadline);
   const [copied, setCopied] = useState(false);
   const [canShare, setCanShare] = useState(false);
@@ -85,163 +103,179 @@ export default function QuestionScreen(props: QuestionScreenProps) {
   const left = qCount - (qIndex + 1);
   const scored = isScoredType(question.type);
 
-  return (
-    <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3.5 md:gap-5 md:pb-[18px]">
-      <section
-        className={clsx(
-          panelClass,
-          "flex flex-col justify-center gap-6 md:gap-[30px] p-5 md:p-7 md:min-h-0 md:overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-        )}
-      >
-        <div className="flex items-center gap-5 md:gap-6">
-          <TimerRing
-            key={question.id}
-            value={Math.ceil(remaining)}
-            max={question.timeOut}
-            className="size-[120px] md:size-[180px]"
-            valueClassName="text-4xl md:text-[58px]"
-          />
-          <div className="flex-1 min-w-0 flex flex-col gap-2">
-            <span className={labelClass}>Answers in</span>
-            <span className={clsx("text-[13.5px]", mutedText)}>
-              <b className="text-[22px] font-bold text-dark dark:text-white">
-                {answered}
-              </b>{" "}
-              / {total}
-            </span>
-            <div className="h-2 rounded-lg overflow-hidden bg-lprimary/8 dark:bg-white/5">
-              <div
-                className="h-full rounded-lg bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep transition-[width] duration-300"
-                style={{ width: `${answeredPct}%` }}
-              />
-            </div>
-            <span className={clsx("text-[13px]", mutedText)}>
-              {Math.max(0, total - answered)} still thinking
-            </span>
-          </div>
-        </div>
+  const nobodyPlaying = !players.some((p) => p.connected);
+  // Long (or unlimited) questions: after 15 s the host may cut them short.
+  const elapsed = question.timeOut - remaining;
+  const showSkip = nobodyPlaying || elapsed >= SKIP_AFTER_S;
 
-        <div className="flex flex-col gap-2.5">
-          <span className={labelClass}>Late joiners</span>
-          <div
-            className={clsx(
-              "flex items-center gap-4 rounded-[18px] p-4",
-              subtleCardClass,
-            )}
-          >
-            <div className="size-[90px] md:size-[136px] shrink-0 rounded-[10px] bg-white p-1.5">
-              <QRCodeSVG
-                value={joinUrl}
-                marginSize={0}
-                level="M"
-                className="size-full"
-              />
-            </div>
+  return (
+    <div className="flex-1 min-h-0 flex flex-col">
+      <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3.5 md:gap-5">
+        <section
+          className={clsx(
+            panelClass,
+            "flex flex-col justify-center gap-6 md:gap-[30px] p-5 md:p-7 md:min-h-0 md:overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          )}
+        >
+          <div className="flex items-center gap-5 md:gap-6">
+            <TimerRing
+              key={question.id}
+              value={Math.ceil(remaining)}
+              max={question.timeOut}
+              className="size-[120px] md:size-[180px]"
+              valueClassName="text-4xl md:text-[58px]"
+            />
             <div className="flex-1 min-w-0 flex flex-col gap-2">
-              <span className="text-[28px] font-extrabold tracking-[0.12em] leading-none text-lprimary dark:text-dprimary">
-                {gameCode}
+              <span className={labelClass}>{t("Answers in")}</span>
+              <span className={clsx("text-[13.5px]", mutedText)}>
+                <b className="text-[22px] font-bold text-dark dark:text-white">
+                  {answered}
+                </b>{" "}
+                / {total}
               </span>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    (
-                      navigator.clipboard?.writeText(joinUrl) ??
-                      Promise.reject(new Error("Clipboard unavailable"))
-                    )
-                      .then(() => setCopied(true))
-                      .catch(() => toast.error("Failed to copy link"))
-                  }
-                  className={clsx(
-                    "flex-1 flex items-center justify-center gap-1.5 rounded-xl border-[1.5px] bg-white dark:bg-dark px-3 py-2 text-[13px] font-semibold whitespace-nowrap cursor-pointer transition-colors",
-                    copied
-                      ? "border-green-500 text-green-500"
-                      : "border-lprimary/15 dark:border-white/5 hover:border-dprimary",
-                  )}
-                >
-                  {copied ? <LuCheck size={15} /> : <LuCopy size={15} />}
-                  {copied ? "Copied" : "Copy link"}
-                </button>
-                {canShare && (
+              <div className="h-2 rounded-lg overflow-hidden bg-lprimary/8 dark:bg-white/5">
+                <div
+                  className="h-full rounded-lg bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep transition-[width] duration-300"
+                  style={{ width: `${answeredPct}%` }}
+                />
+              </div>
+              <span className={clsx("text-[13px]", mutedText)}>
+                {t("{n} still thinking", { n: Math.max(0, total - answered) })}
+              </span>
+            </div>
+          </div>
+
+          {/* Phones: no room for it — the code is at the page's end. */}
+          <div className="hidden md:flex flex-col gap-2.5">
+            <span className={labelClass}>{t("Late joiners")}</span>
+            <div
+              className={clsx(
+                "flex items-center gap-4 rounded-[18px] p-4",
+                subtleCardClass,
+              )}
+            >
+              <div className="size-[90px] md:size-[136px] shrink-0 rounded-[10px] bg-white p-1.5">
+                <QRCodeSVG
+                  value={joinUrl}
+                  marginSize={0}
+                  level="M"
+                  className="size-full"
+                />
+              </div>
+              <div className="flex-1 min-w-0 flex flex-col gap-2">
+                <span className="text-[28px] font-extrabold tracking-[0.12em] leading-none text-lprimary dark:text-dprimary">
+                  {gameCode}
+                </span>
+                <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() =>
-                      navigator.share({ url: joinUrl }).catch(() => {})
+                      (
+                        navigator.clipboard?.writeText(joinUrl) ??
+                        Promise.reject(new Error(t("Clipboard unavailable")))
+                      )
+                        .then(() => setCopied(true))
+                        .catch(() => toast.error(t("Failed to copy link")))
                     }
-                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border-[1.5px] bg-white dark:bg-dark border-lprimary/15 dark:border-white/5 hover:border-dprimary px-3 py-2 text-[13px] font-semibold cursor-pointer transition-colors"
+                    className={clsx(
+                      "flex-1 flex items-center justify-center gap-1.5 rounded-xl border-[1.5px] bg-white dark:bg-dark px-3 py-2 text-[13px] font-semibold whitespace-nowrap cursor-pointer transition-colors",
+                      copied
+                        ? "border-green-500 text-green-500"
+                        : "border-lprimary/15 dark:border-white/5 hover:border-dprimary",
+                    )}
                   >
-                    <LuShare2 size={15} />
-                    Share
+                    {copied ? <LuCheck size={15} /> : <LuCopy size={15} />}
+                    {copied ? "Copied" : t("Copy link")}
                   </button>
-                )}
+                  {canShare && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigator.share({ url: joinUrl }).catch(() => {})
+                      }
+                      className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border-[1.5px] bg-white dark:bg-dark border-lprimary/15 dark:border-white/5 hover:border-dprimary px-3 py-2 text-[13px] font-semibold cursor-pointer transition-colors"
+                    >
+                      <LuShare2 size={15} />
+                      {t("Share")}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section
-        ref={promptRef}
-        className={clsx(
-          panelClass,
-          "flex flex-col p-5 md:px-[34px] md:py-8 md:min-h-0 md:overflow-y-auto",
-        )}
-      >
-        <div className="flex flex-wrap items-center gap-2.5">
-          <span className="text-[12.5px] font-bold tracking-[0.06em] uppercase rounded-full px-3 py-1.5 text-lprimary dark:text-dprimary bg-lprimary/8 dark:bg-white/5">
-            Question {qIndex + 1} of {qCount}
-          </span>
-          {question.type !== "multiple_choice" && (
-            <QuestionTypePill type={question.type} />
-          )}
-          <span className={clsx("text-[13px]", mutedText)}>
-            {scored
-              ? `${question.timeOut}s to answer`
-              : "Not scored · results update live"}
-          </span>
-        </div>
-        {question.mediaType === "image" && question.media && (
-          <Image
-            src={question.media}
-            className="mt-5 mx-auto max-h-[26dvh] w-auto rounded-2xl"
-            alt="Question image"
-            height={300}
-            width={500}
-          />
-        )}
-        <h2
+        <section
+          ref={promptRef}
           className={clsx(
-            "mt-[18px] font-bold tracking-[-0.02em] leading-[1.22] text-pretty wrap-break-word",
-            isCompact ? "text-xl md:text-[26px]" : "text-2xl md:text-[34px]",
+            panelClass,
+            "flex flex-col p-5 md:px-[34px] md:py-8 md:min-h-0 md:overflow-y-auto",
           )}
         >
-          {question.title}
-        </h2>
-        <HostPrompt
-          question={question}
-          live={live?.index === qIndex ? live.summary : null}
-        />
-        <div className="flex flex-wrap md:flex-nowrap items-center gap-3.5 mt-[22px] pt-5 border-t border-lprimary/15 dark:border-white/10">
-          <p
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="text-[12.5px] font-bold tracking-[0.06em] uppercase rounded-full px-3 py-1.5 text-lprimary dark:text-dprimary bg-lprimary/8 dark:bg-white/5">
+              {t("Question {n} of {total}", { n: qIndex + 1, total: qCount })}
+            </span>
+            {question.type !== "multiple_choice" && (
+              <QuestionTypePill type={question.type} />
+            )}
+            <span className={clsx("text-[13px]", mutedText)}>
+              {scored
+                ? `${question.timeOut}s to answer`
+                : t("Not scored · results update live")}
+            </span>
+          </div>
+          {question.mediaType === "image" && question.media && (
+            <QuestionPicture
+              media={question.media}
+              mediaKey={question.mediaKey}
+              className="mt-5 mx-auto max-h-[26dvh] w-auto rounded-2xl"
+              alt={t("Question image")}
+              height={300}
+              width={500}
+            />
+          )}
+          <h2
             className={clsx(
-              "basis-full md:basis-auto flex-1 text-sm",
-              mutedText,
+              "mt-[18px] font-bold tracking-[-0.02em] leading-[1.22] text-pretty wrap-break-word",
+              isCompact ? "text-xl md:text-[26px]" : "text-2xl md:text-[34px]",
             )}
           >
+            {question.title}
+          </h2>
+          <HostPrompt
+            question={question}
+            live={live?.index === qIndex ? live.summary : null}
+          />
+          <p className={clsx("mt-[22px] text-sm", mutedText)}>
             {left > 0
               ? `${left} question${left === 1 ? "" : "s"} left after this one`
-              : "This is the last question"}
+              : t("This is the last question")}
           </p>
+        </section>
+      </div>
+      {/* The host bar, like on every game screen: "Skip" on the far left
+          (red; after 15 s, or right away with nobody playing), the regular
+          next step always on the right — none while answers are open. */}
+      <div className="sticky bottom-0 z-10 flex items-center justify-between gap-3 py-3 min-h-[74px] bg-light-bg/90 dark:bg-dark-bg/90 backdrop-blur">
+        {showSkip ? (
           <button
             type="button"
+            data-host-key="skip"
+            title={t('You can also press "Esc"')}
             onClick={() => socket.emit("host-next")}
-            className={clsx(primaryButtonClass, "flex-1 md:flex-none")}
+            className={clsx(dangerButtonClass, "animate-fade-up")}
           >
-            Next
-            <LuPlay size={17} className="fill-current" />
+            <LuSkipForward size={17} />
+            {t("Skip")}
           </button>
-        </div>
-      </section>
+        ) : (
+          <span />
+        )}
+        <span className={clsx("text-sm", mutedText)}>
+          {t("{n} of {total} answered", { n: answered, total })}
+        </span>
+      </div>
     </div>
   );
 }

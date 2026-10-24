@@ -1,9 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useT } from "@/lib/i18n/context";
 import LeaderboardView from "@/components/Admin/LeaderboardView";
 
 export default function QuizLeaderboardClient({ roomId }: { roomId: string }) {
+  const t = useT();
   const router = useRouter();
 
   return (
@@ -11,7 +13,7 @@ export default function QuizLeaderboardClient({ roomId }: { roomId: string }) {
       <LeaderboardView
         roomId={roomId}
         onBack={() => router.back()}
-        backLabel="Back"
+        backLabel={t("Back")}
       />
     </div>
   );

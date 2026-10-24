@@ -5,6 +5,7 @@ import { FiFlag } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { useReportQuestionMutation } from "@/lib/modules/moderation/hooks";
+import { useT } from "@/lib/i18n/context";
 import { IconButton } from "@/components/ui/IconButton";
 
 /** Duel-only: lets a player flag the current question as wrong/NSFW for admin review. */
@@ -13,6 +14,7 @@ export default function ReportQuestionButton({
 }: {
   questionId: string;
 }) {
+  const t = useT();
   const [reportedIds, setReportedIds] = useState<Set<string>>(new Set());
   const report = useReportQuestionMutation();
   const reported = reportedIds.has(questionId);
@@ -22,7 +24,7 @@ export default function ReportQuestionButton({
     report.mutate(questionId, {
       onSuccess: () => {
         setReportedIds((prev) => new Set(prev).add(questionId));
-        toast.success("Reported — thanks for the feedback.");
+        toast.success(t("Reported — thanks for the feedback."));
       },
       onError: (err) => toast.error(getApiErrorMessage(err)),
     });
@@ -30,7 +32,7 @@ export default function ReportQuestionButton({
 
   return (
     <IconButton
-      aria-label={reported ? "Question reported" : "Report this question"}
+      aria-label={reported ? t("Question reported") : t("Report this question")}
       icon={<FiFlag size={18} />}
       disabled={reported || report.isPending}
       onClick={handleReport}

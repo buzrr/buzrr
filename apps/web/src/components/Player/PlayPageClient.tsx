@@ -1,14 +1,18 @@
 "use client";
 
 import GamePage from "@/components/Player/GamePage";
+import { LeaderBoard } from "@/components/Player/GameScreens";
+import { loadFinalResult } from "@/lib/final-result";
 import ValidatePlayer from "@/components/Player/ValidatePlayer";
-import ClientImage from "@/components/ClientImage";
+import GameLogo from "@/components/Game/GameLogo";
 import Skeleton from "@/components/ui/Skeleton";
 import { usePlayerPlayQuery } from "@/lib/modules/game-sessions/hooks";
 import { isAxiosError } from "axios";
+import { useT } from "@/lib/i18n/context";
 import { notFound, redirect } from "next/navigation";
 
 export default function PlayPageClient({ playerId }: { playerId: string }) {
+  const t = useT();
   const { data, isPending, isError, error } = usePlayerPlayQuery(playerId);
 
   if (isError && isAxiosError(error) && error.response?.status === 404) {
@@ -31,7 +35,7 @@ export default function PlayPageClient({ playerId }: { playerId: string }) {
         role="alert"
         aria-atomic="true"
       >
-        Could not load game data. Please try again.
+        {t("Could not load game data. Please try again.")}
       </div>
     );
   }
@@ -39,6 +43,20 @@ export default function PlayPageClient({ playerId }: { playerId: string }) {
   const { player, game } = data;
 
   if (!player.gameId || !game) {
+    // The room is gone; a finished player keeps their thank-you screen.
+    const last =
+      typeof window !== "undefined" ? loadFinalResult(playerId) : null;
+    if (last) {
+      return (
+        <LeaderBoard
+          playerId={playerId}
+          position={last.position}
+          score={last.score}
+          quizTitle={last.quizTitle}
+          players={last.players}
+        />
+      );
+    }
     redirect(`/player/joinRoom/${playerId}`);
   }
 
@@ -46,17 +64,9 @@ export default function PlayPageClient({ playerId }: { playerId: string }) {
     <>
       <ValidatePlayer playerId={player.id} />
       <div className="p-4 pb-2 flex justify-between">
-        <ClientImage
-          props={{
-            src: "/images/logo.svg",
-            darksrc: "/images/logo-dark.svg",
-            alt: "Buzrr Logo",
-            width: 80,
-            height: 80,
-          }}
-        />
+        <GameLogo logo={game.quiz?.logo} size={80} />
       </div>
-      <GamePage player={player} game={game} />
+      <GamePage player={player} game={game} avatars={data.avatars} />
     </>
   );
 }

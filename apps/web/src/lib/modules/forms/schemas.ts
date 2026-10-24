@@ -19,6 +19,11 @@ export const createAiQuizSchema = z.object({
     .int("Use whole seconds")
     .min(5, "At least 5 seconds")
     .max(600, "At most 600 seconds"),
+  difficulty: z.coerce.number().int().min(1).max(5),
+  /** How many of each scored type: 0 none, 1 few, 2 medium, 3 many. */
+  multipleChoice: z.number().int().min(0).max(3),
+  trueFalse: z.number().int().min(0).max(3),
+  typeAnswer: z.number().int().min(0).max(3),
 });
 
 export const createPlayerSchema = z.object({
@@ -36,10 +41,6 @@ export const updatePlayerNameSchema = z.object({
     .min(1)
     .max(30)
     .regex(/^[a-zA-Z0-9_]*$/),
-});
-
-export const hostQuizSchema = z.object({
-  quizId: z.string().min(1),
 });
 
 const authoredOption = z.object({
@@ -68,8 +69,20 @@ export const addQuestionSchema = z
     textMaxLength: z.union([z.literal(100), z.literal(200), z.literal(500)]),
     allowAnonymous: z.boolean(),
     multipleSubmissions: z.boolean(),
+    ignoreTypos: z.boolean(),
+    fixedLength: z.boolean(),
   })
   .superRefine((v, ctx) => {
+    if (
+      v.type === "type_answer" &&
+      !v.options.some((o) => o.title.trim() !== "")
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["options"],
+        message: "Add at least one accepted answer",
+      });
+    }
     if (!["multiple_choice", "true_false", "poll"].includes(v.type)) return;
     v.options.forEach((o, i) => {
       if (o.title.trim() === "") {

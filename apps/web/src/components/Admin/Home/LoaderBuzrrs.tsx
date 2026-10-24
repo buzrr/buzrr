@@ -2,6 +2,7 @@
 import clsx from "clsx";
 import { quizCardClass } from "./QuizCard";
 import { quizGridClass } from "./ClientBuzrrs";
+import { useT } from "@/lib/i18n/context";
 import { useAppSelector } from "@/state/hooks";
 
 function Bone({ className }: { className?: string }) {
@@ -44,13 +45,14 @@ function CardSkeleton({ view }: { view: "grid" | "list" }) {
 }
 
 const LoaderBuzrrs = ({ cardCount }: { cardCount: number }) => {
+  const t = useT();
   const view = useAppSelector((state) => state.gridListToggle.view);
 
   return (
     <div
       className={quizGridClass(view)}
       aria-busy="true"
-      aria-label="Loading quizzes"
+      aria-label={t("Loading quizzes")}
     >
       {Array.from({ length: cardCount }, (_, i) => (
         <CardSkeleton key={`card-skel-${i}`} view={view} />

@@ -3,6 +3,7 @@
 import clsx from "clsx";
 import Image from "next/image";
 import { mutedText } from "@/components/Game/GameUI";
+import { useT } from "@/lib/i18n/context";
 import { MeCard } from "./JoinShell";
 
 function GhostRow({ rank }: { rank: number }) {
@@ -26,6 +27,7 @@ export default function ProfilePreview({
   name: string;
   image: string;
 }) {
+  const t = useT();
   return (
     <>
       <MeCard image={image} name={name} />
@@ -33,7 +35,7 @@ export default function ProfilePreview({
         <GhostRow rank={1} />
         <div className="flex items-center gap-3.5 rounded-2xl border-2 px-4 py-3 bg-white dark:bg-dark border-dprimary shadow-[0_14px_30px_-16px_#7c4ddb]">
           <span className={clsx("w-[30px] text-sm font-extrabold", mutedText)}>
-            2nd
+            {t("2nd")}
           </span>
           <Image
             src={image}
@@ -43,14 +45,16 @@ export default function ProfilePreview({
             className="size-9 rounded-full object-cover"
           />
           <span className="flex-1 min-w-0 truncate text-base font-bold">
-            {name || "Your Name"}
+            {name || t("Your Name")}
           </span>
-          <span className={clsx("text-sm font-bold", mutedText)}>1250 pt.</span>
+          <span className={clsx("text-sm font-bold", mutedText)}>
+            {t("1250 pt.")}
+          </span>
         </div>
         <GhostRow rank={3} />
       </div>
       <span className={clsx("text-[13px]", mutedText)}>
-        This is how other players will see you on the leaderboard.
+        {t("This is how other players will see you on the leaderboard.")}
       </span>
     </>
   );

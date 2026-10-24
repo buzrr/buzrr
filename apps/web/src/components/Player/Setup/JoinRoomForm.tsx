@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LuScanLine } from "react-icons/lu";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
@@ -11,6 +11,7 @@ import { useJoinRoomMutation } from "@/lib/modules/game-sessions/hooks";
 import { clearPlayerLocalSession } from "@/lib/player-session";
 import { isAxiosError } from "axios";
 import { mutedText, primaryButtonClass } from "@/components/Game/GameUI";
+import { useT } from "@/lib/i18n/context";
 import {
   BackSquare,
   Steps,
@@ -27,16 +28,44 @@ const normalizeCode = (value: string) =>
     .slice(0, CODE_LENGTH);
 
 const JoinRoomForm = ({ joiningAs }: { joiningAs?: ReactNode }) => {
+  const t = useT();
   const router = useRouter();
   const mutation = useJoinRoomMutation();
   const [code, setCode] = useState("");
   const [focused, setFocused] = useState(false);
+  // The last code sent on its own, so a wrong one isn't retried by itself.
+  const [autoTried, setAutoTried] = useState("");
 
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (code.length < CODE_LENGTH) return;
+  // Typing always goes into the first empty box: the (invisible) caret sits
+  // at the end — on arriving here, coming back to the page, and every click.
+  const inputRef = useRef<HTMLInputElement>(null);
+  const caretToEnd = () => {
+    const el = inputRef.current;
+    if (!el) return;
+    if (document.activeElement !== el) el.focus();
+    const end = el.value.length;
+    // Only when it moved (setting it fires `select` again).
+    if (el.selectionStart !== end || el.selectionEnd !== end) {
+      el.setSelectionRange(end, end);
+    }
+  };
+  useEffect(() => {
+    caretToEnd();
+    const onReturn = () => {
+      if (document.visibilityState === "visible") caretToEnd();
+    };
+    window.addEventListener("pageshow", onReturn);
+    document.addEventListener("visibilitychange", onReturn);
+    return () => {
+      window.removeEventListener("pageshow", onReturn);
+      document.removeEventListener("visibilitychange", onReturn);
+    };
+  }, []);
+
+  const join = (gameCode: string) => {
+    if (gameCode.length < CODE_LENGTH || mutation.isPending) return;
     mutation.mutate(
-      { gameCode: code },
+      { gameCode },
       {
         onSuccess: (res) => {
           router.push(`/player/play/${res.playerId}`);
@@ -44,7 +73,7 @@ const JoinRoomForm = ({ joiningAs }: { joiningAs?: ReactNode }) => {
         onError: (err) => {
           if (isAxiosError(err) && err.response?.status === 401) {
             clearPlayerLocalSession();
-            toast.error("Your session expired. Create your player again.");
+            toast.error(t("Your session expired. Create your player again."));
             router.replace("/player");
             return;
           }
@@ -53,6 +82,48 @@ const JoinRoomForm = ({ joiningAs }: { joiningAs?: ReactNode }) => {
       },
     );
   };
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    join(code);
+  };
+
+  // The last character typed: check the code at once — a valid one goes on.
+  const onCodeChange = (value: string) => {
+    const next = normalizeCode(value);
+    setCode(next);
+    if (next.length === CODE_LENGTH && next !== autoTried) {
+      setAutoTried(next);
+      join(next);
+    }
+  };
+
+  // A letter or digit typed anywhere on the page goes into the code.
+  const typeIntoCode = useRef<(key: string) => void>(() => undefined);
+  useEffect(() => {
+    typeIntoCode.current = (key) => onCodeChange(code + key);
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = inputRef.current;
+      if (!el || e.target === el || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (!/^[a-z0-9]$/i.test(e.key)) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.isContentEditable ||
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement
+      ) {
+        return;
+      }
+      e.preventDefault();
+      el.focus();
+      typeIntoCode.current(e.key);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   const cursor = Math.min(code.length, CODE_LENGTH - 1);
 
@@ -68,15 +139,15 @@ const JoinRoomForm = ({ joiningAs }: { joiningAs?: ReactNode }) => {
       {joiningAs}
       <div>
         <h1 className="text-[32px] md:text-[44px] font-extrabold tracking-[-0.03em] leading-[1.06]">
-          Enter room code
+          {t("Enter room code")}
         </h1>
         <p className={clsx("mt-2.5 text-base", mutedText)}>
-          Enter the 6-character code provided by the admin.
+          {t("Enter the 6-character code provided by the admin.")}
         </p>
       </div>
       <div>
         <span className={joinLabelClass}>
-          Room code
+          {t("Room code")}
           <span className={joinCounterClass}>
             {code.length}/{CODE_LENGTH}
           </span>
@@ -85,15 +156,21 @@ const JoinRoomForm = ({ joiningAs }: { joiningAs?: ReactNode }) => {
           <input
             id="gameCode"
             value={code}
-            onChange={(e) => setCode(normalizeCode(e.target.value))}
-            onFocus={() => setFocused(true)}
+            onChange={(e) => onCodeChange(e.target.value)}
+            ref={inputRef}
+            onFocus={() => {
+              setFocused(true);
+              caretToEnd();
+            }}
             onBlur={() => setFocused(false)}
+            onClick={caretToEnd}
+            onSelect={caretToEnd}
             autoFocus
             autoCapitalize="characters"
             autoComplete="off"
             spellCheck={false}
             inputMode="text"
-            aria-label="Room code"
+            aria-label={t("Room code")}
             className="absolute inset-0 z-10 size-full opacity-0 text-base cursor-text"
           />
           <div
@@ -129,7 +206,7 @@ const JoinRoomForm = ({ joiningAs }: { joiningAs?: ReactNode }) => {
         className={clsx("flex items-center gap-2 text-[13.5px]", mutedText)}
       >
         <LuScanLine size={16} className="shrink-0" />
-        Got a QR code? Scan it with your camera to skip this step.
+        {t("Got a QR code? Scan it with your camera to skip this step.")}
       </span>
       <button
         type="submit"

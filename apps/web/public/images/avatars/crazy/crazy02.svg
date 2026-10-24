@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+<defs><pattern id="dots" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="6" cy="6" r="2.2" fill="#fff" opacity="0.28"/></pattern>
+<clipPath id="c"><circle cx="128" cy="128" r="128"/></clipPath></defs>
+<g clip-path="url(#c)"><rect width="256" height="256" fill="#7ed957"/><rect width="256" height="256" fill="url(#dots)"/>
+<circle cx="128" cy="140" r="92" fill="#e8a25c" stroke="#1b1530" stroke-width="7"/>
+<path d="M44 132 Q50 52 128 50 Q206 52 212 132 Q196 118 184 136 Q170 116 150 134 Q132 112 112 134 Q92 114 76 136 Q60 116 44 132 Z" fill="#ff7eb6" stroke="#1b1530" stroke-width="6"/>
+<circle cx="128" cy="146" r="22" fill="#9ad0ff" stroke="#1b1530" stroke-width="6"/>
+<rect x="70" y="80" width="14" height="5" rx="2.5" fill="#ffe14d" transform="rotate(20 70 80)"/><rect x="100" y="64" width="14" height="5" rx="2.5" fill="#7ed957" transform="rotate(-30 100 64)"/><rect x="150" y="66" width="14" height="5" rx="2.5" fill="#4fc3f7" transform="rotate(40 150 66)"/><rect x="180" y="90" width="14" height="5" rx="2.5" fill="#fff" transform="rotate(-10 180 90)"/><rect x="130" y="90" width="14" height="5" rx="2.5" fill="#b388ff" transform="rotate(70 130 90)"/>
+<circle cx="92" cy="186" r="16" fill="#fff" stroke="#1b1530" stroke-width="5"/><circle cx="98.6" cy="183.2" r="6.7" fill="#1b1530"/><circle cx="166" cy="186" r="16" fill="#fff" stroke="#1b1530" stroke-width="5"/><circle cx="159.0" cy="184.2" r="6.7" fill="#1b1530"/>
+<path d="M110 214 Q128 230 146 214" fill="none" stroke="#1b1530" stroke-width="6" stroke-linecap="round"/></g></svg>

@@ -2,9 +2,11 @@
 
 import clsx from "clsx";
 import Skeleton from "@/components/ui/Skeleton";
+import { useT } from "@/lib/i18n/context";
 import { useRecentDuelsQuery } from "@/lib/modules/duel/hooks";
 
 export default function DuelHistoryList({ limit }: { limit?: number }) {
+  const t = useT();
   const { data: duels, isPending, isError } = useRecentDuelsQuery(limit);
 
   if (isPending) {
@@ -22,16 +24,16 @@ export default function DuelHistoryList({ limit }: { limit?: number }) {
   if (isError) {
     return (
       <p className="text-dark dark:text-white">
-        Could not load your duels. Try again later.
+        {t("Could not load your duels. Try again later.")}
       </p>
     );
   }
   if (!duels || duels.length === 0) {
     return (
       <div className="border border-gray border-dashed rounded-lg p-6 text-center text-dark dark:text-white">
-        <p className="text-lg font-black">No duels played yet</p>
+        <p className="text-lg font-black">{t("No duels played yet")}</p>
         <p className="text-sm mt-2">
-          Play a duel and your results will show up here.
+          {t("Play a duel and your results will show up here.")}
         </p>
       </div>
     );
@@ -69,7 +71,9 @@ export default function DuelHistoryList({ limit }: { limit?: number }) {
               >
                 #{entry.rank}
               </span>
-              <span>{entry.score} pts</span>
+              <span>
+                {entry.score} {t("pts")}
+              </span>
               {eloDelta !== null && (
                 <span
                   className={clsx(
@@ -80,7 +84,7 @@ export default function DuelHistoryList({ limit }: { limit?: number }) {
                   )}
                 >
                   {eloDelta >= 0 ? "+" : ""}
-                  {eloDelta} elo
+                  {eloDelta} {t("elo")}
                 </span>
               )}
             </div>

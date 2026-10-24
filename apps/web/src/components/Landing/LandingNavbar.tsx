@@ -5,17 +5,23 @@ import Link from "next/link";
 import { LuGithub, LuMenu, LuX } from "react-icons/lu";
 import ClientImage from "@/components/ClientImage";
 import ThemeIconToggle from "./ThemeIconToggle";
+import { useInstance } from "@/lib/instance-context";
 import { GITHUB_LINK } from "./links";
-
-const navLinks = [
-  { name: "Pricing", href: "/pricing" },
-  { name: "Use cases", href: "/use-cases" },
-  { name: "Alternatives", href: "/alternatives" },
-  { name: "Docs", href: "/docs" },
-];
+import { useT } from "@/lib/i18n/context";
 
 const LandingNavbar = () => {
+  const t = useT();
   const [open, setOpen] = useState(false);
+  const { billing: BILLING_ENABLED, privateBuzz: PRIVATE_BUZZ } = useInstance();
+  // A private instance shows only a login link; the hosted site's pages are gone.
+  const navLinks = PRIVATE_BUZZ
+    ? [{ name: "Login", href: "/admin" }]
+    : [
+        ...(BILLING_ENABLED ? [{ name: "Pricing", href: "/pricing" }] : []),
+        { name: "Use cases", href: "/use-cases" },
+        { name: "Alternatives", href: "/alternatives" },
+        { name: "Docs", href: "/docs" },
+      ];
 
   return (
     <header className="sticky top-0 z-40 bg-light-bg/90 dark:bg-dark-bg/90 backdrop-blur border-b border-card-light dark:border-card-dark">
@@ -39,18 +45,20 @@ const LandingNavbar = () => {
               href={link.href}
               className="text-sm font-medium text-dark dark:text-gray hover:text-lprimary dark:hover:text-dprimary transition-colors"
             >
-              {link.name}
+              {t(link.name)}
             </Link>
           ))}
-          <a
-            href={GITHUB_LINK}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-1.5 text-sm font-medium text-dark dark:text-gray hover:text-lprimary dark:hover:text-dprimary transition-colors"
-          >
-            <LuGithub size={16} />
-            GitHub
-          </a>
+          {!PRIVATE_BUZZ && (
+            <a
+              href={GITHUB_LINK}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 text-sm font-medium text-dark dark:text-gray hover:text-lprimary dark:hover:text-dprimary transition-colors"
+            >
+              <LuGithub size={16} />
+              GitHub
+            </a>
+          )}
           <ThemeIconToggle />
         </div>
 
@@ -77,18 +85,20 @@ const LandingNavbar = () => {
               onClick={() => setOpen(false)}
               className="block py-3 text-sm font-medium text-dark dark:text-gray border-b border-card-light dark:border-card-dark"
             >
-              {link.name}
+              {t(link.name)}
             </Link>
           ))}
-          <a
-            href={GITHUB_LINK}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-1.5 py-3 text-sm font-medium text-dark dark:text-gray"
-          >
-            <LuGithub size={16} />
-            GitHub
-          </a>
+          {!PRIVATE_BUZZ && (
+            <a
+              href={GITHUB_LINK}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 py-3 text-sm font-medium text-dark dark:text-gray"
+            >
+              <LuGithub size={16} />
+              GitHub
+            </a>
+          )}
         </div>
       )}
     </header>

@@ -1,4 +1,5 @@
 import type { AxiosInstance } from "axios";
+import type { CreateGameSessionBody, QuestionStats } from "@buzrr/contract";
 import type {
   GameSession,
   Option,
@@ -15,7 +16,7 @@ import {
 
 export async function createGameSession(
   client: AxiosInstance,
-  body: { quizId: string },
+  body: CreateGameSessionBody,
 ) {
   const { data } = await client.post<{ id: string }>("/game-sessions", body);
   return data;
@@ -58,7 +59,11 @@ export type GameResult = {
   endedAt: string;
 };
 
-export type GameResultWithEntries = GameResult & { entries: GameResultEntry[] };
+export type GameResultWithEntries = GameResult & {
+  entries: GameResultEntry[];
+  /** How each question went; empty for games before the report existed. */
+  questions?: QuestionStats[];
+};
 
 export type AdminLobbyPayload = {
   room: GameSession;
@@ -132,6 +137,8 @@ export type PlayerPlayGame = GameSession & {
 export type PlayerPlayPayload = {
   player: Player;
   game: PlayerPlayGame | null;
+  /** The room's avatar skin: pictures the player may switch to. */
+  avatars?: string[];
 };
 
 export async function getPlayerPlay(client: AxiosInstance, playerId: string) {

@@ -3,6 +3,7 @@ import * as React from "react";
 import clsx from "clsx";
 import Modal from "@mui/material/Modal";
 import { LuPencil, LuPlus, LuX } from "react-icons/lu";
+import { useT } from "@/lib/i18n/context";
 import { mutedText } from "@/components/Game/GameUI";
 
 /**
@@ -20,17 +21,31 @@ export default function BasicModal(props: {
   subtitle?: string;
   children: React.ReactNode | ((close: () => void) => React.ReactNode);
   isEdit?: boolean;
+  /** The title's icon; default a pencil (`isEdit`) or a plus. */
+  icon?: React.ReactNode;
   /** Wider dialog on desktop (the question editor's two columns). */
   wide?: boolean;
   open?: boolean;
   onClose?: () => void;
+  /** A tap beside the dialog (or Escape) asks before closing — for forms
+   *  that would lose what was typed. */
+  confirmDismiss?: boolean;
 }) {
+  const t = useT();
   const [ownOpen, setOwnOpen] = React.useState(false);
   const controlled = props.open !== undefined;
   const open = controlled ? Boolean(props.open) : ownOpen;
   const handleOpen = () => setOwnOpen(true);
-  const handleClose = () =>
-    controlled ? props.onClose?.() : setOwnOpen(false);
+  const [asking, setAsking] = React.useState(false);
+  const handleClose = () => {
+    setAsking(false);
+    if (controlled) props.onClose?.();
+    else setOwnOpen(false);
+  };
+  // Backdrop / Escape: maybe ask first. The close button and the form's own
+  // "Done" close right away.
+  const handleDismiss = () =>
+    props.confirmDismiss ? setAsking(true) : handleClose();
   const id = React.useId();
   const titleId = `${id}-title`;
 
@@ -53,7 +68,7 @@ export default function BasicModal(props: {
 
       <Modal
         open={open}
-        onClose={handleClose}
+        onClose={handleDismiss}
         aria-labelledby={titleId}
         slotProps={{
           backdrop: {
@@ -64,9 +79,47 @@ export default function BasicModal(props: {
         <div
           className="fixed inset-0 flex items-end md:items-center justify-center md:p-6 outline-none"
           onClick={(e) => {
-            if (e.target === e.currentTarget) handleClose();
+            if (e.target === e.currentTarget) handleDismiss();
           }}
         >
+          {asking && (
+            <div
+              className="absolute inset-0 z-10 flex items-center justify-center p-6 bg-[rgba(10,8,20,0.35)]"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setAsking(false);
+              }}
+            >
+              <div
+                role="alertdialog"
+                aria-label={t("Close without saving?")}
+                className="w-full max-w-sm rounded-[20px] border bg-white dark:bg-dark border-lprimary/15 dark:border-white/10 p-5 shadow-xl text-dark dark:text-white"
+              >
+                <p className="text-lg font-bold">
+                  {t("Close without saving?")}
+                </p>
+                <p className={clsx("mt-1 text-sm", mutedText)}>
+                  {t("Your changes to this question will be lost.")}
+                </p>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    autoFocus
+                    onClick={() => setAsking(false)}
+                    className="rounded-xl border-2 border-lprimary dark:border-dprimary px-4 py-2 text-sm font-bold text-lprimary dark:text-dprimary cursor-pointer hover:bg-lprimary/10 dark:hover:bg-dprimary/10"
+                  >
+                    {t("Keep editing")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClose}
+                    className="rounded-xl bg-red-light dark:bg-red-dark px-4 py-2 text-sm font-bold text-white dark:text-dark cursor-pointer hover:opacity-90"
+                  >
+                    {t("Close without saving")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           <div
             className={clsx(
               "w-full max-h-[92dvh]",
@@ -76,7 +129,12 @@ export default function BasicModal(props: {
           >
             <div className="flex items-start gap-4 px-5 pt-[22px] md:px-7 md:pt-[26px]">
               <span className="size-12 shrink-0 rounded-[14px] bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep text-white flex items-center justify-center shadow-[0_10px_24px_-10px_#7c4ddb]">
-                {props.isEdit ? <LuPencil size={22} /> : <LuPlus size={24} />}
+                {props.icon ??
+                  (props.isEdit ? (
+                    <LuPencil size={22} />
+                  ) : (
+                    <LuPlus size={24} />
+                  ))}
               </span>
               <div className="min-w-0">
                 <h2
@@ -98,7 +156,7 @@ export default function BasicModal(props: {
               </div>
               <button
                 type="button"
-                aria-label="Close"
+                aria-label={t("Close")}
                 onClick={handleClose}
                 className={clsx(
                   "ml-auto size-9 shrink-0 rounded-[10px] flex items-center justify-center hover:bg-lprimary/8 dark:hover:bg-white/5 hover:text-dark dark:hover:text-white transition-colors cursor-pointer",

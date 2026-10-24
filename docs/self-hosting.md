@@ -68,8 +68,9 @@ Traefik) in front of both ports and use `https://` URLs here.
   registration: `AUTH_EMAIL_SIGNUP=OFF`.
 - Want Google sign-in as well? Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
   (redirect URI: `<PUBLIC_WEB_URL>/api/auth/callback/google`).
-- There is no email, so there is no "forgot password" yet — choose passwords
-  you'll keep. (A self-service reset for operators is future work.)
+- There is no email, so there is no "forgot password": a superadmin sets a new
+  password under user management (`/admin/superadmin/admins`), where they can
+  also create accounts while sign-up is closed.
 
 ### Making yourself an admin
 
@@ -84,7 +85,9 @@ docker compose exec postgres psql -U buzrr -c \
 ### Question images
 
 Stored on the `buzrr-uploads` volume by default and served by the API at
-`/uploads`. To use object storage instead, see `apps/server/.env.example`:
+`/uploads` — only through signed links that expire after 6 h, handed to the
+players of a game as a question opens and to signed-in users. To use object
+storage instead, see `apps/server/.env.example`:
 
 - **S3-compatible** (AWS S3, Cloudflare R2, Backblaze B2, SeaweedFS, Garage, …):
   `STORAGE_DRIVER=s3`, `S3_BUCKET`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`,
@@ -132,6 +135,68 @@ Knowledge Spaces needs a 768-dimension embedding model (`nomic-embed-text` is
 one); the service refuses others with a message saying so. Local models are
 slower and less reliable than hosted ones at following the quiz format — if a
 generation fails, try again or use a larger model.
+
+### Instance options
+
+Read by the web app on every request — `docker compose up -d` applies them, no
+rebuild:
+
+- `PRIVATE_BUZZ=ON` — a private instance: no marketing pages, a bare landing
+  page (1v1, join room, admin login), no donation prompts, footer links only
+  for signed-in users.
+- `TITLE` — the site name (browser title, app manifest); default Buzrr.
+- `CONTACT_EMAIL` — where "Contact us" points on a private instance (hidden
+  when unset).
+- `DUELS=OFF` — no 1v1 duels: no "Start 1v1", no public (duel pool) option on
+  quizzes, no duel stats; duel pages redirect home. Only the web app reads it.
+
+### Big rooms
+
+How many players fit in a room is set on the **server**:
+
+- `MAX_PLAYERS_NOBILLING` — without billing (the self-hosted default), every
+  host's room size (default `250`).
+- `MAX_PLAYERS_FREE` / `MAX_PLAYERS_PRO` — with `BILLING=ON`, per plan
+  (defaults `50` / `250`). A user's `hostSizeLimit` (database) can raise it
+  for one account.
+
+`DB_POOL_MAX` sets how many PostgreSQL connections one server process keeps
+open (default `10`, the `pg` driver's default). It matters when many players
+join at the same moment — a QR code on the screen: each join briefly takes the
+room's lock (so the room can't overfill) while holding a connection, and the
+joins of one room queue behind each other. With too small a pool, everything
+else the server does (sign-ins, the host's lobby, game results) waits behind
+that queue too, and the player count on the host screen seems stuck until the
+crowd is through. A bigger pool lets that work run alongside.
+
+Rough values for the largest crowd you expect to join **at once**:
+
+| Players joining at once | `DB_POOL_MAX`  |
+| ----------------------- | -------------- |
+| up to ~100              | `10` (default) |
+| ~100–300                | `20`           |
+| ~300–1000               | `30`–`50`      |
+
+Keep the sum of all pools under PostgreSQL's `max_connections` (default
+`100`), with room to spare: every server process × `DB_POOL_MAX`, plus the web
+app (about 10), plus a few for migrations and backups. More connections than
+that don't make joins faster — the room's lock serializes them anyway (a few
+milliseconds each, so 1000 joins take a few seconds) — they only keep the rest
+of the server responsive meanwhile.
+
+`MAX_PARALLEL_DOWNLOADS` (formerly `MAX_PARALLEL_AUDIO_DOWNLOADS`, still
+read) rations the downloads devices make ahead of time: at most that many
+devices per room fetch the next question's encrypted audio clips and picture
+at the same time (and, as a separate pool, the audio skin's files when they
+join),
+the others queue and start as slots free up (a device finishes, leaves, or
+sends no progress for 8 s). Unset or `0` = no limit. Without it, 500 phones
+start the same download within three seconds, and on a modest uplink many of
+them time out. Around `30` keeps each download fast; a 64 kbit/s clip is
+small, so the whole room is through in seconds. When the countdown is over
+and devices are still downloading, the host sees "Audio downloads: x of y
+done" and chooses: go on now, or wait until every download is done (instead
+of the usual 30 s limit).
 
 ## Upgrade
 
