@@ -114,7 +114,7 @@ model Quiz {
   thumbnail    String?
   /// Public quizzes feed the duel-mode question pool.
   isPublic     Boolean       @default(false)
-  /// Quiz settings (`quizSettingsSchema` in @buzrr/contract), e.g. live reactions.
+  /// Quiz settings (`quizSettingsSchema` in @buzrr/contract), e.g. moderated mode.
   settings     Json          @default("{}")
   gameResults  GameResult[]
   gameSessions GameSession[]
@@ -247,6 +247,10 @@ model GameSession {
   creatorId String
   gameCode  String   @unique
   isPlaying Boolean  @default(false)
+  /// This game's settings (`quizSettingsSchema`), chosen by the host when
+  /// opening the room; null = the quiz's. Read through `roomSettings`
+  /// (apps/server/src/common/game-look).
+  settings  Json?
   createdAt DateTime @default(now())
   creator   User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)

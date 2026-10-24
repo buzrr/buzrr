@@ -24,6 +24,14 @@ export const MIN_OPTIONS = 2;
 export const MAX_OPTIONS = 8;
 export const MIN_TIME_OUT = 5;
 export const DEFAULT_TIME_OUT = 15;
+/**
+ * "∞" time to answer: the question stays open until everyone answered or the
+ * host moves on, and opens without a countdown. Stored as this many seconds
+ * (an hour — the room's own lifetime bounds it anyway).
+ */
+export const UNLIMITED_TIME_OUT = 3600;
+export const isUnlimitedTime = (seconds: number | null | undefined) =>
+  (seconds ?? 0) >= UNLIMITED_TIME_OUT;
 
 const publicBase = z.object({
   id: z.string(),
@@ -437,6 +445,16 @@ export const SCORED_TYPES: readonly QuestionType[] = [
 
 export function isScoredType(type: QuestionType): boolean {
   return SCORED_TYPES.includes(type);
+}
+
+/**
+ * Whether a question's "show answer" step has anything to show: a right
+ * answer (the scored types). A poll, a word cloud, … skips it — moderated
+ * games go on from "time's up", where the host already sees how the room
+ * answered.
+ */
+export function revealHasPoint(question: { type: QuestionType }): boolean {
+  return isScoredType(question.type);
 }
 
 /** Rows written before Question.type existed — and any unset type — mean this. */

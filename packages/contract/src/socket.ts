@@ -22,10 +22,44 @@ export const gamePhaseSchema = z.enum([
   "reveal",
   "final",
   "ended",
+  // Moderated games only (see moderationSettingsSchema):
+  /** "Get ready" slide before a question, waiting for the host. */
+  "ready",
+  /** The question closed; the answer waits for the host's "show answer". */
+  "closed",
+  /** Standings after a question, shown on the host's "show scores". */
+  "scores",
 ]);
+
+/**
+ * Moderated mode (a quiz setting): the host steps the room through every
+ * question — get-ready slide, countdown, question, answer, scores. Each
+ * `confirm*` makes that step wait for the host instead of following on its
+ * own. Off by default.
+ */
+export const moderationSettingsSchema = z.object({
+  enabled: z.boolean().default(false),
+  /**
+   * The correct answer is always revealed (no longer an option): whatever an
+   * older quiz stored, this reads as true.
+   */
+  showAnswer: z
+    .boolean()
+    .default(true)
+    .transform(() => true as const),
+  /** The answer is revealed only when the host clicks "Show answer". */
+  confirmShowAnswer: z.boolean().default(true),
+  /** Show the standings after every question. */
+  showScores: z.boolean().default(true),
+  /** ...only when the host clicks "Show scores" (after the answer). */
+  confirmShowScores: z.boolean().default(true),
+  /** A "get ready" slide before the first question that the host starts. */
+  confirmNextQuestion: z.boolean().default(true),
+});
 
 /** `Quiz.settings`. Unknown/missing keys fall back to the defaults. */
 export const quizSettingsSchema = z.object({
+  moderation: moderationSettingsSchema.prefault({}),
   /** Players can send live reactions (👍 ❤️ 😂) that fly across the host screen. */
   reactions: z.boolean().default(true),
 });
@@ -44,7 +78,7 @@ export const reactionSchema = z.object({
     .refine((s) => /\p{Extended_Pictographic}/u.test(s), "Not an emoji"),
   /**
    * Meant for the player's row on the host's board (a right answer at the
-   * reveal): shown there, not only flown.
+   * reveal, or the scores step's top players): shown there, not only flown.
    */
   board: z.boolean().optional(),
 });
@@ -71,6 +105,14 @@ export interface ReactionLimitPayload {
 
 export const playerReactionSchema = reactionSchema.extend({
   playerId: z.string(),
+});
+
+/** A moderated game moved to a phase that has no payload event of its own. */
+export const phaseChangeSchema = z.object({
+  phase: gamePhaseSchema,
+  qIndex: z.number().int(),
+  /** "starting": time until the question opens (display only). */
+  remainingMs: z.number().optional(),
 });
 
 export const gameModeSchema = z.enum(["classic", "duel"]);
@@ -161,6 +203,9 @@ export const PLAYER_LEADERBOARD_TOP = 10;
  * renders no more rows than that.
  */
 export const HOST_LEADERBOARD_TOP = 50;
+
+/** On the scores step the top this many may each send one emoji, shown on their row. */
+export const SCORES_EMOJI_TOP = 20;
 
 export const leaderboardSchema = z.object({
   entries: z.array(leaderboardEntrySchema),
@@ -268,6 +313,8 @@ export const stateSyncSchema = z.object({
   players: z.array(rosterPlayerSchema),
   /** Present for player connections only. */
   you: answerResultSchema.optional(),
+  /** Present for moderated games. */
+  moderation: moderationSettingsSchema.optional(),
 });
 
 export const submitAnswerSchema = z.object({
@@ -335,7 +382,9 @@ export const removePlayerSchema = z.object({ id: z.string().min(1) });
 // -- inferred types -----------------------------------------------------------
 
 export type GamePhase = z.infer<typeof gamePhaseSchema>;
+export type ModerationSettings = z.infer<typeof moderationSettingsSchema>;
 export type QuizSettings = z.infer<typeof quizSettingsSchema>;
+export type PhaseChangePayload = z.infer<typeof phaseChangeSchema>;
 export type BubbleStatsPayload = z.infer<typeof bubbleStatsSchema>;
 export type ReactionPayload = z.infer<typeof reactionSchema>;
 export type PlayerReactionPayload = z.infer<typeof playerReactionSchema>;
@@ -377,6 +426,8 @@ export interface ServerToClientEvents {
   leaderboard: (payload: LeaderboardPayload) => void;
   "game-over": (payload: GameOverPayload) => void;
   "state-sync": (payload: StateSyncPayload) => void;
+  /** Moderated games: ready / starting (countdown) / closed / scores. */
+  "phase-change": (payload: PhaseChangePayload) => void;
   /** Host only: a waiting player's bubble mini-game totals. */
   /**
    * Host only: the bubble totals of every player that changed since the
@@ -400,8 +451,15 @@ export interface ServerToClientEvents {
   "player-removed": (player: PlayerRemovedPayload) => void;
   /** A player left on their own (distinct from a host kick / player-removed). */
   "player-left": (player: PlayerPayload) => void;
-  /** `remainingMs`: time until the first question opens (display only). */
-  "game-started": (payload: { remainingMs: number }) => void;
+  /**
+   * `remainingMs`: time until the first question opens (display only; 0 for a
+   * moderated game that starts on its get-ready slide). `moderation`: present
+   * for moderated games.
+   */
+  "game-started": (payload: {
+    remainingMs: number;
+    moderation?: ModerationSettings;
+  }) => void;
   /** Terminal signal for players: the room is gone, stop rendering it. */
   "game-session-ended": () => void;
 }

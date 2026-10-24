@@ -1,3 +1,4 @@
+import { roomSettings } from "../../common/game-look/game-look";
 import {
   ForbiddenException,
   Injectable,
@@ -5,12 +6,12 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { Prisma } from "@buzrr/prisma";
+import type { CreateGameSession } from "@buzrr/contract";
 import { customAlphabet } from "nanoid";
 import { EntitlementsService } from "../billing/entitlements.service";
 import { GameEngineService } from "../game-engine/game-engine.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
-import { CreateRoomDto } from "./dto/create-room.dto";
 import { JoinRoomDto } from "./dto/join-room.dto";
 import { OPTION_ORDER } from "../../common/utils/option-order";
 
@@ -117,15 +118,26 @@ export class GameSessionsService {
     return { roomId: game.id, playerId };
   }
 
+  /**
+   * Opens a room for a quiz the user owns. `settings` (already validated by
+   * `createGameSessionSchema`) are this game's own.
+   */
   async createRoom(
     user: AuthUser,
-    dto: CreateRoomDto,
+    dto: CreateGameSession,
   ): Promise<{ id: string }> {
     const quiz = await this.prisma.db.quiz.findFirst({
       where: { id: dto.quizId, userId: user.userId },
     });
     if (!quiz) {
       throw new NotFoundException("Unauthorized or quiz not found");
+    }
+    // Only the owner gets this far, so they may also make them the default.
+    if (dto.settings && dto.saveAsDefault) {
+      await this.prisma.db.quiz.update({
+        where: { id: quiz.id },
+        data: { settings: dto.settings },
+      });
     }
     const maxAttempts = 5;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -136,6 +148,7 @@ export class GameSessionsService {
             gameCode,
             quizId: dto.quizId,
             creatorId: user.userId,
+            ...(dto.settings ? { settings: dto.settings } : {}),
           },
         });
         return { id: room.id };
@@ -372,7 +385,16 @@ export class GameSessionsService {
     if (!quiz) {
       throw new NotFoundException("Quiz not found");
     }
-    return { room, players, quiz, maxPlayers, plan };
+    return {
+      room,
+      players,
+      quiz: {
+        ...quiz,
+        settings: roomSettings({ settings: room.settings, quiz }),
+      },
+      maxPlayers,
+      plan,
+    };
   }
 
   async getPlayerPlayContext(playerId: string) {
@@ -385,7 +407,16 @@ export class GameSessionsService {
     if (!player.gameId) {
       return { player, game: null };
     }
-    const game = await this.loadGameForPlay(player.gameId);
+    const loaded = await this.loadGameForPlay(player.gameId);
+    if (!loaded) return { player, game: null };
+    const { settings, ...session } = loaded;
+    const game = {
+      ...session,
+      quiz: {
+        ...session.quiz,
+        settings: roomSettings({ settings, quiz: session.quiz }),
+      },
+    };
     return { player, game };
   }
 

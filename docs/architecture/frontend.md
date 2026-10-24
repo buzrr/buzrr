@@ -31,7 +31,7 @@ ReduxProvider → QueryProvider → Vercel Analytics and the SEO metadata.
 
 Classic-mode navigation sequences (duel flow: [duels.md](duels.md#client-side-flow-web)):
 
-- **Host**: `/admin` (quiz list) → quiz detail → host → `POST /game-sessions`
+- **Host**: `/admin` (quiz list) → quiz detail → "Host quiz" (settings dialog) → `POST /game-sessions`
   → `/admin/play/[roomId]` (lobby; `roomId` = GameSession id) → start-game →
   `/admin/game/[roomId]` (live; the final leaderboard renders here in place —
   no auto-navigation on game over). The durable result is reached later from

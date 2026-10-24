@@ -10,6 +10,7 @@ import {
   applySync,
   gameOver,
   gameStarted,
+  phaseChange,
   reactionBudgetKnown,
   leaderboardReceived,
   playerConnection,
@@ -127,6 +128,7 @@ export function useGameSocket({
 
     conn.on("state-sync", (payload) => dispatch(applySync(payload)));
     conn.on("game-started", (payload) => dispatch(gameStarted(payload)));
+    conn.on("phase-change", (payload) => dispatch(phaseChange(payload)));
     // The reaction budget (and the room's size) — kept in the store, so a
     // reaction bar mounted later (the final standings') still knows it.
     conn.on("reaction-limit", (p) => dispatch(reactionBudgetKnown(p)));

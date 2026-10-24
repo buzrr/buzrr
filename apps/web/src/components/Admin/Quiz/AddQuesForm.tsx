@@ -26,7 +26,9 @@ import {
   MAX_OPTIONS,
   MAX_POLL_OPTIONS,
   TYPE_ANSWER_MAX_LENGTH,
+  UNLIMITED_TIME_OUT,
   answerPattern,
+  isUnlimitedTime,
   MIN_OPTIONS,
   MIN_POLL_OPTIONS,
   RATING_LABEL_MAX,
@@ -109,14 +111,18 @@ function timeRangeFor(type: QuestionType) {
 }
 
 const clampTime = (t: number, type: QuestionType) => {
+  if (isUnlimitedTime(t)) return UNLIMITED_TIME_OUT;
   const { min, max } = timeRangeFor(type);
   return Math.min(max, Math.max(min, t));
 };
 
 const isSliderTime = (type: QuestionType, t?: number) => {
   const { min, max } = timeRangeFor(type);
-  return t === undefined || (t >= min && t <= max);
+  return t === undefined || isUnlimitedTime(t) || (t >= min && t <= max);
 };
+
+/** The slider's last step past the range: no time limit ("∞"). */
+const SLIDER_UNLIMITED_STEP = 5;
 const OPTION_TYPES: QuestionType[] = ["multiple_choice", "true_false", "poll"];
 
 const blankOptions = (n: number): AuthoredOption[] =>
@@ -294,9 +300,11 @@ function configFor(v: FormValues): Record<string, unknown> {
 
 /** The one-line recap in the footer. */
 function summaryOf(v: FormValues): ReactNode {
-  const secs = `${Number(v.time) || DEFAULT_QUESTION_TIMEOUT}s to answer`;
-  const strong = (t: string) => (
-    <b className="text-dark dark:text-white">{t}</b>
+  const secs = isUnlimitedTime(Number(v.time))
+    ? "no time limit"
+    : `${Number(v.time) || DEFAULT_QUESTION_TIMEOUT}s to answer`;
+  const strong = (text: string) => (
+    <b className="text-dark dark:text-white">{text}</b>
   );
   switch (v.type) {
     case "multiple_choice": {
@@ -339,7 +347,9 @@ function summaryOf(v: FormValues): ReactNode {
           {strong("Word cloud")} · not scored ·{" "}
           {v.multipleSubmissions
             ? "multiple submissions"
-            : `${v.cloudMaxAnswers} ${v.cloudMaxAnswers === 1 ? "answer" : "answers"} each`}
+            : v.cloudMaxAnswers === 1
+              ? `${v.cloudMaxAnswers} answer each`
+              : `${v.cloudMaxAnswers} answers each`}
         </>
       );
     case "rating":
@@ -353,8 +363,9 @@ function summaryOf(v: FormValues): ReactNode {
     case "open_text":
       return (
         <>
-          {strong("Open text")} · not scored · up to {v.textMaxLength} chars
-          {v.multipleSubmissions ? " · multiple submissions" : ""}
+          {strong("Open text")} · not scored · up to {v.textMaxLength}{" "}
+          characters
+          {v.multipleSubmissions ? ` · multiple submissions` : ""}
         </>
       );
   }
@@ -1290,7 +1301,7 @@ const AddQuesForm = (props: {
               name="time"
               control={control}
               render={({ field, fieldState }) => {
-                const t = Number(field.value) || 0;
+                const secs = Number(field.value) || 0;
                 const range = timeRangeFor(type);
                 return (
                   <div
@@ -1312,7 +1323,7 @@ const AddQuesForm = (props: {
                           setCustomTime(mode === "Custom");
                           if (mode === "Slider") {
                             field.onChange(
-                              clampTime(t || range.fallback, type),
+                              clampTime(secs || range.fallback, type),
                             );
                           }
                         }}
@@ -1349,25 +1360,41 @@ const AddQuesForm = (props: {
                     ) : (
                       <div className="flex items-center gap-3.5">
                         <span className="shrink-0 w-[58px] text-[22px] font-extrabold tracking-[-0.02em] leading-none text-lprimary dark:text-dprimary">
-                          {t}
-                          <small
-                            className={clsx(
-                              "ml-[3px] text-[13px] font-semibold",
-                              mutedText,
-                            )}
-                          >
-                            sec
-                          </small>
+                          {isUnlimitedTime(secs) ? "∞" : secs}
+                          {!isUnlimitedTime(secs) && (
+                            <small
+                              className={clsx(
+                                "ml-[3px] text-[13px] font-semibold",
+                                mutedText,
+                              )}
+                            >
+                              sec
+                            </small>
+                          )}
                         </span>
                         <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                           <RangeSlider
                             label="Seconds to answer"
                             min={range.min}
-                            max={range.max}
-                            value={clampTime(t, type)}
-                            onChange={field.onChange}
-                            ticks={range.ticks}
+                            max={range.max + SLIDER_UNLIMITED_STEP}
+                            value={
+                              isUnlimitedTime(secs)
+                                ? range.max + SLIDER_UNLIMITED_STEP
+                                : clampTime(secs, type)
+                            }
+                            onChange={(v) =>
+                              field.onChange(
+                                v > range.max ? UNLIMITED_TIME_OUT : v,
+                              )
+                            }
+                            ticks={[...range.ticks, "∞"]}
                           />
+                          {isUnlimitedTime(secs) && (
+                            <span className={clsx("text-xs", mutedText)}>
+                              No time limit and no countdown: the question stays
+                              open until everyone answered or you move on.
+                            </span>
+                          )}
                         </div>
                       </div>
                     )}

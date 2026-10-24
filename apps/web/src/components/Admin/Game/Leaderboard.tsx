@@ -173,103 +173,106 @@ export default function LeaderBoard({
   const rest = leaderboard;
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-2 gap-3.5 md:gap-5 md:pb-[18px]">
-      <section
-        className={clsx(
-          panelClass,
-          "flex flex-col gap-5 p-5 md:p-[30px] md:min-h-0",
-        )}
-      >
-        <div>
-          <span className={labelClass}>Final results</span>
-          <h2 className="mt-2 text-[26px] md:text-[34px] font-extrabold tracking-[-0.02em] leading-[1.1]">
-            Thank you for joining!
-          </h2>
-          <p className={clsx("mt-2 text-[15px]", mutedText)}>
-            {quizTitle} ·{" "}
-            {qCount === 1 ? `${qCount} question` : `${qCount} questions`} ·{" "}
-            {playerCount === 1
-              ? `${playerCount} player`
-              : `${playerCount} players`}
-          </p>
-        </div>
-        <div className="flex-1 grid grid-cols-[1fr_1.15fr_1fr] gap-3 items-end min-h-0">
-          <PodiumSpot entries={onPlace(2)} place={2} />
-          <PodiumSpot entries={onPlace(1)} place={1} />
-          <PodiumSpot entries={onPlace(3)} place={3} />
-        </div>
-        <div className="flex flex-col-reverse md:flex-row md:flex-wrap md:items-center gap-3 md:justify-end pt-[18px] border-t border-lprimary/15 dark:border-white/10 [&>button]:w-full md:[&>button]:w-auto">
-          {leaving && (
-            <span className={clsx("text-sm", mutedText)}>
-              Small game — back to the quiz in a few seconds.{" "}
-              <button
-                type="button"
-                onClick={() => setStay(true)}
-                className="font-semibold text-lprimary dark:text-dprimary hover:underline cursor-pointer"
-              >
-                Stay here
-              </button>
-            </span>
+    <div className="flex-1 min-h-0 flex flex-col">
+      <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-2 gap-3.5 md:gap-5">
+        <section
+          className={clsx(
+            panelClass,
+            "flex flex-col gap-5 p-5 md:p-[30px] md:min-h-0",
           )}
-          <EndQuizButton
-            roomId={roomId}
-            redirectTo="/admin"
-            alreadyEnded={alreadyEnded}
-            primaryLabel="Back to quizzes"
-          />
-        </div>
-      </section>
-
-      <section
-        className={clsx(
-          panelClass,
-          "flex flex-col md:min-h-0 md:overflow-hidden",
-        )}
-      >
-        <div className="flex items-center justify-between px-5 md:px-[26px] pt-5 md:pt-6 pb-3.5">
-          <h3 className="text-xl md:text-[22px] font-bold">Full rankings</h3>
-          <span className={clsx("text-[13.5px]", mutedText)}>
-            {playerCount === 1
-              ? `${playerCount} player`
-              : `${playerCount} players`}
-          </span>
-        </div>
-        <div className="md:flex-1 md:min-h-0 md:overflow-y-auto px-3 md:px-[18px] pb-4 flex flex-col gap-1.5">
-          {rest.map((lead) => (
-            <div
-              key={lead.playerId}
-              className="flex items-center gap-3 md:gap-[13px] rounded-[14px] border border-transparent px-2.5 py-[9px] transition-colors hover:bg-light-bg dark:hover:bg-card-dark hover:border-lprimary/15 dark:hover:border-white/5"
-            >
-              <span
-                className={clsx(
-                  "size-[30px] shrink-0 rounded-[9px] flex items-center justify-center text-sm font-bold",
-                  rankBadgeClass(lead.rank),
-                )}
-              >
-                {lead.rank}
-              </span>
-              <Image
-                src={lead.profilePic || DEFAULT_AVATAR}
-                className="size-9 shrink-0 rounded-full object-cover"
-                width={36}
-                height={36}
-                alt=""
-              />
-              <span className="flex-1 min-w-0 truncate text-[15px] font-semibold">
-                {lead.name}
-              </span>
-              <span className="min-w-16 text-right text-base font-bold tabular-nums">
-                {lead.score.toLocaleString()}
-              </span>
-            </div>
-          ))}
-          {rest.length === 0 && (
-            <p className={clsx("text-center text-sm py-10", mutedText)}>
-              No players finished this quiz.
+        >
+          <div>
+            <span className={labelClass}>Final results</span>
+            <h2 className="mt-2 text-[26px] md:text-[34px] font-extrabold tracking-[-0.02em] leading-[1.1]">
+              Thank you for joining!
+            </h2>
+            <p className={clsx("mt-2 text-[15px]", mutedText)}>
+              {quizTitle} ·{" "}
+              {qCount === 1 ? `${qCount} question` : `${qCount} questions`} ·{" "}
+              {playerCount === 1
+                ? `${playerCount} player`
+                : `${playerCount} players`}
             </p>
+          </div>
+          <div className="flex-1 grid grid-cols-[1fr_1.15fr_1fr] gap-3 items-end min-h-0">
+            <PodiumSpot entries={onPlace(2)} place={2} />
+            <PodiumSpot entries={onPlace(1)} place={1} />
+            <PodiumSpot entries={onPlace(3)} place={3} />
+          </div>
+        </section>
+
+        <section
+          className={clsx(
+            panelClass,
+            "flex flex-col md:min-h-0 md:overflow-hidden",
           )}
-        </div>
-      </section>
+        >
+          <div className="flex items-center justify-between px-5 md:px-[26px] pt-5 md:pt-6 pb-3.5">
+            <h3 className="text-xl md:text-[22px] font-bold">Full rankings</h3>
+            <span className={clsx("text-[13.5px]", mutedText)}>
+              {playerCount === 1
+                ? `${playerCount} player`
+                : `${playerCount} players`}
+            </span>
+          </div>
+          <div className="md:flex-1 md:min-h-0 md:overflow-y-auto px-3 md:px-[18px] pb-4 flex flex-col gap-1.5">
+            {rest.map((lead) => (
+              <div
+                key={lead.playerId}
+                className="flex items-center gap-3 md:gap-[13px] rounded-[14px] border border-transparent px-2.5 py-[9px] transition-colors hover:bg-light-bg dark:hover:bg-card-dark hover:border-lprimary/15 dark:hover:border-white/5"
+              >
+                <span
+                  className={clsx(
+                    "size-[30px] shrink-0 rounded-[9px] flex items-center justify-center text-sm font-bold",
+                    rankBadgeClass(lead.rank),
+                  )}
+                >
+                  {lead.rank}
+                </span>
+                <Image
+                  src={lead.profilePic || DEFAULT_AVATAR}
+                  className="size-9 shrink-0 rounded-full object-cover"
+                  width={36}
+                  height={36}
+                  alt=""
+                />
+                <span className="flex-1 min-w-0 truncate text-[15px] font-semibold">
+                  {lead.name}
+                </span>
+                <span className="min-w-16 text-right text-base font-bold tabular-nums">
+                  {lead.score.toLocaleString()}
+                </span>
+              </div>
+            ))}
+            {rest.length === 0 && (
+              <p className={clsx("text-center text-sm py-10", mutedText)}>
+                No players finished this quiz.
+              </p>
+            )}
+          </div>
+        </section>
+      </div>
+      {/* Same place as "Next question": the very bottom of the screen. */}
+      <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-3 py-3 bg-light-bg/90 dark:bg-dark-bg/90 backdrop-blur [&>button]:w-full md:[&>button]:w-auto md:[&>button]:min-w-80">
+        {leaving && (
+          <span className={clsx("text-sm", mutedText)}>
+            Small game — back to the quiz in a few seconds.{" "}
+            <button
+              type="button"
+              onClick={() => setStay(true)}
+              className="font-semibold text-lprimary dark:text-dprimary hover:underline cursor-pointer"
+            >
+              Stay here
+            </button>
+          </span>
+        )}
+        <EndQuizButton
+          roomId={roomId}
+          redirectTo="/admin"
+          alreadyEnded={alreadyEnded}
+          primaryLabel="Back to quizzes"
+        />
+      </div>
     </div>
   );
 }

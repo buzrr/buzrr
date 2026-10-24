@@ -19,7 +19,7 @@ Measures:
   - request-sync -> state-sync round trip (lobby, a few probe bots every 10 s)
   - submit-answer ack latency (accepted / rejected by reason)
   - broadcast spread: how far apart the players received question-start /
-    question-end for the same question
+    question-end / phase-change for the same question
   - downloads: latency and bytes per kind
 
 Usage:
@@ -95,7 +95,7 @@ EMOJI_POOL = [
     "🥳", "🤯", "🙈", "😬", "🤩", "😇", "👍", "❤️", "🔥", "🎉", "👏",
 ]
 # Phases in which the player screen shows the reaction bar (inline in the lobby).
-REACTION_PHASES = {"idle", "lobby", "starting", "question", "reveal", "final"}
+REACTION_PHASES = {"idle", "lobby", "starting", "question", "reveal", "closed", "scores", "ready", "final"}
 
 
 # -- metrics -------------------------------------------------------------------
@@ -441,6 +441,11 @@ class Bot:
         async def _started(_data=None):
             self.set_phase("starting")
             M.recv[("game-started", 0)].append(time.time())
+
+        @s.on("phase-change")
+        async def _phase(data):
+            self.set_phase(data["phase"])
+            M.recv[(f"phase-change:{data['phase']}", data["qIndex"])].append(time.time())
 
         @s.on("reaction-limit")
         async def _react_limit(data):

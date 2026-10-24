@@ -1,5 +1,7 @@
 "use client";
 
+import { isUnlimitedTime } from "@buzrr/contract";
+
 import clsx from "clsx";
 import { useId, type ReactNode } from "react";
 import ConnectionStatusPill from "@/components/ConnectionStatusPill";
@@ -35,6 +37,10 @@ export const counterClass =
 export const primaryButtonClass =
   "flex items-center justify-center gap-2.5 whitespace-nowrap rounded-[14px] px-[30px] py-3.5 text-base font-bold text-white bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep shadow-[0_10px_24px_-10px_#7c4ddb] transition-[filter,transform] hover:brightness-108 active:translate-y-px cursor-pointer disabled:opacity-50 disabled:cursor-default disabled:hover:brightness-100";
 
+/** Host bar's red action (skip / end), same shape as the primary button. */
+export const dangerButtonClass =
+  "flex items-center justify-center gap-2.5 whitespace-nowrap rounded-[14px] px-[26px] py-3.5 text-base font-bold text-white bg-red-light dark:bg-red-dark dark:text-dark shadow-[0_10px_24px_-10px_#e5544e] transition-[filter,transform] hover:brightness-108 active:translate-y-px cursor-pointer disabled:opacity-50 disabled:cursor-default";
+
 export function OptionKey({
   index,
   className,
@@ -56,34 +62,35 @@ export function OptionKey({
   );
 }
 
-function Progress({
+export function Progress({
   qIndex,
   qCount,
   final,
+  compact = false,
 }: {
   qIndex: number;
   qCount: number;
   final?: boolean;
+  /** Host header: just "Question x of y" and a short bar. */
+  compact?: boolean;
 }) {
   const current = qIndex + 1;
-  const segmented = qCount <= 15;
+  const segmented = qCount <= 15 && !compact;
   return (
     <div
       className={clsx(
         "flex items-center gap-3.5 rounded-[14px] border px-3.5 py-[7px] bg-white dark:bg-dark border-lprimary/15 dark:border-white/5",
-        "flex-1 min-w-0 md:flex-none md:justify-start",
+        compact ? "shrink-0" : "flex-1 min-w-0 md:flex-none md:justify-start",
       )}
     >
       <span className="text-[13.5px] font-semibold whitespace-nowrap">
         {final ? (
           <>
-            Quiz <b className="text-lprimary dark:text-dprimary">complete</b>
+            <b className="text-lprimary dark:text-dprimary">Quiz complete</b>
           </>
         ) : (
           <>
-            Question{" "}
-            <b className="text-lprimary dark:text-dprimary">{current}</b> of{" "}
-            {qCount}
+            Question {current} of {qCount}
           </>
         )}
       </span>
@@ -107,7 +114,9 @@ function Progress({
       {/* Continuous bar on mobile (and on desktop for long quizzes). */}
       <span
         className={clsx(
-          "h-1.5 flex-1 md:flex-none md:w-28 rounded bg-lprimary/10 dark:bg-white/10 overflow-hidden",
+          compact
+            ? "h-1.5 w-16 md:w-20 rounded bg-lprimary/10 dark:bg-white/10 overflow-hidden"
+            : "h-1.5 flex-1 md:flex-none md:w-28 rounded bg-lprimary/10 dark:bg-white/10 overflow-hidden",
           segmented && "md:hidden",
         )}
         aria-hidden="true"
@@ -117,14 +126,16 @@ function Progress({
           style={{ width: `${final ? 100 : (current / qCount) * 100}%` }}
         />
       </span>
-      <span
-        className={clsx(
-          "hidden md:inline text-[12.5px] whitespace-nowrap",
-          mutedText,
-        )}
-      >
-        {final ? `${qCount} of ${qCount}` : `${qCount - current} left`}
-      </span>
+      {!compact && (
+        <span
+          className={clsx(
+            "hidden md:inline text-[12.5px] whitespace-nowrap",
+            mutedText,
+          )}
+        >
+          {final ? `${qCount} of ${qCount}` : `${qCount - current} left`}
+        </span>
+      )}
     </div>
   );
 }
@@ -187,8 +198,14 @@ export function TimerRing({
   const gradientId = `ring-grad-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const r = 44;
   const c = 2 * Math.PI * r;
-  const low = value <= 5;
-  const frac = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
+  // No time limit: a full ring with "∞".
+  const unlimited = isUnlimitedTime(max);
+  const low = !unlimited && value <= 5;
+  const frac = unlimited
+    ? 1
+    : max > 0
+      ? Math.max(0, Math.min(1, value / max))
+      : 0;
   return (
     <div className={clsx("relative shrink-0", className)}>
       <svg viewBox="0 0 100 100" className="block size-full -rotate-90">
@@ -227,9 +244,9 @@ export function TimerRing({
             valueClassName,
           )}
         >
-          {value}
+          {unlimited ? "∞" : value}
         </b>
-        {label && (
+        {label && !unlimited && (
           <span className={clsx("text-[13px] font-medium mt-1", mutedText)}>
             {label}
           </span>
@@ -249,8 +266,13 @@ export function TimerBar({
   max: number;
   className?: string;
 }) {
-  const low = value <= 5;
-  const frac = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
+  const unlimited = isUnlimitedTime(max);
+  const low = !unlimited && value <= 5;
+  const frac = unlimited
+    ? 1
+    : max > 0
+      ? Math.max(0, Math.min(1, value / max))
+      : 0;
   return (
     <div
       role="timer"
@@ -272,7 +294,7 @@ export function TimerBar({
           low && "text-[#e5544e]",
         )}
       >
-        {Math.ceil(value)}s
+        {unlimited ? "∞" : `${Math.ceil(value)}s`}
       </b>
     </div>
   );

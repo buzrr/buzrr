@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { AnimatedNumber } from "@/components/Game/motion";
 import { ReactionOverlay, useFlyers } from "@/components/Game/Flyers";
+import HostHeader from "@/components/Admin/Game/HostHeader";
 import {
   LuBan,
   LuCheck,
@@ -324,27 +325,19 @@ const Lobby = (params: {
       .catch(() => toast.error("Failed to copy"));
   }
 
-  const startDisabled = players.length === 0 || load || !socket?.connected;
+  // Starting with nobody in the room is fine (a rehearsal, a presentation).
+  // `socket.connected` doesn't re-render when it flips; the slice's
+  // connection status does (with nobody joining, nothing else would).
+  const connection = useAppSelector((state) => state.game.connection);
+  const startDisabled = load || !socket || connection !== "connected";
 
   return (
-    <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 pb-4 md:pb-0 md:h-[calc(100dvh-10rem)] text-dark dark:text-white">
-      <div className="flex flex-wrap md:flex-nowrap items-center gap-2.5 md:gap-[18px] py-3.5 md:py-[18px] shrink-0">
-        <ConnectionStatusPill className="!shadow-none !text-[13px] !font-semibold !px-3 !py-1.5 !border-lprimary/15 dark:!border-white/10 !bg-white dark:!bg-white/5" />
-        <div className="order-last md:order-none basis-full md:basis-auto flex-1 min-w-0 flex flex-col md:flex-row md:items-baseline gap-0.5 md:gap-3">
-          <h1 className="text-[22px] md:text-2xl font-bold tracking-[-0.01em] truncate">
-            {params?.quizTitle}
-          </h1>
-          <span className="text-sm text-off-dark dark:text-muted-dark whitespace-nowrap">
-            Waiting for players
-          </span>
-        </div>
-        <span className="flex-1 md:hidden" />
-        <EndQuizButton
-          inline
-          roomId={params.roomId}
-          redirectTo={`/admin/quiz/${params.quizId}`}
-        />
-      </div>
+    <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 -mb-12 pb-4 md:pb-0 md:h-[100dvh] text-dark dark:text-white">
+      <HostHeader
+        title={params.quizTitle}
+        roomId={params.roomId}
+        endRedirect={`/admin/quiz/${params.quizId}`}
+      />
 
       <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3.5 md:gap-5 pb-0 md:pb-[18px]">
         <section className="rounded-3xl border bg-white dark:bg-dark border-lprimary/15 dark:border-white/5 flex flex-col gap-4 md:gap-3.5 [@media(min-height:900px)]:md:gap-5 p-[18px] md:p-[22px] [@media(min-height:900px)]:md:p-[26px] md:min-h-0 md:overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -549,7 +542,11 @@ const Lobby = (params: {
               className="flex items-center justify-center gap-2.5 whitespace-nowrap rounded-[14px] px-[30px] py-3.5 text-base font-bold text-white bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep shadow-[0_10px_24px_-10px_#7c4ddb] transition-[filter,transform] hover:brightness-108 active:translate-y-px cursor-pointer disabled:opacity-50 disabled:cursor-default disabled:hover:brightness-100"
             >
               <LuPlay size={17} className="fill-current" />
-              {load ? "Loading..." : "Start Game"}
+              {load
+                ? "Loading..."
+                : players.length === 0
+                  ? "Start without players"
+                  : "Start Game"}
             </button>
           </div>
         </section>

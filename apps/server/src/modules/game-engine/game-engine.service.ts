@@ -9,6 +9,7 @@ import {
   HOST_LEADERBOARD_TOP,
   PLAYER_LEADERBOARD_TOP,
 } from "@buzrr/contract";
+import { roomSettings } from "../../common/game-look/game-look";
 import { signAssetsDeep } from "../../common/storage/asset-signing";
 import type { GameOverPayload, QuestionAnswer } from "@buzrr/contract";
 import type { DuelOutcome, Prisma } from "@buzrr/prisma";
@@ -264,6 +265,15 @@ export class GameEngineService
       case "game-started":
         target.emit("game-started", {
           remainingMs: Math.max(0, message.deadline - Date.now()),
+          ...(message.moderation ? { moderation: message.moderation } : {}),
+        });
+        break;
+      case "phase-change":
+        target.emit("phase-change", {
+          ...message.payload,
+          ...(message.deadline !== undefined
+            ? { remainingMs: Math.max(0, message.deadline - Date.now()) }
+            : {}),
         });
         break;
       case "question-start":
@@ -438,7 +448,12 @@ export class GameEngineService
 
   async startGame(gameCode: string): Promise<void> {
     const state = await this.store.loadState(gameCode, PARTS_FOR.start);
-    if (!state || state.meta.phase !== "lobby") return;
+    if (!state || state.meta.phase !== "lobby") {
+      this.logger.warn(
+        `Start of ${gameCode} ignored: ${state ? `phase ${state.meta.phase}` : "no live state"}`,
+      );
+      return;
+    }
 
     const session = await this.prisma.db.gameSession.findUnique({
       where: { gameCode },
@@ -472,9 +487,18 @@ export class GameEngineService
       );
     }
 
+    // Moderated mode comes from the room's settings (invalid → unmoderated).
+    const settings = roomSettings(session);
+    const moderation = settings.moderation;
+
     const { effects } = step(
       state,
-      { type: "start", questions, quizTitle: session.quiz.title },
+      {
+        type: "start",
+        questions,
+        quizTitle: session.quiz.title,
+        moderation: moderation?.enabled ? moderation : null,
+      },
       Date.now(),
     );
     await this.run(gameCode, effects);

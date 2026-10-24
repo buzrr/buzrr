@@ -38,10 +38,6 @@ export const updatePlayerNameSchema = z.object({
     .regex(/^[a-zA-Z0-9_]*$/),
 });
 
-export const hostQuizSchema = z.object({
-  quizId: z.string().min(1),
-});
-
 const authoredOption = z.object({
   title: z.string(),
   isCorrect: z.boolean(),

@@ -244,7 +244,7 @@ export function ReactionBar({
   inline?: boolean;
   /**
    * One emoji for the player's row on the host's board (a right answer at
-   * the reveal), then the bar goes.
+   * the reveal, the scores step's top players), then the bar goes.
    */
   oneShot?: boolean;
   onSent?: () => void;

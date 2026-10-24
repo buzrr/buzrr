@@ -9,6 +9,7 @@ import reducer, {
   applySync,
   gameOver,
   gameProgress,
+  gameStarted,
   reactionBudgetKnown,
   liveSummary,
   questionEnd,
@@ -281,6 +282,42 @@ describe("standing", () => {
         applySync(sync({ phase: "question", qIndex: 0, you: result(1, 0) })),
       ).standing,
     ).toBeNull();
+  });
+});
+
+describe("gameStarted", () => {
+  const mod = {
+    enabled: true,
+    showAnswer: true as const,
+    confirmShowAnswer: true,
+    showScores: true,
+    confirmShowScores: true,
+    confirmNextQuestion: true,
+  };
+
+  it("counts down into question 1 in an unmoderated game", () => {
+    const s = reducer(fresh(), gameStarted({ remainingMs: 5000 }));
+    expect(s.phase).toBe("starting");
+  });
+
+  it("opens a moderated game on its get-ready slide, not a countdown", () => {
+    const s = reducer(
+      fresh(),
+      gameStarted({ remainingMs: 0, moderation: mod }),
+    );
+    expect(s.phase).toBe("ready");
+    expect(s.moderation).toEqual(mod);
+  });
+
+  it("counts down when the moderated game skips the get-ready slide", () => {
+    const s = reducer(
+      fresh(),
+      gameStarted({
+        remainingMs: 5000,
+        moderation: { ...mod, confirmNextQuestion: false },
+      }),
+    );
+    expect(s.phase).toBe("starting");
   });
 });
 

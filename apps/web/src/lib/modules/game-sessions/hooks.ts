@@ -6,8 +6,17 @@ import { queryKeys } from "@/lib/modules/query-keys";
 import { gameSessionsApi } from "./api";
 
 export function useCreateGameSessionMutation() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: gameSessionsApi.create,
+    onSuccess: (_data, variables) => {
+      // "Save as this quiz's default" changed the quiz too.
+      if (variables.saveAsDefault) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.quizzes.detail(variables.quizId),
+        });
+      }
+    },
   });
 }
 

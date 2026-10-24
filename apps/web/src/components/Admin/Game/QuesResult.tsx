@@ -33,6 +33,11 @@ import {
   denseRanks,
   type LeaderboardEntry,
 } from "@buzrr/contract";
+import {
+  leaderboardWithReveal,
+  nextQuestionLabel,
+  scoresStepPending,
+} from "@/lib/moderation";
 import type { GameSocket } from "@/types/socket";
 
 /** Hold the old standings until the answer bars have mostly filled. */
@@ -90,7 +95,29 @@ export default function QuesResult(props: QuesResultProps) {
   const players = useAppSelector((state) => state.game.players);
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const qCount = useAppSelector((state) => state.game.qCount);
+  const phase = useAppSelector((state) => state.game.phase);
+  const moderation = useAppSelector((state) => state.game.moderation);
+  // Moderated: the answer and the standings can be separate steps.
+  const showAnswerPanel = phase !== "scores" || reveal !== null;
+  // An unscored question changes no score: no standings after it.
+  const scoredQ = question ? isScoredType(question.type) : true;
+  const showBoard =
+    scoredQ &&
+    (phase === "scores" ||
+      leaderboardWithReveal(moderation, qIndex >= qCount - 1));
+  // Not after the last question: the final standings come next.
+  const nextIsScores =
+    phase === "reveal" &&
+    scoresStepPending(moderation) &&
+    scoredQ &&
+    qIndex < qCount - 1;
+  // Re-armed on every step: "Show standings" keeps this screen mounted.
   const [advancing, setAdvancing] = useState(false);
+  const [armedPhase, setArmedPhase] = useState(phase);
+  if (armedPhase !== phase) {
+    setArmedPhase(phase);
+    setAdvancing(false);
+  }
   const [playerToBan, setPlayerToBan] = useState<{
     playerId: string;
     name: string;
@@ -110,15 +137,42 @@ export default function QuesResult(props: QuesResultProps) {
       ? `${(reveal.avgTimeMs / 1000).toFixed(1)}s`
       : "—";
   const isLastQuestion = qIndex === qCount - 1;
+  // Many options: a tighter panel, so all of them fit without scrolling.
+  const manyOptions =
+    question !== null &&
+    question !== undefined &&
+    "options" in question &&
+    question.options.length >= 5;
   const scored = question ? isScoredType(question.type) : true;
 
-  // Start on the pre-question standings, then count scores up and let rows
-  // glide into their new ranks.
+  // Start on the pre-question standings (once they are on screen), then
+  // count scores up and let rows glide into their new ranks.
   const [settled, setSettled] = useState(false);
+  const [settleArmed, setSettleArmed] = useState(showBoard);
+  if (settleArmed !== showBoard) {
+    setSettleArmed(showBoard);
+    setSettled(false);
+  }
   useEffect(() => {
+    if (!showBoard) return;
     const t = setTimeout(() => setSettled(true), SETTLE_DELAY_MS);
     return () => clearTimeout(t);
-  }, []);
+  }, [showBoard]);
+
+  // "Show answer": the whole question grows once, briefly, as the right
+  // answer turns green.
+  const answerRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (phase !== "reveal") return;
+    answerRef.current?.animate(
+      [
+        { transform: "scale(1)" },
+        { transform: "scale(1.035)", offset: 0.35 },
+        { transform: "scale(1)" },
+      ],
+      { duration: 800, easing: "cubic-bezier(.2,.8,.2,1)" },
+    );
+  }, [phase]);
   // The server sends the host the top HOST_LEADERBOARD_TOP before and after
   // the question: the old top shows first, then the new one.
   const rows = useMemo(
@@ -135,11 +189,13 @@ export default function QuesResult(props: QuesResultProps) {
   );
   const playerCount = leaderboardTotal ?? leaderboard.length;
 
-  // An emoji meant for the board (a right answer at the reveal) stays on the
-  // player's row — this question's board only: it remounts with the next.
+  // An emoji meant for the board (a right answer at the reveal, the scores
+  // step's top SCORES_EMOJI_TOP) stays on the player's row — this question's
+  // board only: it remounts with the next.
   const [rowEmoji, setRowEmoji] = useState<Record<string, string>>({});
+  const onBoard = phase === "reveal" || phase === "scores";
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !onBoard) return;
     const onReaction = (r: {
       playerId: string;
       emoji: string;
@@ -151,7 +207,7 @@ export default function QuesResult(props: QuesResultProps) {
     return () => {
       socket.off("reaction", onReaction);
     };
-  }, [socket]);
+  }, [socket, onBoard]);
   const listRef = useRef<HTMLDivElement>(null);
   useFlipReorder(listRef, rows.map((r) => r.playerId).join());
   const connectedById = new Map(players.map((p) => [p.id, p.connected]));
@@ -189,166 +245,192 @@ export default function QuesResult(props: QuesResultProps) {
   }
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-2 gap-3.5 md:gap-5 md:pb-[18px]">
-      <section
+    <div className="flex-1 min-h-0 flex flex-col">
+      <div
         className={clsx(
-          panelClass,
-          "flex flex-col gap-5 md:gap-[22px] p-5 md:px-[30px] md:py-7 md:min-h-0 md:overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          "flex-1 min-h-0 flex flex-col md:grid gap-3.5 md:gap-5",
+          showAnswerPanel && showBoard ? "md:grid-cols-2" : "md:grid-cols-1",
         )}
       >
-        <div>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span className={labelClass}>Question {qIndex + 1} results</span>
-            {question && !scored && <QuestionTypePill type={question.type} />}
-          </div>
-          <h2 className="mt-2 text-lg md:text-[22px] font-bold leading-[1.3] tracking-[-0.01em] text-pretty wrap-break-word">
-            {question?.title}
-          </h2>
-        </div>
-        <div
-          className={clsx(
-            "grid gap-2 md:gap-3",
-            scored ? "grid-cols-3" : "grid-cols-2",
-          )}
-        >
-          <StatTile
-            value={responses}
-            suffix={` /${Math.max(players.filter((p) => p.connected).length, responses)}`}
-            label="Responses"
-          />
-          {scored && <StatTile value={`${correctPct}%`} label="Got it right" />}
-          <StatTile value={avgTime} label="Avg. answer time" />
-        </div>
-        {question && reveal && (
-          <RevealBreakdown question={question} summary={reveal.summary} />
-        )}
-      </section>
-
-      <section
-        className={clsx(
-          panelClass,
-          "flex flex-col md:min-h-0 md:overflow-hidden",
-        )}
-      >
-        <div className="flex items-center justify-between px-5 md:px-[26px] pt-5 md:pt-6 pb-3.5">
-          <h3 className="text-xl md:text-[22px] font-bold">Leaderboard</h3>
-          <span className={clsx("text-[13.5px]", mutedText)}>
-            {playerCount === 1
-              ? `${playerCount} player`
-              : `${playerCount} players`}
-          </span>
-        </div>
-        <div
-          ref={listRef}
-          className="md:flex-1 md:min-h-0 md:overflow-y-auto px-3 md:px-[18px] pb-2.5 flex flex-col gap-1.5"
-        >
-          {rows.map((lead) => {
-            const connected = connectedById.get(lead.playerId);
-            return (
-              <div
-                key={lead.playerId}
-                data-flip-id={lead.playerId}
-                className="group relative bg-white dark:bg-dark flex items-center gap-3 md:gap-[13px] rounded-[14px] border border-transparent px-2.5 py-[9px] transition-colors hover:bg-light-bg dark:hover:bg-card-dark hover:border-lprimary/15 dark:hover:border-white/5"
-              >
-                <span
-                  className={clsx(
-                    "size-[30px] shrink-0 rounded-[9px] flex items-center justify-center text-sm font-bold transition-colors duration-500",
-                    rankBadgeClass(lead.shownRank),
-                  )}
-                >
-                  {lead.shownRank}
-                </span>
-                <span className="relative shrink-0">
-                  <Image
-                    src={lead.profilePic || DEFAULT_AVATAR}
-                    className="size-9 rounded-full object-cover"
-                    width={36}
-                    height={36}
-                    alt=""
-                  />
-                  <span
-                    title={connected ? "Connected" : "Disconnected"}
-                    className={clsx(
-                      "absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-white dark:border-dark",
-                      connected ? "bg-green-500" : "bg-gray",
-                    )}
-                  />
-                </span>
-                <span className="flex-1 min-w-0 truncate text-[15px] font-semibold">
-                  {lead.name}
-                </span>
-                {rowEmoji[lead.playerId] && (
-                  <span
-                    key={rowEmoji[lead.playerId]}
-                    aria-hidden
-                    className="shrink-0 text-2xl leading-none animate-pop-in"
-                  >
-                    {rowEmoji[lead.playerId]}
-                  </span>
-                )}
-                {lead.delta !== undefined && (
-                  <span
-                    className={clsx(
-                      "min-w-11 text-right text-[12.5px]",
-                      lead.delta > 0
-                        ? "font-bold text-green-600 dark:text-green-500"
-                        : "font-medium text-[#8a8896] dark:text-muted-dark",
-                      settled && lead.delta > 0 && "animate-pop",
-                    )}
-                  >
-                    +{lead.delta}
-                  </span>
-                )}
-                <span className="min-w-[52px] text-right text-base font-bold tabular-nums">
-                  <AnimatedNumber value={lead.shownScore} />
-                </span>
-                <span className="flex gap-0.5 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
-                  <button
-                    type="button"
-                    aria-label={`Remove ${lead.name} from this game`}
-                    title="Kick — can rejoin with the room code"
-                    disabled={removePlayerMutation.isPending}
-                    onClick={() => handleKick(lead.playerId, lead.name)}
-                    className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
-                  >
-                    <LuX size={17} />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Ban ${lead.name} from this room`}
-                    title="Ban — blocked from rejoining this room"
-                    onClick={() =>
-                      setPlayerToBan({
-                        playerId: lead.playerId,
-                        name: lead.name,
-                      })
-                    }
-                    className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
-                  >
-                    <LuBan size={17} />
-                  </button>
-                </span>
-              </div>
-            );
-          })}
-        </div>
-        <div className="sticky bottom-12 md:static px-4 md:px-[22px] py-4 border-t border-lprimary/15 dark:border-white/10 bg-white dark:bg-dark rounded-b-3xl">
-          <button
-            type="button"
-            disabled={advancing}
-            onClick={() => {
-              setAdvancing(true);
-              socket.emit("host-next");
-            }}
-            className={clsx(primaryButtonClass, "w-full")}
+        {showAnswerPanel && (
+          <section
+            ref={answerRef}
+            className={clsx(
+              panelClass,
+              "flex flex-col p-5 md:px-[30px] md:min-h-0 md:overflow-y-auto [scrollbar-width:thin]",
+              manyOptions
+                ? "gap-3 md:gap-3.5 md:py-5"
+                : "gap-5 md:gap-[22px] md:py-7",
+            )}
           >
-            {isLastQuestion
+            <div>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span className={labelClass}>
+                  Question {qIndex + 1} results
+                </span>
+                {question && !scored && (
+                  <QuestionTypePill type={question.type} />
+                )}
+              </div>
+              <h2 className="mt-2 text-lg md:text-[22px] font-bold leading-[1.3] tracking-[-0.01em] text-pretty wrap-break-word">
+                {question?.title}
+              </h2>
+            </div>
+            <div
+              className={clsx(
+                "grid gap-2 md:gap-3",
+                scored ? "grid-cols-3" : "grid-cols-2",
+              )}
+            >
+              <StatTile
+                value={responses}
+                suffix={` /${Math.max(players.filter((p) => p.connected).length, responses)}`}
+                label="Responses"
+              />
+              {scored && (
+                <StatTile value={`${correctPct}%`} label="Got it right" />
+              )}
+              <StatTile value={avgTime} label="Avg. answer time" />
+            </div>
+            {question && reveal && (
+              <RevealBreakdown question={question} summary={reveal.summary} />
+            )}
+          </section>
+        )}
+
+        {showBoard && (
+          <section
+            className={clsx(
+              panelClass,
+              "flex flex-col md:min-h-0 md:overflow-hidden",
+            )}
+          >
+            <div className="flex items-center justify-between px-5 md:px-[26px] pt-5 md:pt-6 pb-3.5">
+              <h3 className="text-xl md:text-[22px] font-bold">Leaderboard</h3>
+              <span className={clsx("text-[13.5px]", mutedText)}>
+                {playerCount === 1
+                  ? `${playerCount} player`
+                  : `${playerCount} players`}
+              </span>
+            </div>
+            <div
+              ref={listRef}
+              className="md:flex-1 md:min-h-0 md:overflow-y-auto px-3 md:px-[18px] pb-2.5 flex flex-col gap-1.5"
+            >
+              {rows.map((lead) => {
+                const connected = connectedById.get(lead.playerId);
+                return (
+                  <div
+                    key={lead.playerId}
+                    data-flip-id={lead.playerId}
+                    className="group relative bg-white dark:bg-dark flex items-center gap-3 md:gap-[13px] rounded-[14px] border border-transparent px-2.5 py-[9px] transition-colors hover:bg-light-bg dark:hover:bg-card-dark hover:border-lprimary/15 dark:hover:border-white/5"
+                  >
+                    <span
+                      className={clsx(
+                        "size-[30px] shrink-0 rounded-[9px] flex items-center justify-center text-sm font-bold transition-colors duration-500",
+                        rankBadgeClass(lead.shownRank),
+                      )}
+                    >
+                      {lead.shownRank}
+                    </span>
+                    <span className="relative shrink-0">
+                      <Image
+                        src={lead.profilePic || DEFAULT_AVATAR}
+                        className="size-9 rounded-full object-cover"
+                        width={36}
+                        height={36}
+                        alt=""
+                      />
+                      <span
+                        title={connected ? "Connected" : "Disconnected"}
+                        className={clsx(
+                          "absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-white dark:border-dark",
+                          connected ? "bg-green-500" : "bg-gray",
+                        )}
+                      />
+                    </span>
+                    <span className="flex-1 min-w-0 truncate text-[15px] font-semibold">
+                      {lead.name}
+                    </span>
+                    {rowEmoji[lead.playerId] && (
+                      <span
+                        key={rowEmoji[lead.playerId]}
+                        aria-hidden
+                        className="shrink-0 text-2xl leading-none animate-pop-in"
+                      >
+                        {rowEmoji[lead.playerId]}
+                      </span>
+                    )}
+                    {lead.delta !== undefined && (
+                      <span
+                        className={clsx(
+                          "min-w-11 text-right text-[12.5px]",
+                          lead.delta > 0
+                            ? "font-bold text-green-600 dark:text-green-500"
+                            : "font-medium text-[#8a8896] dark:text-muted-dark",
+                          settled && lead.delta > 0 && "animate-pop",
+                        )}
+                      >
+                        +{lead.delta}
+                      </span>
+                    )}
+                    <span className="min-w-[52px] text-right text-base font-bold tabular-nums">
+                      <AnimatedNumber value={lead.shownScore} />
+                    </span>
+                    <span className="flex gap-0.5 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        aria-label={`Remove ${lead.name} from this game`}
+                        title="Kick — can rejoin with the room code"
+                        disabled={removePlayerMutation.isPending}
+                        onClick={() => handleKick(lead.playerId, lead.name)}
+                        className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
+                      >
+                        <LuX size={17} />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Ban ${lead.name} from this room`}
+                        title="Ban — blocked from rejoining this room"
+                        onClick={() =>
+                          setPlayerToBan({
+                            playerId: lead.playerId,
+                            name: lead.name,
+                          })
+                        }
+                        className="size-[30px] rounded-[9px] flex items-center justify-center text-off-dark dark:text-muted-dark hover:bg-[#e5544e]/14 hover:text-[#e5544e] transition-colors cursor-pointer"
+                      >
+                        <LuBan size={17} />
+                      </button>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+      </div>
+      {/* One place for the host's next step, always at the bottom. */}
+      <div className="sticky bottom-0 z-10 flex justify-end py-3 bg-light-bg/90 dark:bg-dark-bg/90 backdrop-blur">
+        <button
+          type="button"
+          data-host-key="next"
+          title={'You can also press "Space"'}
+          disabled={advancing}
+          onClick={() => {
+            setAdvancing(true);
+            socket.emit("host-next");
+          }}
+          className={clsx(primaryButtonClass, "w-full md:w-auto md:min-w-80")}
+        >
+          {nextIsScores
+            ? "Show standings"
+            : isLastQuestion
               ? "Final leaderboard"
-              : `Next question · ${qIndex + 2} of ${qCount}`}
-            <LuPlay size={17} className="fill-current" />
-          </button>
-        </div>
-      </section>
+              : nextQuestionLabel(qIndex, qCount)}
+          <LuPlay size={17} className="fill-current" />
+        </button>
+      </div>
 
       <ConfirmationModal
         open={playerToBan !== null}

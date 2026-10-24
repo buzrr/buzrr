@@ -64,6 +64,11 @@ in meta as `pacing` (games from before the field fall back by mode):
   close once every **connected** rostered player has answered.
 - A host-paced reveal whose parked deadline comes due is re-parked, not
   advanced.
+- A room's settings (moderated mode, reactions) come from
+  `roomSettings` (`common/game-look/game-look.ts`): the game's own
+  `GameSession.settings` (the "Host quiz" dialog), else `Quiz.settings`.
+  Every server read for a live room goes through it; moderation is copied
+  into meta at `start-game`.
 - Self-paced play (each player on their own clock) is planned; the strategy
   is where its advance rules belong, but it also needs per-player question
   state that `GameState` doesn't model yet (ADR-012).
@@ -278,8 +283,8 @@ win for each player in `/users/me/stats`.
   room (`.except(host:{code})`) the top 10 plus `total`. A host `state-sync`
   is trimmed the same way.
   Sending the whole board to everyone grows with the room twice over
-  (entries × recipients); at 109 players it delayed the events behind it by
-  about 300ms. A player's own standing comes with `answer-result`, and a
+  (entries × recipients); at 109 players it delayed the `phase-change` behind
+  it by about 300ms. A player's own standing comes with `answer-result`, and a
   player's `state-sync` carries the top plus their own row and
   `leaderboardTotal`.
 - Event names: `question-start`, `question-end`, `answer-result`,
@@ -320,9 +325,9 @@ win for each player in `/users/me/stats`.
   `reset`). Over it the player gets `reaction-limited { retryInMs }`: a
   "limit reached" toast, the buttons fade until then. Above
   `ROOM_REACTIONS_PER_S` (40) in a room within one second, only each
-  player's first reaction of that second passes. A quiz with
-  `settings.reactions` off hides the players' reaction bar (client-side; the
-  gateway does not check it).
+  player's first reaction of that second passes. A room whose
+  settings (`roomSettings`) have `reactions` off hides the players' reaction
+  bar (client-side; the gateway does not check it).
 - **Host lobby:** applies reactions in batches (every 500 ms) and joins every
   250 ms; player cards are memoised, so an update re-renders only the cards
   it changed. Above 40 players no reorder animation and no count-up numbers,

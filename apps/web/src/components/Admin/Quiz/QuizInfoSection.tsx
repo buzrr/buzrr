@@ -13,7 +13,6 @@ import {
 import ConfirmationModal from "@/components/Admin/ConfirmationModal";
 import { inputClass } from "@/components/Game/GameUI";
 import { toast } from "react-toastify";
-import HostQuizForm from "@/components/Admin/Quiz/HostQuizForm";
 import Switch from "@/components/ui/Switch";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import {
@@ -21,7 +20,7 @@ import {
   useUpdateQuizMutation,
 } from "@/lib/modules/quizzes/hooks";
 import type { QuizDetail } from "@/lib/modules/quizzes/api";
-import QuizSettingsCard from "@/components/Admin/Quiz/QuizSettingsCard";
+import ModerationSettingsCard from "@/components/Admin/Quiz/ModerationSettingsCard";
 
 function formatSessionDate(createdAt: string | Date) {
   const d = typeof createdAt === "string" ? new Date(createdAt) : createdAt;
@@ -130,13 +129,13 @@ function EditableHeader({ quiz }: { quiz: QuizDetail }) {
  */
 export function QuizInfoContent(props: {
   quiz: QuizDetail;
+  /** Unused: "Host quiz" is a floating button on the quiz page now. */
   showHostForm?: boolean;
   onShowLeaderboard?: (resultId: string) => void;
 }) {
   const pastGames = props.quiz.gameResults ?? [];
   const questionCount = props.quiz._count?.questions ?? 0;
   const updateQuiz = useUpdateQuizMutation();
-  const showHostForm = props.showHostForm ?? true;
   const deleteResults = useDeleteResultsMutation(props.quiz.id);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
@@ -194,16 +193,7 @@ export function QuizInfoContent(props: {
             appearing in 1v1 duels
           </span>
         </div>
-        <QuizSettingsCard quiz={props.quiz} />
-        {showHostForm && (
-          <div className="w-full mt-[18px]">
-            <HostQuizForm
-              quizId={props.quiz.id}
-              disabled={questionCount === 0}
-              className="w-full"
-            />
-          </div>
-        )}
+        <ModerationSettingsCard quiz={props.quiz} />
       </div>
       <div className="flex-1 flex flex-col min-h-0 w-[90%] mx-auto text-dark dark:text-white">
         <div className="flex items-center justify-between mt-6 mb-3">
@@ -214,7 +204,8 @@ export function QuizInfoContent(props: {
             {pastGames.length}
           </span>
         </div>
-        <div className="overflow-auto flex-1 min-h-0 flex flex-col gap-2.5 pr-1 -mr-1">
+        {/* Bottom room for the site footer and the floating "Host quiz". */}
+        <div className="overflow-auto flex-1 min-h-0 flex flex-col gap-2.5 pr-1 -mr-1 pb-32">
           {pastGames.length > 0 ? (
             <>
               {pastGames.map((result) => {

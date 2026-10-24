@@ -7,6 +7,8 @@ import type {
   GamePhase,
   LiveSummaryPayload,
   LeaderboardEntry,
+  ModerationSettings,
+  PhaseChangePayload,
   PublicQuestion,
   QuestionEndPayload,
   QuestionStartPayload,
@@ -67,6 +69,8 @@ export interface GameLiveState {
   category: DuelCategoryRef;
   /** Duels only: daily streak per signed-in playerId, from game-over. */
   streaks: GameOverPayload["streaks"] | null;
+  /** Moderated games: the quiz's moderation settings; null otherwise. */
+  moderation: ModerationSettings | null;
   /** How many are in the room (server's `reaction-limit`); 0 = not told. */
   roomSize: number;
   /**
@@ -123,6 +127,7 @@ const initialState: GameLiveState = {
   rated: false,
   category: null,
   streaks: null,
+  moderation: null,
   roomSize: 0,
   reactionBudget: { limit: 5, windowMs: REACTION_WINDOW_MS, resetSeq: 0 },
 };
@@ -133,15 +138,24 @@ const initialState: GameLiveState = {
  * ended — so a larger number is always a later moment.
  */
 export function gameProgress(phase: GamePhase, qIndex: number): number {
+  // Per question: ready → starting (countdown) → question → closed → reveal →
+  // scores; unmoderated games skip ready/closed/scores.
+  const base = 1 + qIndex * 6;
   switch (phase) {
     case "lobby":
       return 0;
+    case "ready":
+      return base;
     case "starting":
-      return 1;
+      return base + 1;
     case "question":
-      return 2 + qIndex * 2;
+      return base + 2;
+    case "closed":
+      return base + 3;
     case "reveal":
-      return 3 + qIndex * 2;
+      return base + 4;
+    case "scores":
+      return base + 5;
     case "final":
       return Number.MAX_SAFE_INTEGER - 1;
     case "ended":
@@ -188,13 +202,17 @@ const gameSlice = createSlice({
       state.isFinalLeaderboard = s.phase === "final" || s.phase === "ended";
       state.players = s.players;
       state.you = s.you ?? null;
-      // Mid-question the server sends the standing as of the last reveal —
-      // none yet on the first question.
-      if (s.you && (s.phase === "reveal" || s.phase === "final")) {
+      state.moderation = s.moderation ?? null;
+      // Mid-question (and in moderated "closed") the server sends the
+      // standing as of the last reveal — none yet on the first question.
+      if (
+        s.you &&
+        (s.phase === "reveal" || s.phase === "scores" || s.phase === "final")
+      ) {
         state.standing = nextStanding(state.standing, s.qIndex, s.you);
       } else if (
         s.you &&
-        s.phase === "question" &&
+        (s.phase === "question" || s.phase === "closed") &&
         s.qIndex > 0 &&
         // `answer-result` lands just ahead of the reveal, so a late snapshot
         // of the same question must not roll that standing back.
@@ -203,12 +221,24 @@ const gameSlice = createSlice({
         state.standing = nextStanding(state.standing, s.qIndex - 1, s.you);
       }
     },
-    gameStarted: (state, action: PayloadAction<{ remainingMs: number }>) => {
-      state.phase = "starting";
+    gameStarted: (
+      state,
+      action: PayloadAction<{
+        remainingMs: number;
+        moderation?: ModerationSettings;
+      }>,
+    ) => {
+      // A moderated game with a get-ready slide opens on it (the server's
+      // `phase-change: ready` follows) — never a countdown in between.
+      const mod = action.payload.moderation;
+      state.phase =
+        mod?.enabled && mod.confirmNextQuestion ? "ready" : "starting";
+      state.qIndex = 0;
       // Display-only: the server opens question 1 on its own timer.
       state.deadline = Date.now() + action.payload.remainingMs;
       state.countdownMs = action.payload.remainingMs;
       state.gameOver = false;
+      state.moderation = action.payload.moderation ?? null;
     },
     roomSizeKnown: (state, action: PayloadAction<number>) => {
       state.roomSize = action.payload;
@@ -229,6 +259,35 @@ const gameSlice = createSlice({
         resetSeq: state.reactionBudget.resetSeq + (p.reset ? 1 : 0),
       };
       if (typeof p.players === "number") state.roomSize = p.players;
+    },
+    /** Moderated games: ready / starting / closed / scores. */
+    phaseChange: (state, action: PayloadAction<PhaseChangePayload>) => {
+      const p = action.payload;
+      if (
+        gameProgress(p.phase, p.qIndex) <
+        gameProgress(
+          state.phase === "idle" ? "lobby" : state.phase,
+          state.qIndex,
+        )
+      ) {
+        return;
+      }
+      state.phase = p.phase;
+      state.qIndex = p.qIndex;
+      if (p.phase === "ready" || p.phase === "starting") {
+        state.question = null;
+        state.reveal = null;
+        state.answeredCount = 0;
+        state.liveSummary = null;
+      }
+      if (p.phase === "starting") {
+        const ms = p.remainingMs ?? 0;
+        state.deadline = Date.now() + ms;
+        state.countdownMs = ms;
+      } else {
+        state.deadline = 0;
+        state.countdownMs = 0;
+      }
     },
     questionStart: (state, action: PayloadAction<QuestionStartPayload>) => {
       const q = action.payload;
@@ -336,6 +395,7 @@ const gameSlice = createSlice({
 export const {
   applySync,
   gameStarted,
+  phaseChange,
   roomSizeKnown,
   reactionBudgetKnown,
   questionStart,
