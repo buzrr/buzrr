@@ -363,7 +363,7 @@ const Lobby = (params: {
   return (
     <GameSounds role="host" quizSettings={params.quizSettings}>
       <LiveSounds socket={socket} />
-      <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 -mb-12 pb-4 md:pb-0 md:h-[100dvh] text-dark dark:text-white">
+      <div className="w-full flex flex-col px-4 sm:px-6 lg:px-8 -mb-12 pb-4 md:pb-0 md:h-[100dvh] text-dark dark:text-white">
         <HostHeader
           title={params.quizTitle}
           roomId={params.roomId}

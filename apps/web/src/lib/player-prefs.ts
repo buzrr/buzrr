@@ -1,9 +1,10 @@
 /**
  * What a player picked last time, kept in localStorage so the next game
- * starts with it: the player's own reaction emojis. Browser only; every read
- * tolerates missing or broken values.
+ * starts with it: name + avatar for the profile form, and the player's own
+ * reaction emojis. Browser only; every read tolerates missing or broken values.
  */
 
+const PROFILE_KEY = "buzrr:player-profile";
 const EMOJI_KEY = "buzrr:custom-reactions";
 
 /** The fixed reactions every player has. */
@@ -64,6 +65,17 @@ function write(key: string, value: unknown) {
   } catch {
     // Storage full or blocked: the next game just starts from the defaults.
   }
+}
+
+export function loadPlayerProfile(): { name: string; image: string } | null {
+  const p = read<{ name?: unknown; image?: unknown }>(PROFILE_KEY);
+  return p && typeof p.name === "string" && typeof p.image === "string"
+    ? { name: p.name, image: p.image }
+    : null;
+}
+
+export function savePlayerProfile(profile: { name: string; image: string }) {
+  write(PROFILE_KEY, profile);
 }
 
 /** The player's own reactions (0–4), shown after the base ones. */

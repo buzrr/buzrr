@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -140,6 +140,28 @@ function GameDefaultsCard() {
 }
 
 function AccountCard() {
+  // How this account signs in (Google, or email + password), not assumed.
+  const [signInMethod, setSignInMethod] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void authClient
+      .listAccounts()
+      .then((res) => {
+        if (!alive) return;
+        const ids = (res.data ?? []).map((a) => a.providerId);
+        setSignInMethod(
+          ids.includes("google")
+            ? "Google"
+            : ids.includes("credential")
+              ? "email and password"
+              : null,
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
   const { data: session } = authClient.useSession();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -218,8 +240,9 @@ function AccountCard() {
         <div>
           <p className="text-sm font-bold text-dark dark:text-white">Email</p>
           <p className="text-sm text-off-dark dark:text-off-white">
-            {session?.user.email} · Signed in with Google — email can&apos;t be
-            changed here.
+            {session?.user.email}
+            {signInMethod ? ` · Signed in with ${signInMethod}` : ""} — email
+            can&apos;t be changed here.
           </p>
         </div>
         <Button

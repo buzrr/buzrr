@@ -248,6 +248,7 @@ export default function AllQues(props: { quizId: string }) {
                             <BasicModal
                               isEdit={true}
                               wide
+                              confirmDismiss
                               btnTitle="Edit Question"
                               subtitle={`Question ${index + 1} · changes apply the next time you host.`}
                               btnStyle="text-sm font-semibold text-lprimary dark:text-dprimary hover:underline cursor-pointer"
