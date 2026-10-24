@@ -4,6 +4,12 @@ import {
   OnApplicationBootstrap,
   OnApplicationShutdown,
 } from "@nestjs/common";
+import {
+  HEARTBEAT_TIMEOUT_MS,
+  HOST_LEADERBOARD_TOP,
+  PLAYER_LEADERBOARD_TOP,
+} from "@buzrr/contract";
+import { signAssetsDeep } from "../../common/storage/asset-signing";
 import type { GameOverPayload, QuestionAnswer } from "@buzrr/contract";
 import type { DuelOutcome, Prisma } from "@buzrr/prisma";
 import { nanoid } from "nanoid";
@@ -23,7 +29,11 @@ import {
   summarizeAnswers,
   toLiveQuestion,
 } from "../question-types";
-import { answerEntries } from "./core/views";
+import {
+  answerEntries,
+  hostOfLeaderboard,
+  topOfLeaderboard,
+} from "./core/views";
 import type {
   SocketData,
   StateSyncPayload,
@@ -58,9 +68,10 @@ import {
   RosterEntry,
 } from "./game-engine.types";
 import { GameStoreService, parseAnswer } from "./game-store.service";
+import { OPTION_ORDER } from "../../common/utils/option-order";
 
-/** How long a disconnected lobby player is kept before removal. */
-const LOBBY_DISCONNECT_GRACE_MS = 60_000;
+/** How long a disconnected lobby player is kept before removal (default). */
+const LOBBY_DISCONNECT_GRACE_MS = HEARTBEAT_TIMEOUT_MS;
 const SWEEP_INTERVAL_MS = 15_000;
 /**
  * How often, at most, the host is sent the running results of an unscored
@@ -229,9 +240,22 @@ export class GameEngineService
     }
   }
 
+  /** Told when a new round begins (a question opens, the final standings). */
+  private roundListeners = new Set<(gameCode: string) => void>();
+  onNewRound(listener: (gameCode: string) => void): void {
+    this.roundListeners.add(listener);
+  }
+
   private send(gameCode: string, to: Audience, message: Outbound): void {
     if (!this.io) {
       throw new Error("GameEngineService used before gateway init");
+    }
+    if (
+      "room" in to &&
+      (message.event === "question-start" ||
+        (message.event === "leaderboard" && message.payload.isFinal))
+    ) {
+      for (const l of this.roundListeners) l(gameCode);
     }
     // Per-player rooms work cross-instance via the redis adapter.
     const target =
@@ -246,10 +270,14 @@ export class GameEngineService
         // What is left of the window once the writes before this broadcast
         // are done — the clock has been running since the window opened, so
         // the client is told the truth rather than the full timeOut.
-        target.emit("question-start", {
-          ...message.payload,
-          remainingMs: Math.max(0, message.deadline - Date.now()),
-        });
+        // The question's media only becomes loadable now, for the room.
+        target.emit(
+          "question-start",
+          signAssetsDeep({
+            ...message.payload,
+            remainingMs: Math.max(0, message.deadline - Date.now()),
+          }),
+        );
         break;
       case "question-end":
         target.emit("question-end", message.payload);
@@ -260,9 +288,35 @@ export class GameEngineService
       case "answer-count":
         target.emit("answer-count", message.payload);
         break;
-      case "leaderboard":
-        target.emit("leaderboard", message.payload);
+      case "leaderboard": {
+        const { entries } = message.payload;
+        // The host shows its top (and who just dropped out of it).
+        const forHost =
+          entries.length > HOST_LEADERBOARD_TOP
+            ? {
+                ...message.payload,
+                entries: hostOfLeaderboard(entries),
+                total: entries.length,
+              }
+            : message.payload;
+        if (!("room" in to) || entries.length <= PLAYER_LEADERBOARD_TOP) {
+          target.emit("leaderboard", message.payload);
+          break;
+        }
+        // The players get the top (and their own standing from
+        // answer-result) — one small broadcast.
+        this.io.to(`host:${gameCode}`).emit("leaderboard", forHost);
+        this.io
+          .to(gameCode)
+          .except(`host:${gameCode}`)
+          .emit("leaderboard", {
+            ...message.payload,
+            entries: topOfLeaderboard(entries),
+            total: entries.length,
+          });
+        // Their own place comes with answer-result (once per question).
         break;
+      }
     }
   }
 
@@ -393,7 +447,7 @@ export class GameEngineService
           include: {
             questions: {
               orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-              include: { options: { orderBy: { createdAt: "asc" } } },
+              include: { options: { orderBy: OPTION_ORDER } },
             },
           },
         },
@@ -705,7 +759,12 @@ export class GameEngineService
    * timeout later). Marking the player gone then would count a live player
    * as absent — and the early close would skip them on the next question.
    */
-  async playerDisconnected(gameCode: string, playerId: string): Promise<void> {
+  async playerDisconnected(
+    gameCode: string,
+    playerId: string,
+    /** Lobby: how long until a player still gone leaves the list. */
+    lobbyGraceMs = LOBBY_DISCONNECT_GRACE_MS,
+  ): Promise<void> {
     // `player:{id}` also holds a duel user's queue/invite sockets — only a
     // socket in this game, as this player, counts as them still being here.
     const stillHere = () =>
@@ -769,7 +828,7 @@ export class GameEngineService
         void this.removeIfStillGone(gameCode, playerId).catch((err) =>
           this.logger.error("Lobby grace removal failed", err),
         );
-      }, LOBBY_DISCONNECT_GRACE_MS);
+      }, lobbyGraceMs);
       timer.unref();
       this.disconnectTimers.set(graceKey, timer);
     }
@@ -1393,7 +1452,10 @@ export class GameEngineService
     if (!meta || !entry || entry.connected) return;
     if (meta.phase !== "lobby") return;
     await this.store.removePlayer(gameCode, playerId);
-    this.emitRoom(gameCode).emit("player-removed", { id: playerId });
+    this.emitRoom(gameCode).emit("player-removed", {
+      id: playerId,
+      timedOut: true,
+    });
   }
 
   /**

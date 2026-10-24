@@ -10,7 +10,7 @@ import {
   subtleCardClass,
 } from "@/components/Game/GameUI";
 import { Switch } from "@/components/ui/Switch";
-import { SubmitButton } from "./Inputs";
+import { SubmitButton, useAnswerFocus } from "./Inputs";
 import type { QuestionRenderer } from "./types";
 import { TextWall } from "./Visuals";
 
@@ -57,9 +57,12 @@ function AnswerForm({
   const [anonymous, setAnonymous] = useState(false);
   const sent = entriesOf(selected);
   const repeat = question.multipleSubmissions;
+  const full = sent.length >= MAX_SUBMISSIONS;
+  const inputRef = useAnswerFocus<HTMLTextAreaElement>(
+    disabled || full || (!repeat && sent.length > 0),
+  );
   // One answer each: once sent, show it and stop.
   if (!repeat && sent.length > 0) return <SentList entries={sent} />;
-  const full = sent.length >= MAX_SUBMISSIONS;
 
   const send = () => {
     const value = text.trim();
@@ -72,6 +75,7 @@ function AnswerForm({
     <>
       {sent.length > 0 && <SentList entries={sent} />}
       <textarea
+        ref={inputRef}
         className={clsx(
           inputClass,
           sent.length > 0 ? "mt-3" : "mt-4 md:mt-7",

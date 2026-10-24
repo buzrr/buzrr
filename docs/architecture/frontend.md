@@ -118,7 +118,9 @@ disconnect`), emits `request-sync` on connect as a safety net and when the
 - Guest screen: `Player/PlayPageClient` → `Player/GamePage` →
   `Player/GameScreens/*` (`Question` submits with ack + rollback toast,
   `Result`, `WaitGameStart` with the canvas bubble mini-game in `Game.tsx`,
-  `Leaderboard`).
+  `Leaderboard`). Reactions: `Game/Flyers` — `ReactionBar` on the phone
+  (👍 ❤️ 😂 plus up to 4 own emojis kept in the browser,
+  `lib/player-prefs.ts`), `ReactionOverlay` flyers on the host screen.
 - Duel screen: `Duel/DuelGameClient` (score bar, countdown with category and
   streak chip, reuses `GameScreens/Question`/`Result`, rating + daily-streak
   result panel, `DuelAudio`). Duel home: `CategoryPicker`, `DuelProfileCard`,

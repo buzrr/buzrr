@@ -6,7 +6,11 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { DEFAULT_TIME_OUT, type ImportQuiz } from "@buzrr/contract";
+import {
+  DEFAULT_TIME_OUT,
+  quizSettingsSchema,
+  type ImportQuiz,
+} from "@buzrr/contract";
 import { z } from "zod";
 import {
   LlmTimeoutError,
@@ -22,6 +26,7 @@ import {
 } from "../question-types";
 import { CreateAiQuizDto } from "./dto/create-ai-quiz.dto";
 import { CreateQuizDto } from "./dto/create-quiz.dto";
+import { inAuthoredOrder } from "../../common/utils/option-order";
 
 /**
  * Shape the model must return (sent to the provider as a JSON Schema for
@@ -105,9 +110,23 @@ export class QuizzesService {
   async update(
     user: AuthUser,
     quizId: string,
-    dto: { title?: string; description?: string; isPublic?: boolean },
+    dto: {
+      title?: string;
+      description?: string;
+      isPublic?: boolean;
+      settings?: Record<string, unknown>;
+    },
   ) {
+    let settings: ReturnType<typeof quizSettingsSchema.parse> | undefined;
+    if (dto.settings !== undefined) {
+      const parsed = quizSettingsSchema.safeParse(dto.settings);
+      if (!parsed.success) {
+        throw new BadRequestException("Invalid quiz settings");
+      }
+      settings = parsed.data;
+    }
     const data = {
+      ...(settings !== undefined ? { settings } : {}),
       ...(dto.title !== undefined ? { title: dto.title } : {}),
       ...(dto.description !== undefined
         ? { description: dto.description.trim() || null }
@@ -255,10 +274,12 @@ export class QuizzesService {
               config: question.config,
               createdById: user.userId,
               options: {
-                create: question.options.map((option) => ({
-                  title: option.title,
-                  isCorrect: option.isCorrect,
-                })),
+                create: inAuthoredOrder(
+                  question.options.map((option) => ({
+                    title: option.title,
+                    isCorrect: option.isCorrect,
+                  })),
+                ),
               },
             })),
           },
@@ -377,7 +398,7 @@ Rules:
           questions: {
             create: questionsArray.slice(0, dto.questions).map((q, index) => ({
               title: q.question,
-              options: { create: q.options },
+              options: { create: inAuthoredOrder(q.options) },
               timeOut: dto.time,
               order: index + 1,
               createdById: user.userId,
