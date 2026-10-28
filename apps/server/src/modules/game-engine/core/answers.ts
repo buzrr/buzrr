@@ -32,6 +32,10 @@ export function judgeAnswer(
   if (!meta.qStartAt) {
     return { accepted: false, reason: "Question has not started" };
   }
+  // Question-first games: the options are still hidden while players read.
+  if (receivedAt < meta.qStartAt) {
+    return { accepted: false, reason: "Answers are not open yet" };
+  }
   // Server-measured time: never trust the client clock, and never take a
   // correction the client can influence. Answers are accepted for a short
   // fixed grace past the deadline so ones sent in time can still arrive.

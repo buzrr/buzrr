@@ -4,9 +4,10 @@ import clsx from "clsx";
 import Image from "next/image";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { LuCheck, LuCopy, LuPlay, LuShare2 } from "react-icons/lu";
+import { LuCheck, LuCopy, LuEye, LuPlay, LuShare2 } from "react-icons/lu";
 import { toast } from "react-toastify";
 import { useAppSelector } from "@/state/hooks";
+import { useReadingTime } from "@/hooks/useReadingTime";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
 import { buildJoinUrl } from "@/lib/join-link";
 import {
@@ -44,6 +45,8 @@ export default function QuestionScreen(props: QuestionScreenProps) {
   const players = useAppSelector((state) => state.game.players);
   const live = useAppSelector((state) => state.game.liveSummary);
   const remaining = useServerCountdown(deadline);
+  // Question-first games: the room reads before the options go up.
+  const read = useReadingTime();
   const [copied, setCopied] = useState(false);
   const [canShare, setCanShare] = useState(false);
   const promptRef = useRef<HTMLElement>(null);
@@ -94,13 +97,25 @@ export default function QuestionScreen(props: QuestionScreenProps) {
         )}
       >
         <div className="flex items-center gap-5 md:gap-6">
-          <TimerRing
-            key={question.id}
-            value={Math.ceil(remaining)}
-            max={question.timeOut}
-            className="size-[120px] md:size-[180px]"
-            valueClassName="text-4xl md:text-[58px]"
-          />
+          {read.reading ? (
+            <TimerRing
+              key={`read-${question.id}`}
+              value={Math.ceil(read.left)}
+              max={read.total}
+              label="reading"
+              lowAt={0}
+              className="size-[120px] md:size-[180px]"
+              valueClassName="text-4xl md:text-[58px]"
+            />
+          ) : (
+            <TimerRing
+              key={question.id}
+              value={Math.ceil(remaining)}
+              max={question.timeOut}
+              className="size-[120px] md:size-[180px]"
+              valueClassName="text-4xl md:text-[58px]"
+            />
+          )}
           <div className="flex-1 min-w-0 flex flex-col gap-2">
             <span className={labelClass}>Answers in</span>
             <span className={clsx("text-[13.5px]", mutedText)}>
@@ -217,10 +232,31 @@ export default function QuestionScreen(props: QuestionScreenProps) {
         >
           {question.title}
         </h2>
-        <HostPrompt
-          question={question}
-          live={live?.index === qIndex ? live.summary : null}
-        />
+        {read.reading ? (
+          <div
+            role="status"
+            className="mt-6 md:mt-8 flex-1 min-h-[140px] flex flex-col items-center justify-center gap-2 rounded-[18px] border-2 border-dashed px-5 py-8 text-center border-lprimary/20 dark:border-white/10"
+          >
+            <LuEye
+              size={30}
+              className="text-lprimary dark:text-dprimary animate-pulse"
+            />
+            <span className="text-lg md:text-2xl font-bold">
+              Options appear in{" "}
+              <span className="tabular-nums">{Math.ceil(read.left)}s</span>
+            </span>
+            <span className={clsx("text-sm", mutedText)}>
+              Give everyone a moment to read the question
+            </span>
+          </div>
+        ) : (
+          <div className="animate-fade-up">
+            <HostPrompt
+              question={question}
+              live={live?.index === qIndex ? live.summary : null}
+            />
+          </div>
+        )}
         <div className="flex flex-wrap md:flex-nowrap items-center gap-3.5 mt-[22px] pt-5 border-t border-lprimary/15 dark:border-white/10">
           <p
             className={clsx(

@@ -1,4 +1,8 @@
-import { duelQueueSchema, submitAnswerSchema } from "@buzrr/contract";
+import {
+  duelQueueSchema,
+  sendReactionSchema,
+  submitAnswerSchema,
+} from "@buzrr/contract";
 import { Logger } from "@nestjs/common";
 import {
   OnGatewayConnection,
@@ -20,6 +24,9 @@ import type {
 } from "./realtime.types";
 
 type DuelInviteAck = (result: DuelInviteAcceptAck) => void;
+
+/** One reaction per player socket this often at most; the rest are dropped. */
+const REACTION_MIN_GAP_MS = 400;
 
 @WebSocketGateway({
   cors: {
@@ -106,6 +113,7 @@ export class RealtimeGateway
         sessionId: gameSessionId,
         quizId: result.quizId,
         hostId: result.hostId,
+        ...result.settings,
       });
 
       this.logger.log(
@@ -142,6 +150,7 @@ export class RealtimeGateway
         this.registerHostHandlers(socket, gameCode);
       } else {
         this.registerPlayerHandlers(socket, gameCode);
+        if (player) this.registerReactionHandler(socket, gameCode, player);
       }
 
       socket.on("request-sync", () => {
@@ -380,6 +389,34 @@ export class RealtimeGateway
         await this.engine.endGame(gameCode);
       } catch (error) {
         this.logger.error("Error ending game session:", error);
+      }
+    });
+  }
+
+  /**
+   * Classic players only. Reactions are best effort: malformed, too frequent
+   * (per socket) or out-of-phase ones are dropped without a reply.
+   */
+  private registerReactionHandler(
+    socket: TypedSocket,
+    gameCode: string,
+    player: { id: string; name: string },
+  ): void {
+    let lastAt = 0;
+    socket.on("send-reaction", async (payload) => {
+      const now = Date.now();
+      if (now - lastAt < REACTION_MIN_GAP_MS) return;
+      const parsed = sendReactionSchema.safeParse(payload);
+      if (!parsed.success) return;
+      lastAt = now;
+      try {
+        await this.engine.relayReaction(gameCode, {
+          playerId: player.id,
+          name: player.name,
+          emoji: parsed.data.emoji,
+        });
+      } catch (error) {
+        this.logger.error("Error relaying reaction:", error);
       }
     });
   }

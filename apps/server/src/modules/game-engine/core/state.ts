@@ -50,6 +50,12 @@ export type Outbound =
        * before the broadcast are done — not the full window.
        */
       deadline: number;
+      /**
+       * When answering opens (the window start). Later than the broadcast
+       * only in question-first games; the shell sends what's left of it as
+       * `opensInMs`.
+       */
+      opensAt: number;
     }
   | { event: "question-end"; payload: QuestionEndPayload }
   | { event: "answer-result"; payload: AnswerResultPayload }

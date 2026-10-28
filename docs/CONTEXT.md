@@ -17,6 +17,12 @@ stats/history, health endpoint, Vercel Analytics.
 
 ## Recent architectural moves (still fresh, know they exist)
 
+- **Host session settings** (2026-10-28): "Host quiz" opens a settings
+  modal — question-first reading time (3/5/10s before options and answering
+  open) and player emoji reactions on result/leaderboard screens (socket
+  only, host room, never stored). Stored on `GameSession`
+  (`readTimeSec`, `reactionsEnabled`), copied to meta; classic only.
+  Migration `20261028000001` needs `migrate:deploy`.
 - **Duel categories, standalone questions, daily streak** (2026-10, ADR-015):
   `Question.quizId` is optional (`createdById` owns it; admin-only
   `POST /api/questions` for standalone/bulk content); questions have 0..n

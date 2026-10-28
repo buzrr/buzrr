@@ -54,6 +54,11 @@ export const questionStartSchema = z.object({
   question: publicQuestionSchema,
   /** Time left to answer, as of this event being sent. */
   remainingMs: z.number(),
+  /**
+   * Question-first games: time until the options show and answering opens,
+   * as of this event being sent. Absent when answering is already open.
+   */
+  opensInMs: z.number().optional(),
 });
 
 export const questionEndSchema = z.object({
@@ -190,6 +195,8 @@ export const stateSyncSchema = z.object({
   question: publicQuestionSchema.optional(),
   /** Present while phase is "question": time left, as of this snapshot. */
   remainingMs: z.number().optional(),
+  /** Present while phase is "question" and answering hasn't opened yet. */
+  opensInMs: z.number().optional(),
   /** Present while phase is "question": answers received so far. */
   answeredCount: z.number().int().optional(),
   /** Present while phase is "reveal". */
@@ -199,6 +206,8 @@ export const stateSyncSchema = z.object({
   players: z.array(rosterPlayerSchema),
   /** Present for player connections only. */
   you: answerResultSchema.optional(),
+  /** The host turned player reactions on for this game. */
+  reactions: z.boolean().optional(),
 });
 
 export const submitAnswerSchema = z.object({
@@ -228,6 +237,21 @@ export const playerRemovedSchema = playerRefSchema.extend({
   banned: z.boolean().optional(),
 });
 
+/**
+ * Emoji a player can react with on result and leaderboard screens. Reactions
+ * are fire-and-forget: never stored, and a dropped one is fine.
+ */
+export const REACTION_EMOJIS = ["👏", "🔥", "😂", "😮", "😭", "🎉"] as const;
+
+export const sendReactionSchema = z.object({ emoji: z.enum(REACTION_EMOJIS) });
+
+/** A player's reaction, relayed to the host room only. */
+export const reactionSchema = z.object({
+  playerId: z.string(),
+  name: z.string(),
+  emoji: z.enum(REACTION_EMOJIS),
+});
+
 export const duelInviteAcceptSchema = z.object({ code: z.string().min(1) });
 export const removePlayerSchema = z.object({ id: z.string().min(1) });
 
@@ -255,6 +279,9 @@ export type SubmitAnswerPayload = z.infer<typeof submitAnswerSchema>;
 export type SubmitAnswerAck = z.infer<typeof submitAnswerAckSchema>;
 export type PlayerPayload = z.infer<typeof playerRefSchema>;
 export type PlayerRemovedPayload = z.infer<typeof playerRemovedSchema>;
+export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
+export type SendReactionPayload = z.infer<typeof sendReactionSchema>;
+export type ReactionPayload = z.infer<typeof reactionSchema>;
 
 // -- event maps -----------------------------------------------------------------
 
@@ -269,6 +296,8 @@ export interface ServerToClientEvents {
   "game-over": (payload: GameOverPayload) => void;
   "state-sync": (payload: StateSyncPayload) => void;
   "player-connection": (payload: PlayerConnectionPayload) => void;
+  /** Host room only: a player's emoji reaction. Best effort. */
+  reaction: (payload: ReactionPayload) => void;
   // -- duel matchmaking --
   "duel:matched": (payload: DuelMatchedPayload) => void;
   "duel:queued": (payload: { elo: number }) => void;
@@ -306,6 +335,8 @@ export interface ClientToServerEvents {
   "request-sync": () => void;
   /** A player voluntarily leaves the room (back / leave-game confirmation). */
   "leave-room": () => void;
+  /** No ack: reactions are best effort and dropped outside results. */
+  "send-reaction": (payload: SendReactionPayload) => void;
   // -- host intents (the server decides what each one means) --
   "remove-player": (player: { id: string }, gameCode?: string) => void;
   "start-game": (gameCode?: string) => void;

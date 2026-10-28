@@ -134,6 +134,32 @@ describe("opening a question (deadline in starting)", () => {
     expect(kinds(effects).at(-1)).toBe("arm-bot");
   });
 
+  it("opens answering after a question-first game's reading time", () => {
+    const reading = state({
+      meta: meta({ phase: "starting", qCount: 2, readTimeMs: 5_000 }),
+    });
+    const { effects } = step(reading, { type: "deadline" }, T0);
+    const closeAt = T0 + 5_000 + 10_000 + ANSWER_GRACE_MS;
+    expect(effectOf(effects, "set-deadline")?.at).toBe(closeAt);
+    expect(effectOf(effects, "arm-timer")?.at).toBe(closeAt);
+    // The full timeOut starts once the options show, so reading is free.
+    expect(effectOf(effects, "patch-meta")?.patch).toMatchObject({
+      qStartAt: T0 + 5_000,
+      qDeadline: T0 + 15_000,
+    });
+    const [start] = emitted(effects);
+    if (start?.message.event !== "question-start") throw new Error();
+    expect(start.message.opensAt).toBe(T0 + 5_000);
+    expect(start.message.deadline).toBe(T0 + 15_000);
+  });
+
+  it("opens answering at once without a reading time", () => {
+    const { effects } = step(starting, { type: "deadline" }, T0);
+    const [start] = emitted(effects);
+    if (start?.message.event !== "question-start") throw new Error();
+    expect(start.message.opensAt).toBe(T0);
+  });
+
   it("logs rather than opening a question that isn't there", () => {
     const s = state({ meta: meta({ phase: "starting" }), questions: [] });
     expect(kinds(step(s, { type: "deadline" }, T0).effects)).toEqual(["log"]);

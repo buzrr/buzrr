@@ -46,8 +46,16 @@ export interface GameMeta {
    * span it was held for.
    */
   pausedAt?: number;
+  /**
+   * Classic only, from the host's settings: how long a question shows before
+   * its answer window opens. 0 (or absent) = options and answering at once.
+   */
+  readTimeMs?: number;
+  /** Classic only: players may send emoji reactions during results. */
+  reactions?: boolean;
   qIndex: number;
   qId: string;
+  /** When answering opened (or opens, during a question's reading time). */
   qStartAt: number;
   qDeadline: number;
   qCount: number;

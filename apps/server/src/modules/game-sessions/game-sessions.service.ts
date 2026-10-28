@@ -4,6 +4,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from "@nestjs/common";
+import { DEFAULT_GAME_SETTINGS } from "@buzrr/contract";
 import { Prisma } from "@buzrr/prisma";
 import { customAlphabet } from "nanoid";
 import { EntitlementsService } from "../billing/entitlements.service";
@@ -94,6 +95,8 @@ export class GameSessionsService {
             gameCode,
             quizId: dto.quizId,
             creatorId: user.userId,
+            readTimeSec: dto.readTimeSec ?? DEFAULT_GAME_SETTINGS.readTimeSec,
+            reactionsEnabled: dto.reactions ?? DEFAULT_GAME_SETTINGS.reactions,
           },
         });
         return { id: room.id };

@@ -234,7 +234,11 @@ function openQuestion(
       message: `Question ${index} is missing`,
     });
   }
-  const deadline = now + question.timeOut * 1000;
+  // Question-first games show the question for a reading time before the
+  // answer window opens. The window — and so the score's clock — starts when
+  // it opens, so reading never costs points; one close timer is all it needs.
+  const opensAt = now + (meta.readTimeMs ?? 0);
+  const deadline = opensAt + question.timeOut * 1000;
   // Answers are taken until the grace runs out; the reveal waits for it.
   const closeAt = deadline + ANSWER_GRACE_MS;
 
@@ -244,13 +248,13 @@ function openQuestion(
     meta.botId && meta.botTier
       ? planBotAnswer(question, meta.botTier, ctx.random)
       : null;
-  const botAnswerAt = plan ? now + plan.delayMs : 0;
+  const botAnswerAt = plan ? opensAt + plan.delayMs : 0;
 
   const patch = {
     phase: "question" as const,
     qIndex: index,
     qId: question.id,
-    qStartAt: now,
+    qStartAt: opensAt,
     qDeadline: deadline,
     ...(plan ? { botAnswer: JSON.stringify(plan.answer), botAnswerAt } : {}),
   };
@@ -275,6 +279,7 @@ function openQuestion(
           remainingMs: deadline - now,
         },
         deadline,
+        opensAt,
       },
     },
     { kind: "arm-timer", at: closeAt },

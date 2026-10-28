@@ -229,3 +229,30 @@ export type DuelProfile = z.infer<typeof duelProfileSchema>;
 export type CreateDuelInvite = z.output<typeof createDuelInviteSchema>;
 export type SetTimeZone = z.infer<typeof setTimeZoneSchema>;
 export type StreakMonth = z.infer<typeof streakMonthSchema>;
+
+// -- hosted session settings ----------------------------------------------------
+
+/** Question-first reading times a host can pick, in seconds; 0 = together. */
+export const READ_TIME_OPTIONS = [0, 3, 5, 10] as const;
+/** What "Question first" starts on in the host's settings. */
+export const DEFAULT_READ_TIME_SEC = 5;
+
+/** `POST /api/game-sessions` — how the hosted session plays. */
+export const gameSettingsSchema = z.object({
+  /** Seconds the question shows before its options and answering open. */
+  readTimeSec: z.union([
+    z.literal(0),
+    z.literal(3),
+    z.literal(5),
+    z.literal(10),
+  ]),
+  /** Players may send emoji reactions on result and leaderboard screens. */
+  reactions: z.boolean(),
+});
+
+export const DEFAULT_GAME_SETTINGS: GameSettings = {
+  readTimeSec: 0,
+  reactions: false,
+};
+
+export type GameSettings = z.infer<typeof gameSettingsSchema>;

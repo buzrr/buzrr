@@ -198,7 +198,15 @@ however many answers arrive.
 opens the phase in one meta write carrying `qStartAt = now`,
 `qDeadline = now + timeOut` (the real window, no grace) and the bot plan, and
 only **then** emits `question-start` with whatever is left of the window as
-`remainingMs`. The order matters: `submitAnswer` reads the window back from
+`remainingMs`. **Question-first games** (classic, host setting
+`readTimeMs` in meta) stamp the window `readTimeMs` later —
+`qStartAt = now + readTimeMs`, `qDeadline = qStartAt + timeOut` — and send
+`opensInMs` (also on a question-phase `state-sync`); clients hide the answer
+UI until it runs out, and `judgeAnswer` rejects anything received before
+`qStartAt`. No extra phase or timer: the one close timer still fires at
+`qDeadline + ANSWER_GRACE_MS`, and since scoring measures from `qStartAt`,
+reading costs no points. The options do travel in that `question-start`
+(hidden, not withheld) — they can be read early, never answered early. The order matters: `submitAnswer` reads the window back from
 Redis, so a player answering the instant the event lands would race an
 after-the-fact write and be rejected as "not started". The cost is the Redis
 write, which comes out of the window rather than being billed to the player on
@@ -265,8 +273,16 @@ win for each player in `/users/me/stats`.
   Reveal-time `leaderboard` entries (the reveal broadcast, a roster change
   during the reveal, and reveal-phase `state-sync`) carry `delta` — points earned on that question;
   final/ended leaderboards omit it.
+- **Reactions** (classic, host setting `reactions` in meta, also sent as
+  `state-sync.reactions`): a player's `send-reaction { emoji }` (one of the
+  contract's `REACTION_EMOJIS`, no ack) is throttled per socket in the
+  gateway (400ms), gated by `relayReaction` on one `HMGET meta phase
+reactions` (only in `reveal`/`final`), and relayed as `reaction` to
+  `host:{gameCode}` only — the sender echoes its own locally. Never stored;
+  drops are acceptable. Cost: 1 Redis command + 1 `PUBLISH` per reaction.
 - Event names: `question-start`, `question-end`, `answer-result`,
-  `answer-count`, `live-summary` (host room only), `leaderboard`, `game-over`,
+  `answer-count`, `live-summary` (host room only), `reaction` (host room
+  only), `leaderboard`, `game-over`,
   `state-sync`, `player-connection`,
   `player-joined/removed/left`, `game-started`, `game-session-ended`, plus the
   `duel:*` family.

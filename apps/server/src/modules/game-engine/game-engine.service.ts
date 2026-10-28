@@ -4,7 +4,11 @@ import {
   OnApplicationBootstrap,
   OnApplicationShutdown,
 } from "@nestjs/common";
-import type { GameOverPayload, QuestionAnswer } from "@buzrr/contract";
+import type {
+  GameOverPayload,
+  QuestionAnswer,
+  ReactionPayload,
+} from "@buzrr/contract";
 import type { DuelOutcome, Prisma } from "@buzrr/prisma";
 import { nanoid } from "nanoid";
 import { BotTier } from "../../common/utils/duel-bot";
@@ -246,10 +250,15 @@ export class GameEngineService
         // What is left of the window once the writes before this broadcast
         // are done — the clock has been running since the window opened, so
         // the client is told the truth rather than the full timeOut.
-        target.emit("question-start", {
-          ...message.payload,
-          remainingMs: Math.max(0, message.deadline - Date.now()),
-        });
+        {
+          const now = Date.now();
+          const opensInMs = message.opensAt - now;
+          target.emit("question-start", {
+            ...message.payload,
+            remainingMs: Math.max(0, message.deadline - now),
+            ...(opensInMs > 0 ? { opensInMs } : {}),
+          });
+        }
         break;
       case "question-end":
         target.emit("question-end", message.payload);
@@ -283,7 +292,13 @@ export class GameEngineService
   /** Create the live session record on first socket contact (idempotent). */
   async ensureLiveSession(
     gameCode: string,
-    init: { sessionId: string; quizId: string; hostId: string },
+    init: {
+      sessionId: string;
+      quizId: string;
+      hostId: string;
+      readTimeMs: number;
+      reactions: boolean;
+    },
   ): Promise<void> {
     await this.store.initMeta(gameCode, {
       sessionId: init.sessionId,
@@ -294,6 +309,8 @@ export class GameEngineService
       pacing: "host",
       phase: "lobby",
       rated: false,
+      readTimeMs: init.readTimeMs,
+      reactions: init.reactions,
       qIndex: 0,
       qId: "",
       qStartAt: 0,
@@ -658,6 +675,19 @@ export class GameEngineService
       answered: Object.keys(answers).length,
       summary: summarizeAnswers(question, answerEntries(answers, roster)),
     });
+  }
+
+  /**
+   * A player's emoji, passed to the host screen only (the sender echoes it
+   * locally). Never stored; dropped unless the host turned reactions on and
+   * the room is on a result or leaderboard screen.
+   */
+  async relayReaction(gameCode: string, reaction: ReactionPayload) {
+    if (!this.io) return;
+    const gate = await this.store.reactionGate(gameCode);
+    if (!gate.reactions) return;
+    if (gate.phase !== "reveal" && gate.phase !== "final") return;
+    this.io.to(`host:${gameCode}`).emit("reaction", reaction);
   }
 
   // -- roster / presence -----------------------------------------------------------

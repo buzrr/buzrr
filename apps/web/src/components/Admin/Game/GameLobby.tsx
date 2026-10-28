@@ -9,6 +9,7 @@ import ConnectionBanner from "@/components/ConnectionBanner";
 import { GameTopBar } from "@/components/Game/GameUI";
 import EndQuizButton from "@/components/Admin/EndQuizButton";
 import GetReady from "@/components/Game/GetReady";
+import { ReactionOverlay } from "@/components/Game/Reactions";
 import QuestionScreen from "./QuestionScreen";
 import QuesResult from "./QuesResult";
 import LeaderBoard from "./Leaderboard";
@@ -42,6 +43,9 @@ const GameLobby = (params: {
   const phase = useAppSelector((state) => state.game.phase);
   const qIndex = useAppSelector((state) => state.game.qIndex);
   const qCount = useAppSelector((state) => state.game.qCount);
+  const reactionsEnabled = useAppSelector(
+    (state) => state.game.reactionsEnabled,
+  );
 
   useEffect(() => {
     dispatch(setPlayers(params.players));
@@ -74,6 +78,9 @@ const GameLobby = (params: {
   return (
     <div className="w-full max-w-7xl mx-auto flex flex-col px-4 sm:px-6 lg:px-8 pb-4 md:pb-0 md:h-[calc(100dvh-10rem)] text-dark dark:text-white">
       <ConnectionBanner />
+      {reactionsEnabled && (phase === "reveal" || phase === "final") && (
+        <ReactionOverlay socket={socket} />
+      )}
       <GameTopBar
         title={title}
         qIndex={qIndex}

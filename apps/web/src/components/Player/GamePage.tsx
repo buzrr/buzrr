@@ -10,6 +10,7 @@ import ConnectionBanner from "@/components/ConnectionBanner";
 import GetReady from "@/components/Game/GetReady";
 import ConnectionStatusPill from "@/components/ConnectionStatusPill";
 import ConfirmationModal from "@/components/Admin/ConfirmationModal";
+import { ReactionBar } from "@/components/Game/Reactions";
 import { usePlayerSocket } from "@/hooks/usePlayerSocket";
 import { playersApi } from "@/lib/modules/players/api";
 
@@ -41,6 +42,12 @@ const GamePage = (params: {
   const phase = useAppSelector((state) => state.game.phase);
   const question = useAppSelector((state) => state.game.question);
   const you = useAppSelector((state) => state.game.you);
+  const reactionsEnabled = useAppSelector(
+    (state) => state.game.reactionsEnabled,
+  );
+  // The server takes reactions on result and leaderboard screens only.
+  const showReactions =
+    reactionsEnabled && (phase === "reveal" || phase === "final");
 
   const { socket } = usePlayerSocket({
     playerId: params.player.id,
@@ -98,43 +105,47 @@ const GamePage = (params: {
         desc="If you leave now you'll be removed from this game. Your name is saved — you can rejoin with the room code."
         confirmLabel="Leave Game"
       />
-      {phase === "idle" || phase === "lobby" ? (
-        <WaitGameStart
-          player={params.player}
-          game={params.game}
-          onLeave={() => setShowLeaveModal(true)}
-        />
-      ) : phase === "question" ? (
-        question && socket ? (
-          <Question
-            question={question}
-            socket={socket}
-            quizTitle={game.quiz.title ?? ""}
+      {showReactions && socket && <ReactionBar socket={socket} />}
+      {/* Room for the tray, so it never covers the screen's own buttons. */}
+      <div className={showReactions ? "pb-20" : undefined}>
+        {phase === "idle" || phase === "lobby" ? (
+          <WaitGameStart
+            player={params.player}
+            game={params.game}
+            onLeave={() => setShowLeaveModal(true)}
+          />
+        ) : phase === "question" ? (
+          question && socket ? (
+            <Question
+              question={question}
+              socket={socket}
+              quizTitle={game.quiz.title ?? ""}
+              gameCode={game.gameCode}
+              hostName={game.creator?.name}
+              hostImage={game.creator?.image}
+            />
+          ) : (
+            <GetReady title={game.quiz.title ?? undefined} />
+          )
+        ) : phase === "reveal" ? (
+          <Result
+            you={you}
             gameCode={game.gameCode}
+            quizTitle={game.quiz.title ?? ""}
             hostName={game.creator?.name}
             hostImage={game.creator?.image}
           />
+        ) : phase === "final" || phase === "ended" ? (
+          <LeaderBoard
+            playerId={params.player.id}
+            position={you?.rank ?? null}
+            score={you?.totalScore ?? 0}
+          />
         ) : (
+          // "starting" — the pre-question countdown
           <GetReady title={game.quiz.title ?? undefined} />
-        )
-      ) : phase === "reveal" ? (
-        <Result
-          you={you}
-          gameCode={game.gameCode}
-          quizTitle={game.quiz.title ?? ""}
-          hostName={game.creator?.name}
-          hostImage={game.creator?.image}
-        />
-      ) : phase === "final" || phase === "ended" ? (
-        <LeaderBoard
-          playerId={params.player.id}
-          position={you?.rank ?? null}
-          score={you?.totalScore ?? 0}
-        />
-      ) : (
-        // "starting" — the pre-question countdown
-        <GetReady title={game.quiz.title ?? undefined} />
-      )}
+        )}
+      </div>
     </>
   );
 };

@@ -238,15 +238,20 @@ model Player {
 /// gameplay flag kept here is `isPlaying`, which join checks read to tell a
 /// waiting lobby from a room already in progress.
 model GameSession {
-  id        String   @id @default(cuid())
-  quizId    String
-  creatorId String
-  gameCode  String   @unique
-  isPlaying Boolean  @default(false)
-  createdAt DateTime @default(now())
-  creator   User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
-  quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  players   Player[]
+  id               String   @id @default(cuid())
+  quizId           String
+  creatorId        String
+  gameCode         String   @unique
+  isPlaying        Boolean  @default(false)
+  /// Host's session settings, copied into Redis meta when the room goes live.
+  /// Seconds players read the question before answering opens; 0 = together.
+  readTimeSec      Int      @default(0)
+  /// Players may send emoji reactions on result and leaderboard screens.
+  reactionsEnabled Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  creator          User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  quiz             Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  players          Player[]
 }
 
 /// Immutable record of a finished game. Live state lives in Redis during
