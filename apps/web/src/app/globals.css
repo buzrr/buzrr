@@ -132,7 +132,8 @@
     }
   }
 
-  /* --sway: sideways drift, set per reaction so they don't stack. */
+  /* --sway: sideways drift, set per reaction so they don't stack;
+     --rise: how far up it travels. */
   @keyframes reaction-rise {
     0% {
       opacity: 0;
@@ -147,7 +148,7 @@
     }
     100% {
       opacity: 0;
-      transform: translate(var(--sway, 0), -60vh) scale(1);
+      transform: translate(var(--sway, 0), var(--rise, -60vh)) scale(1);
     }
   }
 

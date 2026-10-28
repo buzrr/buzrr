@@ -22,7 +22,7 @@ interface Floating {
   id: number;
   emoji: string;
   name?: string;
-  /** Horizontal start, % of the layer width. */
+  /** Horizontal start, % of the layer's width. */
   x: number;
   /** Sideways drift on the way up (CSS length). */
   sway: string;
@@ -45,8 +45,8 @@ export function useFloatingReactions() {
       id,
       emoji,
       name,
-      x: 8 + Math.random() * 84,
-      sway: `${Math.round((Math.random() - 0.5) * 80)}px`,
+      x: 10 + Math.random() * 60,
+      sway: `${Math.round((Math.random() - 0.5) * 50)}px`,
     };
     setItems((list) => [...list.slice(-(MAX_FLOATING - 1)), item]);
     const timer = setTimeout(() => {
@@ -59,30 +59,43 @@ export function useFloatingReactions() {
   return { items, add };
 }
 
-/** The floating layer itself: decorative, never in the way of a click. */
+/**
+ * The floating layer itself: decorative, never in the way of a click.
+ * `className` places it (a fixed box); reactions rise from its bottom edge.
+ */
 export function ReactionLayer({
   items,
   className,
+  rise,
+  start = "bottom-0",
 }: {
   items: Floating[];
-  className?: string;
+  className: string;
+  /** Where reactions start, as a `bottom-*` class inside the layer. */
+  start?: string;
+  /** How far up a reaction travels (CSS length); defaults to 60vh. */
+  rise?: string;
 }) {
   return (
     <div
       aria-hidden
       className={clsx(
-        "pointer-events-none fixed inset-0 z-40 overflow-hidden",
+        "pointer-events-none fixed z-40 overflow-hidden",
         className,
       )}
     >
       {items.map((item) => (
         <span
           key={item.id}
-          className="absolute bottom-[6vh] flex flex-col items-center animate-reaction-rise"
+          className={clsx(
+            "absolute flex flex-col items-center animate-reaction-rise",
+            start,
+          )}
           style={
             {
               left: `${item.x}%`,
               "--sway": item.sway,
+              ...(rise ? { "--rise": rise } : {}),
             } as CSSProperties
           }
         >
@@ -111,7 +124,16 @@ export function ReactionOverlay({ socket }: { socket: GameSocket }) {
       socket.off("reaction", onReaction);
     };
   }, [socket, add]);
-  return <ReactionLayer items={items} />;
+  // A full-height strip up the right edge, clear of the leaderboard.
+  // Reactions start just above the footer and rise most of the way up.
+  return (
+    <ReactionLayer
+      items={items}
+      className="right-2 md:right-6 inset-y-0 w-36 md:w-48"
+      start="bottom-14"
+      rise="-85vh"
+    />
+  );
 }
 
 /**
@@ -134,8 +156,10 @@ export function ReactionBar({ socket }: { socket: GameSocket }) {
 
   return (
     <>
-      <ReactionLayer items={items} />
-      <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(12px,env(safe-area-inset-bottom))] pointer-events-none">
+      {/* Rising from just above the tray. */}
+      <ReactionLayer items={items} className="inset-x-0 top-0 bottom-32" />
+      {/* Above the app-wide footer (fixed, z-50) rather than under it. */}
+      <div className="fixed inset-x-0 bottom-12 z-50 flex justify-center px-4 mb-[env(safe-area-inset-bottom)] pointer-events-none">
         <div
           role="group"
           aria-label="Send a reaction"

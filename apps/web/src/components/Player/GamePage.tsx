@@ -107,7 +107,7 @@ const GamePage = (params: {
       />
       {showReactions && socket && <ReactionBar socket={socket} />}
       {/* Room for the tray, so it never covers the screen's own buttons. */}
-      <div className={showReactions ? "pb-20" : undefined}>
+      <div className={showReactions ? "pb-32" : undefined}>
         {phase === "idle" || phase === "lobby" ? (
           <WaitGameStart
             player={params.player}
