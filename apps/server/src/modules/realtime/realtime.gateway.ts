@@ -150,7 +150,11 @@ export class RealtimeGateway
         this.registerHostHandlers(socket, gameCode);
       } else {
         this.registerPlayerHandlers(socket, gameCode);
-        if (player) this.registerReactionHandler(socket, gameCode, player);
+        // Settings are fixed at room creation, so a session with reactions off
+        // never needs the handler; reactionGate still enforces the phase.
+        if (player && result.settings.reactions) {
+          this.registerReactionHandler(socket, gameCode, player);
+        }
       }
 
       socket.on("request-sync", () => {
