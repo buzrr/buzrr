@@ -2,6 +2,14 @@ import { Injectable, Logger } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { PrismaService } from "../../prisma/prisma.service";
 
+/** The host's session settings, as the live game keeps them in meta. */
+function settingsOf(game: { readTimeSec: number; reactionsEnabled: boolean }) {
+  return {
+    readTimeMs: game.readTimeSec * 1000,
+    reactions: game.reactionsEnabled,
+  };
+}
+
 @Injectable()
 export class RealtimeService {
   private readonly logger = new Logger(RealtimeService.name);
@@ -150,6 +158,7 @@ export class RealtimeService {
         gameSessionId: game.id,
         quizId: game.quizId,
         hostId: game.creatorId,
+        settings: settingsOf(game),
         isRoomHost: false,
       };
     }
@@ -187,6 +196,7 @@ export class RealtimeService {
         gameSessionId: game.id,
         quizId: game.quizId,
         hostId: game.creatorId,
+        settings: settingsOf(game),
         isRoomHost: true,
       };
     }

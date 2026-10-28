@@ -7,6 +7,7 @@ import {
   LuArrowUp,
   LuCheck,
   LuClock,
+  LuEye,
   LuSend,
   LuTrophy,
   LuX,
@@ -15,6 +16,7 @@ import type { PublicQuestion, QuestionAnswer } from "@buzrr/contract";
 import { DEFAULT_AVATAR } from "@/constants";
 import { useAppSelector } from "@/state/hooks";
 import type { Standing } from "@/state/game/gameSlice";
+import { useReadingTime } from "@/hooks/useReadingTime";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
 import { AnswerInput, QuestionTypePill } from "@/components/QuestionTypes";
 import {
@@ -28,6 +30,28 @@ import {
   panelClass,
   subtleCardClass,
 } from "@/components/Game/GameUI";
+
+/** Where the options go while a question-first game's players read. */
+function ReadingPlaceholder({ secondsLeft }: { secondsLeft: number }) {
+  return (
+    <div
+      role="status"
+      className={clsx(
+        "mt-6 md:mt-8 flex flex-col items-center justify-center gap-2 rounded-[18px] border-2 border-dashed px-5 py-8 md:py-12 text-center border-lprimary/20 dark:border-white/10",
+      )}
+    >
+      <LuEye
+        size={28}
+        className="text-lprimary dark:text-dprimary animate-pulse"
+      />
+      <span className="text-lg md:text-xl font-bold">Read the question</span>
+      <span className={clsx("text-sm", mutedText)}>
+        Options appear in{" "}
+        <b className="tabular-nums text-dark dark:text-white">{secondsLeft}s</b>
+      </span>
+    </div>
+  );
+}
 
 const STATUS = {
   correct: {
@@ -254,6 +278,9 @@ const QuestionAndResult = (params: {
   const remaining = useServerCountdown(deadline);
   const timeOut = params?.question?.timeOut ?? 1;
   const isQuestion = params.screen === "question";
+  // Question-first games: the options stay hidden while players read.
+  const read = useReadingTime();
+  const reading = isQuestion && read.reading;
   const status = STATUS[params.status ?? "timesout"];
   const isLast = qCount > 0 && qIndex >= qCount - 1;
   // The player page scrolls as a whole, so size the title by length rather
@@ -265,7 +292,7 @@ const QuestionAndResult = (params: {
       params.question.options.some((o) => o.title.length > 80));
 
   function handleSubmit(answer: QuestionAnswer) {
-    if (params.locked || offline) return;
+    if (params.locked || offline || reading) return;
     params?.submitAnswer?.(answer);
   }
 
@@ -281,14 +308,23 @@ const QuestionAndResult = (params: {
           ) : undefined
         }
       />
-      {isQuestion && (
-        <TimerBar
-          key={params.question?.id ?? params.question?.title}
-          value={remaining}
-          max={timeOut}
-          className="mb-2.5 md:hidden"
-        />
-      )}
+      {isQuestion &&
+        (reading ? (
+          <TimerBar
+            key={`read-${params.question?.id}`}
+            value={read.left}
+            max={read.total}
+            lowAt={0}
+            className="mb-2.5 md:hidden"
+          />
+        ) : (
+          <TimerBar
+            key={params.question?.id ?? params.question?.title}
+            value={remaining}
+            max={timeOut}
+            className="mb-2.5 md:hidden"
+          />
+        ))}
       <div className="flex-1 flex flex-col md:grid md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3.5 md:gap-5">
         <section
           className={clsx(
@@ -297,7 +333,17 @@ const QuestionAndResult = (params: {
           )}
         >
           <div className="flex items-center gap-[26px]">
-            {isQuestion ? (
+            {reading ? (
+              <TimerRing
+                key={`read-${params.question?.id}`}
+                value={Math.ceil(read.left)}
+                max={read.total}
+                label="get ready"
+                lowAt={0}
+                className="size-[150px]"
+                valueClassName="text-5xl"
+              />
+            ) : isQuestion ? (
               <TimerRing
                 key={params.question?.id ?? params.question?.title}
                 value={Math.ceil(remaining)}
@@ -423,13 +469,19 @@ const QuestionAndResult = (params: {
             >
               {params.question?.title ?? ""}
             </h2>
-            {params.question && (
-              <AnswerInput
-                question={params.question}
-                selected={params.answer ?? null}
-                disabled={offline || Boolean(params.locked)}
-                onSubmit={handleSubmit}
-              />
+            {reading ? (
+              <ReadingPlaceholder secondsLeft={Math.ceil(read.left)} />
+            ) : (
+              params.question && (
+                <div className="animate-fade-up">
+                  <AnswerInput
+                    question={params.question}
+                    selected={params.answer ?? null}
+                    disabled={offline || Boolean(params.locked)}
+                    onSubmit={handleSubmit}
+                  />
+                </div>
+              )
             )}
             {params.locked && !params.canAddMore && (
               <div className="mt-6 flex justify-center animate-fade-up">

@@ -55,6 +55,9 @@ const nextConfig: NextConfig = {
     "kysely",
   ],
   transpilePackages: ["@buzrr/prisma", "@buzrr/contract"],
+  experimental: {
+    agentUpgrade: "security",
+  },
   // App screens are never search results. Their layouts also set a robots
   // meta tag, but on dynamic routes Next streams metadata via JS for most
   // crawlers — the header works without JS.

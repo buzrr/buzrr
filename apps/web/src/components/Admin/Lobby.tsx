@@ -1,7 +1,7 @@
 "use client";
 import clsx from "clsx";
 import { DEFAULT_AVATAR } from "@/constants";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import { removePlayer, setPlayers } from "@/state/admin/playersSlice";
 import Image from "next/image";
@@ -30,6 +30,14 @@ import ConfirmationModal from "@/components/Admin/ConfirmationModal";
 import { buildJoinUrl } from "@/lib/join-link";
 import EndQuizButton from "@/components/Admin/EndQuizButton";
 
+function SettingChip({ children }: { children: ReactNode }) {
+  return (
+    <span className="rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap text-lprimary dark:text-dprimary bg-lprimary/8 dark:bg-white/5">
+      {children}
+    </span>
+  );
+}
+
 const Lobby = (params: {
   roomId: string;
   userId: string;
@@ -40,6 +48,9 @@ const Lobby = (params: {
   quizId: string;
   maxPlayers?: number;
   plan?: "free" | "pro";
+  /** The session's settings, chosen when it was hosted. */
+  readTimeSec?: number;
+  reactionsEnabled?: boolean;
 }) => {
   const dispatch = useAppDispatch();
   const players = useAppSelector((state) => state.player.players);
@@ -172,6 +183,14 @@ const Lobby = (params: {
           </h1>
           <span className="text-sm text-off-dark dark:text-muted-dark whitespace-nowrap">
             Waiting for players
+          </span>
+          <span className="flex flex-wrap gap-1.5 md:self-center">
+            <SettingChip>
+              {params.readTimeSec
+                ? `Question first · ${params.readTimeSec}s`
+                : "Question + options together"}
+            </SettingChip>
+            {params.reactionsEnabled && <SettingChip>Reactions on</SettingChip>}
           </span>
         </div>
         <span className="flex-1 md:hidden" />

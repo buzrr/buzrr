@@ -62,6 +62,8 @@ export default function AdminPlayClient({
       gameStarted={room.isPlaying}
       maxPlayers={maxPlayers}
       plan={plan}
+      readTimeSec={room.readTimeSec}
+      reactionsEnabled={room.reactionsEnabled}
     />
   );
 }

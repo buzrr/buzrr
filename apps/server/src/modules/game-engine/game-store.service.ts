@@ -34,8 +34,9 @@ const NUMERIC_META = new Set([
   "botElo",
   "botAnswerAt",
   "pausedAt",
+  "readTimeMs",
 ]);
-const BOOLEAN_META = new Set(["hostConnected", "rated"]);
+const BOOLEAN_META = new Set(["hostConnected", "rated", "reactions"]);
 
 function parseMeta(raw: Record<string, string>): GameMeta | null {
   if (!raw || Object.keys(raw).length === 0) return null;
@@ -202,6 +203,18 @@ export class GameStoreService {
 
   async getMeta(code: string): Promise<GameMeta | null> {
     return parseMeta(await this.redis.hgetall(keys.meta(code)));
+  }
+
+  /** Just what a reaction is checked against: one `HMGET`. */
+  async reactionGate(
+    code: string,
+  ): Promise<{ phase: string | null; reactions: boolean }> {
+    const [phase, reactions] = await this.redis.hmget(
+      keys.meta(code),
+      "phase",
+      "reactions",
+    );
+    return { phase, reactions: reactions === "1" };
   }
 
   /**

@@ -22,6 +22,8 @@ export default function BasicModal(props: {
   isEdit?: boolean;
   /** Wider dialog on desktop (the question editor's two columns). */
   wide?: boolean;
+  /** Header badge icon; defaults to a pencil (isEdit) or a plus. */
+  icon?: React.ReactNode;
   open?: boolean;
   onClose?: () => void;
 }) {
@@ -76,7 +78,12 @@ export default function BasicModal(props: {
           >
             <div className="flex items-start gap-4 px-5 pt-[22px] md:px-7 md:pt-[26px]">
               <span className="size-12 shrink-0 rounded-[14px] bg-linear-to-br from-[#9a6cf5] to-[#7c4ddb] dark:from-accent dark:to-accent-deep text-white flex items-center justify-center shadow-[0_10px_24px_-10px_#7c4ddb]">
-                {props.isEdit ? <LuPencil size={22} /> : <LuPlus size={24} />}
+                {props.icon ??
+                  (props.isEdit ? (
+                    <LuPencil size={22} />
+                  ) : (
+                    <LuPlus size={24} />
+                  ))}
               </span>
               <div className="min-w-0">
                 <h2

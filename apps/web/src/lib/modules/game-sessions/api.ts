@@ -1,3 +1,4 @@
+import type { GameSettings } from "@buzrr/contract";
 import type { AxiosInstance } from "axios";
 import type {
   GameSession,
@@ -15,7 +16,7 @@ import {
 
 export async function createGameSession(
   client: AxiosInstance,
-  body: { quizId: string },
+  body: { quizId: string } & GameSettings,
 ) {
   const { data } = await client.post<{ id: string }>("/game-sessions", body);
   return data;

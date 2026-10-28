@@ -46,6 +46,9 @@
   --animate-fade-in: fade-in 0.3s ease-out both;
   --animate-fade-up-fast: fade-up 0.35s ease-out both;
   --animate-modal-in: modal-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* Player reactions drifting up the screen (Game/Reactions). */
+  --animate-reaction-rise: reaction-rise 2.6s ease-out both;
+  --animate-reaction-fade: reaction-fade 2.6s ease-out both;
   /* AI quiz generation loader (AiMagicLoader). */
   --animate-ai-wand: ai-wand 1.6s ease-in-out infinite;
   --animate-ai-sparkle: ai-sparkle 1.9s ease-out infinite both;
@@ -125,6 +128,37 @@
       opacity: 0;
     }
     to {
+      opacity: 1;
+    }
+  }
+
+  /* --sway: sideways drift, set per reaction so they don't stack;
+     --rise: how far up it travels. */
+  @keyframes reaction-rise {
+    0% {
+      opacity: 0;
+      transform: translate(0, 0) scale(0.6);
+    }
+    12% {
+      opacity: 1;
+      transform: translate(0, -6vh) scale(1.1);
+    }
+    80% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: translate(var(--sway, 0), var(--rise, -60vh)) scale(1);
+    }
+  }
+
+  @keyframes reaction-fade {
+    0%,
+    100% {
+      opacity: 0;
+    }
+    15%,
+    75% {
       opacity: 1;
     }
   }
@@ -288,6 +322,10 @@ html.theme-anim *::after {
   .animate-ai-progress,
   .ai-magic-ring {
     animation: none;
+  }
+  /* Shown in place instead of floating up. */
+  .animate-reaction-rise {
+    animation: var(--animate-reaction-fade);
   }
   /* Frozen mid-burst instead of hidden, so the scene still reads as magic. */
   .animate-ai-sparkle {

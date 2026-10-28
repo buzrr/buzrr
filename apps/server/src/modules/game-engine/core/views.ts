@@ -152,6 +152,7 @@ export function buildSnapshot(
     mode: meta.mode,
     qIndex: meta.qIndex,
     qCount: meta.qCount,
+    reactions: Boolean(meta.reactions),
     players: roster.map((p) => ({
       id: p.id,
       name: p.name,
@@ -175,6 +176,7 @@ export function buildSnapshot(
       payload.remainingMs = meta.qStartAt
         ? Math.max(0, meta.qDeadline - now)
         : question.timeOut * 1000;
+      if (meta.qStartAt > now) payload.opensInMs = meta.qStartAt - now;
       payload.answeredCount = Object.keys(answers).length;
     } else {
       payload.reveal = buildReveal(

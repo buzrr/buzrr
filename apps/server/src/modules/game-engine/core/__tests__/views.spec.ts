@@ -111,6 +111,20 @@ describe("buildSnapshot", () => {
     });
   });
 
+  it("carries the time left to read during a question-first reading time", () => {
+    const reading = questionOpen(
+      {},
+      { qStartAt: T0 + 5_000, qDeadline: T0 + 15_000, reactions: true },
+    );
+    const snap = buildSnapshot(reading, null, T0 + 2_000);
+    expect(snap).toMatchObject({
+      opensInMs: 3_000,
+      remainingMs: 13_000,
+      reactions: true,
+    });
+    expect(buildSnapshot(reading, null, T0 + 5_000).opensInMs).toBeUndefined();
+  });
+
   it("falls back to the full window for an unstamped legacy question", () => {
     const s = questionOpen({}, { qStartAt: 0 });
     expect(buildSnapshot(s, null, T0).remainingMs).toBe(10_000);

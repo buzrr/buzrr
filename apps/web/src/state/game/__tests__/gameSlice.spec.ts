@@ -282,3 +282,44 @@ describe("standing", () => {
     ).toBeNull();
   });
 });
+
+describe("question-first reading time", () => {
+  it("holds answering until opensInMs runs out", () => {
+    const before = Date.now();
+    const state = reducer(
+      fresh(),
+      questionStart({
+        index: 0,
+        qCount: 3,
+        question: question("q1"),
+        remainingMs: 15_000,
+        opensInMs: 5_000,
+      }),
+    );
+    expect(state.opensAt).toBeGreaterThanOrEqual(before + 5_000);
+    expect(state.deadline - state.opensAt).toBeCloseTo(10_000, -2);
+    expect(reducer(state, questionEnd(reveal(0))).opensAt).toBe(0);
+  });
+
+  it("opens at once without a reading time", () => {
+    expect(onQuestion(0).opensAt).toBe(0);
+  });
+
+  it("takes the reading time and reactions flag from a snapshot", () => {
+    const state = reducer(
+      fresh(),
+      applySync(
+        sync({
+          phase: "question",
+          question: question("q1"),
+          remainingMs: 12_000,
+          opensInMs: 2_000,
+          reactions: true,
+        }),
+      ),
+    );
+    expect(state.opensAt).toBeGreaterThan(Date.now());
+    expect(state.reactionsEnabled).toBe(true);
+    expect(reducer(fresh(), applySync(sync({}))).reactionsEnabled).toBe(false);
+  });
+});

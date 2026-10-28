@@ -30,6 +30,13 @@ export interface GameLiveState {
    * `remainingMs` on receipt. Display only; 0 when no question is open.
    */
   deadline: number;
+  /**
+   * Question-first games: local-clock ms when the options show and answering
+   * opens, from the server's `opensInMs`. 0 when answering is open.
+   */
+  opensAt: number;
+  /** Length of that reading time as received (for the progress ring). */
+  readMs: number;
   /** Length of the current start countdown (for the progress ring). */
   countdownMs: number;
   /** Answers received for the open question (host meter). */
@@ -64,6 +71,8 @@ export interface GameLiveState {
   category: DuelCategoryRef;
   /** Duels only: daily streak per signed-in playerId, from game-over. */
   streaks: GameOverPayload["streaks"] | null;
+  /** The host turned player reactions on for this game. */
+  reactionsEnabled: boolean;
 }
 
 export interface Standing {
@@ -96,6 +105,8 @@ const initialState: GameLiveState = {
   qCount: 0,
   question: null,
   deadline: 0,
+  opensAt: 0,
+  readMs: 0,
   countdownMs: 0,
   answeredCount: 0,
   liveSummary: null,
@@ -111,6 +122,7 @@ const initialState: GameLiveState = {
   rated: false,
   category: null,
   streaks: null,
+  reactionsEnabled: false,
 };
 
 /**
@@ -161,6 +173,9 @@ const gameSlice = createSlice({
       state.question = s.question ?? null;
       state.deadline =
         s.remainingMs === undefined ? 0 : Date.now() + s.remainingMs;
+      state.opensAt = s.opensInMs ? Date.now() + s.opensInMs : 0;
+      state.readMs = s.opensInMs ?? 0;
+      state.reactionsEnabled = s.reactions ?? false;
       state.countdownMs = s.phase === "starting" ? (s.remainingMs ?? 0) : 0;
       state.answeredCount = s.answeredCount ?? 0;
       // The host is sent a fresh summary right after its snapshot; keep the
@@ -202,6 +217,8 @@ const gameSlice = createSlice({
       state.qCount = q.qCount;
       state.question = q.question;
       state.deadline = Date.now() + q.remainingMs;
+      state.opensAt = q.opensInMs ? Date.now() + q.opensInMs : 0;
+      state.readMs = q.opensInMs ?? 0;
       state.answeredCount = 0;
       state.liveSummary = null;
       state.reveal = null;
@@ -211,6 +228,8 @@ const gameSlice = createSlice({
       state.phase = "reveal";
       state.reveal = action.payload;
       state.deadline = 0;
+      state.opensAt = 0;
+      state.readMs = 0;
     },
     answerResult: (state, action: PayloadAction<AnswerResultPayload>) => {
       state.you = action.payload;

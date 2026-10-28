@@ -174,18 +174,21 @@ export function TimerRing({
   label = "seconds",
   className,
   valueClassName,
+  lowAt = 5,
 }: {
   value: number;
   max: number;
   label?: string;
   className?: string;
   valueClassName?: string;
+  /** Turns red at or below this many seconds; 0 never does. */
+  lowAt?: number;
 }) {
   // Unique per ring: a shared id would bind every ring to the first gradient.
   const gradientId = `ring-grad-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const r = 44;
   const c = 2 * Math.PI * r;
-  const low = value <= 5;
+  const low = value <= lowAt;
   const frac = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
   return (
     <div className={clsx("relative shrink-0", className)}>
@@ -242,12 +245,15 @@ export function TimerBar({
   value,
   max,
   className,
+  lowAt = 5,
 }: {
   value: number;
   max: number;
   className?: string;
+  /** Turns red at or below this many seconds; 0 never does. */
+  lowAt?: number;
 }) {
-  const low = value <= 5;
+  const low = value <= lowAt;
   const frac = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
   return (
     <div

@@ -95,4 +95,26 @@ describe("judgeAnswer", () => {
     );
     expect(result).toEqual({ accepted: false, reason: "Invalid answer" });
   });
+
+  describe("during a question-first reading time", () => {
+    // Answering opens at T0 + 5s; the question went out at T0.
+    const reading = questionOpen(
+      {},
+      { qStartAt: T0 + 5_000, qDeadline: T0 + 15_000 },
+    );
+
+    it("turns answers away before the options show", () => {
+      expect(judgeAnswer(reading, submit("q1-a"), T0 + 4_999)).toEqual({
+        accepted: false,
+        reason: "Answers are not open yet",
+      });
+    });
+
+    it("times an answer from when answering opened", () => {
+      expect(judgeAnswer(reading, submit("q1-a"), T0 + 5_000)).toMatchObject({
+        accepted: true,
+        stored: { timeTakenMs: 0, score: 1000 },
+      });
+    });
+  });
 });
