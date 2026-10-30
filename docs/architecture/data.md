@@ -187,8 +187,10 @@ the server **refuses to boot without it**.
    (each row through its type's handler; unplayable rows are skipped),
    sets `isPlaying: true` (the one gameplay flag Postgres carries, read by
    join checks), runs the phase machine entirely in Redis.
-5. `endGame` → `GameResult(+entries)` insert; delete `GameSession`, detach
-   `Player.gameId`; delete all `game:{code}:*`.
+5. Final leaderboard → `GameResult(+entries, report)` insert (the room stays
+   open); `endGame` (host leaves or abandon sweep) → delete `GameSession`,
+   detach `Player.gameId`; delete all `game:{code}:*`. A game ended before
+   its final board inserts the result in `endGame` instead.
 
 **Duel** — no Postgres until the end: queue/invite (Redis) → `startDuel` seeds
 Redis → play → `persistResult` writes `GameResult` + ELO updates in one

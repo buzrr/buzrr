@@ -62,6 +62,12 @@ export interface GameMeta {
   startedAt: number;
   hostConnected: boolean;
   hostLastSeenAt: number;
+  /**
+   * Classic only: the GameResult saved when the final leaderboard showed,
+   * and that board (JSON `LeaderboardEntry[]`) — what the game ends with.
+   */
+  resultId?: string;
+  finalEntries?: string;
 }
 
 export interface RosterEntry {

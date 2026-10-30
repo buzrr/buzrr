@@ -8,7 +8,6 @@ import type {
   GameOverPayload,
   QuestionAnswer,
   ReactionPayload,
-  SessionReport,
 } from "@buzrr/contract";
 import type { DuelOutcome, Prisma } from "@buzrr/prisma";
 import { nanoid } from "nanoid";
@@ -216,6 +215,9 @@ export class GameEngineService
           break;
         case "end-game":
           await this.endGame(gameCode);
+          break;
+        case "save-result":
+          await this.saveFinalResult(gameCode);
           break;
         case "dispatch":
           await this.dispatch(gameCode, {
@@ -469,17 +471,36 @@ export class GameEngineService
     const claimed = await this.store.claimEnded(gameCode);
     if (!claimed) return;
 
-    const [scores, roster] = await Promise.all([
-      this.store.leaderboard(gameCode),
-      this.store.roster(gameCode),
-    ]);
-    const entries = buildLeaderboard(scores, roster);
-    const { resultId, eloChanges, streaks } = await this.persistResult(
-      gameCode,
-      meta,
-      entries,
-      opts,
-    );
+    // A classic game saved its result when the final leaderboard showed;
+    // it ends on that saved board, without writing a second result.
+    let entries: LeaderboardEntry[];
+    let resultId: string | undefined;
+    let eloChanges:
+      | Record<string, { before: number; after: number }>
+      | undefined;
+    let streaks: StreakChanges | undefined;
+    if (await this.store.claimResult(gameCode)) {
+      const [scores, roster] = await Promise.all([
+        this.store.leaderboard(gameCode),
+        this.store.roster(gameCode),
+      ]);
+      entries = buildLeaderboard(scores, roster);
+      ({ resultId, eloChanges, streaks } = await this.persistResult(
+        gameCode,
+        meta,
+        entries,
+        opts,
+      ));
+    } else {
+      const saved = await this.store.getMeta(gameCode);
+      resultId = saved?.resultId;
+      entries = saved?.finalEntries
+        ? (JSON.parse(saved.finalEntries) as LeaderboardEntry[])
+        : buildLeaderboard(
+            await this.store.leaderboard(gameCode),
+            await this.store.roster(gameCode),
+          );
+    }
 
     this.emitRoom(gameCode).emit("game-over", {
       entries,
@@ -1135,36 +1156,41 @@ export class GameEngineService
     gameCode: string,
     qCount: number,
   ): Promise<Record<string, StoredAnswer>[]> {
-    const answers: Record<string, StoredAnswer>[] = [];
-    for (let i = 0; i < qCount; i++) {
-      answers.push(await this.store.getAnswers(gameCode, i));
-    }
-    return answers;
+    return Promise.all(
+      Array.from({ length: qCount }, (_, i) =>
+        this.store.getAnswers(gameCode, i),
+      ),
+    );
   }
 
   /**
-   * The session report of a classic game still showing its final
-   * leaderboard — read-only, the room stays live. Null when the game isn't
-   * there or hasn't reached the final leaderboard.
+   * A host-paced game reached its final leaderboard: save the result now,
+   * while everyone who finished is still on the board. The room stays open
+   * until the host leaves; `endGame` then reuses this result.
    */
-  async liveReport(gameCode: string): Promise<SessionReport | null> {
-    const state = await this.store.loadState(gameCode, [
-      "questions",
-      "roster",
-      "scores",
+  private async saveFinalResult(gameCode: string): Promise<void> {
+    const meta = await this.store.getMeta(gameCode);
+    if (!meta || meta.phase !== "final") return;
+    if (!(await this.store.claimResult(gameCode))) return;
+    const [scores, roster] = await Promise.all([
+      this.store.leaderboard(gameCode),
+      this.store.roster(gameCode),
     ]);
-    if (!state || state.meta.mode !== "classic") return null;
-    if (state.meta.phase !== "final") return null;
-    return buildSessionReport({
-      quizTitle: state.meta.quizTitle,
-      gameCode,
-      startedAt: state.meta.startedAt,
-      endedAt: null,
-      questions: state.questions,
-      roster: state.roster,
-      entries: buildLeaderboard(state.scores, state.roster),
-      answers: await this.allAnswers(gameCode, state.meta.qCount),
+    const entries = buildLeaderboard(scores, roster);
+    const { resultId } = await this.persistResult(gameCode, meta, entries);
+    await this.store.patchMeta(gameCode, {
+      ...(resultId ? { resultId } : {}),
+      finalEntries: JSON.stringify(entries),
     });
+  }
+
+  /**
+   * The GameResult saved when this game's final leaderboard showed. Null
+   * before then, or if saving failed.
+   */
+  async savedResultId(gameCode: string): Promise<string | null> {
+    const meta = await this.store.getMeta(gameCode);
+    return meta?.resultId ?? null;
   }
 
   /**

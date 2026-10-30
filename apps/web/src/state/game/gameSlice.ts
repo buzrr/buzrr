@@ -308,6 +308,9 @@ const gameSlice = createSlice({
       state.players = state.players.filter(
         (p) => p.id !== action.payload.playerId,
       );
+      // The final board is already saved with everyone who finished; someone
+      // leaving it stays on it.
+      if (state.isFinalLeaderboard) return;
       state.leaderboard = state.leaderboard.filter(
         (entry) => entry.playerId !== action.payload.playerId,
       );

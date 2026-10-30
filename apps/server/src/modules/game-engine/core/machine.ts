@@ -372,6 +372,10 @@ function enterFinal(state: GameState, pacing: PacingStrategy): Transition {
     // still sees it (a game that ends here clears the entry straight away).
     { kind: "park-deadline" },
     { kind: "patch-meta", patch },
+    // Saved before the board goes out, so nobody leaving the final screen
+    // can drop out of the result. The room itself stays open (reactions)
+    // until the host leaves it.
+    ...(pacing.endsOnFinal ? [] : [{ kind: "save-result" } as const]),
     {
       kind: "emit",
       to: ROOM,

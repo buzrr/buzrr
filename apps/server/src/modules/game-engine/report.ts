@@ -103,7 +103,15 @@ export function buildSessionReport(input: SessionReportInput): SessionReport {
   const { questions, entries } = input;
   const playerCount = entries.length;
   const rosterById = new Map(input.roster.map((p) => [p.id, p]));
-  const answersFor = (i: number) => input.answers[i] ?? {};
+  // Only players on the final board count: a kicked or departed player's
+  // answers stay stored, but they are not in `playerCount`.
+  const onBoard = new Set(entries.map((e) => e.playerId));
+  const kept = input.answers.map((byPlayer) =>
+    Object.fromEntries(
+      Object.entries(byPlayer).filter(([id]) => onBoard.has(id)),
+    ),
+  );
+  const answersFor = (i: number): Record<string, StoredAnswer> => kept[i] ?? {};
   const scoredIdx = questions
     .map((q, i) => (isScored(q.type) ? i : -1))
     .filter((i) => i >= 0);

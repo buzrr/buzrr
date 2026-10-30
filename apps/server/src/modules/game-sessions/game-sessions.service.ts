@@ -150,8 +150,8 @@ export class GameSessionsService {
   }
 
   /**
-   * Pro session report of a room still on its final leaderboard, built from
-   * the live game — the room is not ended.
+   * Pro session report of a room still on its final leaderboard: the one
+   * saved when that board showed (the room stays open until the host leaves).
    */
   async getLiveReport(user: AuthUser, roomId: string): Promise<SessionReport> {
     const room = await this.prisma.db.gameSession.findUnique({
@@ -164,14 +164,13 @@ export class GameSessionsService {
     if (room.creatorId !== user.userId) {
       throw new ForbiddenException("Unauthorized");
     }
-    await this.entitlements.assertPro(user.userId, "session_report");
-    const report = await this.engine.liveReport(room.gameCode);
-    if (!report) {
+    const resultId = await this.engine.savedResultId(room.gameCode);
+    if (!resultId) {
       throw new ConflictException(
         "The report is available once the quiz reaches its final leaderboard",
       );
     }
-    return report;
+    return this.getResultReport(user, resultId);
   }
 
   /** Pro session report of a finished game this user hosted. */

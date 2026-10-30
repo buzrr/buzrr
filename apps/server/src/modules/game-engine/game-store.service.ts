@@ -190,6 +190,14 @@ redis.call('EXPIRE', KEYS[1], ARGV[1])
 return 1
 `;
 
+/** Set once per game: whoever sets it is the one that saves the result. */
+const CLAIM_RESULT_SCRIPT = `
+if redis.call('EXISTS', KEYS[1]) == 0 then
+  return 0
+end
+return redis.call('HSETNX', KEYS[1], 'resultClaimed', '1')
+`;
+
 /**
  * Redis access layer for live game sessions. All state that changes during a
  * running game lives here; Postgres only sees the lobby record and (later)
@@ -314,6 +322,20 @@ export class GameStoreService {
    * already claimed it (or the game is gone), so only one claimant persists
    * the result and cleans up.
    */
+  /**
+   * Claims saving the game's result. A classic game saves when its final
+   * leaderboard shows and `endGame` runs later, so both ask: only the first
+   * writes a GameResult.
+   */
+  async claimResult(code: string): Promise<boolean> {
+    const claimed = await this.redis.eval(
+      CLAIM_RESULT_SCRIPT,
+      1,
+      keys.meta(code),
+    );
+    return claimed === 1;
+  }
+
   async claimEnded(code: string): Promise<boolean> {
     const claimed = await this.redis.eval(
       CLAIM_ENDED_SCRIPT,

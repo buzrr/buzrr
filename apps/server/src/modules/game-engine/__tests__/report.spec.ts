@@ -130,3 +130,30 @@ describe("buildSessionReport", () => {
     expect(cy!.answers[2]).toMatchObject({ answer: "Rain", isCorrect: null });
   });
 });
+
+describe("buildSessionReport — players off the board", () => {
+  it("ignores answers from players no longer on the leaderboard", () => {
+    const q1 = question("q1", { correct: 0 });
+    const roster = [player("ana")];
+    const report = buildSessionReport({
+      quizTitle: "Left",
+      gameCode: "ABC123",
+      startedAt: T0,
+      endedAt: null,
+      questions: [q1],
+      roster,
+      entries: buildLeaderboard([{ playerId: "ana", score: 900 }], roster),
+      answers: [
+        {
+          ana: answer("q1-a", { isCorrect: true, score: 900 }),
+          // Kicked mid-game: the answer is still stored.
+          zed: answer("q1-b"),
+        },
+      ],
+    });
+    expect(report.questions[0]!.answered).toBe(1);
+    expect(report.questions[0]!.breakdown[1]!.count).toBe(0);
+    expect(report.accuracy).toBe(1);
+    expect(report.participation).toBe(1);
+  });
+});

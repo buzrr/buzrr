@@ -162,8 +162,8 @@ export default function LeaderBoard({
           <PodiumSpot entries={onPlace(3)} place={3} />
         </div>
         <div className="flex flex-col-reverse md:flex-row gap-3 md:justify-end pt-[18px] border-t border-lprimary/15 dark:border-white/10 [&>button]:w-full md:[&>button]:w-auto">
-          {/* Live while the room is on its final screen; once ended, the
-              copy saved with the result (none if nothing was saved). */}
+          {/* Both read the report saved when this board showed: by room
+              while it is open, by result once it has ended. */}
           {!alreadyEnded ? (
             <DownloadReportButton source={{ roomId }} />
           ) : resultId ? (

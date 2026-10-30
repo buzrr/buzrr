@@ -380,7 +380,17 @@ gone (the previous behaviour). Covered by
 ## Game end & persistence
 
 `endGame` is idempotent and race-safe: `store.claimEnded` (Lua) atomically
-flips phase → `ended`; only the winner of that claim persists. Then:
+flips phase → `ended`; only the winner of that claim goes on. Saving the
+result is a second, separate claim (`store.claimResult`, `HSETNX
+resultClaimed`), because a host-paced classic game saves **when its final
+leaderboard shows** (`save-result` effect from `enterFinal`, run by
+`saveFinalResult`), not when the host closes the room. That save writes
+`resultId` and the board (`finalEntries`) to meta, so a player who leaves the
+final screen stays in the result. The room stays open for reactions until
+the host's "Back to quizzes" / `POST :roomId/end` or the abandon sweep runs
+`endGame`, which then finds the claim taken and ends on the saved
+`resultId`/board instead of saving again. Duels (and a classic game ended
+before its final board) save inside `endGame`. Then:
 
 1. `persistResult` writes the immutable `GameResult` + entries (correct counts
    are recomputed from Redis answer hashes). Rated duels apply ELO updates to
