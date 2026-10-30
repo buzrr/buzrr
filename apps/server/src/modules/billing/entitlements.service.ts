@@ -13,7 +13,24 @@ import type { PlanId, PlanLimits } from "./plans";
 /** Either the root client or an interactive-transaction client. */
 type Db = Prisma.TransactionClient;
 
-export type PlanLimitKind = "quizzes" | "ai_tokens";
+export type PlanLimitKind =
+  | "quizzes"
+  | "ai_tokens"
+  /** Pro-only features: refused outright on Free, no allowance. */
+  | "image_upload"
+  | "session_report";
+
+export type ProFeature = Extract<
+  PlanLimitKind,
+  "image_upload" | "session_report"
+>;
+
+const PRO_FEATURE_MESSAGES: Record<ProFeature, string> = {
+  image_upload:
+    "Images on questions are a Buzrr Pro feature. Upgrade to add images to your questions.",
+  session_report:
+    "Session reports are a Buzrr Pro feature. Upgrade to download a PDF report of every game you host.",
+};
 
 export type Entitlements = {
   plan: PlanId;
@@ -95,12 +112,31 @@ export class EntitlementsService {
 
   async resolvePlan(userId: string, db: Db = this.prisma.db): Promise<PlanId> {
     if (!this.billing.enabled) return "pro";
-    const subs = await db.subscription.findMany({
-      where: { userId, status: { in: ["active", "cancelled"] } },
-      select: { status: true, currentPeriodEnd: true, cancelAtPeriodEnd: true },
-    });
+    const [user, subs] = await Promise.all([
+      db.user.findUnique({ where: { id: userId }, select: { role: true } }),
+      db.subscription.findMany({
+        where: { userId, status: { in: ["active", "cancelled"] } },
+        select: {
+          status: true,
+          currentPeriodEnd: true,
+          cancelAtPeriodEnd: true,
+        },
+      }),
+    ]);
+    // Superadmins run the instance; they always have Pro, no subscription.
+    if (user?.role === "superadmin") return "pro";
     const now = new Date();
     return subs.some((sub) => isProSubscription(sub, now)) ? "pro" : "free";
+  }
+
+  /** Refuses a Pro-only feature on Free with the usual `PLAN_LIMIT` body. */
+  async assertPro(
+    userId: string,
+    feature: ProFeature,
+    db: Db = this.prisma.db,
+  ): Promise<void> {
+    if ((await this.resolvePlan(userId, db)) === "pro") return;
+    throw planLimitError(feature, PRO_FEATURE_MESSAGES[feature]);
   }
 
   async getEntitlements(userId: string): Promise<Entitlements> {

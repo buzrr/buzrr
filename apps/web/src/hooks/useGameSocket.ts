@@ -125,6 +125,7 @@ export function useGameSocket({
       dispatch(
         gameOver({
           entries: payload.entries,
+          resultId: payload.resultId,
           eloChanges: payload.eloChanges,
           rated: payload.rated,
           category: payload.category,

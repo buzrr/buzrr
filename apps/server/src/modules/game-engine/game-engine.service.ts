@@ -8,6 +8,7 @@ import type {
   GameOverPayload,
   QuestionAnswer,
   ReactionPayload,
+  SessionReport,
 } from "@buzrr/contract";
 import type { DuelOutcome, Prisma } from "@buzrr/prisma";
 import { nanoid } from "nanoid";
@@ -60,8 +61,10 @@ import {
   LeaderboardEntry,
   LiveQuestion,
   RosterEntry,
+  StoredAnswer,
 } from "./game-engine.types";
 import { GameStoreService, parseAnswer } from "./game-store.service";
+import { buildSessionReport } from "./report";
 
 /** How long a disconnected lobby player is kept before removal. */
 const LOBBY_DISCONNECT_GRACE_MS = 60_000;
@@ -1127,6 +1130,43 @@ export class GameEngineService
     }
   }
 
+  /** Stored answers for every question, by question index. */
+  private async allAnswers(
+    gameCode: string,
+    qCount: number,
+  ): Promise<Record<string, StoredAnswer>[]> {
+    const answers: Record<string, StoredAnswer>[] = [];
+    for (let i = 0; i < qCount; i++) {
+      answers.push(await this.store.getAnswers(gameCode, i));
+    }
+    return answers;
+  }
+
+  /**
+   * The session report of a classic game still showing its final
+   * leaderboard — read-only, the room stays live. Null when the game isn't
+   * there or hasn't reached the final leaderboard.
+   */
+  async liveReport(gameCode: string): Promise<SessionReport | null> {
+    const state = await this.store.loadState(gameCode, [
+      "questions",
+      "roster",
+      "scores",
+    ]);
+    if (!state || state.meta.mode !== "classic") return null;
+    if (state.meta.phase !== "final") return null;
+    return buildSessionReport({
+      quizTitle: state.meta.quizTitle,
+      gameCode,
+      startedAt: state.meta.startedAt,
+      endedAt: null,
+      questions: state.questions,
+      roster: state.roster,
+      entries: buildLeaderboard(state.scores, state.roster),
+      answers: await this.allAnswers(gameCode, state.meta.qCount),
+    });
+  }
+
   /**
    * Writes the immutable GameResult before the live state is destroyed.
    * For duels this also applies the ELO update atomically in the same
@@ -1146,15 +1186,32 @@ export class GameEngineService
 
     const roster = await this.store.roster(gameCode);
     const rosterById = new Map(roster.map((p) => [p.id, p]));
+    const answersByQuestion = await this.allAnswers(gameCode, meta.qCount);
     const correctCounts = new Map<string, number>();
-    for (let i = 0; i < meta.qCount; i++) {
-      const answers = await this.store.getAnswers(gameCode, i);
+    for (const answers of answersByQuestion) {
       for (const [playerId, a] of Object.entries(answers)) {
         if (a.isCorrect) {
           correctCounts.set(playerId, (correctCounts.get(playerId) ?? 0) + 1);
         }
       }
     }
+    // Classic games keep the Pro session report, so a host can download it
+    // again from History once the live state is gone.
+    const report =
+      meta.mode === "classic"
+        ? buildSessionReport({
+            quizTitle: meta.quizTitle,
+            gameCode,
+            startedAt: meta.startedAt,
+            endedAt: Date.now(),
+            questions:
+              (await this.store.loadState(gameCode, ["questions"]))
+                ?.questions ?? [],
+            roster,
+            entries,
+            answers: answersByQuestion,
+          })
+        : undefined;
 
     // `!== false` rather than truthiness: duels already live in Redis before
     // `rated` existed stay rated across the deploy.
@@ -1203,6 +1260,7 @@ export class GameEngineService
       playerCount: entries.length,
       questionCount: meta.qCount,
       startedAt: new Date(meta.startedAt),
+      ...(report ? { report } : {}),
       entries: {
         create: entries.map((e) => ({
           playerName: e.name,

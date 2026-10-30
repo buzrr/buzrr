@@ -1,10 +1,11 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
 } from "@nestjs/common";
-import { DEFAULT_GAME_SETTINGS } from "@buzrr/contract";
+import { DEFAULT_GAME_SETTINGS, type SessionReport } from "@buzrr/contract";
 import { Prisma } from "@buzrr/prisma";
 import { customAlphabet } from "nanoid";
 import { EntitlementsService } from "../billing/entitlements.service";
@@ -121,6 +122,8 @@ export class GameSessionsService {
       where: { hostId: user.userId },
       orderBy: { endedAt: "desc" },
       take: 50,
+      // The report is Pro-only and large; it has its own endpoint.
+      omit: { report: true },
       include: { _count: { select: { entries: true } } },
     });
   }
@@ -129,6 +132,7 @@ export class GameSessionsService {
   async getResult(user: AuthUser, resultId: string) {
     const result = await this.prisma.db.gameResult.findUnique({
       where: { id: resultId },
+      omit: { report: true },
       include: { entries: { orderBy: { rank: "asc" } } },
     });
     if (!result) {
@@ -143,6 +147,53 @@ export class GameSessionsService {
       throw new ForbiddenException("Unauthorized");
     }
     return result;
+  }
+
+  /**
+   * Pro session report of a room still on its final leaderboard, built from
+   * the live game — the room is not ended.
+   */
+  async getLiveReport(user: AuthUser, roomId: string): Promise<SessionReport> {
+    const room = await this.prisma.db.gameSession.findUnique({
+      where: { id: roomId },
+      select: { creatorId: true, gameCode: true },
+    });
+    if (!room) {
+      throw new NotFoundException("Room not found");
+    }
+    if (room.creatorId !== user.userId) {
+      throw new ForbiddenException("Unauthorized");
+    }
+    await this.entitlements.assertPro(user.userId, "session_report");
+    const report = await this.engine.liveReport(room.gameCode);
+    if (!report) {
+      throw new ConflictException(
+        "The report is available once the quiz reaches its final leaderboard",
+      );
+    }
+    return report;
+  }
+
+  /** Pro session report of a finished game this user hosted. */
+  async getResultReport(
+    user: AuthUser,
+    resultId: string,
+  ): Promise<SessionReport> {
+    const result = await this.prisma.db.gameResult.findUnique({
+      where: { id: resultId },
+      select: { hostId: true, report: true },
+    });
+    if (!result) {
+      throw new NotFoundException("Result not found");
+    }
+    if (result.hostId !== user.userId) {
+      throw new ForbiddenException("Unauthorized");
+    }
+    await this.entitlements.assertPro(user.userId, "session_report");
+    if (!result.report) {
+      throw new NotFoundException("No report was saved for this game");
+    }
+    return result.report as SessionReport;
   }
 
   /**

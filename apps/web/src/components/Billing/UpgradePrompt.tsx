@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 import ModalCloseButton from "@/components/ModalCloseButton";
 import { getPlanLimitError } from "@/lib/api/errors";
-import type { PlanLimitDetails } from "@/lib/api/errors";
+import type { PlanLimitDetails, ProFeature } from "@/lib/api/errors";
 import { useEntitlementsQuery } from "@/lib/modules/billing/hooks";
 import style from "@/utils/modalStyle";
 
@@ -17,6 +17,20 @@ function formatReset(iso: string): string {
     minute: "2-digit",
   });
 }
+
+const TITLES: Record<PlanLimitDetails["limit"], string> = {
+  quizzes: "You've reached your quiz limit",
+  ai_tokens: "You're out of AI generations",
+  image_upload: "Images on questions are a Pro feature",
+  session_report: "Session reports are a Pro feature",
+};
+
+/** What a Free user sees when they open a Pro-only feature. */
+const FEATURE_MESSAGES: Record<ProFeature, string> = {
+  image_upload: "Upgrade to Buzrr Pro to add images to your questions.",
+  session_report:
+    "Upgrade to Buzrr Pro to download a PDF report of your session: overall stats plus a page for every player.",
+};
 
 /**
  * Shown when the API refuses an action with `code: "PLAN_LIMIT"`. A limit with
@@ -31,10 +45,7 @@ export default function UpgradePrompt({
   onClose: () => void;
 }) {
   const weeklyRefill = limit?.resetsAt ?? null;
-  const title =
-    limit?.limit === "quizzes"
-      ? "You've reached your quiz limit"
-      : "You're out of AI generations";
+  const title = limit ? TITLES[limit.limit] : "";
 
   return (
     <Modal
@@ -71,6 +82,8 @@ export default function UpgradePrompt({
               <li>Unlimited quizzes</li>
               <li>10 AI quiz generations every week</li>
               <li>Rooms of up to 250 players</li>
+              <li>Images on questions</li>
+              <li>Downloadable PDF session reports</li>
             </ul>
           )}
           <div className="mt-6 flex flex-col sm:flex-row gap-3">
@@ -116,10 +129,14 @@ export function usePlanLimitPrompt() {
     if (details) setLimit(details);
     return details !== null;
   }, []);
+  /** Opens the prompt for a Pro-only feature without a round trip. */
+  const promptForFeature = useCallback((feature: ProFeature) => {
+    setLimit({ limit: feature, message: FEATURE_MESSAGES[feature] });
+  }, []);
   const upgradePrompt = (
     <UpgradePrompt limit={limit} onClose={() => setLimit(null)} />
   );
-  return { handlePlanLimit, upgradePrompt };
+  return { handlePlanLimit, promptForFeature, upgradePrompt };
 }
 
 /** Remaining AI generations, next to the controls that spend them. */

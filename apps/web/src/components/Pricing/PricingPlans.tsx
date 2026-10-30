@@ -175,6 +175,8 @@ export default function PricingPlans() {
             `Up to ${PLAN_COPY.pro.maxPlayers} players per room`,
             "Unlimited quizzes",
             `${PLAN_COPY.pro.aiTokensPerWeek} AI quiz generations every week`,
+            "Images on questions",
+            "Downloadable PDF session reports",
             "Everything in Free",
             "Cancel anytime — keep Pro until your period ends",
           ]}

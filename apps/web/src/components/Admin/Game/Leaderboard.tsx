@@ -5,6 +5,7 @@ import Image from "next/image";
 import { DEFAULT_AVATAR } from "@/constants";
 import { useAppSelector } from "@/state/hooks";
 import EndQuizButton from "@/components/Admin/EndQuizButton";
+import DownloadReportButton from "./DownloadReportButton";
 import {
   labelClass,
   mutedText,
@@ -129,6 +130,7 @@ export default function LeaderBoard({
 }) {
   const leaderboard = useAppSelector((state) => state.game.leaderboard);
   const qCount = useAppSelector((state) => state.game.qCount);
+  const resultId = useAppSelector((state) => state.game.resultId);
   // Ranks are shared by equal scores, so a step can hold several players.
   const onPlace = (place: number) =>
     leaderboard.filter((entry) => entry.rank === place);
@@ -160,6 +162,13 @@ export default function LeaderBoard({
           <PodiumSpot entries={onPlace(3)} place={3} />
         </div>
         <div className="flex flex-col-reverse md:flex-row gap-3 md:justify-end pt-[18px] border-t border-lprimary/15 dark:border-white/10 [&>button]:w-full md:[&>button]:w-auto">
+          {/* Live while the room is on its final screen; once ended, the
+              copy saved with the result (none if nothing was saved). */}
+          {!alreadyEnded ? (
+            <DownloadReportButton source={{ roomId }} />
+          ) : resultId ? (
+            <DownloadReportButton source={{ resultId }} />
+          ) : null}
           <EndQuizButton
             roomId={roomId}
             redirectTo="/admin"

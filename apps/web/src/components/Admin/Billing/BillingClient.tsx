@@ -38,6 +38,14 @@ function formatAmount(minorUnits: number, currency: string): string {
 function SubscriptionStatus({ data }: { data: Entitlements }) {
   const sub = data.subscription;
   if (!sub) {
+    // Pro without a subscription: a superadmin account.
+    if (data.plan === "pro") {
+      return (
+        <p className="text-sm text-off-dark dark:text-off-white">
+          Buzrr Pro is included with your account.
+        </p>
+      );
+    }
     return (
       <p className="text-sm text-off-dark dark:text-off-white">
         You&apos;re on the Free plan.

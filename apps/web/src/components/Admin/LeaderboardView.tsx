@@ -4,6 +4,7 @@ import Image from "next/image";
 import { DEFAULT_AVATAR } from "@/constants";
 import Skeleton from "@/components/ui/Skeleton";
 import { useResultQuery } from "@/lib/modules/game-sessions/hooks";
+import DownloadReportButton from "@/components/Admin/Game/DownloadReportButton";
 
 function rankBadge(rank: number) {
   if (rank === 1) return <span className="text-3xl overflow-hidden">🥇</span>;
@@ -71,6 +72,9 @@ export default function LeaderboardView({
         Played {new Date(result.endedAt).toLocaleString()} · Room{" "}
         {result.gameCode}
       </p>
+      {result.mode === "classic" && (
+        <DownloadReportButton source={{ resultId: result.id }} />
+      )}
 
       <div className="flex flex-col gap-3 my-4 w-full max-w-2xl">
         {result.entries.length > 0 ? (
