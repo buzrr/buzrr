@@ -37,6 +37,18 @@ function formatAmount(minorUnits: number, currency: string): string {
 
 function SubscriptionStatus({ data }: { data: Entitlements }) {
   const sub = data.subscription;
+  // Pro that no subscription grants: a superadmin, whose latest subscription
+  // (if any) may be long expired.
+  if (
+    data.plan === "pro" &&
+    !(sub && (sub.status === "active" || sub.cancelAtPeriodEnd))
+  ) {
+    return (
+      <p className="text-sm text-off-dark dark:text-off-white">
+        Buzrr Pro is included with your account.
+      </p>
+    );
+  }
   if (!sub) {
     return (
       <p className="text-sm text-off-dark dark:text-off-white">

@@ -68,3 +68,16 @@ export function useInvalidateEntitlements() {
   return () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.billing.me });
 }
+
+/**
+ * Whether this account may use Pro-only features, and whether to mark them
+ * with a PRO tag. With billing off everyone has Pro, so nothing is tagged.
+ * Until entitlements load, nothing is gated (the API still enforces).
+ */
+export function useProFeature() {
+  const { data } = useEntitlementsQuery();
+  return {
+    isPro: data ? data.plan === "pro" : true,
+    showBadge: data?.billingEnabled ?? false,
+  };
+}

@@ -17,6 +17,13 @@ stats/history, health endpoint, Vercel Analytics.
 
 ## Recent architectural moves (still fresh, know they exist)
 
+- **Pro session report** (2026-10-30): "Download report" on the host's
+  final leaderboard and in History builds a PDF in the browser (jsPDF) —
+  a session summary page, then one page per player. The data comes from a
+  pure builder (`game-engine/report.ts`), snapshotted into
+  `GameResult.report` (classic only). Classic results are now saved the
+  moment the final leaderboard shows, not when the host closes the room. Question images became Pro too. Migration
+  `20261030000001` needs `migrate:deploy`.
 - **Host session settings** (2026-10-28): "Host quiz" opens a settings
   modal — question-first reading time (3/5/10s before options and answering
   open) and player emoji reactions on result/leaderboard screens (socket
@@ -54,7 +61,8 @@ effects }` in `game-engine/core/`, unit-tested; `GameEngineService` is
 
 - **Buzrr Pro (billing & entitlements)** — Dodo Payments subscriptions:
   - **Limits:** Free is 50 players, 10 quizzes, 3 lifetime AI generations.
-    Pro is 250 players, unlimited quizzes, 10 AI generations per week.
+    Pro is 250 players, unlimited quizzes, 10 AI generations per week,
+    question images and PDF session reports. Superadmins are always Pro.
   - **Plans** are derived per request from `subscriptions`.
   - **Webhooks** are verified in `apps/web`, then re-verified and applied by
     `apps/server/src/modules/billing` from Dodo-fetched state.

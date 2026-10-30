@@ -134,6 +134,32 @@ describe("EntitlementsService (Postgres)", () => {
     expect(await service.resolvePlan(userId)).toBe("pro");
   });
 
+  it("gives superadmins Pro without a subscription", async (ctx) => {
+    if (!dbUp) ctx.skip();
+    const userId = await user();
+    await prisma.user.update({
+      where: { id: userId },
+      data: { role: "superadmin" },
+    });
+    expect(await service.resolvePlan(userId)).toBe("pro");
+    await expect(
+      service.assertPro(userId, "session_report"),
+    ).resolves.toBeUndefined();
+  });
+
+  it("refuses Pro-only features on Free", async (ctx) => {
+    if (!dbUp) ctx.skip();
+    const userId = await user();
+    await expectPlanLimit(
+      service.assertPro(userId, "image_upload"),
+      "image_upload",
+    );
+    await createSubscription(userId, { status: "active" });
+    await expect(
+      service.assertPro(userId, "image_upload"),
+    ).resolves.toBeUndefined();
+  });
+
   it("gives everyone Pro limits when billing is off", async (ctx) => {
     if (!dbUp) ctx.skip();
     const userId = await user();

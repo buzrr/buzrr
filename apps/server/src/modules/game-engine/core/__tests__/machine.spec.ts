@@ -296,10 +296,12 @@ describe("out of the reveal", () => {
     const s = revealing({}, {}, 1);
     const { state: next, effects } = step(s, { type: "host-next" }, T0);
     expect(next.meta.phase).toBe("final");
+    // The result is saved before the board goes out; the room stays open.
     expect(kinds(effects)).toEqual([
       "clear-timer",
       "park-deadline",
       "patch-meta",
+      "save-result",
       "emit",
     ]);
     expect(emitted(effects)[0]?.message).toMatchObject({

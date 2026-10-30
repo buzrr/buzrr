@@ -94,6 +94,11 @@ export type Effect =
   | { kind: "cancel-bot" }
   /** Run the end-of-game claim/persist/cleanup path. */
   | { kind: "end-game" }
+  /**
+   * Save the result while the room stays open on its final leaderboard
+   * (host-paced games); ending it later doesn't save again.
+   */
+  | { kind: "save-result" }
   /** Step the machine again with a freshly loaded state. */
   | { kind: "dispatch"; event: "close-question"; qIndex: number }
   | { kind: "log"; level: "warn" | "error"; message: string };

@@ -28,6 +28,9 @@ import {
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { addQuestionSchema } from "@/lib/modules/forms/schemas";
 import { useUpsertQuestionMutation } from "@/lib/modules/questions/hooks";
+import { useProFeature } from "@/lib/modules/billing/hooks";
+import ProBadge from "@/components/Billing/ProBadge";
+import { usePlanLimitPrompt } from "@/components/Billing/UpgradePrompt";
 import RangeSlider from "@/components/ui/RangeSlider";
 import { Segmented } from "@/components/ui/Segmented";
 import { Switch } from "@/components/ui/Switch";
@@ -353,6 +356,9 @@ const AddQuesForm = (props: {
   const { question } = props;
   const initialType = props.type ?? DEFAULT_QUESTION_TYPE;
   const mutation = useUpsertQuestionMutation(props.quizId);
+  const { isPro, showBadge } = useProFeature();
+  const { handlePlanLimit, promptForFeature, upgradePrompt } =
+    usePlanLimitPrompt();
   const [file, setFile] = useState<File | null>();
   const [fileLink, setFileLink] = useState(
     question?.media ? question.media : "",
@@ -548,7 +554,7 @@ const AddQuesForm = (props: {
         }
       },
       onError: (err) => {
-        toast.error(getApiErrorMessage(err));
+        if (!handlePlanLimit(err)) toast.error(getApiErrorMessage(err));
       },
     });
   });
@@ -662,9 +668,16 @@ const AddQuesForm = (props: {
               ) : (
                 <label
                   className={clsx(
-                    "flex items-center gap-3.5 rounded-2xl border-[1.5px] border-dashed px-4 py-3 cursor-pointer transition-colors border-lprimary/25 dark:border-white/15 hover:border-dprimary bg-light-bg dark:bg-card-dark",
+                    "relative flex items-center gap-3.5 rounded-2xl border-[1.5px] border-dashed px-4 py-3 cursor-pointer transition-colors border-lprimary/25 dark:border-white/15 hover:border-dprimary bg-light-bg dark:bg-card-dark",
                   )}
+                  onClick={(e) => {
+                    // Free accounts get the upgrade prompt, not the picker.
+                    if (isPro) return;
+                    e.preventDefault();
+                    promptForFeature("image_upload");
+                  }}
                 >
+                  {showBadge && <ProBadge />}
                   <span className="size-10 shrink-0 rounded-xl flex items-center justify-center bg-lprimary/10 dark:bg-white/5 text-lprimary dark:text-dprimary">
                     <LuImagePlus size={20} />
                   </span>
@@ -1116,6 +1129,7 @@ const AddQuesForm = (props: {
               : "Add question"}
         </button>
       </div>
+      {upgradePrompt}
     </form>
   );
 };

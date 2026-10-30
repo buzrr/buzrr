@@ -1,4 +1,4 @@
-import type { GameSettings } from "@buzrr/contract";
+import type { GameSettings, SessionReport } from "@buzrr/contract";
 import type { AxiosInstance } from "axios";
 import type {
   GameSession,
@@ -121,6 +121,22 @@ export async function getResult(client: AxiosInstance, resultId: string) {
   return data;
 }
 
+/** Pro: report of a room still on its final leaderboard (room stays live). */
+export async function getLiveReport(client: AxiosInstance, roomId: string) {
+  const { data } = await client.get<SessionReport>(
+    `/game-sessions/${encodeURIComponent(roomId)}/report`,
+  );
+  return data;
+}
+
+/** Pro: report saved with a finished game. */
+export async function getResultReport(client: AxiosInstance, resultId: string) {
+  const { data } = await client.get<SessionReport>(
+    `/game-sessions/results/${encodeURIComponent(resultId)}/report`,
+  );
+  return data;
+}
+
 export type PlayerPlayGame = GameSession & {
   quiz: Quiz & {
     questions: (Question & {
@@ -155,6 +171,9 @@ export const gameSessionsApi = {
     banRoomPlayer(getAuthApiClient(), args.roomId, args.playerId),
   history: () => getHistory(getAuthApiClient()),
   result: (resultId: string) => getResult(getAuthApiClient(), resultId),
+  liveReport: (roomId: string) => getLiveReport(getAuthApiClient(), roomId),
+  resultReport: (resultId: string) =>
+    getResultReport(getAuthApiClient(), resultId),
   playerPlay: (playerId: string) =>
     getPlayerPlay(getPublicApiClient(), playerId),
 };

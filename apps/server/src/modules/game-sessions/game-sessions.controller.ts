@@ -53,6 +53,22 @@ export class GameSessionsController {
     return this.gameSessions.getResult(user, resultId);
   }
 
+  @Get("results/:resultId/report")
+  resultReport(
+    @CurrentAccountUser() user: AuthUser,
+    @Param("resultId") resultId: string,
+  ) {
+    return this.gameSessions.getResultReport(user, resultId);
+  }
+
+  @Get(":roomId/report")
+  liveReport(
+    @CurrentAccountUser() user: AuthUser,
+    @Param("roomId") roomId: string,
+  ) {
+    return this.gameSessions.getLiveReport(user, roomId);
+  }
+
   @Get(":roomId/lobby")
   adminLobby(
     @CurrentAccountUser() user: AuthUser,

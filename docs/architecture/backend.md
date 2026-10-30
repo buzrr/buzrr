@@ -26,7 +26,7 @@ Global modules: `ConfigModule`, `RedisModule` (3 ioredis clients),
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | `health`         | `GET /health` (no prefix) — pings Postgres + Redis with 2s timeouts; 503 if either is down                                                                                                                                                                                                                                                                                                                       | Prisma, REDIS                            |
 | `players`        | `POST /players` (mint guest + player JWT), `PATCH /players/name`, `GET /players/:id`, `PATCH /players/:id/clear-game` — all `@Public()` + rate-limited                                                                                                                                                                                                                                                           | own JwtModule                            |
-| `game-sessions`  | `POST /game-sessions` (create room), `POST /join`, `GET /player-play/:playerId` (public), `GET /history`, `GET /results/:resultId`, `GET /:roomId/lobby`, `POST /:roomId/end`, `DELETE /:roomId/players/:playerId` (kick), `POST /:roomId/players/:playerId/ban`                                                                                                                                                 | GameEngine, Billing                      |
+| `game-sessions`  | `POST /game-sessions` (create room), `POST /join`, `GET /player-play/:playerId` (public), `GET /history`, `GET /results/:resultId`, `GET /results/:resultId/report` (Pro), `GET /:roomId/lobby`, `GET /:roomId/report` (Pro, the report saved for a room still on its final leaderboard), `POST /:roomId/end`, `DELETE /:roomId/players/:playerId` (kick), `POST /:roomId/players/:playerId/ban`                 | GameEngine, Billing                      |
 | `quizzes`        | CRUD `/quizzes`, `POST /quizzes/ai` (`TextGenerator`; `ai` rate profile; spends an AI token), `POST /quizzes/import` (batch import from Buzrr-AI; body = contract `importQuizSchema`)                                                                                                                                                                                                                            | TextGenerator, question types, Billing   |
 | `questions`      | `POST /questions` (standalone/bulk, no quiz; admin-only; body = contract `createStandaloneQuestionsSchema`), `PATCH /questions/reorder`, `DELETE /questions/:id`, `POST /questions/:id/report`; plus `QuizQuestionsController`: `GET/POST /quizzes/:quizId/questions` (multipart upsert; media via `MediaStorage`)                                                                                               | MediaStorage, question types, Moderation |
 | `moderation`     | `GET /moderation/questions?status=pending\|approved\|unapproved`, `GET .../counts`, `PATCH .../approve` · `.../unapprove` · `.../pending` · `.../categories` (bulk, `{ ids }` ≤100; skipped ids reported back), `PATCH .../:id/approve`, `PATCH .../:id/unapprove`, `PATCH .../:id/pending` (back to review), `PATCH .../:id/categories` (retag; no re-moderation) — `@Roles("admin","superadmin")`              | Categories                               |
@@ -146,10 +146,12 @@ limits and billing routes return 503.
 
 - **`plans.ts`** — the only table of limits:
   - Free: 50 players, 10 quizzes, 3 lifetime AI generations.
-  - Pro: 250 players, unlimited quizzes, 10 AI generations per rolling week.
+  - Pro: 250 players, unlimited quizzes, 10 AI generations per rolling week,
+    question images, session reports.
 - **`entitlements.service.ts`** — the single authority, exported to the
-  quizzes and game-sessions modules:
-  - `resolvePlan` reads `subscriptions` on every call, never the JWT. Pro
+  quizzes, questions and game-sessions modules:
+  - `resolvePlan` reads `subscriptions` (and the user's role) on every
+    call, never the JWT. A `superadmin` is always Pro. Otherwise Pro
     means `active` with `currentPeriodEnd` no more than `RENEWAL_GRACE_MS`
     (48h, `plans.ts`) in the past, or `cancelled` with `cancelAtPeriodEnd`
     inside the paid period.
@@ -160,8 +162,12 @@ limits and billing routes return 503.
   - `reserveAiToken` / `releaseAiToken`: each spend is one conditional
     `UPDATE`. A refund needs the reservation's release token, is idempotent,
     and never lands in a newer Pro window.
-  - Refusals are `403 { code: "PLAN_LIMIT", limit: "quizzes" | "ai_tokens",
-max, resetsAt? }`; the web client's upgrade prompt keys on that body.
+  - `assertPro(userId, feature)` refuses a Pro-only feature on Free:
+    `image_upload` (a new question image in `QuestionsService`; keeping an
+    existing one stays free) and `session_report` (the report endpoints).
+  - Refusals are `403 { code: "PLAN_LIMIT", limit: "quizzes" | "ai_tokens" |
+"image_upload" | "session_report", max?, resetsAt? }`; the web client's
+    upgrade prompt keys on that body.
 - **`billing.service.ts`**:
   - Hosted checkout. `metadata.userId` is set server-side; a live subscription
     returns 409 `ALREADY_SUBSCRIBED`.

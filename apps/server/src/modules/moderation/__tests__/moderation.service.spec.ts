@@ -4,6 +4,7 @@ import { prisma } from "@buzrr/prisma";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { MediaStorage } from "../../../common/storage/media-storage";
 import type { PrismaService } from "../../../prisma/prisma.service";
+import type { EntitlementsService } from "../../billing/entitlements.service";
 import { CategoriesService } from "../../categories/categories.service";
 import { QuestionsService } from "../../questions/questions.service";
 import { requireDatabase } from "../../billing/__tests__/helpers";
@@ -241,6 +242,8 @@ describe("ModerationService", () => {
       prismaService,
       {} as MediaStorage,
       categories,
+      // No image in play, so the Pro gate is never consulted.
+      {} as EntitlementsService,
     );
     await questions.upsertFromMultipart(
       { userId } as never,

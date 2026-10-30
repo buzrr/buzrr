@@ -63,6 +63,8 @@ export interface GameLiveState {
   standing: Standing | null;
   connection: ConnectionStatus;
   gameOver: boolean;
+  /** The saved GameResult, from game-over (absent if nothing was saved). */
+  resultId: string | null;
   /** Duels only: rating change per playerId, delivered with game-over. */
   eloChanges: Record<string, { before: number; after: number }> | null;
   /** True only for rated duels; friend invites play unrated. */
@@ -118,6 +120,7 @@ const initialState: GameLiveState = {
   standing: null,
   connection: "connecting",
   gameOver: false,
+  resultId: null,
   eloChanges: null,
   rated: false,
   category: null,
@@ -272,6 +275,7 @@ const gameSlice = createSlice({
       state,
       action: PayloadAction<{
         entries: LeaderboardEntry[];
+        resultId?: string;
         eloChanges?: Record<string, { before: number; after: number }>;
         rated?: boolean;
         category?: DuelCategoryRef;
@@ -282,6 +286,7 @@ const gameSlice = createSlice({
       state.leaderboard = action.payload.entries;
       state.isFinalLeaderboard = true;
       state.gameOver = true;
+      state.resultId = action.payload.resultId ?? null;
       state.eloChanges = action.payload.eloChanges ?? null;
       state.rated = action.payload.rated ?? false;
       state.category = action.payload.category ?? null;
@@ -303,6 +308,9 @@ const gameSlice = createSlice({
       state.players = state.players.filter(
         (p) => p.id !== action.payload.playerId,
       );
+      // The final board is already saved with everyone who finished; someone
+      // leaving it stays on it.
+      if (state.isFinalLeaderboard) return;
       state.leaderboard = state.leaderboard.filter(
         (entry) => entry.playerId !== action.payload.playerId,
       );

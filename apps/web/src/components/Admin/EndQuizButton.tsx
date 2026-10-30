@@ -14,10 +14,10 @@ import { primaryButtonClass } from "@/components/Game/GameUI";
  * Host control shown on every gameplay screen (lobby, question, reveal,
  * leaderboard). Ending a started game saves the current standings as the game
  * result before tearing the room down — the modal stays open with a loader
- * until that write finishes. The final leaderboard ("final" phase) is not yet
- * saved either — its primary "Back to quizzes" button ends and saves without a
- * confirmation, since the quiz is already complete. Only once the room has
- * ended (`alreadyEnded`) is the button a plain exit.
+ * until that write finishes. The final leaderboard ("final" phase) is already
+ * saved; its primary "Back to quizzes" button closes the room (no second
+ * save) without a confirmation. Only once the room has ended
+ * (`alreadyEnded`) is the button a plain exit.
  */
 export default function EndQuizButton({
   roomId,

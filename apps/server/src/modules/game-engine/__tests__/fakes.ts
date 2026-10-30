@@ -97,6 +97,33 @@ export class MemoryStore {
   async ensureOwner() {
     return true;
   }
+  async getAnswers(_code: string, qIndex: number) {
+    return Object.fromEntries(this.answers.get(qIndex) ?? []);
+  }
+  async leaderboard() {
+    return [...this.scores]
+      .map(([playerId, score]) => ({ playerId, score }))
+      .sort((a, b) => b.score - a.score);
+  }
+  async removePlayer(_code: string, id: string) {
+    this.players.delete(id);
+    this.scores.delete(id);
+  }
+  resultClaimed = false;
+  async claimResult() {
+    if (this.resultClaimed) return false;
+    this.resultClaimed = true;
+    return true;
+  }
+  async claimEnded() {
+    if (this.meta.phase === "ended") return false;
+    this.meta = { ...this.meta, phase: "ended" };
+    return true;
+  }
+  deleted = false;
+  async deleteGame() {
+    this.deleted = true;
+  }
 }
 
 /**

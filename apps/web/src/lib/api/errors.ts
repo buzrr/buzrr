@@ -14,9 +14,22 @@ export function getApiErrorMessage(error: unknown): string {
   return "Something went wrong";
 }
 
+/** Allowances (quizzes, AI) and Pro-only features the API can refuse. */
+export type PlanLimitKind =
+  | "quizzes"
+  | "ai_tokens"
+  | "image_upload"
+  | "session_report";
+
+/** Features Free accounts can't use at all (no allowance). */
+export type ProFeature = Extract<
+  PlanLimitKind,
+  "image_upload" | "session_report"
+>;
+
 export type PlanLimitDetails = {
   message: string;
-  limit: "quizzes" | "ai_tokens";
+  limit: PlanLimitKind;
   max?: number;
   resetsAt?: string | null;
 };

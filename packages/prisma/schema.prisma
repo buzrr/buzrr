@@ -269,6 +269,10 @@ model GameResult {
   endedAt       DateTime          @default(now())
   /// Duel category; null for classic games and Random duels.
   categoryId    String?
+  /// Classic games: the Pro session report (`SessionReport` in
+  /// @buzrr/contract), snapshotted at game end. Null for duels and for games
+  /// that ended before reports existed.
+  report        Json?
   host          User?             @relation(fields: [hostId], references: [id])
   quiz          Quiz?             @relation(fields: [quizId], references: [id])
   category      Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)

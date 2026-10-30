@@ -9,7 +9,9 @@ import reducer, {
   applySync,
   gameOver,
   gameProgress,
+  leaderboardReceived,
   liveSummary,
+  playerRemoved,
   questionEnd,
   questionStart,
   resetGame,
@@ -321,5 +323,30 @@ describe("question-first reading time", () => {
     expect(state.opensAt).toBeGreaterThan(Date.now());
     expect(state.reactionsEnabled).toBe(true);
     expect(reducer(fresh(), applySync(sync({}))).reactionsEnabled).toBe(false);
+  });
+});
+
+describe("a player leaving", () => {
+  const board = [
+    { playerId: "ana", name: "Ana", profilePic: null, score: 900, rank: 1 },
+    { playerId: "ben", name: "Ben", profilePic: null, score: 500, rank: 2 },
+  ];
+
+  it("drops off a mid-game leaderboard", () => {
+    const mid = reducer(
+      fresh(),
+      leaderboardReceived({ entries: board, isFinal: false }),
+    );
+    const after = reducer(mid, playerRemoved({ playerId: "ben" }));
+    expect(after.leaderboard.map((e) => e.playerId)).toEqual(["ana"]);
+  });
+
+  it("stays on the final leaderboard, which is already saved", () => {
+    const final = reducer(
+      fresh(),
+      leaderboardReceived({ entries: board, isFinal: true }),
+    );
+    const after = reducer(final, playerRemoved({ playerId: "ben" }));
+    expect(after.leaderboard.map((e) => e.playerId)).toEqual(["ana", "ben"]);
   });
 });

@@ -60,8 +60,10 @@ import {
   LeaderboardEntry,
   LiveQuestion,
   RosterEntry,
+  StoredAnswer,
 } from "./game-engine.types";
 import { GameStoreService, parseAnswer } from "./game-store.service";
+import { buildSessionReport } from "./report";
 
 /** How long a disconnected lobby player is kept before removal. */
 const LOBBY_DISCONNECT_GRACE_MS = 60_000;
@@ -213,6 +215,9 @@ export class GameEngineService
           break;
         case "end-game":
           await this.endGame(gameCode);
+          break;
+        case "save-result":
+          await this.saveFinalResult(gameCode);
           break;
         case "dispatch":
           await this.dispatch(gameCode, {
@@ -466,17 +471,36 @@ export class GameEngineService
     const claimed = await this.store.claimEnded(gameCode);
     if (!claimed) return;
 
-    const [scores, roster] = await Promise.all([
-      this.store.leaderboard(gameCode),
-      this.store.roster(gameCode),
-    ]);
-    const entries = buildLeaderboard(scores, roster);
-    const { resultId, eloChanges, streaks } = await this.persistResult(
-      gameCode,
-      meta,
-      entries,
-      opts,
-    );
+    // A classic game saved its result when the final leaderboard showed;
+    // it ends on that saved board, without writing a second result.
+    let entries: LeaderboardEntry[];
+    let resultId: string | undefined;
+    let eloChanges:
+      | Record<string, { before: number; after: number }>
+      | undefined;
+    let streaks: StreakChanges | undefined;
+    if (await this.store.claimResult(gameCode)) {
+      const [scores, roster] = await Promise.all([
+        this.store.leaderboard(gameCode),
+        this.store.roster(gameCode),
+      ]);
+      entries = buildLeaderboard(scores, roster);
+      ({ resultId, eloChanges, streaks } = await this.persistResult(
+        gameCode,
+        meta,
+        entries,
+        opts,
+      ));
+    } else {
+      const saved = await this.store.getMeta(gameCode);
+      resultId = saved?.resultId;
+      entries = saved?.finalEntries
+        ? (JSON.parse(saved.finalEntries) as LeaderboardEntry[])
+        : buildLeaderboard(
+            await this.store.leaderboard(gameCode),
+            await this.store.roster(gameCode),
+          );
+    }
 
     this.emitRoom(gameCode).emit("game-over", {
       entries,
@@ -1127,6 +1151,48 @@ export class GameEngineService
     }
   }
 
+  /** Stored answers for every question, by question index. */
+  private async allAnswers(
+    gameCode: string,
+    qCount: number,
+  ): Promise<Record<string, StoredAnswer>[]> {
+    return Promise.all(
+      Array.from({ length: qCount }, (_, i) =>
+        this.store.getAnswers(gameCode, i),
+      ),
+    );
+  }
+
+  /**
+   * A host-paced game reached its final leaderboard: save the result now,
+   * while everyone who finished is still on the board. The room stays open
+   * until the host leaves; `endGame` then reuses this result.
+   */
+  private async saveFinalResult(gameCode: string): Promise<void> {
+    const meta = await this.store.getMeta(gameCode);
+    if (!meta || meta.phase !== "final") return;
+    if (!(await this.store.claimResult(gameCode))) return;
+    const [scores, roster] = await Promise.all([
+      this.store.leaderboard(gameCode),
+      this.store.roster(gameCode),
+    ]);
+    const entries = buildLeaderboard(scores, roster);
+    const { resultId } = await this.persistResult(gameCode, meta, entries);
+    await this.store.patchMeta(gameCode, {
+      ...(resultId ? { resultId } : {}),
+      finalEntries: JSON.stringify(entries),
+    });
+  }
+
+  /**
+   * The GameResult saved when this game's final leaderboard showed. Null
+   * before then, or if saving failed.
+   */
+  async savedResultId(gameCode: string): Promise<string | null> {
+    const meta = await this.store.getMeta(gameCode);
+    return meta?.resultId ?? null;
+  }
+
   /**
    * Writes the immutable GameResult before the live state is destroyed.
    * For duels this also applies the ELO update atomically in the same
@@ -1146,15 +1212,32 @@ export class GameEngineService
 
     const roster = await this.store.roster(gameCode);
     const rosterById = new Map(roster.map((p) => [p.id, p]));
+    const answersByQuestion = await this.allAnswers(gameCode, meta.qCount);
     const correctCounts = new Map<string, number>();
-    for (let i = 0; i < meta.qCount; i++) {
-      const answers = await this.store.getAnswers(gameCode, i);
+    for (const answers of answersByQuestion) {
       for (const [playerId, a] of Object.entries(answers)) {
         if (a.isCorrect) {
           correctCounts.set(playerId, (correctCounts.get(playerId) ?? 0) + 1);
         }
       }
     }
+    // Classic games keep the Pro session report, so a host can download it
+    // again from History once the live state is gone.
+    const report =
+      meta.mode === "classic"
+        ? buildSessionReport({
+            quizTitle: meta.quizTitle,
+            gameCode,
+            startedAt: meta.startedAt,
+            endedAt: Date.now(),
+            questions:
+              (await this.store.loadState(gameCode, ["questions"]))
+                ?.questions ?? [],
+            roster,
+            entries,
+            answers: answersByQuestion,
+          })
+        : undefined;
 
     // `!== false` rather than truthiness: duels already live in Redis before
     // `rated` existed stay rated across the deploy.
@@ -1203,6 +1286,7 @@ export class GameEngineService
       playerCount: entries.length,
       questionCount: meta.qCount,
       startedAt: new Date(meta.startedAt),
+      ...(report ? { report } : {}),
       entries: {
         create: entries.map((e) => ({
           playerName: e.name,

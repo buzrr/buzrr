@@ -26,6 +26,7 @@ import {
   validateDefinition,
 } from "../question-types";
 import { CategoriesService } from "../categories/categories.service";
+import { EntitlementsService } from "../billing/entitlements.service";
 import { ReorderQuestionsDto } from "./dto/reorder-questions.dto";
 
 type MultipartBody = Record<string, string | undefined>;
@@ -87,6 +88,7 @@ export class QuestionsService {
     private readonly prisma: PrismaService,
     private readonly storage: MediaStorage,
     private readonly categories: CategoriesService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   private async assertQuizOwned(quizId: string, userId: string) {
@@ -242,6 +244,15 @@ export class QuestionsService {
 
     let fileLink = "";
     let mediaType = "";
+
+    // Images are Pro. Keeping (or removing) the image a question already has
+    // stays free, so a lapsed subscription never strands existing content.
+    if (
+      (file && file.size > 0) ||
+      (file_link && file_link !== existing?.media)
+    ) {
+      await this.entitlements.assertPro(user.userId, "image_upload");
+    }
 
     if (file && file.size > 0) {
       let uploaded;
