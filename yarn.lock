@@ -8623,7 +8623,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"jspdf-autotable@npm:^5":
+"jspdf-autotable@npm:^5.0.2":
   version: 5.0.9
   resolution: "jspdf-autotable@npm:5.0.9"
   peerDependencies:
@@ -8632,7 +8632,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"jspdf@npm:^3":
+"jspdf@npm:^3.0.4":
   version: 3.0.4
   resolution: "jspdf@npm:3.0.4"
   dependencies:
@@ -12972,8 +12972,8 @@ __metadata:
     eslint: "npm:^9"
     eslint-config-next: "npm:16.4.3"
     jose: "npm:^6.2.2"
-    jspdf: "npm:^3"
-    jspdf-autotable: "npm:^5"
+    jspdf: "npm:^3.0.4"
+    jspdf-autotable: "npm:^5.0.2"
     next: "npm:16.4.3"
     nitro: "npm:3.0.260610-beta"
     papaparse: "npm:^5.7.0"
