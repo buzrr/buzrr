@@ -233,6 +233,7 @@ const LandingFooter = () => {
               alt="Featured on MakeItLast"
               width="184"
               height="48"
+              loading="lazy"
             />
           </a>
         </div>
