@@ -226,6 +226,15 @@ const LandingFooter = () => {
               className="hidden dark:block"
             />
           </a>
+          <a href="https://www.makeitla.st/" title="Featured on MakeItLast">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://www.makeitla.st/badge/makeitlast-badge-dark.svg?v=3"
+              alt="Featured on MakeItLast"
+              width="184"
+              height="48"
+            />
+          </a>
         </div>
 
         <div className="mt-6 pt-6 border-t border-card-light dark:border-card-dark flex flex-col sm:flex-row items-center justify-between gap-4">
