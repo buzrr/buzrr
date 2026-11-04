@@ -226,6 +226,7 @@ const LandingFooter = () => {
               className="hidden dark:block"
             />
           </a>
+<<<<<<< HEAD
           <a href="https://www.makeitla.st/" title="Featured on MakeItLast">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -236,6 +237,8 @@ const LandingFooter = () => {
               loading="lazy"
             />
           </a>
+=======
+>>>>>>> 692944e (feat: featured badges)
         </div>
 
         <div className="mt-6 pt-6 border-t border-card-light dark:border-card-dark flex flex-col sm:flex-row items-center justify-between gap-4">
