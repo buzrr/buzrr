@@ -110,15 +110,17 @@ Templates are the truth: root `.env.example`, `apps/web/.env.example`,
   it holds Socket.IO connections, in-process timers, and lazy background
   workers. Prisma `binaryTargets` includes `rhel-openssl-3.0.x` for such
   hosts. Health probe: `GET /health` (200/503 with per-dependency status).
-  **EC2 path**: `.github/workflows/deploy-server.yml` runs after CI passes on
+  **VM path (EC2, Oracle)**: `.github/workflows/deploy-server.yml` runs after CI passes on
   `main` (or manually), builds `apps/server/Dockerfile` for `linux/amd64`,
   pushes `ghcr.io/buzrr/buzrr-server:{latest,<sha>}`, then over SSH copies
-  `deploy/ec2/{docker-compose.yml,Caddyfile}` to the host and runs
+  `deploy/ec2/{docker-compose.yml,Caddyfile}` to each host in its matrix, one
+  at a time and carrying on past a failed host, and runs
   `docker compose pull && up -d` pinned to the SHA. The stack is a one-shot
   `migrate` (`scripts/deploy.mjs`), `server`, and Caddy (HTTPS + WebSockets
-  for `API_DOMAIN`); Postgres/Redis are external. The host keeps its own
-  `.env` (template `deploy/ec2/.env.example`). The deploy job is skipped
-  while repo variable `EC2_HOST` is unset; it also needs secret `EC2_SSH_KEY`.
+  for `API_DOMAIN`); Postgres/Redis are external. Each host keeps its own
+  `.env` (template `deploy/ec2/.env.example`). A matrix target `<T>` (`EC2`,
+  `ORACLE0`) is skipped while repo variable `<T>_HOST` is unset; it also needs
+  secret `<T>_SSH_KEY`.
 - **Buzrr-AI → the same kind of container host**, two processes from one image
   (`apps/ai/Dockerfile`, the repo's first): `uvicorn` and
   `arq buzrr_ai.worker.WorkerSettings`. Health probe `GET /health`, same shape as

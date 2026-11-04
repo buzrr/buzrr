@@ -1,4 +1,4 @@
-# Production stack for a single EC2 host: the Nest API behind Caddy (HTTPS +
+# Production stack for one VM host: the Nest API behind Caddy (HTTPS +
 # WebSocket upgrades). Postgres and Redis are external — their URLs live in
 # `.env` next to this file (template: .env.example). Images are built by
 # .github/workflows/deploy-server.yml; nothing is built on the host.

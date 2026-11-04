@@ -1,18 +1,20 @@
 name: Deploy server
 
 # Builds the Nest API image (apps/server/Dockerfile), pushes it to GHCR, then
-# rolls it out on the EC2 host over SSH. Runs only after CI has passed on main,
+# rolls it out on each host over SSH. Runs only after CI has passed on main,
 # so a red build never reaches production. Manual runs (workflow_dispatch)
 # deploy the selected ref without waiting for CI.
 #
-# Setup (repo → Settings → Secrets and variables → Actions):
-#   variables  EC2_HOST      public IP / DNS of the instance (deploy is skipped while unset)
-#              EC2_USER      SSH user, default "ubuntu"
-#              EC2_PATH      directory holding the compose stack, default "/home/ubuntu/buzrr"
-#   secrets    EC2_SSH_KEY   private key whose public half is in the host's authorized_keys
-#              EC2_KNOWN_HOSTS  optional `ssh-keyscan` output; pinned instead of scanning each run
+# Hosts are listed in the deploy job's matrix; a new one also needs its secrets
+# added to the "Configure SSH" step. Each entry <T> reads its own settings
+# (repo → Settings → Secrets and variables → Actions):
+#   variables  <T>_HOST      public IP / DNS of the instance (that host is skipped while unset)
+#              <T>_USER      SSH user, default "ubuntu"
+#              <T>_PATH      directory holding the compose stack, default "/home/ubuntu/buzrr"
+#   secrets    <T>_SSH_KEY   private key whose public half is in the host's authorized_keys
+#              <T>_KNOWN_HOSTS  optional `ssh-keyscan` output; pinned instead of scanning each run
 #
-# The host keeps its own `.env` (never in git); deploy/ec2/* is copied over it.
+# Each host keeps its own `.env` (never in git); deploy/ec2/* is copied over it.
 on:
   workflow_run:
     workflows: [CI]
@@ -24,7 +26,7 @@ permissions:
   contents: read
   packages: write
 
-# Never run two rollouts against the host at once; let the running one finish.
+# Never run two rollouts at once; let the running one finish.
 concurrency:
   group: deploy-server
   cancel-in-progress: false
@@ -68,28 +70,38 @@ jobs:
           cache-to: type=gha,scope=server,mode=max
 
   deploy:
-    name: Roll out on EC2
+    name: Roll out on ${{ matrix.target }}
     needs: image
-    if: vars.EC2_HOST != ''
     runs-on: ubuntu-latest
+    # One host at a time, so only one `migrate` runs at a time. A failed host
+    # doesn't stop the rest: the others still deploy and the run ends up red.
+    strategy:
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        target: [EC2, ORACLE0]
     permissions:
       contents: read
       packages: read
     env:
-      HOST: ${{ vars.EC2_HOST }}
-      SSH_USER: ${{ vars.EC2_USER || 'ubuntu' }}
-      DEPLOY_PATH: ${{ vars.EC2_PATH || '/home/ubuntu/buzrr' }}
+      HOST: ${{ vars[format('{0}_HOST', matrix.target)] }}
+      SSH_USER: ${{ vars[format('{0}_USER', matrix.target)] || 'ubuntu' }}
+      DEPLOY_PATH: ${{ vars[format('{0}_PATH', matrix.target)] || '/home/ubuntu/buzrr' }}
       SERVER_TAG: ${{ needs.image.outputs.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - if: env.HOST != ''
+        uses: actions/checkout@v4
         with:
           ref: ${{ needs.image.outputs.sha }}
           sparse-checkout: deploy/ec2
 
       - name: Configure SSH
+        if: env.HOST != ''
         env:
-          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-          KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+          # Named one by one so the job only receives these secrets. Both branches
+          # check the target, so an empty secret can't fall through to the other host's.
+          SSH_KEY: ${{ matrix.target == 'EC2' && secrets.EC2_SSH_KEY || matrix.target == 'ORACLE0' && secrets.ORACLE0_SSH_KEY || '' }}
+          KNOWN_HOSTS: ${{ matrix.target == 'EC2' && secrets.EC2_KNOWN_HOSTS || matrix.target == 'ORACLE0' && secrets.ORACLE0_KNOWN_HOSTS || '' }}
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
@@ -102,11 +114,13 @@ jobs:
           printf 'Host target\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/id_deploy\n' "$HOST" "$SSH_USER" > ~/.ssh/config
 
       - name: Copy stack files
+        if: env.HOST != ''
         run: |
           ssh target "mkdir -p '$DEPLOY_PATH'"
           scp deploy/ec2/docker-compose.yml deploy/ec2/Caddyfile "target:$DEPLOY_PATH/"
 
       - name: Pull and restart
+        if: env.HOST != ''
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
