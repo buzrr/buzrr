@@ -209,6 +209,8 @@ model Option {
   questionId String
   createdAt  DateTime @default(now())
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId], map: "Option_questionId_idx")
 }
 
 /// A player flagging an approved question as wrong/NSFW. Distinct reporters
