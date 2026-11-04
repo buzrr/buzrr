@@ -20,6 +20,7 @@ Format:
 
 ## Entries
 
+- 2026-11-04 — `deploy-server.yml` rolls out to several hosts: matrix of targets (`EC2`, `ORACLE0`) with per-target `<T>_*` settings, sequential and carrying on past a failed host. Updated infrastructure.md.
 - 2026-09-18 — Answer window is stamped into meta **before** `question-start` goes out (was: broadcast first, stamp after), and the per-socket RTT credit is gone — `latency-probe`/`monitorLatency` removed from the socket contract, and `ANSWER_GRACE_MS` is now a flat allowance that accepts late-arriving answers at deadline score. Docs touched: realtime.md, invariants.md, ARCHITECTURE.md.
 - 2026-09-16 — Answer window stamped after `question-start` is broadcast; per-socket RTT probe (`latency-probe`, rolling median) credits half the round trip; 300ms grace past the real deadline; clients receive `remainingMs` instead of `deadline`/`serverNow`/`startAt`. Docs touched: realtime.md, invariants.md, frontend.md, ARCHITECTURE.md.
 - 2026-09-14 — Pricing docs aligned with the configured Dodo product: ₹399 INR localized price (fallbacks set to 39900), `by_currency`/`by_country` both supported, product-level discount shown, Adaptive Currency caveat. Docs: ADR-010, infrastructure.md, CONTEXT.md.
@@ -60,4 +61,3 @@ Format:
 - 2026-10-28 — Host session settings chosen in a modal on Host quiz: question-first reading time (3/5/10s; answer window opens `readTimeMs` after `question-start`, `opensInMs` on the wire) and best-effort player emoji reactions relayed to the host room (`send-reaction` → `reaction`). `GameSession.readTimeSec`/`reactionsEnabled`, migration `20261028000001`. Updated realtime.md, data.md, CONTEXT.
 - 2026-10-30 — Pro features: superadmins always resolve Pro; `EntitlementsService.assertPro` gates question image uploads and the new session report (`GET /game-sessions/:roomId/report` live, `GET /results/:resultId/report` saved as `GameResult.report`, migration `20261030000001`; PDF built client-side). PRO tags + upgrade prompt on the web. Updated backend.md, data.md, CONTEXT.
 - 2026-10-30 — Host-paced classic games save their `GameResult` (and report) when the final leaderboard shows (`save-result` effect, `claimResult` Redis claim, `resultId`/`finalEntries` in meta); `endGame` reuses that save, so leavers stay in the result and nothing is saved twice. Updated realtime.md, data.md, CONTEXT.
-- 2026-11-04 — `deploy-server.yml` rolls out to several hosts: matrix of targets (`EC2`, `ORACLE0`) with per-target `<T>_*` settings, sequential and carrying on past a failed host. Updated infrastructure.md.

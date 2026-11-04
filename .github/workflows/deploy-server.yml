@@ -5,8 +5,9 @@ name: Deploy server
 # so a red build never reaches production. Manual runs (workflow_dispatch)
 # deploy the selected ref without waiting for CI.
 #
-# Hosts are listed in the deploy job's matrix. Each entry <T> reads its own
-# settings (repo → Settings → Secrets and variables → Actions):
+# Hosts are listed in the deploy job's matrix; a new one also needs its secrets
+# added to the "Configure SSH" step. Each entry <T> reads its own settings
+# (repo → Settings → Secrets and variables → Actions):
 #   variables  <T>_HOST      public IP / DNS of the instance (that host is skipped while unset)
 #              <T>_USER      SSH user, default "ubuntu"
 #              <T>_PATH      directory holding the compose stack, default "/home/ubuntu/buzrr"
@@ -97,8 +98,10 @@ jobs:
       - name: Configure SSH
         if: env.HOST != ''
         env:
-          SSH_KEY: ${{ secrets[format('{0}_SSH_KEY', matrix.target)] }}
-          KNOWN_HOSTS: ${{ secrets[format('{0}_KNOWN_HOSTS', matrix.target)] }}
+          # Named one by one so the job only receives these secrets. Both branches
+          # check the target, so an empty secret can't fall through to the other host's.
+          SSH_KEY: ${{ matrix.target == 'EC2' && secrets.EC2_SSH_KEY || matrix.target == 'ORACLE0' && secrets.ORACLE0_SSH_KEY || '' }}
+          KNOWN_HOSTS: ${{ matrix.target == 'EC2' && secrets.EC2_KNOWN_HOSTS || matrix.target == 'ORACLE0' && secrets.ORACLE0_KNOWN_HOSTS || '' }}
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
