@@ -147,13 +147,10 @@ function AccountCard() {
 
   const userId = session?.user.id;
   const sessionImage = session?.user.image;
-  const avatarOptions = useMemo(
-    () => [
-      userId ? resolveAccountPhoto(userId, sessionImage) : "",
-      ...PROFILES,
-    ],
-    [userId, sessionImage],
-  );
+  const avatarOptions = useMemo(() => {
+    const photo = userId ? resolveAccountPhoto(userId, sessionImage) : "";
+    return photo ? [photo, "", ...PROFILES] : ["", ...PROFILES];
+  }, [userId, sessionImage]);
 
   const onSubmit = handleSubmit(async (values) => {
     const { error } = await authClient.updateUser({

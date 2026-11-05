@@ -118,7 +118,7 @@ export const FEATURES = {
   selfHost: {
     icon: LuServer,
     title: "Self-hostable",
-    text: "One docker compose up runs your own instance, even with no internet access. Self-hosted instances run with billing off and Pro limits.",
+    text: "One docker compose up runs your own instance, and once its images are built it needs no internet access. Self-hosted instances run with billing off and Pro limits.",
   },
   browser: {
     icon: LuGlobe,
@@ -141,7 +141,7 @@ export const PLAN_FACTS = {
 /** What the hosted free plan and self-hosting include; every "free" claim draws on this. */
 export const FREE_PLAN_POINTS = [
   `The hosted free plan has no time limit and costs nothing: rooms of up to ${PLAN_FACTS.freePlayers} players, ${PLAN_FACTS.freeQuizzes} quizzes and ${PLAN_FACTS.freeAi} AI generations in total.`,
-  "It includes all six question types, ranked 1v1 battles and friend challenges, and joining by code, link or QR. Players never pay or sign up.",
+  "It includes all six question types, ranked 1v1 battles and friend challenges, and joining by code, link or QR. Players in hosted rooms never pay or sign up; 1v1 battles need a free account.",
   "Question images and PDF session reports are Buzrr Pro features on the hosted version.",
   "Self-hosting is free: your instance runs with billing off and Pro limits, and you only pay for your own server.",
 ];

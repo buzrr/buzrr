@@ -129,7 +129,10 @@ const BADGES: ListingBadge[] = [
   },
   {
     name: "MakeItLast",
-    link: { href: "https://www.makeitla.st/", title: "Featured on MakeItLast" },
+    link: {
+      href: "https://www.makeitla.st/tools/buzrr",
+      title: "Featured on MakeItLast",
+    },
     content: (
       <img
         src="https://www.makeitla.st/badge/makeitlast-badge-dark.svg?v=3"
@@ -146,6 +149,8 @@ const BADGES: ListingBadge[] = [
  * The second copy exists only to make the loop seamless, so it is hidden from
  * assistive tech and the tab order. `pr-8` matches `gap-8`, which keeps the two
  * copies the same width and makes the -50% keyframe land exactly on the seam.
+ * Keyboard focus swaps the marquee for a static, wrapped row, as reduced motion
+ * does, so the focused badge and its ring are never clipped or carried away.
  */
 function BadgeSet({ duplicate = false }: { duplicate?: boolean }) {
   return (
@@ -153,8 +158,8 @@ function BadgeSet({ duplicate = false }: { duplicate?: boolean }) {
       aria-hidden={duplicate || undefined}
       className={
         duplicate
-          ? "flex shrink-0 items-center gap-8 pr-8 motion-reduce:hidden"
-          : "flex shrink-0 items-center gap-8 pr-8 motion-reduce:shrink motion-reduce:flex-wrap motion-reduce:justify-center motion-reduce:pr-0"
+          ? "flex shrink-0 items-center gap-8 pr-8 motion-reduce:hidden group-has-focus-visible/marquee:hidden"
+          : "flex shrink-0 items-center gap-8 pr-8 motion-reduce:shrink motion-reduce:flex-wrap motion-reduce:justify-center motion-reduce:pr-0 group-has-focus-visible/marquee:shrink group-has-focus-visible/marquee:flex-wrap group-has-focus-visible/marquee:justify-center group-has-focus-visible/marquee:pr-0"
       }
     >
       {BADGES.map((badge) => (
@@ -179,8 +184,8 @@ export default function FeaturedBadges() {
       >
         AS FEATURED ON
       </p>
-      <div className="overflow-hidden mask-[linear-gradient(to_right,transparent,black_6%,black_94%,transparent)] motion-reduce:mask-none">
-        <div className="flex w-max animate-marquee hover:[animation-play-state:paused] focus-within:[animation-play-state:paused] motion-reduce:w-full motion-reduce:justify-center">
+      <div className="group/marquee overflow-hidden mask-[linear-gradient(to_right,transparent,black_6%,black_94%,transparent)] motion-reduce:mask-none has-focus-visible:overflow-visible has-focus-visible:mask-none">
+        <div className="flex w-max animate-marquee hover:[animation-play-state:paused] focus-within:[animation-play-state:paused] motion-reduce:w-full motion-reduce:justify-center has-focus-visible:w-full has-focus-visible:animate-none has-focus-visible:justify-center">
           <BadgeSet />
           <BadgeSet duplicate />
         </div>

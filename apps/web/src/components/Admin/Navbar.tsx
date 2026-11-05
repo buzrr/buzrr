@@ -87,7 +87,14 @@ export default function Navbar() {
         )}
       >
         <div className="flex justify-center items-center md:justify-start p-5 md:px-6 md:py-3 mb-2 border-b border-card-light dark:border-off-dark">
-          <Link href="/" prefetch={false} className="inline-block">
+          <Link
+            href="/"
+            prefetch={false}
+            className="inline-block"
+            onClick={() => {
+              dispatch(setNavToggle(NavToggle.collapse));
+            }}
+          >
             <ClientImage
               props={{
                 src: "/images/logo.svg",

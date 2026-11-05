@@ -42,7 +42,7 @@ const crumbs = [
 const REQUIRED = [
   "Docker with Compose v2.24 or newer.",
   "About 4 GB of free RAM while the images build, and much less to run them.",
-  "Free ports 3000 (web) and 3001 (API). Postgres and Redis are published too, for backups and debugging.",
+  "Free ports 3000 (web) and 3001 (API). Postgres and Redis are published on localhost only, for backups and debugging.",
 ];
 
 const OPTIONAL = [
@@ -65,6 +65,7 @@ const LOCAL_STEPS = [
 const PRODUCTION = [
   "Set PUBLIC_WEB_URL and PUBLIC_API_URL to addresses players' devices can reach, in a .env file next to docker-compose.yml, then run docker compose up -d --build. The API address is compiled into the web app, so it needs the rebuild.",
   "For the public internet, put a reverse proxy with HTTPS in front of both ports, such as Caddy, nginx or Traefik.",
+  "Never expose Postgres (5432) or Redis (6379) publicly: Postgres uses a default password and Redis has none, and Docker's published ports can bypass host firewalls such as ufw. The compose file binds both to 127.0.0.1, so keep that binding.",
   "Once your hosts have accounts, close registration with AUTH_EMAIL_SIGNUP=OFF.",
   "Back up the Postgres database and the uploads volume. To upgrade, run git pull and docker compose up -d --build; migrations apply before the API starts.",
 ];

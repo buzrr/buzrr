@@ -9,7 +9,7 @@ needs the internet.
 - Docker with Compose **v2.24 or newer** (`docker compose version`).
 - About 4 GB of free RAM while the images build (much less to run).
 - Free ports 3000 (web) and 3001 (API). Postgres (5432) and Redis (6379) are
-  published too, for backups and debugging.
+  published on localhost only, for backups and debugging.
 
 ## Start it
 
@@ -61,6 +61,10 @@ network — no account needed to play.
 
 For the public internet, put a reverse proxy with HTTPS (Caddy, nginx,
 Traefik) in front of both ports and use `https://` URLs here.
+
+Never expose Postgres (5432) or Redis (6379) publicly: Postgres uses a default
+password, Redis has none, and Docker's published ports can bypass host firewalls
+such as ufw. `docker-compose.yml` binds both to `127.0.0.1`, so keep that binding.
 
 ### Accounts
 

@@ -248,8 +248,9 @@ const WAYGROUND_CELLS: Partial<Record<RowId, Cell>> = {
   selfHost: CLOUD_ONLY,
   offline: ONLINE_ONLY,
   join: {
-    status: "yes",
-    text: "Yes — players join with a code, no account needed",
+    status: "unverified",
+    text: "Players enter a code; whether they need an account isn't stated",
+    source: 0,
   },
   aiQuiz: {
     status: "yes",
