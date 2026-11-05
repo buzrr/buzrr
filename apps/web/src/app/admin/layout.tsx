@@ -32,8 +32,9 @@ export default async function RootLayout({
     <SessionProvider role={role}>
       {/* pb-12: room for the fixed site footer (48px) so it never covers the
           bottom of a page. Full-height screens subtract the same 3rem. */}
-      <div className="flex flex-col w-screen pb-12">
-        <div className="p-2 bg-light-bg dark:bg-dark-bg hidden md:block">
+      <div className="group/admin flex flex-col w-screen pb-12">
+        {/* Pages with the sidebar show the logo there instead. */}
+        <div className="p-2 bg-light-bg dark:bg-dark-bg hidden md:block md:group-has-data-admin-shell/admin:hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <Link href="/" className="inline-block">
               <ClientImage

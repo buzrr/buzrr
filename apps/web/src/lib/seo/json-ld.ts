@@ -72,6 +72,7 @@ export function softwareApplicationSchema(): JsonLdNode {
     featureList: [
       "Live hosted multiplayer quiz rooms joined with a 6-character code, link or QR code",
       "Players join as guests without creating an account",
+      "Multiple-choice, true/false, poll, word-cloud and rating questions, plus open-text audience Q&A",
       "Ranked 1v1 quiz battles with ELO matchmaking",
       "AI quiz generation from a topic description",
       "AI question generation from uploaded PDF, DOCX, TXT and Markdown documents",

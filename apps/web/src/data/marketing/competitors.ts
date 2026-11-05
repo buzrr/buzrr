@@ -1,12 +1,12 @@
 import type { Faq } from "@/lib/seo/json-ld";
-import { PLAN_FACTS, type FeatureId } from "./product";
+import { FREE_PLAN_SUMMARY, PLAN_FACTS, type FeatureId } from "./product";
 import type { UseCaseSlug } from "./use-cases";
 
 /**
  * Competitor facts for the alternative and comparison pages.
  *
  * The two page types have different jobs and must not repeat each other:
- * - `/alternatives/{slug}` answers "open-source / free {X} alternative": why
+ * - `/alternatives/{slug}` answers "free {X} alternative" and "open-source {X} alternative": why
  *   people switch, who Buzrr suits, and when {X} is the better fit.
  * - `/compare/buzrr-vs-{slug}` answers "Buzrr vs {X}": the feature and
  *   pricing table, what each product is, and sources.
@@ -106,7 +106,7 @@ export const BUZRR_CELLS: Record<RowId, Cell> = {
   },
   freeLimits: {
     status: "info",
-    text: `${PLAN_FACTS.freePlayers} players per room, ${PLAN_FACTS.freeQuizzes} quizzes, ${PLAN_FACTS.freeAi} AI generations; self-hosted instances get Pro limits`,
+    text: `${PLAN_FACTS.freePlayers} players per room, ${PLAN_FACTS.freeQuizzes} quizzes, ${PLAN_FACTS.freeAi} AI generations; images and PDF reports are Pro; self-hosted instances get Pro limits`,
   },
   openSource: { status: "yes", text: "Yes — AGPL-3.0, full source on GitHub" },
   selfHost: {
@@ -143,10 +143,13 @@ export const BUZRR_CELLS: Record<RowId, Cell> = {
   },
   selfPaced: { status: "no", text: "No — live play only" },
   questionTypes: {
-    status: "partial",
-    text: "Multiple choice, one correct answer, optional image",
+    status: "yes",
+    text: "Multiple choice (one or several right answers), true/false, poll, word cloud, rating and open text",
   },
-  audienceTools: { status: "no", text: "No — quizzes only" },
+  audienceTools: {
+    status: "yes",
+    text: "Yes — polls, word clouds, rating and open-text Q&A; no upvoting or Q&A moderation",
+  },
   integrations: { status: "no", text: "None" },
 };
 
@@ -195,6 +198,12 @@ export interface Competitor {
     useCases: UseCaseSlug[];
   };
 }
+
+/** The FAQ that answers the "free {X} alternative" query directly. */
+const freeAlternativeFaq = (searchName: string, what: string): Faq => ({
+  question: `What is a free alternative to ${searchName}?`,
+  answer: `Buzrr is a free, open-source alternative to ${searchName} for ${what}. ${FREE_PLAN_SUMMARY}`,
+});
 
 const UNVERIFIED = (name: string): Cell => ({
   status: "unverified",
@@ -262,7 +271,7 @@ const WAYGROUND_CELLS: Partial<Record<RowId, Cell>> = {
   scoring: UNVERIFIED("Wayground"),
   selfPaced: {
     status: "yes",
-    text: "Yes — auto-graded homework and practice",
+    text: "Yes — auto-graded homework and AI-generated practice",
     source: 0,
   },
   questionTypes: UNVERIFIED("Wayground"),
@@ -368,10 +377,10 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
     alternative: {
       teaser:
         "Live rooms with a code, speed scoring and leaderboards — open source, self-hostable, plus ranked 1v1 battles.",
-      title: "Open-Source Kahoot Alternative (Free, Self-Hostable)",
+      title: "Free Kahoot Alternative: Open Source, Self-Hostable",
       description:
-        "Buzrr is a free, open-source Kahoot alternative you can self-host: live quiz rooms joined by code or QR, speed scoring, AI questions and ranked 1v1 battles.",
-      h1: "Open-source Kahoot alternative: free and self-hostable",
+        "Buzrr is a free Kahoot alternative, open source and self-hostable: live quiz rooms joined by code or QR, speed scoring, AI questions and 1v1 battles.",
+      h1: "Free Kahoot alternative: open source and self-hostable",
       lead: "Yes — Buzrr is a free, open-source Kahoot alternative: a host screen, a room code, and everyone answering on their phones against the clock. Its code is public under AGPL-3.0, so you can also run it on your own server.",
       whyLook: {
         heading: "Why people look for a Kahoot alternative",
@@ -423,20 +432,23 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
         "images",
       ],
       goodFit: [
-        "You run live multiple-choice quizzes and don't need other question formats.",
+        "You run live quizzes, with the odd poll or word cloud between scored rounds.",
         "You want to read, audit or self-host the software.",
         "You like the idea of ranked 1v1 play alongside hosted rooms.",
         "You want to generate questions from your own documents with citations.",
       ],
       stayWith: [
         "You rely on self-paced challenges or homework assignments — Buzrr is live only.",
-        "You need question types beyond single-answer multiple choice.",
-        "You need video in questions — Buzrr supports images only.",
+        "You need scored question types beyond multiple choice and true/false.",
+        "You need video in questions — Buzrr supports images only, on Pro or self-hosted.",
         "You want an established product with a large existing content library.",
       ],
       useCases: ["classroom-quizzes", "team-building", "corporate-training"],
       related: ["quizizz", "wayground", "slido", "mentimeter", "quizup"],
       faq: [
+        {
+          ...freeAlternativeFaq("Kahoot", "live quiz games"),
+        },
         {
           question: "Is there an open-source alternative to Kahoot?",
           answer:
@@ -448,13 +460,9 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
             "Yes, with Buzrr. One docker compose up runs the whole stack — web app, game server, PostgreSQL and Redis — on your own machine or server, with billing off and Pro limits.",
         },
         {
-          question: "Is Buzrr free?",
-          answer: `Yes. The hosted free plan has no time limit and allows rooms of ${PLAN_FACTS.freePlayers} players; Buzrr Pro raises the limits. Self-hosting is free.`,
-        },
-        {
           question: "What can't Buzrr do that Kahoot! can?",
           answer:
-            "Buzrr has no self-paced or homework mode, no video in questions, and only single-answer multiple-choice questions. If you rely on those, Kahoot! is the better fit.",
+            "Buzrr has no self-paced or homework mode and no video in questions, and only multiple-choice and true/false questions score points. If you rely on those, Kahoot! is the better fit.",
         },
       ],
     },
@@ -504,10 +512,10 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
     alternative: {
       teaser:
         "For people who used Quizizz for its live quiz game, now that it has become Wayground.",
-      title: "Open-Source Quizizz Alternative (Free, Self-Hostable)",
+      title: "Free Quizizz Alternative: Open Source, Self-Hostable",
       description:
-        "Quizizz is now Wayground. If you used it for live quiz games, Buzrr is a free, open-source, self-hostable alternative with code join, speed scoring and AI questions.",
-      h1: "Open-source Quizizz alternative: free and self-hostable",
+        "Need a free Quizizz alternative? Quizizz is now Wayground. For live quiz games, Buzrr is free, open source and self-hostable, with AI questions.",
+      h1: "Free Quizizz alternative: open source and self-hostable",
       lead: "If you used Quizizz for its live quiz games, Buzrr is a free, open-source alternative focused on exactly that. Quizizz itself is now Wayground, a much broader teaching platform.",
       whyLook: {
         heading: "Why people look for a Quizizz alternative",
@@ -562,7 +570,7 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
       stayWith: [
         "You assign self-paced homework or practice — Buzrr is live only.",
         "You need LMS, rostering or SSO integration.",
-        "You need question types beyond single-answer multiple choice.",
+        "You need scored question types beyond multiple choice and true/false.",
       ],
       useCases: ["classroom-quizzes", "college-events", "pub-trivia"],
       related: ["wayground", "kahoot", "mentimeter", "slido"],
@@ -573,9 +581,8 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
             "No. Quizizz rebranded as Wayground in June 2025, and the product now lives at wayground.com.",
         },
         {
-          question:
-            "What is a free alternative to Quizizz for live quiz games?",
-          answer: `Buzrr. Hosts build or AI-generate a multiple-choice quiz, players join with a code, link or QR without an account, and faster correct answers score more. The free plan allows rooms of ${PLAN_FACTS.freePlayers} players, and self-hosting is free.`,
+          question: "What is a free alternative to Quizizz?",
+          answer: `For live quiz games, Buzrr. Hosts build or AI-generate a quiz, players join with a code, link or QR without an account, and faster correct answers score more. ${FREE_PLAN_SUMMARY}`,
         },
         {
           question: "Does Buzrr have Quizizz-style homework mode?",
@@ -625,10 +632,10 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
     alternative: {
       teaser:
         "A focused, open-source live quiz game instead of a full teaching platform.",
-      title: "Open-Source Wayground Alternative (Free, Self-Hostable)",
+      title: "Free Wayground Alternative: Open Source, Self-Hosted",
       description:
-        "Buzrr is a free, open-source Wayground alternative for live quiz games: code or QR join without accounts, speed scoring, cited AI questions and self-hosting.",
-      h1: "Open-source Wayground alternative: free and self-hostable",
+        "Buzrr is a free Wayground alternative for live quiz games: open source, with code or QR join, no player accounts, speed scoring and cited AI questions.",
+      h1: "Free Wayground alternative: open source and self-hostable",
       lead: "Buzrr is a free, open-source alternative to Wayground for the live quiz game: players join with a code, answer against the clock and climb a leaderboard. It skips the rest of Wayground's teaching platform, and you can self-host it.",
       whyLook: {
         heading: "Why people look for a Wayground alternative",
@@ -692,6 +699,9 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
           question: "Is Wayground the same as Quizizz?",
           answer:
             "Yes. Quizizz rebranded as Wayground in June 2025, and the product moved to wayground.com.",
+        },
+        {
+          ...freeAlternativeFaq("Wayground", "live quiz games"),
         },
         {
           question: "Is there an open-source alternative to Wayground?",
@@ -804,12 +814,12 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
     },
     alternative: {
       teaser:
-        "For Slido quiz, trivia and game sessions — not its Q&A or polls.",
-      title: "Open-Source Slido Alternative for Quizzes, Trivia & Games",
+        "For Slido quiz, trivia, poll and Q&A sessions — without upvoting or slide integrations.",
+      title: "Free Slido Alternative for Quizzes, Polls & Trivia",
       description:
-        "Running a Slido quiz, trivia round or game? Buzrr is a free, open-source alternative built only for quiz games: speed scoring, leaderboards, AI questions, 1v1 battles.",
-      h1: "Open-source Slido alternative for quizzes, trivia and games",
-      lead: "If you use Slido for quizzes, trivia or games, Buzrr is a free, open-source alternative built only for that: speed scoring, a leaderboard after every question, and players on their own phones. It doesn't replace Slido's Q&A or polls.",
+        "Buzrr is a free, open-source Slido alternative for quizzes and trivia: speed scoring, leaderboards, polls, word clouds, AI questions and 1v1 battles.",
+      h1: "Free Slido alternative for quizzes, polls and trivia",
+      lead: "If you use Slido for quizzes, trivia or games, Buzrr is a free, open-source alternative built for that: speed scoring, a leaderboard after every question, and players on their own phones. It also runs polls, word clouds and open-text Q&A, but has no Q&A upvoting or slide integrations.",
       whyLook: {
         heading: "When a Slido quiz isn't enough",
         points: [
@@ -844,7 +854,11 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
           },
           {
             title: "Picture rounds",
-            text: "Attach an image to any question — logos, maps, flags, photo rounds for trivia night.",
+            text: "Attach an image to a question — logos, maps, flags, photo rounds for trivia night. Images need Buzrr Pro or a self-hosted instance.",
+          },
+          {
+            title: "Polls and Q&A between rounds",
+            text: "Mix polls, word clouds, rating scales and open-text Q&A into a quiz. They aren't scored, and responses show on the host screen.",
           },
         ],
       },
@@ -852,26 +866,29 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
         "liveRooms",
         "speedScoring",
         "liveResults",
+        "questionTypes",
         "guestPlayers",
         "images",
         "aiQuiz",
         "duels",
-        "roomControls",
         "selfHost",
       ],
       goodFit: [
         "Your session is a quiz, trivia round or game with a winner.",
-        "You don't need polls, word clouds or moderated Q&A.",
+        "You don't need upvoted or moderated Q&A, or slide integrations.",
         "You want to self-host or audit the tool.",
       ],
       stayWith: [
-        "You need audience Q&A with upvoting, or polls and word clouds.",
+        "You need audience Q&A with upvoting, ranking polls or surveys.",
         "You run interactions inside PowerPoint, Google Slides, Webex, Zoom or Teams.",
         "Your sessions are meetings first and quizzes second.",
       ],
       useCases: ["pub-trivia", "live-audience-quizzes", "college-events"],
       related: ["mentimeter", "kahoot", "quizizz", "quizup"],
       faq: [
+        {
+          ...freeAlternativeFaq("Slido", "quizzes, trivia and live polls"),
+        },
         {
           question: "Does Slido have quiz games?",
           answer:
@@ -880,12 +897,12 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
         {
           question: "Is Buzrr good for trivia nights?",
           answer:
-            "Yes. Players join from their phones with a code or QR, image questions work for picture rounds, and the leaderboard updates after every question. Hosts can generate a draft quiz with AI.",
+            "Yes. Players join from their phones with a code or QR, image questions (on Pro or self-hosted) work for picture rounds, and the leaderboard updates after every question. Hosts can generate a draft quiz with AI.",
         },
         {
           question: "Can Buzrr replace Slido Q&A and polls?",
           answer:
-            "No. Buzrr has no audience Q&A, polls, word clouds, surveys or presentation integrations. It replaces Slido only for quizzes and games.",
+            "Partly. Buzrr has polls, word clouds, rating scales and open-text Q&A, with responses on a wall on the host screen, but no upvoting, Q&A moderation, surveys or presentation integrations. It replaces Slido for quizzes, games, simple polls and simple Q&A.",
         },
       ],
     },
@@ -894,10 +911,10 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
         "A quiz game against an audience-interaction suite: pricing, joining, AI, self-hosting.",
       description:
         "Buzrr vs Slido compared: pricing, free plan, open source, self-hosting, offline/LAN use, no-account join, AI generation and 1v1 duels, with sources.",
-      lead: "Slido and Buzrr overlap on one feature — live quizzes — and differ on almost everything else. Slido is an audience interaction suite for meetings and events; Buzrr is an open-source quiz game platform you can self-host.",
+      lead: "Slido and Buzrr overlap on live quizzes, polls and Q&A. Slido is an audience interaction suite for meetings and events; Buzrr is an open-source quiz game platform you can self-host.",
       overview: [
         "Slido, part of Webex by Cisco, runs polls, Q&A, quizzes and surveys inside presentations and video calls.",
-        "Buzrr does live quiz games and ranked 1v1 battles, in any browser, without integrations.",
+        "Buzrr does live quiz games with polls, word clouds and open-text Q&A, plus ranked 1v1 battles, in any browser, without integrations.",
       ],
       faq: [
         {
@@ -988,10 +1005,10 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
     alternative: {
       teaser:
         "A standalone quiz game instead of quiz slides inside a presentation.",
-      title: "Open-Source Mentimeter Alternative (Free, Self-Hostable)",
+      title: "Free Mentimeter Alternative: Open Source, Self-Hosted",
       description:
-        "Buzrr is a free, open-source Mentimeter alternative for quiz competitions: a standalone live quiz game with QR join, speed scoring, full leaderboards and self-hosting.",
-      h1: "Open-source Mentimeter alternative: free and self-hostable",
+        "Buzrr is a free Mentimeter alternative for quiz competitions: open source, with QR join, speed scoring, polls, word clouds and full leaderboards.",
+      h1: "Free Mentimeter alternative: open source and self-hostable",
       lead: "For quiz competitions, Buzrr is a free, open-source Mentimeter alternative: a standalone live quiz game rather than quiz slides inside a presentation. You can use the hosted version or run it on your own server.",
       whyLook: {
         heading: "Why look beyond Mentimeter for quizzes",
@@ -1031,9 +1048,9 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
         "liveRooms",
         "liveResults",
         "speedScoring",
+        "questionTypes",
         "knowledgeSpaces",
         "aiQuiz",
-        "images",
         "duels",
         "openSource",
         "guestPlayers",
@@ -1045,7 +1062,7 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
       ],
       stayWith: [
         "You want quiz questions woven into a presentation with content slides.",
-        "You need type-your-answer questions — Buzrr is multiple choice only.",
+        "You need scored type-your-answer questions — Buzrr's open text isn't scored.",
         "You use other interactive slide types alongside quizzes.",
       ],
       useCases: [
@@ -1055,6 +1072,9 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
       ],
       related: ["slido", "kahoot", "quizizz", "quizup"],
       faq: [
+        {
+          ...freeAlternativeFaq("Mentimeter", "live quiz competitions"),
+        },
         {
           question: "Is there an open-source alternative to Mentimeter?",
           answer:
@@ -1080,7 +1100,7 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
       lead: "Mentimeter is presentation software with quiz slides; Buzrr is an open-source quiz game you can self-host. Both let an audience join with a code, without an account, and compete for points on speed.",
       overview: [
         "Mentimeter's Quiz Competition is a set of slides in a presentation, with Select Answer and Type Answer questions and a top-10 leaderboard slide.",
-        "Buzrr is only a quiz game: its own host screen, player view and full leaderboard, plus ranked 1v1 battles.",
+        "Buzrr is a live quiz game: its own host screen, player view and full leaderboard, with polls and word clouds in the mix, plus ranked 1v1 battles.",
       ],
       faq: [
         {
@@ -1121,11 +1141,11 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
     alternative: {
       teaser:
         "Ranked 1v1 battles of seven timed questions, in the browser — QuizUp shut down in 2021.",
-      title: "QuizUp Alternative: Ranked 1v1 Quiz Battles",
+      title: "Free QuizUp Alternative: Ranked 1v1 Quiz Battles",
       description:
-        "QuizUp shut down in 2021. Buzrr has ranked 1v1 quiz battles in the browser: seven timed questions, ELO matchmaking and friend challenges. Open source.",
-      h1: "A QuizUp alternative for 1v1 quiz battles",
-      lead: "QuizUp went offline in March 2021. Buzrr's duel mode is the closest replacement we know how to build: you against one opponent, seven timed multiple-choice questions, speed counts.",
+        "QuizUp shut down in 2021. Buzrr is a free alternative with ranked 1v1 quiz battles in the browser: seven timed questions and ELO matchmaking.",
+      h1: "A free QuizUp alternative for 1v1 quiz battles",
+      lead: "QuizUp went offline in March 2021. Buzrr's duel mode is the closest replacement we know how to build: you against one opponent, seven timed questions, speed counts. It's free and open source.",
       whyLook: {
         heading: "What QuizUp players miss",
         points: [
@@ -1148,7 +1168,7 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
         points: [
           {
             title: "Seven questions, one opponent",
-            text: "A duel is seven timed multiple-choice questions. Correct answers earn more the faster you are, and the higher total wins.",
+            text: "A duel is seven timed multiple-choice or true/false questions. Correct answers earn more the faster you are, and the higher total wins.",
           },
           {
             title: "ELO matchmaking",
@@ -1185,9 +1205,9 @@ export const COMPETITORS: Record<CompetitorSlug, Competitor> = {
       related: ["kahoot", "quizizz", "slido", "mentimeter"],
       faq: [
         {
-          question: "Is there a QuizUp replacement?",
+          question: "Is there a free QuizUp replacement?",
           answer:
-            "QuizUp shut down in March 2021. Buzrr offers the same core loop: ranked 1v1 matches of seven timed multiple-choice questions with ELO matchmaking and friend invites, in the browser. It doesn't recreate QuizUp's topic categories or social features.",
+            "QuizUp shut down in March 2021. Buzrr offers the same core loop for free: ranked 1v1 matches of seven timed questions with ELO matchmaking and friend invites, in the browser. It doesn't recreate QuizUp's topic categories or social features.",
         },
         {
           question: "Do I need an account for Buzrr duels?",
@@ -1205,7 +1225,7 @@ export const QUIZUP_ROWS: { label: string; quizup: string; buzrr: string }[] = [
     label: "Match format",
     quizup:
       "1v1, seven rounds of timed multiple-choice questions (six normal, one bonus)",
-    buzrr: "1v1, seven timed multiple-choice questions",
+    buzrr: "1v1, seven timed multiple-choice or true/false questions",
   },
   {
     label: "Scoring",

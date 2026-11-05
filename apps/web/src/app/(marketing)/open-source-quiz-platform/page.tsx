@@ -42,8 +42,8 @@ const crumbs = [
 const REPO_PARTS = [
   {
     path: "apps/web",
-    stack: "Next.js 15, React 19",
-    role: "The website and every screen — host, player and duel. Also hosts sign-in (Better Auth with Google).",
+    stack: "Next.js 16, React 19",
+    role: "The website and every screen — host, player and duel. Also hosts sign-in (Better Auth).",
   },
   {
     path: "apps/server",
@@ -203,7 +203,7 @@ export default function OpenSourcePage() {
             "duels",
             "aiQuiz",
             "knowledgeSpaces",
-            "speedScoring",
+            "questionTypes",
             "selfHost",
           ]}
         />

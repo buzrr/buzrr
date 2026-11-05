@@ -11,11 +11,11 @@ export default function LandingVideo() {
   if (!src) return null;
 
   return (
-    <section className="mt-14">
-      <h2 className="text-center text-2xl sm:text-3xl font-black text-dark dark:text-white">
+    <section className="mt-16 sm:mt-24">
+      <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-dark dark:text-white">
         See Buzrr in action
       </h2>
-      <div className="mt-8">
+      <div className="mt-10">
         <LandingVideoPlayer src={src} poster={cloudinaryPoster(src)} />
       </div>
     </section>

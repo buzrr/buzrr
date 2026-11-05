@@ -41,6 +41,8 @@
   --animate-float-slow: float 7s ease-in-out infinite;
   --animate-fade-up: fade-up 0.7s ease-out both;
   --animate-pop: pop 0.25s ease-out;
+  /* Footer listing badges (Landing/FeaturedBadges). */
+  --animate-marquee: marquee 60s linear infinite;
   --animate-pop-in: pop-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   --animate-shake: shake 0.4s ease-in-out both;
   --animate-fade-in: fade-in 0.3s ease-out both;
@@ -57,6 +59,12 @@
   --animate-ai-tip: ai-tip 1.6s ease-in-out infinite;
   --animate-ai-shimmer-text: ai-shimmer-text 3s linear infinite;
   --animate-ai-progress: ai-progress 1.5s ease-in-out infinite;
+
+  @keyframes marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
 
   @keyframes pop {
     0%,
@@ -307,6 +315,7 @@ html.theme-anim *::after {
 @media (prefers-reduced-motion: reduce) {
   .animate-float,
   .animate-float-slow,
+  .animate-marquee,
   .animate-fade-up,
   .animate-pop,
   .animate-pop-in,

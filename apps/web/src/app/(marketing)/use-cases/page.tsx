@@ -92,7 +92,7 @@ export default function UseCasesHubPage() {
 
       <CtaPanel
         title="Start with one quiz"
-        text="Sign in with Google, write five questions (or let AI draft them) and host a room."
+        text="Sign in, write five questions (or let AI draft them) and host a room."
         primary={{ label: "Create a free quiz", href: "/admin" }}
         secondary={{ label: "Play a 1v1 battle", href: "/duel" }}
       />

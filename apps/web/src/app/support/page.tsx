@@ -66,7 +66,7 @@ export default function SupportPage() {
             Help keep Buzrr open source and growing.
           </p>
           <p className="mt-6 text-base sm:text-lg text-dark/70 dark:text-gray max-w-2xl">
-            Buzrr is an open-source alternative to Kahoot and QuizUp, built
+            Buzrr is a free, open-source alternative to Kahoot and QuizUp, built
             during countless late-night coding sessions and maintained for the
             community.
           </p>
