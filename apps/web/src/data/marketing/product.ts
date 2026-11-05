@@ -2,10 +2,12 @@ import type { IconType } from "react-icons";
 import {
   LuBot,
   LuChartColumn,
+  LuFileDown,
   LuFileText,
   LuGithub,
   LuGlobe,
   LuImage,
+  LuListChecks,
   LuQrCode,
   LuRefreshCw,
   LuServer,
@@ -25,7 +27,7 @@ import { PLAN_COPY } from "@/lib/pricing";
 
 /** Standalone "What is Buzrr?" answer — must make sense with no context. */
 export const WHAT_IS_BUZRR =
-  "Buzrr is an open-source quiz platform that runs in the browser. A host builds a multiple-choice quiz — by hand or with AI — and opens a live room; players join from their own phones or laptops with a 6-character code, a link or a QR code, without creating an account. Signed-in users can also play ranked 1v1 quiz battles. Buzrr is licensed under AGPL-3.0, so anyone can read the code or run their own instance.";
+  "Buzrr is an open-source quiz platform that runs in the browser. A host builds a quiz — by hand or with AI — from multiple-choice, true/false, poll, word-cloud, rating and open-text questions, and opens a live room; players join from their own phones or laptops with a 6-character code, a link or a QR code, without creating an account. Signed-in users can also play ranked 1v1 quiz battles. Buzrr is licensed under AGPL-3.0, so anyone can read the code or run their own instance.";
 
 export const FEATURES = {
   // game-sessions + realtime modules; ShareRoom.tsx (link + QR)
@@ -38,7 +40,7 @@ export const FEATURES = {
   guestPlayers: {
     icon: LuUserPlus,
     title: "No accounts for players",
-    text: "Players pick a name and an avatar and they are in. Only the host signs in (with Google).",
+    text: "Players pick a name and an avatar and they are in. Only the host signs in.",
   },
   // common/utils/compute-score.ts
   speedScoring: {
@@ -68,7 +70,7 @@ export const FEATURES = {
   aiQuiz: {
     icon: LuBot,
     title: "AI quiz generation",
-    text: "Describe a topic and Buzrr drafts up to 15 multiple-choice questions with Google Gemini. Edit anything before you host.",
+    text: "Describe a topic and Buzrr drafts up to 15 multiple-choice questions with AI. Edit anything before you host.",
   },
   // apps/ai — Knowledge Spaces, DocumentUploader.tsx accepts .pdf .docx .txt .md
   knowledgeSpaces: {
@@ -76,11 +78,23 @@ export const FEATURES = {
     title: "Quizzes from your documents",
     text: "Upload PDF, DOCX, TXT or Markdown files to an AI Knowledge Space. Generated questions cite the passage they came from, and you export the ones you keep into a quiz.",
   },
-  // AddQuesForm.tsx — image upload via Cloudinary
+  // AddQuesForm.tsx; entitlements.service.ts `image_upload` (Pro feature)
   images: {
     icon: LuImage,
     title: "Image questions",
-    text: "Attach an image to a question — a diagram, a map, a logo, a photo round.",
+    text: "Attach an image to a question — a diagram, a map, a logo, a photo round. Included with Buzrr Pro and on self-hosted instances.",
+  },
+  // @buzrr/contract QUESTION_TYPES, SCORED_TYPES; QuestionTypes/meta.tsx
+  questionTypes: {
+    icon: LuListChecks,
+    title: "Six question types",
+    text: "Multiple choice (one or several right answers) and true/false score points. Polls, word clouds, rating scales and open text collect responses on the host screen, and open text doubles as audience Q&A.",
+  },
+  // entitlements.service.ts `session_report`; lib/report/sessionReportPdf.ts
+  sessionReports: {
+    icon: LuFileDown,
+    title: "PDF session reports",
+    text: "Download a PDF report of a game you hosted. Included with Buzrr Pro and on self-hosted instances.",
   },
   // Admin/Lobby.tsx — kick + ban mutations
   roomControls: {
@@ -104,7 +118,7 @@ export const FEATURES = {
   selfHost: {
     icon: LuServer,
     title: "Self-hostable",
-    text: "Run your own instance on your own infrastructure. Self-hosted instances run with billing off and Pro limits.",
+    text: "One docker compose up runs your own instance, even with no internet access. Self-hosted instances run with billing off and Pro limits.",
   },
   browser: {
     icon: LuGlobe,
@@ -124,25 +138,34 @@ export const PLAN_FACTS = {
   proAiPerWeek: PLAN_COPY.pro.aiTokensPerWeek,
 };
 
+/** What the hosted free plan and self-hosting include; every "free" claim draws on this. */
+export const FREE_PLAN_POINTS = [
+  `The hosted free plan has no time limit and costs nothing: rooms of up to ${PLAN_FACTS.freePlayers} players, ${PLAN_FACTS.freeQuizzes} quizzes and ${PLAN_FACTS.freeAi} AI generations in total.`,
+  "It includes all six question types, ranked 1v1 battles and friend challenges, and joining by code, link or QR. Players never pay or sign up.",
+  "Question images and PDF session reports are Buzrr Pro features on the hosted version.",
+  "Self-hosting is free: your instance runs with billing off and Pro limits, and you only pay for your own server.",
+];
+
+/** One-sentence version of `FREE_PLAN_POINTS`, for FAQ answers. */
+export const FREE_PLAN_SUMMARY = `The hosted free plan has no time limit and allows rooms of ${PLAN_FACTS.freePlayers} players, ${PLAN_FACTS.freeQuizzes} quizzes and ${PLAN_FACTS.freeAi} AI generations, and self-hosting is free.`;
+
 /** Things Buzrr does not do. Stated plainly so pages never imply otherwise. */
 export const LIMITATIONS = {
   questionTypes:
-    "Questions are multiple choice with one correct answer. There are no polls, word clouds, open-text, type-an-answer or rating questions.",
+    "Only multiple-choice and true/false questions score points. Polls, word clouds, rating scales and open text are unscored, and their results show on the host screen only. Open text works as audience Q&A, without upvoting or moderation.",
   livePacing:
     "Hosted rooms are live only — there is no self-paced or homework mode.",
   noIntegrations:
     "There are no LMS, Slack, Teams, PowerPoint or Google Slides integrations.",
   guestResults:
     "Players are guests, so results are recorded against the nickname they typed, not a student or employee account.",
-  googleLogin:
-    "Hosts sign in with Google; that is currently the only sign-in method.",
 };
 
 /** The host → player flow, step by step (see docs/architecture/frontend.md). */
 export const HOST_STEPS = [
   {
     title: "Build a quiz",
-    text: "Sign in, create a quiz and add multiple-choice questions with a time limit each — or generate a draft with AI and edit it.",
+    text: "Sign in, create a quiz and add questions with a time limit each — or generate a draft with AI and edit it.",
   },
   {
     title: "Open a room",

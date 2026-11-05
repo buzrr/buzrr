@@ -42,7 +42,7 @@ export const USE_CASES: Record<UseCaseSlug, UseCase> = {
     name: "Classroom quizzes",
     title: "Live Classroom Quizzes Students Join Without Accounts",
     description:
-      "Live multiple-choice quizzes for class: students join from any browser with a code or QR, no student accounts needed. Free and open source.",
+      "Live quizzes for class: students join from any browser with a code or QR, no student accounts needed. Free and open source.",
     h1: "Live quizzes for the classroom",
     lead: "Put a code on the projector, students join from their phones or school laptops, and you run a quick review or a revision game in the time it takes to take attendance.",
     problem: {
@@ -95,11 +95,12 @@ export const USE_CASES: Record<UseCaseSlug, UseCase> = {
       'Turn on "Hide Questions" in the quiz editor before you project it, so students can\'t read ahead.',
       "Speed scoring rewards quick answers. For a low-stakes review, use generous timers so accuracy matters more than reflexes.",
       "If a student's Wi-Fi drops, they can rejoin the same room and keep their score.",
+      "Add a word cloud or poll to a quiz to check how the class feels about a topic before you start the scored questions.",
     ],
     watchOut: [
       "Buzrr has no homework or self-paced mode — every quiz is played live.",
       "There is no LMS or gradebook integration, and results are stored against nicknames, not student records.",
-      "Questions are multiple choice with a single correct answer.",
+      "Only multiple-choice and true/false questions score points; polls, word clouds, ratings and open text are for opinions.",
       `The free plan hosts up to ${PLAN_FACTS.freePlayers} players per room, which covers most classes.`,
     ],
     alternatives: ["kahoot", "quizizz", "mentimeter"],
@@ -146,7 +147,7 @@ export const USE_CASES: Record<UseCaseSlug, UseCase> = {
     workflow: {
       heading: "Running a fest prelims round",
       steps: [
-        "Build the prelims quiz in advance. Add image questions for logo or picture rounds.",
+        "Build the prelims quiz in advance. With Pro or your own instance, add image questions for logo or picture rounds.",
         "On the day, open the room and project the QR code while teams settle in.",
         "Keep an eye on the lobby and ban anyone who joins under an offensive name.",
         "Run the round. The running leaderboard after each question keeps the hall engaged.",
@@ -168,8 +169,8 @@ export const USE_CASES: Record<UseCaseSlug, UseCase> = {
     ],
     watchOut: [
       `Rooms are capped at ${PLAN_FACTS.freePlayers} players on Free and ${PLAN_FACTS.proPlayers} on Pro. For a larger audience, split into several rooms.`,
-      "Hosts sign in with Google, so the organiser running the room needs a Google account.",
-      "There is no built-in buzzer round or open-answer question type.",
+      "There is no built-in buzzer round, and open-text answers aren't scored.",
+      "Image questions need Buzrr Pro or a self-hosted instance.",
     ],
     alternatives: ["kahoot", "slido", "quizup"],
     related: ["pub-trivia", "live-audience-quizzes", "team-building"],
@@ -234,7 +235,6 @@ export const USE_CASES: Record<UseCaseSlug, UseCase> = {
     watchOut: [
       "There is no SSO, LMS or HRIS integration, and participants are guests — results are not tied to employee records.",
       "No completion tracking or certificates: Buzrr is a live quiz tool, not a learning management system.",
-      "Hosts sign in with Google.",
     ],
     alternatives: ["kahoot", "slido", "mentimeter"],
     related: ["team-building", "live-audience-quizzes", "classroom-quizzes"],
@@ -265,7 +265,7 @@ export const USE_CASES: Record<UseCaseSlug, UseCase> = {
         },
         {
           title: "Photo rounds",
-          text: "Add an image to any question for baby-photo guessing, office-landmark or product-screenshot rounds.",
+          text: "Add an image to a question for baby-photo guessing, office-landmark or product-screenshot rounds. Images need Buzrr Pro or a self-hosted instance.",
         },
         {
           title: "Rematches with 1v1 battles",
@@ -301,7 +301,7 @@ export const USE_CASES: Record<UseCaseSlug, UseCase> = {
     ],
     watchOut: [
       "There are no Slack or Teams apps — you share a link.",
-      "Only multiple-choice questions: no open-text, drawing or poll rounds.",
+      "Open-text, poll and word-cloud rounds aren't scored, and there are no drawing rounds.",
     ],
     alternatives: ["kahoot", "slido", "quizup"],
     related: ["corporate-training", "pub-trivia", "college-events"],
@@ -332,7 +332,7 @@ export const USE_CASES: Record<UseCaseSlug, UseCase> = {
         },
         {
           title: "Picture rounds built in",
-          text: "Attach an image to a question for flags, logos, famous faces or a zoomed-in mystery object.",
+          text: "Attach an image to a question for flags, logos, famous faces or a zoomed-in mystery object. Images need Buzrr Pro or a self-hosted instance.",
         },
         {
           title: "Phones in, answer sheets out",
@@ -365,7 +365,7 @@ export const USE_CASES: Record<UseCaseSlug, UseCase> = {
     ],
     watchOut: [
       "No audio or video questions — play music clips from your own speaker and ask the question in Buzrr.",
-      "Answers are multiple choice; there is no type-your-answer round.",
+      "Scored answers are multiple choice or true/false; typed answers aren't scored.",
       "Scores don't accumulate across separate quizzes.",
     ],
     alternatives: ["quizup", "kahoot", "mentimeter"],
@@ -427,7 +427,7 @@ export const USE_CASES: Record<UseCaseSlug, UseCase> = {
       "Keep audience quizzes short — five to seven questions is plenty.",
     ],
     watchOut: [
-      "Buzrr is quiz-only: there is no audience Q&A, polling, word clouds or slide presentation. Tools like Slido and Mentimeter cover those.",
+      "Buzrr has polls, word clouds and open-text Q&A, but no Q&A upvoting or slide presentation. Slido has upvoted Q&A, and Mentimeter is built around presentations.",
       `Room size is capped at ${PLAN_FACTS.freePlayers} players on Free and ${PLAN_FACTS.proPlayers} on Pro.`,
       "There is no PowerPoint or Google Slides integration — you switch from your slides to the Buzrr host tab.",
     ],

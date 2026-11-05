@@ -36,7 +36,7 @@ import {
   type CompetitorSlug,
 } from "@/data/marketing/competitors";
 import { alternativePage, ogImageFor } from "@/data/marketing/pages";
-import { HOST_STEPS } from "@/data/marketing/product";
+import { FREE_PLAN_POINTS, HOST_STEPS } from "@/data/marketing/product";
 import { faqPageSchema, siteGraph, webPageSchema } from "@/lib/seo/json-ld";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 
@@ -83,7 +83,7 @@ const COMPARE_TEASER_ROWS = [
 const DUEL_STEPS = [
   {
     title: "Sign in",
-    text: "Duels need a Buzrr account so your rating has somewhere to live. Sign in with Google.",
+    text: "Duels need a Buzrr account so your rating has somewhere to live.",
   },
   {
     title: "Queue",
@@ -91,7 +91,7 @@ const DUEL_STEPS = [
   },
   {
     title: "Play seven questions",
-    text: "Both players get the same seven timed multiple-choice questions. Faster correct answers earn more points.",
+    text: "Both players get the same seven timed questions. Faster correct answers earn more points.",
   },
   {
     title: "Win, lose, adjust",
@@ -109,7 +109,7 @@ export default async function AlternativePage({ params }: { params: Params }) {
   const crumbs = [
     { name: "Home", path: "/" },
     { name: "Alternatives", path: "/alternatives" },
-    { name: `${c.displayName} alternative`, path: page.path },
+    { name: `Free ${c.displayName} alternative`, path: page.path },
   ];
 
   return (
@@ -128,7 +128,7 @@ export default async function AlternativePage({ params }: { params: Params }) {
       />
       <PageHero
         crumbs={crumbs}
-        eyebrow={`${c.displayName} alternative`}
+        eyebrow={`Free ${c.displayName} alternative`}
         title={alt.h1}
         lead={alt.lead}
         primary={
@@ -222,6 +222,10 @@ export default async function AlternativePage({ params }: { params: Params }) {
         <PointGrid points={alt.differences.points} />
       </Section>
 
+      <Section title="What's free in Buzrr">
+        <BulletList items={FREE_PLAN_POINTS} />
+      </Section>
+
       <Section title="Buzrr features you'd use">
         <FeatureGrid ids={alt.features} />
       </Section>
@@ -253,7 +257,7 @@ export default async function AlternativePage({ params }: { params: Params }) {
         <ProductShots />
       </Section>
 
-      <Section title={`${c.searchName} alternative FAQ`}>
+      <Section title={`Free ${c.searchName} alternative FAQ`}>
         <FaqList faqs={alt.faq} />
         <p className="mt-4 text-xs text-dark/60 dark:text-gray">
           {c.displayName} facts checked {FACTS_CHECKED}.
@@ -283,8 +287,8 @@ export default async function AlternativePage({ params }: { params: Params }) {
         }
         text={
           isQuizUp
-            ? "Sign in with Google and hit Start 1v1. Your rating starts at 1200."
-            : "Sign in with Google, build or generate a quiz, and put the code on the screen. Players don't need an account."
+            ? "Sign in and hit Start 1v1. Your rating starts at 1200."
+            : "Sign in, build or generate a quiz, and put the code on the screen. Players don't need an account."
         }
         primary={
           isQuizUp

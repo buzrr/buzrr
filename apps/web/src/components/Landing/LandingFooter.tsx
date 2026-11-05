@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LuGithub, LuHeart, LuInstagram, LuYoutube } from "react-icons/lu";
 import ClientImage from "@/components/ClientImage";
+import FeaturedBadges from "./FeaturedBadges";
 import { LEGAL_PAGES } from "@/data/legal";
 import {
   COMPARE_SLUGS,
@@ -30,7 +31,7 @@ const columns = [
     ],
   },
   {
-    title: "Alternatives",
+    title: "Free alternatives",
     links: [
       { name: "All alternatives", href: "/alternatives" },
       ...COMPETITOR_SLUGS.map((slug) => ({
@@ -126,117 +127,7 @@ const LandingFooter = () => {
           ))}
         </div>
 
-        <div className="mt-10 flex flex-wrap items-center justify-center sm:justify-start gap-3">
-          <a
-            href="https://www.producthunt.com/products/buzrr?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-buzrr"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1283224&theme=light&t=1792221342802"
-              alt="Buzrr - Build quizzes. Battle friends. | Product Hunt"
-              width="220"
-              height="48"
-              loading="lazy"
-            />
-          </a>
-          <a
-            href="https://www.scrolllaunch.com/products/buzrr?ref=badge"
-            target="_blank"
-            rel="noopener"
-            className="block"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="https://www.scrolllaunch.com/api/badge/buzrr"
-              alt="Featured on ScrollLaunch"
-              width="220"
-              height="48"
-              loading="lazy"
-            />
-          </a>
-          <a
-            href="https://launched.tools/tools/buzrr"
-            target="_blank"
-            rel="noopener"
-            className="flex items-center gap-2 rounded-[10px] border border-[#D4D7C9] bg-transparent px-3 py-2 font-[sans-serif] no-underline"
-          >
-            <span className="inline-flex h-[22px] w-[22px] items-center justify-center rounded-md bg-[#C6F94E]">
-              <svg
-                width="13"
-                height="13"
-                viewBox="128 120 264 264"
-                aria-hidden="true"
-              >
-                <path d="M214 120 L392 120 L392 298 Z" fill="#15170F" />
-                <path
-                  d="M156 356 L322 190"
-                  stroke="#15170F"
-                  strokeWidth="78"
-                  fill="none"
-                />
-              </svg>
-            </span>
-            <span className="flex flex-col leading-[1.2]">
-              <span className="text-xs font-bold text-dark dark:text-white">
-                Featured on launched.tools
-              </span>
-              <span className="text-[10px] text-[#878C79]">REVIEWED ✓</span>
-            </span>
-          </a>
-          <a
-            href="https://www.foundrlist.com/product/buzrr?utm_source=badge&utm_medium=embed"
-            target="_blank"
-            rel="noopener"
-            className="block"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="https://www.foundrlist.com/api/badge/buzrr"
-              alt="Featured on FoundrList"
-              width="150"
-              height="48"
-              loading="lazy"
-            />
-          </a>
-          <a
-            href="https://www.uneed.best/tool/buzrr"
-            target="_blank"
-            rel="noopener"
-            className="block"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="https://www.uneed.best/EMBED3B.png"
-              alt="Launching Soon on Uneed"
-              width="184"
-              height="48"
-              loading="lazy"
-              className="dark:hidden"
-            />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="https://www.uneed.best/EMBED3.png"
-              alt="Launching Soon on Uneed"
-              width="184"
-              height="48"
-              loading="lazy"
-              className="hidden dark:block"
-            />
-          </a>
-          <a href="https://www.makeitla.st/" title="Featured on MakeItLast">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="https://www.makeitla.st/badge/makeitlast-badge-dark.svg?v=3"
-              alt="Featured on MakeItLast"
-              width="184"
-              height="48"
-              loading="lazy"
-            />
-          </a>
-        </div>
+        <FeaturedBadges />
 
         <div className="mt-6 pt-6 border-t border-card-light dark:border-card-dark flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="flex items-center gap-1.5 text-sm text-dark/70 dark:text-gray">

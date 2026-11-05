@@ -53,8 +53,7 @@ export const ALTERNATIVES_HUB: MarketingPage = {
   path: "/alternatives",
   ogKey: "alternatives",
   ogEyebrow: "Alternatives",
-  ogTitle:
-    "Open-source alternatives to Kahoot!, Wayground, Slido and Mentimeter",
+  ogTitle: "Free alternatives to Kahoot!, Wayground, Slido and Mentimeter",
   ogAlt:
     "Buzrr compared with Kahoot!, Wayground (Quizizz), Slido and Mentimeter",
   sourceFiles: [`${MARKETING}/alternatives/page.tsx`, COMPETITOR_DATA],
@@ -74,9 +73,9 @@ export function alternativePage(slug: keyof typeof COMPETITORS): MarketingPage {
   return {
     path: alternativePath(slug),
     ogKey: `alternatives-${slug}`,
-    ogEyebrow: `${c.displayName} alternative`,
+    ogEyebrow: `Free ${c.displayName} alternative`,
     ogTitle: c.alternative.h1,
-    ogAlt: `Buzrr as a ${c.displayName} alternative`,
+    ogAlt: `Buzrr as a free ${c.displayName} alternative`,
     sourceFiles: [
       `${MARKETING}/alternatives/[competitor]/page.tsx`,
       COMPETITOR_DATA,

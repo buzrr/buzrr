@@ -26,6 +26,7 @@ import {
   alternativePath,
 } from "@/data/marketing/competitors";
 import { ALTERNATIVES_HUB, ogImageFor } from "@/data/marketing/pages";
+import { FREE_PLAN_SUMMARY } from "@/data/marketing/product";
 import {
   faqPageSchema,
   siteGraph,
@@ -34,9 +35,9 @@ import {
 } from "@/lib/seo/json-ld";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 
-const TITLE = "Open-Source Kahoot, Wayground, Slido & Mentimeter Alternatives";
+const TITLE = "Free Alternatives to Kahoot, Slido & Mentimeter";
 const DESCRIPTION =
-  "How Buzrr, an open-source live quiz platform, compares with Kahoot!, Wayground (formerly Quizizz), Slido, Mentimeter and QuizUp — and when another tool fits better.";
+  "Free, open-source alternative to Kahoot!, Wayground (Quizizz), Slido, Mentimeter and QuizUp: how Buzrr compares, and when another tool fits better.";
 
 export const metadata = buildPageMetadata({
   title: TITLE,
@@ -55,17 +56,21 @@ const CHOOSING = [
   "You want a live, competitive quiz game on players' own devices — Buzrr, Kahoot! and Wayground (formerly Quizizz) all run one; Buzrr is the open-source one.",
   "You want to self-host or audit the code — of the tools here, only Buzrr is open source.",
   "You want ranked 1v1 quiz battles like QuizUp had — Buzrr's duel mode.",
-  "You need audience Q&A, polls or word clouds — Slido or Mentimeter; Buzrr doesn't do these.",
-  "You want quiz or trivia games without Q&A and polls — Buzrr; Slido runs quizzes as one feature of a meeting tool.",
+  "You need upvoted Q&A or interactions inside your slides — Slido; Buzrr has polls, word clouds and open-text Q&A, but no upvoting or slide integrations.",
+  "The quiz or trivia game is the main event — Buzrr; Slido runs quizzes as one feature of a meeting tool.",
   "You want quiz questions inside a presentation — Mentimeter's quiz slides, or Slido's slide integrations.",
   "You assign self-paced homework, need LMS integration or accommodations — Wayground (formerly Quizizz) or Kahoot!'s self-paced challenges; Buzrr is live only.",
 ];
 
 const FAQS: Faq[] = [
   {
+    question: "What is a free alternative to Kahoot, Slido or Mentimeter?",
+    answer: `Buzrr is a free, open-source alternative for live quizzes, with polls, word clouds and open-text Q&A too. ${FREE_PLAN_SUMMARY}`,
+  },
+  {
     question: "Is Buzrr free?",
     answer:
-      "Yes, there is a free plan with no time limit. Buzrr Pro raises room size, quiz and AI limits. Self-hosting the open-source code is free.",
+      "Yes, there is a free plan with no time limit. Buzrr Pro raises room size, quiz and AI limits and adds question images and PDF reports. Self-hosting the open-source code is free.",
   },
   {
     question: "Is Buzrr open source?",
@@ -140,8 +145,8 @@ export default function AlternativesHubPage() {
                   Buzrr
                 </th>
                 <td className="p-4">
-                  Live hosted quiz rooms, ranked 1v1 quiz battles and AI
-                  question generation, in the browser.
+                  Live hosted quiz rooms with polls, word clouds and Q&A, ranked
+                  1v1 quiz battles and AI question generation, in the browser.
                 </td>
                 <td className="p-4">Yes (AGPL-3.0)</td>
               </tr>
@@ -188,7 +193,7 @@ export default function AlternativesHubPage() {
       </Section>
 
       <Section
-        title="Buzrr as an alternative to…"
+        title="Buzrr as a free alternative to…"
         intro="Each page covers why people switch, what's genuinely different, and when you're better off staying where you are."
       >
         <LinkCards items={alternativeCards(COMPETITOR_SLUGS)} />
@@ -231,7 +236,7 @@ export default function AlternativesHubPage() {
 
       <CtaPanel
         title="Host your first Buzrr quiz"
-        text="Sign in with Google, build or generate a quiz, and put the join code on the screen."
+        text="Sign in, build or generate a quiz, and put the join code on the screen."
         primary={{ label: "Create a quiz", href: "/admin" }}
         secondary={{ label: "Play a 1v1 battle", href: "/duel" }}
       />

@@ -12,7 +12,7 @@ export const DEFAULT_TITLE =
 
 /** The one-sentence definition reused in metadata and JSON-LD. */
 export const SITE_DESCRIPTION =
-  "Open-source quiz platform: host live multiplayer quiz rooms players join with a code, play ranked 1v1 quiz battles, and generate quizzes with AI. Free to start.";
+  "Free, open-source quiz platform: host live multiplayer quiz rooms players join with a code, play ranked 1v1 quiz battles, and generate quizzes with AI.";
 
 export const REPO_URL = "https://github.com/buzrr/buzrr";
 export const LICENSE_URL = `${REPO_URL}/blob/main/LICENSE`;

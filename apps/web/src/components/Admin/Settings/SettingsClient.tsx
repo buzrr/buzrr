@@ -1,11 +1,10 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { z } from "zod";
@@ -13,10 +12,10 @@ import GridListToggle from "@/components/Admin/GridListToggle";
 import NavbarToggle from "@/components/Admin/NavbarToggle";
 import SignOutButton from "@/components/Admin/SignOutButton";
 import DeleteProfileButton from "@/components/Admin/Settings/DeleteProfileButton";
+import SelectProfile, { PROFILES } from "@/components/Player/SelectProfile";
 import ThemeToggle from "@/components/ThemeToggle";
 import Button from "@/components/ui/Button";
 import TextInput from "@/components/ui/TextInput";
-import { DEFAULT_AVATAR } from "@/constants";
 import { authClient } from "@/lib/auth-client";
 import { useEntitlementsQuery } from "@/lib/modules/billing/hooks";
 
@@ -26,15 +25,33 @@ const accountSchema = z.object({
     .trim()
     .min(1, "Display name is required")
     .max(50, "Display name must be at most 50 characters"),
-  image: z
-    .string()
-    .trim()
-    .url("Must be a valid URL")
-    .startsWith("https://", "Must be an https:// URL")
-    .or(z.literal("")),
+  // Set by the avatar picker only: a preset path, the account's own photo URL,
+  // or "" for the default avatar.
+  image: z.string(),
 });
 
 type AccountValues = z.infer<typeof accountSchema>;
+
+const accountPhotoKey = (userId: string) => `buzrr:account-photo:${userId}`;
+
+/**
+ * The account's own photo (e.g. from Google), offered as the first avatar.
+ * Saving a preset overwrites `user.image`, so it is remembered on this device
+ * to keep it selectable afterwards. Storage may be unavailable, which only
+ * means the photo can't be offered again once replaced.
+ */
+function resolveAccountPhoto(userId: string, image: string | null | undefined) {
+  const key = accountPhotoKey(userId);
+  try {
+    if (image && !PROFILES.includes(image)) {
+      localStorage.setItem(key, image);
+      return image;
+    }
+    return localStorage.getItem(key) ?? "";
+  } catch {
+    return image && !PROFILES.includes(image) ? image : "";
+  }
+}
 
 function SettingsCard({
   title,
@@ -111,6 +128,7 @@ function AccountCard() {
     register,
     handleSubmit,
     reset,
+    setValue,
     watch,
     formState: { errors, isSubmitting },
   } = useForm<AccountValues>({
@@ -127,11 +145,15 @@ function AccountCard() {
     }
   }, [session, reset]);
 
-  const imageValue = watch("image");
-  const previewSrc =
-    imageValue && imageValue.startsWith("https://")
-      ? imageValue
-      : DEFAULT_AVATAR;
+  const userId = session?.user.id;
+  const sessionImage = session?.user.image;
+  const avatarOptions = useMemo(
+    () => [
+      userId ? resolveAccountPhoto(userId, sessionImage) : "",
+      ...PROFILES,
+    ],
+    [userId, sessionImage],
+  );
 
   const onSubmit = handleSubmit(async (values) => {
     const { error } = await authClient.updateUser({
@@ -161,21 +183,13 @@ function AccountCard() {
           autoComplete="off"
           {...register("name")}
         />
-        <div className="flex items-end gap-4">
-          <TextInput
-            label="Avatar URL"
-            placeholder="https://..."
-            error={errors.image?.message}
-            autoComplete="off"
-            containerClassName="flex-1"
-            {...register("image")}
-          />
-          <Image
-            src={previewSrc}
-            className="rounded-full shrink-0 mb-1"
-            alt="Avatar preview"
-            width={48}
-            height={48}
+        <div className="max-w-md">
+          <SelectProfile
+            data={{ name: "", image: watch("image") }}
+            options={avatarOptions}
+            setData={({ image }) =>
+              setValue("image", image, { shouldDirty: true })
+            }
           />
         </div>
         <div>

@@ -4,6 +4,7 @@ import clsx from "clsx";
 import Image from "next/image";
 import { LuCheck, LuShuffle } from "react-icons/lu";
 import { joinLabelClass } from "@/components/Player/Setup/JoinShell";
+import { DEFAULT_AVATAR } from "@/constants";
 
 export const PROFILES = [
   "/images/player_profile/profile1.png",
@@ -25,16 +26,19 @@ export default function SelectProfile(props: {
     image: string;
   };
   setData: (data: { name: string; image: string }) => void;
+  /** Avatars to offer; an empty string shows the default avatar. */
+  options?: string[];
 }) {
-  const selected = Math.max(0, PROFILES.indexOf(props.data.image));
+  const options = props.options ?? PROFILES;
+  const selected = Math.max(0, options.indexOf(props.data.image));
 
   function pick(index: number) {
-    props.setData({ ...props.data, image: PROFILES[index] });
+    props.setData({ ...props.data, image: options[index] });
   }
 
   function shuffle() {
-    const offset = 1 + Math.floor(Math.random() * (PROFILES.length - 1));
-    pick((selected + offset) % PROFILES.length);
+    const offset = 1 + Math.floor(Math.random() * (options.length - 1));
+    pick((selected + offset) % options.length);
   }
 
   return (
@@ -55,7 +59,7 @@ export default function SelectProfile(props: {
         aria-label="Avatar"
         className="mt-2.5 grid grid-cols-4 sm:grid-cols-6 gap-2.5 md:gap-3"
       >
-        {PROFILES.map((src, index) => {
+        {options.map((src, index) => {
           const on = index === selected;
           return (
             <button
@@ -73,7 +77,7 @@ export default function SelectProfile(props: {
               )}
             >
               <Image
-                src={src}
+                src={src || DEFAULT_AVATAR}
                 width={96}
                 height={96}
                 alt=""

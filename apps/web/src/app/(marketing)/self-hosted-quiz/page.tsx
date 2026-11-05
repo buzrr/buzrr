@@ -25,7 +25,7 @@ import { REPO_URL } from "@/lib/seo/site";
 
 const TITLE = "Self-Hosted Quiz Platform: Run Your Own Buzrr";
 const DESCRIPTION =
-  "Self-host Buzrr, the open-source live quiz platform: requirements (Node.js, PostgreSQL, Redis, Google OAuth), setup commands and production notes.";
+  "Self-host Buzrr, the free, open-source live quiz platform, with one docker compose up: local accounts, image storage and optional local AI, even offline.";
 
 export const metadata = buildPageMetadata({
   title: TITLE,
@@ -40,39 +40,33 @@ const crumbs = [
 ];
 
 const REQUIRED = [
-  "Node.js 18 or newer (20 LTS recommended). Yarn 4 comes via Corepack.",
-  "PostgreSQL. Locally, yarn setup starts one in Docker.",
-  "Redis. The game server keeps live game state there and won't start without it.",
-  "Google OAuth credentials. Google is the only sign-in method, so without them nobody can log in to host.",
-  "Somewhere to run a long-lived Node process for the Socket.IO game server — a container or VM host, not a serverless function.",
+  "Docker with Compose v2.24 or newer.",
+  "About 4 GB of free RAM while the images build, and much less to run them.",
+  "Free ports 3000 (web) and 3001 (API). Postgres and Redis are published too, for backups and debugging.",
 ];
 
 const OPTIONAL = [
-  "A Gemini API key, to turn on AI quiz generation.",
-  "Cloudinary credentials, for image questions.",
-  "Upstash Redis credentials with RATELIMIT=ON, for rate limiting.",
-  "The Python AI service (apps/ai) with pgvector, for Knowledge Spaces. Without it, that part of the app stays hidden.",
+  "A model for AI quiz generation: a Gemini API key, any OpenAI-compatible server, or the bundled Ollama, which runs on your own hardware.",
+  "The AI service (the compose ai profile), for Knowledge Spaces. Without it, that part of the app stays hidden.",
+  "Google OAuth credentials, if you want Google sign-in alongside local accounts.",
+  "An S3-compatible bucket or Cloudinary, if you'd rather not keep question images on a Docker volume.",
 ];
 
 const LOCAL_STEPS = [
-  { text: "Install Docker and Node.js, then clone the repository." },
+  { text: "Install Docker, then clone the repository." },
   {
-    text: "Run corepack enable, yarn install and yarn setup. Setup starts Postgres and Redis in Docker, writes the .env files with a shared auth secret, and pushes the database schema. It's safe to re-run.",
+    text: "Run docker compose up -d. The first run builds the images and takes a few minutes. It starts Postgres and Redis, applies migrations, seeds starter duel questions and generates the auth secret.",
   },
   {
-    text: "Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to apps/web/.env (redirect URI: http://localhost:3000/api/auth/callback/google).",
-  },
-  {
-    text: "Run yarn dev. The web app is on port 3000 and the API on port 3001.",
+    text: "Open http://localhost:3000 and create an account. Nothing here calls an outside service.",
   },
 ];
 
 const PRODUCTION = [
-  "Deploy apps/web to a Node host (the repo's own deployment uses Vercel) and apps/server to a container or VM host such as Render, Railway or Fly.",
-  "Set BETTER_AUTH_SECRET to the same value on both apps — the web app signs tokens and the server verifies them.",
-  "Set WEB_ORIGIN on the server to your site's URL. If it's unset, the API accepts any origin.",
-  "Apply the committed migrations with prisma migrate deploy rather than db push.",
-  "Seed the 1v1 question pool (yarn workspace @buzrr/prisma seed:duel), or duels will report that there are no questions.",
+  "Set PUBLIC_WEB_URL and PUBLIC_API_URL to addresses players' devices can reach, in a .env file next to docker-compose.yml, then run docker compose up -d --build. The API address is compiled into the web app, so it needs the rebuild.",
+  "For the public internet, put a reverse proxy with HTTPS in front of both ports, such as Caddy, nginx or Traefik.",
+  "Once your hosts have accounts, close registration with AUTH_EMAIL_SIGNUP=OFF.",
+  "Back up the Postgres database and the uploads volume. To upgrade, run git pull and docker compose up -d --build; migrations apply before the API starts.",
 ];
 
 export default function SelfHostedQuizPage() {
@@ -93,7 +87,7 @@ export default function SelfHostedQuizPage() {
         crumbs={crumbs}
         eyebrow="Self-hosting"
         title="Run your own live quiz server"
-        lead="Buzrr is open source, so you can run the whole thing — live rooms, 1v1 battles, AI generation — on your own infrastructure, with your own database and your own API keys."
+        lead="Buzrr is open source, so you can run the whole thing — live rooms, 1v1 battles, AI generation — on your own infrastructure with one command, even on a network with no internet access."
         primary={{ label: "Get the code", href: REPO_URL }}
         secondary={{
           label: "Why open source",
@@ -106,9 +100,9 @@ export default function SelfHostedQuizPage() {
           Yes. Buzrr is AGPL-3.0 open source and the repository includes
           everything needed to run it: a Next.js web app, a NestJS game server,
           a PostgreSQL schema with migrations, and an optional Python AI
-          service. It needs PostgreSQL, Redis and Google OAuth credentials.
-          Self-hosted instances run with billing off, and every account gets Pro
-          limits.
+          service. One docker compose up runs the stack with local accounts and
+          local image storage, and no outside services. Self-hosted instances
+          run with billing off, and every account gets Pro limits.
         </p>
       </Answer>
 
@@ -136,18 +130,14 @@ export default function SelfHostedQuizPage() {
       </Section>
 
       <Section
-        title="Run it locally"
-        intro="From the repository's README. The whole bootstrap is one script."
+        title="Run it"
+        intro="From the repository's self-hosting guide. The whole install is one command."
       >
         <Steps steps={LOCAL_STEPS} />
         <pre className="mt-6 overflow-x-auto rounded-xl bg-dark text-off-white p-4 text-sm">
-          <code>{`git clone ${REPO_URL}.git
-cd buzrr
-corepack enable
-yarn install
-yarn setup     # Postgres + Redis in Docker, .env files, schema
-# add GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET to apps/web/.env
-yarn dev       # web :3000, api :3001`}</code>
+          <code>{`git clone ${REPO_URL} && cd buzrr
+docker compose up -d     # first run builds the images (a few minutes)
+# then open http://localhost:3000 and create an account`}</code>
         </pre>
       </Section>
 
@@ -158,8 +148,8 @@ yarn dev       # web :3000, api :3001`}</code>
       <Section title="What's different on your own instance">
         <BulletList
           items={[
-            `No billing: every account gets Pro limits — ${PLAN_FACTS.proPlayers} players per room, unlimited quizzes and ${PLAN_FACTS.proAiPerWeek} AI generations a week. An operator can raise an individual host's room cap in the database (the hostSizeLimit column).`,
-            "AI generation runs on your own Gemini key, so its cost and data handling are between you and Google.",
+            `No billing: every account gets Pro limits — ${PLAN_FACTS.proPlayers} players per room, unlimited quizzes, ${PLAN_FACTS.proAiPerWeek} AI generations a week, question images and PDF session reports. An operator can raise an individual host's room cap in the database (the hostSizeLimit column).`,
+            "AI stays off until you configure a model. With a local model, nothing leaves your network; with a hosted one, its cost and data handling are between you and that provider.",
             "Duel questions come from public quizzes approved in the moderation queue. The API can't grant the superadmin role, so give your own account superadmin in the database to manage moderators.",
             "Bot opponents in 1v1 matchmaking are on by default; set DUEL_BOTS=OFF to disable them.",
           ]}
@@ -170,8 +160,8 @@ yarn dev       # web :3000, api :3001`}</code>
         <BulletList
           tone="caution"
           items={[
-            "There's no one-click installer or official Docker image for the web and server apps. The bundled docker-compose file only runs the local databases.",
-            "Documentation is the README, ARCHITECTURE.md and the docs folder in the repository.",
+            "There are no prebuilt images to pull: the first docker compose up builds them from source.",
+            "Local accounts have no password reset, because an offline server can't send email.",
             "Redis is required for all live play and matchmaking. If it goes down, games stop.",
           ]}
         />
@@ -193,8 +183,8 @@ yarn dev       # web :3000, api :3001`}</code>
       </Section>
 
       <CtaPanel
-        title="Clone it and run yarn setup"
-        text="Most of the setup is one script. Questions and bug reports go to GitHub issues."
+        title="Clone it and run docker compose up"
+        text="The whole install is one command. Questions and bug reports go to GitHub issues."
         primary={{ label: "Open the repository", href: REPO_URL }}
         secondary={{ label: "Report an issue", href: `${REPO_URL}/issues` }}
       />

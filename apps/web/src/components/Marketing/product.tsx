@@ -279,7 +279,7 @@ export function SourceList({ slug }: { slug: CompetitorSlug }) {
 export function alternativeCards(slugs: CompetitorSlug[]): LinkCardItem[] {
   return slugs.map((slug) => ({
     href: alternativePath(slug),
-    title: `${COMPETITORS[slug].displayName} alternative`,
+    title: `Free ${COMPETITORS[slug].displayName} alternative`,
     text: COMPETITORS[slug].alternative.teaser,
   }));
 }

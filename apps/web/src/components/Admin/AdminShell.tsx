@@ -1,8 +1,9 @@
 import Navbar from "@/components/Admin/Navbar";
 
 /**
- * Shared admin page frame: sidebar + content column constrained to the same
- * responsive container as the landing page.
+ * Shared admin page frame: a sidebar pinned to the left edge that stays put
+ * while the content column scrolls. `data-admin-shell` also hides the top logo
+ * bar in `app/admin/layout.tsx`, since the sidebar shows the logo instead.
  */
 export default function AdminShell({
   children,
@@ -10,9 +11,11 @@ export default function AdminShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex w-full max-w-7xl mx-auto sm:px-6 lg:px-8">
+    <div data-admin-shell className="flex w-full sm:px-6 md:pr-0">
       <Navbar />
-      <div className="w-full md:w-[75%]">{children}</div>
+      <div className="w-full min-w-0 md:flex-1">
+        <div className="mx-auto max-w-6xl">{children}</div>
+      </div>
     </div>
   );
 }

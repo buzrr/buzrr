@@ -82,20 +82,22 @@ export default function Navbar() {
       ></div>
       <div
         className={clsx(
-          "z-20 p-6 px-8 flex bg-light-bg dark:bg-dark-bg flex-col h-dvh md:h-[85vh] fixed top-0 left-0 md:relative md:top-auto md:left-auto w-[80vw] md:w-[25%] overflow-y-auto",
+          "z-20 p-4 flex bg-white dark:bg-card-dark flex-col h-dvh md:h-[calc(100dvh-6rem)] md:mt-6 md:rounded-2xl fixed top-0 left-0 md:sticky md:top-6 md:left-auto md:self-start w-[80vw] md:w-56 lg:w-64 md:shrink-0 overflow-y-auto",
           toggle === NavToggle.collapse && "hidden md:flex",
         )}
       >
-        <div className="flex justify-center items-center md:hidden p-5 mb-2 border-b border-gray">
-          <ClientImage
-            props={{
-              src: "/images/logo.svg",
-              darksrc: "/images/logo-dark.svg",
-              alt: "Buzrr Logo",
-              width: 90,
-              height: 90,
-            }}
-          />
+        <div className="flex justify-center items-center md:justify-start p-5 md:px-6 md:py-3 mb-2 border-b border-card-light dark:border-off-dark">
+          <Link href="/" prefetch={false} className="inline-block">
+            <ClientImage
+              props={{
+                src: "/images/logo.svg",
+                darksrc: "/images/logo-dark.svg",
+                alt: "Buzrr Logo",
+                width: 90,
+                height: 90,
+              }}
+            />
+          </Link>
         </div>
         <div className="flex flex-col">
           <div className="p-2">
@@ -109,7 +111,7 @@ export default function Navbar() {
                 className={clsx(
                   "my-1 py-2 px-4 rounded-lg flex items-center gap-3",
                   !isActive(link.href)
-                    ? "hover:bg-card-light hover:dark:bg-card-dark dark:text-white transition-colors duration-200 ease-in-out"
+                    ? "hover:bg-card-light hover:dark:bg-cardhover-dark dark:text-white transition-colors duration-200 ease-in-out"
                     : "bg-lprimary text-white dark:bg-dprimary dark:text-dark dark:font-extrabold",
                 )}
                 onClick={() => {
@@ -122,14 +124,14 @@ export default function Navbar() {
             ))}
           </div>
         </div>
-        <div className="mt-auto mb-2 pt-6 border-t border-t-gray">
+        <div className="mt-auto mb-2 pt-6 border-t border-card-light dark:border-off-dark">
           <Link
             href="/admin/profile"
             prefetch={false}
             className={clsx(
               "flex items-center p-2 px-4 rounded-md",
               !isActive("/admin/profile")
-                ? "hover:bg-card-light dark:hover:bg-card-dark transition-colors duration-200 ease-in-out"
+                ? "hover:bg-card-light dark:hover:bg-cardhover-dark transition-colors duration-200 ease-in-out"
                 : "bg-lprimary dark:bg-dprimary",
             )}
             onClick={() => {
@@ -163,7 +165,7 @@ export default function Navbar() {
                 Logout
               </span>
             }
-            btnStyle="my-1 py-2 px-4 rounded-lg flex items-center w-full text-dark dark:text-white hover:bg-card-light hover:dark:bg-card-dark transition-colors duration-200 ease-in-out hover:cursor-pointer"
+            btnStyle="my-1 py-2 px-4 rounded-lg flex items-center w-full text-dark dark:text-white hover:bg-card-light hover:dark:bg-cardhover-dark transition-colors duration-200 ease-in-out hover:cursor-pointer"
           />
           <div className="p-2 px-4">
             <div className="text-xs text-off-dark dark:text-off-white mt-2">

@@ -1,20 +1,16 @@
 import Link from "next/link";
 import {
+  LuArrowRight,
   LuBot,
   LuChartColumn,
   LuDoorOpen,
-  LuGitCommitHorizontal,
-  LuGitPullRequest,
-  LuGithub,
   LuHeart,
   LuPlay,
-  LuScale,
   LuServer,
   LuSmartphone,
   LuSparkles,
   LuStar,
   LuSwords,
-  LuUsers,
   LuZap,
 } from "react-icons/lu";
 import LandingNavbar from "@/components/Landing/LandingNavbar";
@@ -23,13 +19,13 @@ import HeroVisual from "@/components/Landing/HeroVisual";
 import LandingVideo from "@/components/Landing/LandingVideo";
 import { GITHUB_LINK } from "@/components/Landing/links";
 import { getGithubStats } from "@/lib/github-stats";
-import { JsonLd, LinkCards } from "@/components/Marketing/primitives";
+import { JsonLd } from "@/components/Marketing/primitives";
 import {
   OPEN_SOURCE_CARD,
   SELF_HOST_CARD,
-  WhatIsBuzrr,
   cardsForUseCases,
 } from "@/components/Marketing/product";
+import { WHAT_IS_BUZRR } from "@/data/marketing/product";
 import { siteGraph, webPageSchema } from "@/lib/seo/json-ld";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 import { DEFAULT_TITLE, SITE_DESCRIPTION } from "@/lib/seo/site";
@@ -41,12 +37,12 @@ export const metadata = buildPageMetadata({
   path: "/",
 });
 
-const heroBadges = [
-  { icon: <LuUsers size={13} />, label: "Contributors Welcome" },
-  { icon: <LuScale size={13} />, label: "AGPL-3.0 License" },
-  { icon: null, label: "TypeScript" },
-  { icon: null, label: "Next.js" },
-  { icon: null, label: "NestJS" },
+const heroFacts = [
+  "Contributors Welcome",
+  "AGPL-3.0 License",
+  "TypeScript",
+  "Next.js",
+  "NestJS",
 ];
 
 const features = [
@@ -58,7 +54,7 @@ const features = [
   {
     icon: LuBot,
     title: "AI Quiz Generator",
-    text: "Generate whole quizzes instantly with Gemini.",
+    text: "Generate whole quizzes instantly with AI.",
   },
   {
     icon: LuSwords,
@@ -82,29 +78,37 @@ const features = [
   },
 ];
 
+const moreLinks = [
+  {
+    href: "/alternatives",
+    title:
+      "Free alternatives to Kahoot, Wayground (Quizizz), Slido and Mentimeter",
+    text: "How Buzrr compares, with sources — and when another tool fits better.",
+  },
+  OPEN_SOURCE_CARD,
+  SELF_HOST_CARD,
+];
+
 const formatStat = (n: number | null) =>
   n === null ? "—" : n.toLocaleString("en-US");
+
+const sectionClass =
+  "py-16 sm:py-24 border-t border-card-light dark:border-card-dark";
+const headingClass =
+  "text-3xl sm:text-4xl font-semibold tracking-tight text-dark dark:text-white";
+const buttonClass =
+  "inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-colors";
+const primaryButtonClass = `${buttonClass} bg-accent hover:bg-accent-deep text-white dark:bg-dprimary dark:hover:bg-off-white dark:text-dark`;
+const secondaryButtonClass = `${buttonClass} border border-dark/15 dark:border-white/20 text-dark dark:text-white hover:bg-dark/5 dark:hover:bg-white/10`;
 
 export default async function Home() {
   const stats = await getGithubStats();
 
   const statTiles = [
-    {
-      icon: LuUsers,
-      value: formatStat(stats.contributors),
-      label: "Contributors",
-    },
-    {
-      icon: LuGitCommitHorizontal,
-      value: formatStat(stats.commits),
-      label: "Commits",
-    },
-    {
-      icon: LuGitPullRequest,
-      value: formatStat(stats.mergedPRs),
-      label: "PRs Merged",
-    },
-    { icon: LuStar, value: formatStat(stats.stars), label: "GitHub Stars" },
+    { value: formatStat(stats.contributors), label: "Contributors" },
+    { value: formatStat(stats.commits), label: "Commits" },
+    { value: formatStat(stats.mergedPRs), label: "PRs Merged" },
+    { value: formatStat(stats.stars), label: "GitHub Stars" },
   ];
 
   return (
@@ -123,14 +127,18 @@ export default async function Home() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Hero */}
-        <section className="flex flex-col xl:flex-row items-center gap-12 xl:gap-16 pt-14 pb-16 sm:pt-20">
-          <div className="flex flex-col items-center xl:items-start text-center xl:text-left max-w-2xl animate-fade-up">
+        <section className="relative isolate flex flex-col items-center pt-20 pb-20 sm:pt-28 sm:pb-28 text-center">
+          <div
+            aria-hidden
+            className="absolute inset-x-0 top-0 -z-10 h-[560px] bg-[radial-gradient(ellipse_at_top,rgb(125_73_248/0.16),transparent_65%)]"
+          />
+          <div className="flex flex-col items-center animate-fade-up">
             <span className="flex items-center gap-1.5 rounded-full border border-lprimary/30 dark:border-dprimary/30 bg-lprimary/10 dark:bg-dprimary/10 px-3 py-1 text-xs font-bold text-lprimary dark:text-dprimary">
               <LuSparkles size={13} />
               Open Source
             </span>
 
-            <h1 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-black text-dark dark:text-white leading-tight">
+            <h1 className="mt-5 text-[13vw] sm:text-7xl lg:text-8xl font-semibold tracking-tighter text-dark dark:text-white leading-[1.02]">
               Build quizzes.
               <br />
               <span className="text-lprimary dark:text-dprimary">
@@ -139,76 +147,61 @@ export default async function Home() {
               friends.
             </h1>
 
-            <p className="mt-5 text-base sm:text-lg text-dark/70 dark:text-gray max-w-md">
+            <p className="mt-7 text-lg sm:text-xl text-dark/70 dark:text-gray max-w-xl">
               Open-source multiplayer quiz platform for classrooms, communities
               and friends.
             </p>
 
-            <div className="mt-8 flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+            <div className="mt-10 flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
               <Link
                 href="/duel"
-                className="flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-3 rounded-xl text-lg font-black bg-lprimary dark:bg-dprimary text-white dark:text-dark hover:opacity-90 transition-opacity"
+                className={`${primaryButtonClass} w-full sm:w-auto h-12 px-8`}
               >
-                <LuPlay size={18} />
+                <LuPlay size={16} />
                 Start 1v1
               </Link>
               <Link
                 href="/player"
-                className="flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-3 rounded-xl text-lg font-black border-2 border-lprimary dark:border-dprimary text-lprimary dark:text-dprimary hover:bg-lprimary/10 dark:hover:bg-dprimary/10 transition-colors"
+                className={`${secondaryButtonClass} w-full sm:w-auto h-12 px-8`}
               >
-                <LuDoorOpen size={18} />
+                <LuDoorOpen size={16} />
                 Join Room
               </Link>
             </div>
 
             <Link
               href="/admin"
-              className="mt-4 text-sm text-dark/60 dark:text-gray hover:text-lprimary dark:hover:text-dprimary transition-colors underline underline-offset-4"
+              className="mt-5 text-sm text-dark/60 dark:text-gray hover:text-lprimary dark:hover:text-dprimary transition-colors underline underline-offset-4"
             >
               or create and host your own quiz →
             </Link>
-
-            <div className="mt-8 flex flex-wrap justify-center xl:justify-start gap-2">
-              {heroBadges.map((badge) => (
-                <span
-                  key={badge.label}
-                  className="flex items-center gap-1.5 rounded-lg border border-card-light dark:border-off-dark bg-white dark:bg-dark px-3 py-1.5 text-xs font-semibold text-dark dark:text-gray"
-                >
-                  {badge.icon && (
-                    <span className="text-lprimary dark:text-dprimary">
-                      {badge.icon}
-                    </span>
-                  )}
-                  {badge.label}
-                </span>
-              ))}
-            </div>
           </div>
 
-          <div className="w-full max-w-md xl:max-w-lg shrink-0">
+          <div className="mt-16 sm:mt-20 w-full max-w-3xl">
             <HeroVisual />
           </div>
+
+          <ul className="mt-12 flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs text-dark/60 dark:text-muted-dark">
+            {heroFacts.map((fact) => (
+              <li key={fact}>{fact}</li>
+            ))}
+          </ul>
         </section>
 
         {/* Features */}
-        <section className="py-14">
-          <h2 className="text-center text-2xl sm:text-3xl font-black text-dark dark:text-white">
-            Everything you need
-          </h2>
-          <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
+        <section className={sectionClass}>
+          <h2 className={headingClass}>Everything you need</h2>
+          <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-10">
             {features.map((feature) => (
-              <div
-                key={feature.title}
-                className="flex flex-col items-center text-center gap-2 rounded-xl border border-card-light dark:border-off-dark bg-white dark:bg-dark p-5 hover:border-lprimary/40 dark:hover:border-dprimary/40 hover:-translate-y-0.5 transition-all"
-              >
+              <div key={feature.title}>
                 <feature.icon
                   className="text-lprimary dark:text-dprimary"
-                  size={22}
+                  size={20}
                 />
-                <h3 className="text-sm font-bold text-dark dark:text-white">
+                <h3 className="mt-4 font-semibold text-dark dark:text-white">
                   {feature.title}
                 </h3>
-                <p className="text-xs text-dark/60 dark:text-gray">
+                <p className="mt-1 text-sm text-dark/70 dark:text-gray">
                   {feature.text}
                 </p>
               </div>
@@ -217,112 +210,113 @@ export default async function Home() {
         </section>
 
         {/* What is Buzrr + where it fits (internal links to the SEO pages) */}
-        <section className="py-14 max-w-5xl mx-auto">
-          <WhatIsBuzrr />
+        <section className={sectionClass}>
+          <div className="grid lg:grid-cols-[1fr_2fr] gap-6 lg:gap-12">
+            <h2 className={headingClass}>What is Buzrr?</h2>
+            <p className="text-lg text-dark/80 dark:text-off-white leading-relaxed">
+              {WHAT_IS_BUZRR}
+            </p>
+          </div>
           <LandingVideo />
-          <h2 className="mt-14 text-center text-2xl sm:text-3xl font-black text-dark dark:text-white">
-            What people use Buzrr for
-          </h2>
-          <div className="mt-8">
-            <LinkCards
-              items={cardsForUseCases([
-                "classroom-quizzes",
-                "college-events",
-                "corporate-training",
-                "team-building",
-                "pub-trivia",
-                "live-audience-quizzes",
-              ])}
-            />
-          </div>
-          <div className="mt-4">
-            <LinkCards
-              items={[
-                {
-                  href: "/alternatives",
-                  title:
-                    "Alternatives to Kahoot, Wayground (Quizizz), Slido and Mentimeter",
-                  text: "How Buzrr compares, with sources — and when another tool fits better.",
-                },
-                OPEN_SOURCE_CARD,
-                SELF_HOST_CARD,
-              ]}
-            />
-          </div>
+        </section>
+
+        <section className={sectionClass}>
+          <h2 className={headingClass}>What people use Buzrr for</h2>
+          <ul className="mt-10 grid md:grid-cols-2 md:gap-x-12 border-t border-card-light dark:border-card-dark md:border-t-0">
+            {cardsForUseCases([
+              "classroom-quizzes",
+              "college-events",
+              "corporate-training",
+              "team-building",
+              "pub-trivia",
+              "live-audience-quizzes",
+            ]).map((item) => (
+              <li
+                key={item.href}
+                className="border-b border-card-light dark:border-card-dark"
+              >
+                <Link
+                  href={item.href}
+                  className="group flex items-center justify-between gap-4 py-5 font-medium text-dark dark:text-white hover:text-lprimary dark:hover:text-dprimary transition-colors"
+                >
+                  {item.title}
+                  <LuArrowRight
+                    size={16}
+                    aria-hidden
+                    className="shrink-0 transition-transform group-hover:translate-x-1"
+                  />
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <ul className="mt-12 grid md:grid-cols-3 gap-8 md:gap-12">
+            {moreLinks.map((item) => (
+              <li key={item.href}>
+                <Link href={item.href} className="group block">
+                  <span className="font-semibold text-dark dark:text-white group-hover:text-lprimary dark:group-hover:text-dprimary transition-colors">
+                    {item.title}
+                  </span>
+                  <span className="mt-2 block text-sm text-dark/70 dark:text-gray">
+                    {item.text}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </section>
 
         {/* Built in Public */}
-        <section className="py-14">
-          <h2 className="text-center text-2xl sm:text-3xl font-black text-dark dark:text-white">
-            Built in Public
-          </h2>
-          <div className="mt-8 grid grid-cols-2 md:grid-cols-4 rounded-xl border border-card-light dark:border-off-dark bg-white dark:bg-dark divide-x divide-y md:divide-y-0 divide-card-light dark:divide-off-dark overflow-hidden">
+        <section className={sectionClass}>
+          <h2 className={headingClass}>Built in Public</h2>
+          <dl className="mt-12 grid grid-cols-2 lg:grid-cols-4 gap-8">
             {statTiles.map((stat) => (
-              <div
-                key={stat.label}
-                className="flex flex-col items-center gap-1 p-6"
-              >
-                <span className="flex items-center gap-2 text-xl sm:text-2xl font-black text-lprimary dark:text-dprimary">
-                  <stat.icon size={20} />
-                  {stat.value}
-                </span>
-                <span className="text-xs sm:text-sm text-dark/60 dark:text-gray">
+              <div key={stat.label} className="flex flex-col-reverse gap-1">
+                <dt className="text-sm text-dark/60 dark:text-gray">
                   {stat.label}
-                </span>
+                </dt>
+                <dd className="text-4xl sm:text-5xl font-semibold tracking-tight text-dark dark:text-white">
+                  {stat.value}
+                </dd>
               </div>
             ))}
-          </div>
+          </dl>
         </section>
 
-        {/* GitHub CTA */}
-        <section className="pb-16">
-          <div className="flex flex-col sm:flex-row items-center gap-6 rounded-2xl border border-card-light dark:border-off-dark bg-white dark:bg-dark p-6 sm:p-8">
-            <div className="flex items-center justify-center size-14 shrink-0 rounded-full bg-card-light dark:bg-card-dark text-dark dark:text-white">
-              <LuGithub size={26} />
-            </div>
-            <div className="text-center sm:text-left">
-              <p className="font-bold text-dark dark:text-white">
-                Buzrr is open source and contributor friendly.
-              </p>
-              <p className="text-sm text-dark/60 dark:text-gray">
-                Free software under AGPL-3.0 — we welcome contributions from
-                everyone. Check out our repo!
-              </p>
-            </div>
+        {/* GitHub + support CTAs */}
+        <section className={`${sectionClass} grid md:grid-cols-2 gap-12`}>
+          <div className="flex flex-col items-start">
+            <h2 className="text-xl font-semibold text-dark dark:text-white">
+              Buzrr is open source and contributor friendly.
+            </h2>
+            <p className="mt-2 mb-6 text-dark/70 dark:text-gray">
+              Free software under AGPL-3.0 — we welcome contributions from
+              everyone. Check out our repo!
+            </p>
             <a
               href={GITHUB_LINK}
               target="_blank"
               rel="noreferrer"
-              className="sm:ml-auto flex items-center gap-2 px-6 py-3 rounded-xl font-bold border-2 border-lprimary dark:border-dprimary text-lprimary dark:text-dprimary hover:bg-lprimary/10 dark:hover:bg-dprimary/10 transition-colors"
+              className={`${secondaryButtonClass} mt-auto h-11 px-6 text-sm`}
             >
-              <LuStar size={16} />
+              <LuStar size={14} />
               Star on GitHub
             </a>
           </div>
-        </section>
-
-        {/* Support CTA */}
-        <section className="pb-16">
-          <div className="flex flex-col sm:flex-row items-center gap-6 rounded-2xl border border-card-light dark:border-off-dark bg-white dark:bg-dark p-6 sm:p-8">
+          <div className="flex flex-col items-start">
+            <h2 className="text-xl font-semibold text-dark dark:text-white">
+              Enjoying Buzrr? Help keep it running.
+            </h2>
+            <p className="mt-2 mb-6 text-dark/70 dark:text-gray">
+              Donations cover servers and chai — always optional, never
+              required.
+            </p>
             <Link
               href="/support"
-              className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold bg-lprimary dark:bg-dprimary text-white dark:text-dark hover:opacity-90 transition-opacity"
+              className={`${secondaryButtonClass} mt-auto h-11 px-6 text-sm`}
             >
-              <LuHeart size={16} className="fill-current" />
+              <LuHeart size={14} className="fill-current" />
               Donate Us
             </Link>
-            <div className="text-center sm:text-left">
-              <p className="font-bold text-dark dark:text-white">
-                Enjoying Buzrr? Help keep it running.
-              </p>
-              <p className="text-sm text-dark/60 dark:text-gray">
-                Donations cover servers and chai — always optional, never
-                required.
-              </p>
-            </div>
-            <div className="sm:ml-auto hidden sm:flex items-center justify-center size-14 shrink-0 rounded-full bg-card-light dark:bg-card-dark text-lprimary dark:text-dprimary">
-              <LuHeart size={26} className="fill-current" />
-            </div>
           </div>
         </section>
       </main>
