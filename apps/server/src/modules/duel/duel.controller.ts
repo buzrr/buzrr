@@ -255,17 +255,45 @@ export class DuelController {
   async recent(
     @CurrentAccountUser() user: AuthUser,
     @Query("limit") limit?: string,
+    @Query("cursor") cursor?: string,
   ) {
     const take = Math.min(Math.max(parseInt(limit ?? "", 10) || 10, 1), 50);
-    return this.prisma.db.gameResultEntry.findMany({
-      where: { userId: user.userId, result: { mode: "duel" } },
-      orderBy: { result: { endedAt: "desc" } },
-      take,
+    // Keyset on (result.endedAt, id): the cursor is the last entry's id.
+    const after = cursor
+      ? await this.prisma.db.gameResultEntry.findFirst({
+          where: { id: cursor, userId: user.userId },
+          select: { id: true, result: { select: { endedAt: true } } },
+        })
+      : null;
+    const rows = await this.prisma.db.gameResultEntry.findMany({
+      where: {
+        userId: user.userId,
+        result: { mode: "duel" },
+        ...(after
+          ? {
+              OR: [
+                { result: { endedAt: { lt: after.result.endedAt } } },
+                {
+                  result: { endedAt: after.result.endedAt },
+                  id: { lt: after.id },
+                },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ result: { endedAt: "desc" } }, { id: "desc" }],
+      take: take + 1,
       include: {
         result: {
           include: { entries: true },
         },
       },
     });
+    const hasMore = rows.length > take;
+    const items = hasMore ? rows.slice(0, take) : rows;
+    return {
+      items,
+      nextCursor: hasMore ? items[items.length - 1]!.id : null,
+    };
   }
 }

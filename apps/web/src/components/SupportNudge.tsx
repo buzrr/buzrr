@@ -6,6 +6,7 @@ import Modal from "@mui/material/Modal";
 import Box from "@mui/material/Box";
 import modalStyle from "@/utils/modalStyle";
 import supportLinks from "@/data/support-links.json";
+import { useEntitlementsQuery } from "@/lib/modules/billing/hooks";
 
 const STORAGE_KEY = "buzrr:support-nudge-dismissed-at";
 const SHOW_EVERY_MS = 3 * 24 * 60 * 60 * 1000;
@@ -13,14 +14,22 @@ const SHOW_EVERY_MS = 3 * 24 * 60 * 60 * 1000;
 /**
  * Gentle donation nudge for the admin dashboard. Shows at most once every
  * 3 days; any dismissal (button, backdrop, Escape) resets the timer.
+ * Never shown to paying Buzrr Pro members.
  */
 export default function SupportNudge() {
   const [open, setOpen] = useState(false);
   const id = useId();
   const titleId = `${id}-title`;
   const descId = `${id}-desc`;
+  const { data: entitlements } = useEntitlementsQuery();
+  // Eligibility needs the plan; a failed lookup keeps the nudge hidden.
+  const resolved = entitlements !== undefined;
+  // With billing off everyone is "pro" without paying; they still see it.
+  const isProMember =
+    entitlements?.billingEnabled === true && entitlements.plan === "pro";
 
   useEffect(() => {
+    if (!resolved || isProMember) return;
     try {
       const dismissedAt = Number(window.localStorage.getItem(STORAGE_KEY));
       if (dismissedAt && Date.now() - dismissedAt < SHOW_EVERY_MS) return;
@@ -29,7 +38,7 @@ export default function SupportNudge() {
     }
     const timer = setTimeout(() => setOpen(true), 1500);
     return () => clearTimeout(timer);
-  }, []);
+  }, [resolved, isProMember]);
 
   const dismiss = () => {
     try {
@@ -42,7 +51,7 @@ export default function SupportNudge() {
 
   return (
     <Modal
-      open={open}
+      open={open && !isProMember}
       onClose={dismiss}
       aria-labelledby={titleId}
       aria-describedby={descId}

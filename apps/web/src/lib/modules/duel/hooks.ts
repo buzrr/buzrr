@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { duelApi } from "./api";
 
 export function useDuelProfileQuery(enabled = true) {
@@ -13,11 +18,26 @@ export function useDuelProfileQuery(enabled = true) {
   });
 }
 
-export function useRecentDuelsQuery(limit?: number, enabled = true) {
+export const DUEL_PAGE_SIZE = 10;
+
+/** The latest duels, one page (the profile's "recent duels"). */
+export function useRecentDuelsQuery(limit = DUEL_PAGE_SIZE, enabled = true) {
   return useQuery({
-    queryKey: ["duel", "recent", limit ?? 10] as const,
-    queryFn: () => duelApi.recent(limit),
+    queryKey: ["duel", "recent", limit] as const,
+    queryFn: () => duelApi.recent({ limit }),
     enabled,
+    staleTime: 30_000,
+  });
+}
+
+/** Full duel history, 10 at a time (loads more on scroll). */
+export function useDuelHistoryInfiniteQuery() {
+  return useInfiniteQuery({
+    queryKey: ["duel", "history"] as const,
+    queryFn: ({ pageParam }: { pageParam: string | undefined }) =>
+      duelApi.recent({ limit: DUEL_PAGE_SIZE, cursor: pageParam }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     staleTime: 30_000,
   });
 }

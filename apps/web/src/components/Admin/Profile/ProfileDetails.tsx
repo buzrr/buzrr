@@ -9,7 +9,7 @@ import { authClient } from "@/lib/auth-client";
 import { useCurrentRole } from "@/components/SessionProvider";
 import { useDuelProfileQuery } from "@/lib/modules/duel/hooks";
 import { useMyStatsQuery } from "@/lib/modules/users/hooks";
-import DuelHistoryList from "./DuelHistoryList";
+import { RecentDuelsList } from "./DuelHistoryList";
 
 function StatTile({ label, value }: { label: string; value: string | number }) {
   return (
@@ -135,7 +135,7 @@ function ActivityStats() {
 function RecentDuels() {
   return (
     <div className="flex flex-col gap-3">
-      <DuelHistoryList />
+      <RecentDuelsList />
       <Link
         href="/admin/profile/duels"
         className="text-sm text-lprimary dark:text-dprimary font-bold hover:underline w-fit"

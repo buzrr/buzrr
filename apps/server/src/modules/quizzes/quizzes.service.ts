@@ -176,14 +176,33 @@ export class QuizzesService {
     }
   }
 
-  async findAllForUser(user: AuthUser) {
-    return this.prisma.db.quiz.findMany({
-      where: { userId: user.userId },
-      orderBy: { createdAt: "desc" },
-      include: {
-        _count: { select: { questions: true, gameResults: true } },
-      },
-    });
+  /** One page of the user's quizzes, newest first; `total` only on the first page. */
+  async findPageForUser(
+    user: AuthUser,
+    params: { cursor?: string; limit: number },
+  ) {
+    const where = { userId: user.userId };
+    const [rows, total] = await Promise.all([
+      this.prisma.db.quiz.findMany({
+        where,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: params.limit + 1,
+        ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
+        include: {
+          _count: { select: { questions: true, gameResults: true } },
+        },
+      }),
+      params.cursor
+        ? Promise.resolve(null)
+        : this.prisma.db.quiz.count({ where }),
+    ]);
+    const hasMore = rows.length > params.limit;
+    const items = hasMore ? rows.slice(0, params.limit) : rows;
+    return {
+      items,
+      nextCursor: hasMore ? items[items.length - 1]!.id : null,
+      total,
+    };
   }
 
   async findOneForUser(user: AuthUser, quizId: string) {

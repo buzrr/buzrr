@@ -14,8 +14,18 @@ export type QuizListItem = Quiz & {
   _count?: { questions: number; gameResults: number };
 };
 
-export async function listQuizzes(client: AxiosInstance) {
-  const { data } = await client.get<QuizListItem[]>("/quizzes");
+export type QuizzesPage = {
+  items: QuizListItem[];
+  nextCursor: string | null;
+  /** Total quiz count; only sent with the first page. */
+  total: number | null;
+};
+
+export async function listQuizzes(
+  client: AxiosInstance,
+  params: { limit?: number; cursor?: string } = {},
+) {
+  const { data } = await client.get<QuizzesPage>("/quizzes", { params });
   return data;
 }
 
@@ -82,7 +92,8 @@ export async function importQuiz(
 }
 
 export const quizzesApi = {
-  list: () => listQuizzes(getAuthApiClient()),
+  list: (params?: { limit?: number; cursor?: string }) =>
+    listQuizzes(getAuthApiClient(), params),
   getById: (quizId: string) => getQuizById(getAuthApiClient(), quizId),
   create: (body: Parameters<typeof createQuiz>[1]) =>
     createQuiz(getAuthApiClient(), body),

@@ -3,7 +3,8 @@
 import ClientBuzrrs from "./ClientBuzrrs";
 import LoaderBuzrrs from "./LoaderBuzrrs";
 import QuizActionCards from "./QuizActionCards";
-import { useQuizzesQuery } from "@/lib/modules/quizzes/hooks";
+import { useQuizzesInfiniteQuery } from "@/lib/modules/quizzes/hooks";
+import { useLoadMoreOnScroll } from "@/hooks/useLoadMoreOnScroll";
 
 function SectionLabel({
   children,
@@ -29,7 +30,17 @@ function SectionLabel({
 }
 
 const Buzrrs = () => {
-  const { data: quizzes, isPending, isError } = useQuizzesQuery();
+  const query = useQuizzesInfiniteQuery();
+  const { data, isPending, hasNextPage, isFetchingNextPage, fetchNextPage } =
+    query;
+  const quizzes = data?.pages.flatMap((page) => page.items);
+  const total = data?.pages[0]?.total ?? quizzes?.length;
+  const sentinelRef = useLoadMoreOnScroll({
+    // After a failed page, wait for the retry button instead of looping.
+    hasMore: hasNextPage && !query.isFetchNextPageError,
+    loading: isFetchingNextPage,
+    loadMore: () => void fetchNextPage(),
+  });
 
   return (
     <>
@@ -38,18 +49,35 @@ const Buzrrs = () => {
 
       <SectionLabel
         className="mt-7 md:mt-[30px] mb-3.5"
-        count={quizzes?.length}
+        count={total ?? undefined}
       >
         Your quizzes
       </SectionLabel>
       {isPending ? (
         <LoaderBuzrrs cardCount={3} />
-      ) : isError || !quizzes ? (
+      ) : !quizzes ? (
         <p className="text-dark dark:text-white text-sm">
           Could not load quizzes. Check your connection and API configuration.
         </p>
       ) : (
-        <ClientBuzrrs quizzes={quizzes} />
+        <>
+          <ClientBuzrrs quizzes={quizzes} />
+          {isFetchingNextPage && (
+            <div className="mt-3 md:mt-4">
+              <LoaderBuzrrs cardCount={3} />
+            </div>
+          )}
+          {query.isFetchNextPageError && (
+            <button
+              type="button"
+              onClick={() => void fetchNextPage()}
+              className="mt-4 text-sm font-bold text-lprimary dark:text-dprimary hover:underline"
+            >
+              Couldn&apos;t load more quizzes. Retry
+            </button>
+          )}
+          <div ref={sentinelRef} aria-hidden="true" />
+        </>
       )}
     </>
   );

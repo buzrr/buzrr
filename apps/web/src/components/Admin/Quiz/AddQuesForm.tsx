@@ -14,6 +14,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   DEFAULT_QUESTION_TYPE,
   MAX_POLL_OPTIONS,
+  MAX_QUESTION_IMAGE_BYTES,
   MIN_POLL_OPTIONS,
   RATING_LABEL_MAX,
   isQuestionType,
@@ -417,6 +418,11 @@ const AddQuesForm = (props: {
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const selectedFile = e.target.files?.[0] || null;
+    if (selectedFile && selectedFile.size > MAX_QUESTION_IMAGE_BYTES) {
+      toast.error("Image must be 5MB or smaller");
+      e.target.value = "";
+      return;
+    }
     setFile(selectedFile);
   }
 
@@ -686,7 +692,7 @@ const AddQuesForm = (props: {
                       Upload an image
                     </span>
                     <span className={clsx("text-[12.5px]", mutedText)}>
-                      PNG, JPG or GIF under 10MB
+                      PNG, JPG or GIF up to 5MB
                     </span>
                   </span>
                   <input

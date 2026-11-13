@@ -144,7 +144,7 @@ Lifecycle (all transitions are Lua scripts — keep them atomic):
 
 REST surface (`duel.controller.ts`): `GET /api/duel/me`, `POST
 /api/duel/invites`, `GET|DELETE /api/duel/invites/:code`, `GET
-/api/duel/recent`.
+/api/duel/recent` (cursor-paginated: `?limit&cursor` → `{ items, nextCursor }`).
 
 ## ELO (`common/utils/elo.ts` + `persistResult` in the engine)
 
