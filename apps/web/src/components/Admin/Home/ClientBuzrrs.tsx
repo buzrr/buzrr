@@ -25,20 +25,22 @@ export function quizGridClass(view: "grid" | "list") {
 /**
  * The quiz cards, virtualized one visual row at a time (a row is 2 or 3
  * cards in the grid, 1 in the list) so long lists stay light. Column count
- * and gap follow `quizGridClass`'s breakpoints.
+ * and gap follow `quizGridClass`'s breakpoints. Remount it (key) when the
+ * view or breakpoint changes: cached row sizes belong to the old layout.
  */
 function VirtualQuizRows({
   quizzes,
   view,
+  isMd,
   onEdit,
   onDelete,
 }: {
   quizzes: QuizListItem[];
   view: "grid" | "list";
+  isMd: boolean;
   onEdit: (quiz: QuizListItem) => void;
   onDelete: (quiz: QuizListItem) => void;
 }) {
-  const isMd = useMediaQuery("(min-width: 768px)");
   const columns = view === "grid" ? (isMd ? 3 : 2) : 1;
   const rows = useMemo(() => {
     const out: QuizListItem[][] = [];
@@ -64,7 +66,7 @@ function VirtualQuizRows({
         const cards = rows[row.index]!;
         return (
           <div
-            key={`${view}-${columns}-${row.index}`}
+            key={row.index}
             data-index={row.index}
             ref={virtualizer.measureElement}
             className={clsx("absolute left-0 w-full", quizGridClass(view))}
@@ -89,6 +91,7 @@ function VirtualQuizRows({
 export default function ClientBuzrrs({ quizzes }: { quizzes: QuizListItem[] }) {
   const deleteQuizMutation = useDeleteQuizMutation();
   const view = useAppSelector((state) => state.gridListToggle.view);
+  const isMd = useMediaQuery("(min-width: 768px)");
 
   const [delModalOpen, setDelModalOpen] = useState(false);
   const [quizId, setQuizId] = useState("");
@@ -118,8 +121,10 @@ export default function ClientBuzrrs({ quizzes }: { quizzes: QuizListItem[] }) {
   return (
     <>
       <VirtualQuizRows
+        key={`${view}-${isMd ? "md" : "sm"}`}
         quizzes={quizzes}
         view={view}
+        isMd={isMd}
         onEdit={setEditQuiz}
         onDelete={(quiz) => {
           setQuizId(quiz.id);

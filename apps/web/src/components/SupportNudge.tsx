@@ -21,8 +21,9 @@ export default function SupportNudge() {
   const id = useId();
   const titleId = `${id}-title`;
   const descId = `${id}-desc`;
-  const { data: entitlements, isError } = useEntitlementsQuery();
-  const resolved = entitlements !== undefined || isError;
+  const { data: entitlements } = useEntitlementsQuery();
+  // Eligibility needs the plan; a failed lookup keeps the nudge hidden.
+  const resolved = entitlements !== undefined;
   // With billing off everyone is "pro" without paying; they still see it.
   const isProMember =
     entitlements?.billingEnabled === true && entitlements.plan === "pro";
