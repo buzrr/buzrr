@@ -5,6 +5,7 @@ export const queryKeys = {
   leaderboard: (gameCode: string) => ["leaderboard", gameCode] as const,
   quizzes: {
     all: ["quizzes"] as const,
+    list: ["quizzes", "list"] as const,
     detail: (quizId: string) => ["quizzes", "detail", quizId] as const,
   },
   players: {

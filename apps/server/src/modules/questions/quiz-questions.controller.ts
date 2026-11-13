@@ -10,6 +10,7 @@ import {
   UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
+import { MAX_QUESTION_IMAGE_BYTES } from "@buzrr/contract";
 import type { Express } from "express";
 import { CurrentAccountUser } from "../../common/decorators/current-user.decorator";
 import type { AuthUser } from "../../common/decorators/current-user.decorator";
@@ -26,7 +27,9 @@ export class QuizQuestionsController {
 
   @Post(":quizId/questions")
   @HttpCode(HttpStatus.NO_CONTENT)
-  @UseInterceptors(FileInterceptor("file"))
+  @UseInterceptors(
+    FileInterceptor("file", { limits: { fileSize: MAX_QUESTION_IMAGE_BYTES } }),
+  )
   upsert(
     @CurrentAccountUser() user: AuthUser,
     @Param("quizId") quizId: string,

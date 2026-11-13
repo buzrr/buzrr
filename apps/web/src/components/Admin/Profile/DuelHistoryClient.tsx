@@ -21,7 +21,7 @@ export default function DuelHistoryClient() {
       >
         ← Back to profile
       </Link>
-      <DuelHistoryList limit={50} />
+      <DuelHistoryList />
     </div>
   );
 }

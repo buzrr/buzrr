@@ -75,16 +75,25 @@ export async function getDuelProfile(client: AxiosInstance) {
   return data;
 }
 
-export async function getRecentDuels(client: AxiosInstance, limit?: number) {
-  const { data } = await client.get<RecentDuel[]>("/duel/recent", {
-    params: limit ? { limit } : undefined,
+export type RecentDuelsPage = {
+  items: RecentDuel[];
+  nextCursor: string | null;
+};
+
+export async function getRecentDuels(
+  client: AxiosInstance,
+  params: { limit?: number; cursor?: string } = {},
+) {
+  const { data } = await client.get<RecentDuelsPage>("/duel/recent", {
+    params,
   });
   return data;
 }
 
 export const duelApi = {
   me: () => getDuelProfile(getAuthApiClient()),
-  recent: (limit?: number) => getRecentDuels(getAuthApiClient(), limit),
+  recent: (params?: { limit?: number; cursor?: string }) =>
+    getRecentDuels(getAuthApiClient(), params),
   createInvite: (categoryId: string | null) =>
     createDuelInvite(getAuthApiClient(), categoryId),
   categories: () => getDuelCategories(getAuthApiClient()),

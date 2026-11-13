@@ -1,13 +1,24 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { queryKeys } from "@/lib/modules/query-keys";
 import { quizzesApi } from "./api";
 
-export function useQuizzesQuery() {
-  return useQuery({
-    queryKey: queryKeys.quizzes.all,
-    queryFn: () => quizzesApi.list(),
+export const QUIZ_PAGE_SIZE = 10;
+
+/** The user's quizzes, 10 at a time (loads more on scroll). */
+export function useQuizzesInfiniteQuery() {
+  return useInfiniteQuery({
+    queryKey: queryKeys.quizzes.list,
+    queryFn: ({ pageParam }: { pageParam: string | undefined }) =>
+      quizzesApi.list({ limit: QUIZ_PAGE_SIZE, cursor: pageParam }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     staleTime: 30_000,
   });
 }

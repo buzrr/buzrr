@@ -9,6 +9,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import { CurrentAccountUser } from "../../common/decorators/current-user.decorator";
@@ -26,8 +27,13 @@ export class QuizzesController {
   constructor(private readonly quizzes: QuizzesService) {}
 
   @Get()
-  list(@CurrentAccountUser() user: AuthUser) {
-    return this.quizzes.findAllForUser(user);
+  list(
+    @CurrentAccountUser() user: AuthUser,
+    @Query("cursor") cursor?: string,
+    @Query("limit") limit?: string,
+  ) {
+    const take = Math.min(Math.max(parseInt(limit ?? "", 10) || 10, 1), 50);
+    return this.quizzes.findPageForUser(user, { cursor, limit: take });
   }
 
   @Get(":id")

@@ -12,6 +12,9 @@ import {
 // type's server handler — these schemas only fix the envelope.
 // ---------------------------------------------------------------------------
 
+/** Largest question image the API accepts (5 MB). */
+export const MAX_QUESTION_IMAGE_BYTES = 5 * 1024 * 1024;
+
 /** A question can be tagged with at most this many categories. */
 export const MAX_QUESTION_CATEGORIES = 5;
 

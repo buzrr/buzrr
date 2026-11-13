@@ -1,6 +1,6 @@
 "use client";
 import clsx from "clsx";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import QuizCard from "./QuizCard";
 import EditQuizModal from "./EditQuizModal";
@@ -10,11 +10,79 @@ import { useAppSelector } from "@/state/hooks";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import type { QuizListItem } from "@/lib/modules/quizzes/api";
 import { useDeleteQuizMutation } from "@/lib/modules/quizzes/hooks";
+import {
+  useMediaQuery,
+  useWindowListVirtualizer,
+} from "@/hooks/useWindowListVirtualizer";
 
 export function quizGridClass(view: "grid" | "list") {
   return clsx(
     "gap-3 md:gap-4",
     view === "grid" ? "grid grid-cols-2 md:grid-cols-3" : "flex flex-col",
+  );
+}
+
+/**
+ * The quiz cards, virtualized one visual row at a time (a row is 2 or 3
+ * cards in the grid, 1 in the list) so long lists stay light. Column count
+ * and gap follow `quizGridClass`'s breakpoints.
+ */
+function VirtualQuizRows({
+  quizzes,
+  view,
+  onEdit,
+  onDelete,
+}: {
+  quizzes: QuizListItem[];
+  view: "grid" | "list";
+  onEdit: (quiz: QuizListItem) => void;
+  onDelete: (quiz: QuizListItem) => void;
+}) {
+  const isMd = useMediaQuery("(min-width: 768px)");
+  const columns = view === "grid" ? (isMd ? 3 : 2) : 1;
+  const rows = useMemo(() => {
+    const out: QuizListItem[][] = [];
+    for (let i = 0; i < quizzes.length; i += columns) {
+      out.push(quizzes.slice(i, i + columns));
+    }
+    return out;
+  }, [quizzes, columns]);
+
+  const { listRef, virtualizer, scrollMargin } = useWindowListVirtualizer({
+    count: rows.length,
+    estimateSize: view === "grid" ? 190 : 80,
+    gap: isMd ? 16 : 12,
+  });
+
+  return (
+    <div
+      ref={listRef}
+      className="relative w-full"
+      style={{ height: virtualizer.getTotalSize() }}
+    >
+      {virtualizer.getVirtualItems().map((row) => {
+        const cards = rows[row.index]!;
+        return (
+          <div
+            key={`${view}-${columns}-${row.index}`}
+            data-index={row.index}
+            ref={virtualizer.measureElement}
+            className={clsx("absolute left-0 w-full", quizGridClass(view))}
+            style={{ top: row.start - scrollMargin }}
+          >
+            {cards.map((quiz) => (
+              <QuizCard
+                key={quiz.id}
+                quiz={quiz}
+                view={view}
+                onEdit={() => onEdit(quiz)}
+                onDelete={() => onDelete(quiz)}
+              />
+            ))}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -49,20 +117,15 @@ export default function ClientBuzrrs({ quizzes }: { quizzes: QuizListItem[] }) {
 
   return (
     <>
-      <div className={quizGridClass(view)}>
-        {quizzes.map((quiz) => (
-          <QuizCard
-            key={quiz.id}
-            quiz={quiz}
-            view={view}
-            onEdit={() => setEditQuiz(quiz)}
-            onDelete={() => {
-              setQuizId(quiz.id);
-              setDelModalOpen(true);
-            }}
-          />
-        ))}
-      </div>
+      <VirtualQuizRows
+        quizzes={quizzes}
+        view={view}
+        onEdit={setEditQuiz}
+        onDelete={(quiz) => {
+          setQuizId(quiz.id);
+          setDelModalOpen(true);
+        }}
+      />
       <ConfirmationModal
         open={delModalOpen}
         setOpen={setDelModalOpen}
