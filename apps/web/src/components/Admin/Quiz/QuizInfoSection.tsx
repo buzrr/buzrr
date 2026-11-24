@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { LuChevronRight } from "react-icons/lu";
+import { useState } from "react";
+import { LuChevronRight, LuPencil } from "react-icons/lu";
 import { toast } from "react-toastify";
 import HostQuizForm from "@/components/Admin/Quiz/HostQuizForm";
+import EditQuizModal from "@/components/Admin/Home/EditQuizModal";
 import Switch from "@/components/ui/Switch";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { useUpdateQuizMutation } from "@/lib/modules/quizzes/hooks";
@@ -28,6 +30,7 @@ export function QuizInfoContent(props: {
   const questionCount = props.quiz._count?.questions ?? 0;
   const updateQuiz = useUpdateQuizMutation();
   const showHostForm = props.showHostForm ?? true;
+  const [editOpen, setEditOpen] = useState(false);
 
   return (
     <>
@@ -47,9 +50,20 @@ export function QuizInfoContent(props: {
             Quizzes
           </span>
         </nav>
-        <h2 className="text-[26px] md:text-[32px] font-bold tracking-[-0.02em] leading-[1.05] mt-3 mb-1 wrap-break-word">
-          {props.quiz.title}
-        </h2>
+        <div className="flex items-start gap-2 mt-3 mb-1">
+          <h2 className="flex-1 min-w-0 text-[26px] md:text-[32px] font-bold tracking-[-0.02em] leading-[1.05] wrap-break-word">
+            {props.quiz.title}
+          </h2>
+          <button
+            type="button"
+            aria-label="Edit quiz title and description"
+            title="Edit quiz"
+            onClick={() => setEditOpen(true)}
+            className="shrink-0 mt-0.5 rounded-lg p-2 text-off-dark dark:text-muted-dark hover:text-dark dark:hover:text-white hover:bg-lprimary/10 dark:hover:bg-white/5 transition-colors cursor-pointer"
+          >
+            <LuPencil size={18} />
+          </button>
+        </div>
         <p className="capitalize mb-4 text-[15px] text-off-dark dark:text-muted-dark">
           {props.quiz.description}
         </p>
@@ -86,6 +100,7 @@ export function QuizInfoContent(props: {
           </div>
         )}
       </div>
+      <EditQuizModal quiz={props.quiz} open={editOpen} setOpen={setEditOpen} />
       <div className="flex-1 flex flex-col min-h-0 w-[90%] mx-auto text-dark dark:text-white">
         <div className="flex items-center justify-between mt-6 mb-3">
           <h4 className="text-sm font-bold tracking-[0.04em] uppercase text-[#8a8896] dark:text-muted-dark">
