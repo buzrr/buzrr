@@ -22,7 +22,7 @@ import {
 
 type FormValues = z.infer<typeof createQuizSchema>;
 
-export const TITLE_MAX = 60;
+export const TITLE_MAX = 100;
 export const DESCRIPTION_MAX = 200;
 
 const CreateBuzrrForm = (params: {
